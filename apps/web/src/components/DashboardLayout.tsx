@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Outlet, useLocation } from "react-router-dom"
 import { Fragment } from "react"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card"
 
 function humanize(segment: string) {
     const specials: Record<string, string> = {
@@ -90,7 +91,16 @@ export default function Dashboard() {
                     </div>
                 </header>
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-                    <Outlet />
+                    <Card className="h-screen">
+                        <CardHeader>
+                            <CardTitle>Card Title</CardTitle>
+                            <CardDescription>Card Description</CardDescription>
+                            <CardAction>Card Action</CardAction>
+                        </CardHeader>
+                        <CardContent className="h-screen">
+                            <Outlet />
+                        </CardContent>
+                    </Card>
                 </div>
             </SidebarInset>
         </SidebarProvider>

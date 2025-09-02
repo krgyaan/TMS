@@ -35,6 +35,7 @@ export function ThemeProvider({
 
         root.classList.remove("light", "dark")
 
+
         if (theme === "system") {
             const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
                 .matches
@@ -42,10 +43,12 @@ export function ThemeProvider({
                 : "light"
 
             root.classList.add(systemTheme)
+            root.setAttribute("data-ag-theme-mode", systemTheme)
             return
         }
 
         root.classList.add(theme)
+        root.setAttribute("data-ag-theme-mode", theme)
     }, [theme])
 
     const value = {
