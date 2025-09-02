@@ -42,6 +42,32 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Custom global scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sidebar-border) var(--color-sidebar);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: var(--color-sidebar);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-sidebar-border);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sidebar-accent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--color-sidebar);
+}
+
+
 :root {
     font-family: "Geist", sans-serif;
     --radius: 0.65rem;
