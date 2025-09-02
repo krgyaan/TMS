@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { ColDef, GridApi } from 'ag-grid-community';
+import type { ColDef, GridApi, ColumnApi } from 'ag-grid-community';
 
 export interface UseDataTableOptions<T> {
   /** Initial data */
@@ -33,6 +33,8 @@ export interface UseDataTableReturn<T> {
   setSelectedRows: (rows: T[]) => void;
   /** Grid API reference */
   gridApi: GridApi<T> | null;
+  /** Column API reference */
+  columnApi: ColumnApi | null;
   /** Set grid API */
   setGridApi: (api: GridApi<T> | null) => void;
   /** Refresh grid */
@@ -45,14 +47,15 @@ export interface UseDataTableReturn<T> {
 
 export function useDataTable<T extends Record<string, any>>({
   initialData = [],
-  columnDefs: _columnDefs,
-  enableSelection: _enableSelection = false,
-  selectionType: _selectionType = 'single',
+  columnDefs,
+  enableSelection = false,
+  selectionType = 'single',
   onSelectionChange,
 }: UseDataTableOptions<T>): UseDataTableReturn<T> {
   const [data, setData] = useState<T[]>(initialData);
   const [selectedRows, setSelectedRows] = useState<T[]>([]);
   const [gridApi, setGridApi] = useState<GridApi<T> | null>(null);
+  const [columnApi, setColumnApi] = useState<ColumnApi | null>(null);
 
   // Add new row
   const addRow = useCallback((row: T) => {
@@ -121,6 +124,7 @@ export function useDataTable<T extends Record<string, any>>({
     selectedRows,
     setSelectedRows: handleSelectionChange,
     gridApi,
+    columnApi,
     setGridApi,
     refreshGrid,
     exportToCsv,

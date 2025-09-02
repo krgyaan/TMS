@@ -4,8 +4,9 @@ import type { ColDef, GridOptions, GridReadyEvent } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
-// Import AG Grid setup to register modules
-import '../../lib/ag-grid-setup';
+// Import AG Grid styles
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 export interface DataTableProps<T = any> {
     /** Array of data to display in the table */
@@ -123,17 +124,17 @@ const DataTable = <T extends Record<string, any>>({
     }, [onGridReady]);
 
     // Handle selection change
-    const handleSelectionChanged = useCallback((event: any) => {
-        if (onSelectionChanged && enableRowSelection && event.api) {
+    const handleSelectionChanged = useCallback(() => {
+        if (onSelectionChanged && enableRowSelection) {
             const selectedRows: T[] = [];
-            event.api.forEachNodeAfterFilterAndSort((node: any) => {
+            finalGridOptions.api?.forEachNodeAfterFilterAndSort((node) => {
                 if (node.isSelected()) {
                     selectedRows.push(node.data);
                 }
             });
             onSelectionChanged(selectedRows);
         }
-    }, [onSelectionChanged, enableRowSelection]);
+    }, [onSelectionChanged, enableRowSelection, finalGridOptions.api]);
 
     return (
         <div className={`ag-theme-alpine ${className}`} style={{ height: typeof height === 'number' ? `${height}px` : height }}>

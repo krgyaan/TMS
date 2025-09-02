@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { ColDef } from 'ag-grid-community';
 import DataTable from '../ui/data-table';
-import { useDataTable } from '@/hooks/use-data-table';
+import { useDataTable } from '../../hooks/use-data-table';
 
 export interface IndexPageConfig<T> {
     title: string;
