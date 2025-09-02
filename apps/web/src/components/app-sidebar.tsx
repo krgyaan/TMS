@@ -3,12 +3,17 @@
 import * as React from "react"
 import {
     AudioWaveform,
-    BookOpen,
-    Bot,
     Command,
     GalleryVerticalEnd,
-    Settings2,
-    SquareTerminal,
+    FileSearch,
+    Wrench,
+    Headset,
+    BarChart3,
+    Banknote,
+    Users,
+    Gauge,
+    Settings,
+    Share2,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -50,7 +55,7 @@ const data = {
         {
             title: "Tendering",
             url: "#",
-            icon: SquareTerminal,
+            icon: FileSearch,
             isActive: false,
             items: [
                 {
@@ -110,7 +115,7 @@ const data = {
         {
             title: "Operations",
             url: "#",
-            icon: Bot,
+            icon: Wrench,
             isActive: false,
             items: [
                 {
@@ -130,7 +135,7 @@ const data = {
         {
             title: "Service",
             url: "#",
-            icon: BookOpen,
+            icon: Headset,
             isActive: false,
             items: [
                 {
@@ -154,7 +159,7 @@ const data = {
         {
             title: "BI Dashboard",
             url: "#",
-            icon: Settings2,
+            icon: BarChart3,
             isActive: false,
             items: [
                 {
@@ -186,7 +191,7 @@ const data = {
         {
             title: "Accounts",
             url: "#",
-            icon: Settings2,
+            icon: Banknote,
             isActive: false,
             items: [
                 {
@@ -222,7 +227,7 @@ const data = {
         {
             title: "CRM",
             url: "#",
-            icon: Settings2,
+            icon: Users,
             isActive: false,
             items: [
                 {
@@ -246,7 +251,7 @@ const data = {
         {
             title: "Performance",
             url: "#",
-            icon: Settings2,
+            icon: Gauge,
             isActive: false,
             items: [
                 {
@@ -286,7 +291,7 @@ const data = {
         {
             title: "Master",
             url: "#",
-            icon: Settings2,
+            icon: Settings,
             isActive: false,
             items: [
                 {
@@ -346,7 +351,7 @@ const data = {
         {
             title: 'Shared',
             url: '#',
-            icon: Settings2,
+            icon: Share2,
             isActive: true,
             items: [
                 {

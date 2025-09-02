@@ -16,6 +16,7 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Outlet, useLocation } from "react-router-dom"
+import { Fragment } from "react"
 
 function humanize(segment: string) {
     const specials: Record<string, string> = {
@@ -67,14 +68,14 @@ export default function Dashboard() {
                                 )}
                                 {crumbs.map((c, i) => (
                                     i < crumbs.length - 1 ? (
-                                        <>
-                                            <BreadcrumbItem key={c.path} className="hidden md:block">
+                                        <Fragment key={c.path}>
+                                            <BreadcrumbItem className="hidden md:block">
                                                 <BreadcrumbLink href={c.path}>{c.label}</BreadcrumbLink>
                                             </BreadcrumbItem>
                                             {i < crumbs.length - 1 && (
                                                 <BreadcrumbSeparator className="hidden md:block" />
                                             )}
-                                        </>
+                                        </Fragment>
                                     ) : (
                                         <BreadcrumbItem key={c.path}>
                                             <BreadcrumbPage>{c.label}</BreadcrumbPage>
