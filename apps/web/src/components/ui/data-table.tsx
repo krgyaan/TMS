@@ -1,12 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridOptions, GridReadyEvent } from 'ag-grid-community';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
-
-// Import AG Grid styles
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
+import type { ColDef, GridOptions, GridReadyEvent, RowSelectionOptions } from 'ag-grid-community';
+import { myAgTheme } from '@/components/data-grid/theme';
 
 export interface DataTableProps<T = any> {
     /** Array of data to display in the table */
@@ -39,6 +34,8 @@ export interface DataTableProps<T = any> {
     selectionType?: 'single' | 'multiple';
     /** Callback when row selection changes */
     onSelectionChanged?: (selectedRows: T[]) => void;
+    /** Optional override for theme; defaults to myAgTheme */
+    themeOverride?: any;
 }
 
 const DataTable = <T extends Record<string, any>>({
@@ -57,6 +54,7 @@ const DataTable = <T extends Record<string, any>>({
     enableRowSelection = false,
     selectionType = 'single',
     onSelectionChanged,
+    themeOverride,
 }: DataTableProps<T>) => {
     // Default grid options
     const defaultGridOptions: GridOptions<T> = useMemo(() => ({
@@ -74,9 +72,13 @@ const DataTable = <T extends Record<string, any>>({
             minWidth: 100,
         },
 
-        // Row selection
-        rowSelection: enableRowSelection ? selectionType : undefined,
-        suppressRowClickSelection: enableRowSelection,
+        // Row selection (new object-based API)
+        rowSelection: enableRowSelection
+            ? ({
+                mode: selectionType === 'multiple' ? 'multiRow' : 'singleRow',
+                enableClickSelection: true,
+            } as RowSelectionOptions)
+            : undefined,
 
         // Performance optimizations
         suppressColumnVirtualisation: false,
@@ -110,10 +112,14 @@ const DataTable = <T extends Record<string, any>>({
         selectionType,
     ]);
 
-    // Merge user grid options with defaults
+    // Merge user grid options with defaults (shallow, with deep-merge for defaultColDef)
     const finalGridOptions = useMemo(() => ({
         ...defaultGridOptions,
         ...gridOptions,
+        defaultColDef: {
+            ...defaultGridOptions.defaultColDef,
+            ...(gridOptions.defaultColDef || {}),
+        },
     }), [defaultGridOptions, gridOptions]);
 
     // Handle grid ready
@@ -124,20 +130,15 @@ const DataTable = <T extends Record<string, any>>({
     }, [onGridReady]);
 
     // Handle selection change
-    const handleSelectionChanged = useCallback(() => {
+    const handleSelectionChanged = useCallback((event: any) => {
         if (onSelectionChanged && enableRowSelection) {
-            const selectedRows: T[] = [];
-            finalGridOptions.api?.forEachNodeAfterFilterAndSort((node) => {
-                if (node.isSelected()) {
-                    selectedRows.push(node.data);
-                }
-            });
-            onSelectionChanged(selectedRows);
+            const selectedRows = event.api?.getSelectedRows?.() ?? [];
+            onSelectionChanged(selectedRows as T[]);
         }
-    }, [onSelectionChanged, enableRowSelection, finalGridOptions.api]);
+    }, [onSelectionChanged, enableRowSelection]);
 
     return (
-        <div className={`ag-theme-alpine ${className}`} style={{ height: typeof height === 'number' ? `${height}px` : height }}>
+        <div className={`${className}`} style={{ height: typeof height === 'number' ? `${height}px` : height }}>
             <AgGridReact
                 rowData={data}
                 columnDefs={columnDefs}
@@ -145,6 +146,7 @@ const DataTable = <T extends Record<string, any>>({
                 onGridReady={handleGridReady}
                 onSelectionChanged={handleSelectionChanged}
                 loading={loading}
+                theme={themeOverride ?? myAgTheme}
             />
         </div>
     );

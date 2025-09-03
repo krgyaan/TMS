@@ -1,105 +1,15 @@
 import { useMemo, useState } from "react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type {
-    ColDef,
-    RowSelectionOptions,
-    ValueFormatterParams,
-} from "ag-grid-community";
-
-import type { CustomCellRendererProps } from "ag-grid-react";
-import { AgGridReact } from "ag-grid-react";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
 import { useFetchJson } from "@/hooks/usFetchJson";
-import { themeQuartz } from 'ag-grid-community';
+import { dateCol, currencyCol, logoCol, booleanIconCol } from "@/components/data-grid";
+import DataTable from "@/components/ui/data-table";
 
-const myTheme = themeQuartz
-    .withParams(
-        {
-            accentColor: "#FF6900",
-            fontFamily: "inherit",
-            foregroundColor: "#181D1F",
-            backgroundColor: "#fff",
-            headerFontSize: 14,
-        },
-        "light"
-    )
-    .withParams(
-        {
-            accentColor: "#FF6900",
-            fontFamily: "inherit",
-            foregroundColor: "#F5F5F5",
-            backgroundColor: "#18181b",
-            headerFontSize: 14,
-        },
-        "dark"
-    );
+// Theme is globally provided via DataTable defaults (myAgTheme)
 
 
-// Custom Cell Renderer (Display logos based on cell value)
-const CompanyLogoRenderer = (params: CustomCellRendererProps) => (
-    <span
-        style={{
-            display: "flex",
-            height: "100%",
-            width: "100%",
-            alignItems: "center",
-        }}
-    >
-        {params.value && (
-            <img
-                alt={`${params.value} Flag`}
-                src={`https://www.ag-grid.com/example-assets/space-company-logos/${params.value.toLowerCase()}.png`}
-                style={{
-                    display: "block",
-                    width: "25px",
-                    height: "auto",
-                    maxHeight: "50%",
-                    marginRight: "12px",
-                    filter: "brightness(1.1)",
-                }}
-            />
-        )}
-        <p
-            style={{
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-            }}
-        >
-            {params.value}
-        </p>
-    </span>
-);
-
-/* Custom Cell Renderer (Display tick / cross in 'Successful' column) */
-const MissionResultRenderer = (params: CustomCellRendererProps) => (
-    <span
-        style={{
-            display: "flex",
-            justifyContent: "center",
-            height: "100%",
-            alignItems: "center",
-        }}
-    >
-        {
-            <img
-                alt={`${params.value}`}
-                src={`https://www.ag-grid.com/example-assets/icons/${params.value ? "tick-in-circle" : "cross-in-circle"}.png`}
-                style={{ width: "auto", height: "auto" }}
-            />
-        }
-    </span>
-);
-
-/* Format Date Cells */
-const dateFormatter = (params: ValueFormatterParams): string => {
-    return new Date(params.value).toLocaleDateString("en-us", {
-        weekday: "long",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
-};
+// Using standardized cell renderers and formatters from components/data-grid
 
 // Row Data Interface
 interface IRow {
@@ -126,40 +36,12 @@ const index = () => {
 
     // Column Definitions: Defines & controls grid columns.
     const [colDefs] = useState<ColDef[]>([
-        {
-            field: "mission",
-            width: 150,
-        },
-        {
-            field: "company",
-            width: 130,
-            cellRenderer: CompanyLogoRenderer,
-        },
-        {
-            field: "location",
-            width: 225,
-        },
-        {
-            field: "date",
-            valueFormatter: dateFormatter,
-        },
-        {
-            field: "price",
-            width: 130,
-            valueFormatter: (params: ValueFormatterParams) => {
-                if (typeof params.value !== "number") return "";
-                return params.value.toLocaleString("en-IN", {
-                    style: "currency",
-                    currency: "INR",
-                    maximumFractionDigits: 0,
-                });
-            },
-        },
-        {
-            field: "successful",
-            width: 120,
-            cellRenderer: MissionResultRenderer,
-        },
+        { field: "mission", width: 150 },
+        logoCol("company", { width: 130 }),
+        { field: "location", width: 225 },
+        dateCol("date"),
+        currencyCol("price", { locale: "en-IN", currency: "INR", maximumFractionDigits: 0 }, { width: 130 }),
+        booleanIconCol("successful", { width: 120 }),
         { field: "rocket" },
     ]);
 
@@ -186,18 +68,20 @@ const index = () => {
                 </CardAction>
             </CardHeader>
             <CardContent className="h-screen px-0">
-                <AgGridReact
-                    theme={myTheme}
-                    rowData={data}
+                <DataTable
+                    data={data || []}
                     loading={loading}
                     columnDefs={colDefs}
-                    defaultColDef={defaultColDef}
-                    pagination={true}
-                    rowSelection={rowSelection}
-                    onSelectionChanged={(event) => console.log("Row Selected!")}
-                    onCellValueChanged={(event) =>
-                        console.log(`New Cell Value: ${event.value}`)
-                    }
+                    gridOptions={{
+                        defaultColDef: { editable: true, filter: true },
+                        rowSelection,
+                        pagination: true,
+                    }}
+                    enablePagination={true}
+                    enableRowSelection={true}
+                    selectionType="multiple"
+                    onSelectionChanged={(rows) => console.log("Row Selected!", rows)}
+                    height="100%"
                 />
             </CardContent>
         </Card>
