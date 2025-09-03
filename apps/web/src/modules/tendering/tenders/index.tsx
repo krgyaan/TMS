@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import type {
     ColDef,
     RowSelectionOptions,
@@ -8,6 +10,30 @@ import type {
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { AgGridReact } from "ag-grid-react";
 import { useFetchJson } from "@/hooks/usFetchJson";
+import { themeQuartz } from 'ag-grid-community';
+
+const myTheme = themeQuartz
+    .withParams(
+        {
+            accentColor: "#FF6900",
+            fontFamily: "inherit",
+            foregroundColor: "#181D1F",
+            backgroundColor: "#fff",
+            headerFontSize: 14,
+        },
+        "light"
+    )
+    .withParams(
+        {
+            accentColor: "#FF6900",
+            fontFamily: "inherit",
+            foregroundColor: "#F5F5F5",
+            backgroundColor: "#18181b",
+            headerFontSize: 14,
+        },
+        "dark"
+    );
+
 
 // Custom Cell Renderer (Display logos based on cell value)
 const CompanyLogoRenderer = (params: CustomCellRendererProps) => (
@@ -147,21 +173,34 @@ const index = () => {
 
     // Container: Defines the grid's theme & dimensions.
     return (
-        <div style={{ width: "100%", height: "100%" }}>
-            <AgGridReact
-                rowData={data}
-                loading={loading}
-                columnDefs={colDefs}
-                defaultColDef={defaultColDef}
-                pagination={true}
-                rowSelection={rowSelection}
-                onSelectionChanged={(event) => console.log("Row Selected!")}
-                onCellValueChanged={(event) =>
-                    console.log(`New Cell Value: ${event.value}`)
-                }
-                enableRowPinning={true}
-            />
-        </div>
+        <Card className="">
+            <CardHeader>
+                <CardTitle>
+                    Tenders
+                </CardTitle>
+                <CardDescription>
+                    All tenders listed
+                </CardDescription>
+                <CardAction>
+                    <Button variant={"default"} onClick={() => alert("Adding...")}>Add New</Button>
+                </CardAction>
+            </CardHeader>
+            <CardContent className="h-screen px-0">
+                <AgGridReact
+                    theme={myTheme}
+                    rowData={data}
+                    loading={loading}
+                    columnDefs={colDefs}
+                    defaultColDef={defaultColDef}
+                    pagination={true}
+                    rowSelection={rowSelection}
+                    onSelectionChanged={(event) => console.log("Row Selected!")}
+                    onCellValueChanged={(event) =>
+                        console.log(`New Cell Value: ${event.value}`)
+                    }
+                />
+            </CardContent>
+        </Card>
     );
 };
 
