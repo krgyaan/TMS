@@ -9,6 +9,7 @@ import { paths } from "@/app/routes/paths";
 
 // Tendering
 const Tendering_Tenders = lazy(() => import("@/modules/tendering/tenders"));
+const Tender_Create = lazy(() => import("@/modules/tendering/tenders/create"));
 const Tendering_InfoSheet = lazy(() => import("@/modules/tendering/info-sheet"));
 const Tendering_TenderApproval = lazy(() => import("@/modules/tendering/tenders"));
 const Tendering_PhysDocs = lazy(() => import("@/modules/tendering/phydocs"));
@@ -99,6 +100,7 @@ export default function AppRoutes() {
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
                     {/* Tendering */}
                     <Route path={paths.tendering.tenders} element={<Suspense fallback={<Loading />}><Tendering_Tenders /></Suspense>} />
+                    <Route path={paths.tendering.tenderCreate} element={<Suspense fallback={<Loading />}><Tender_Create /></Suspense>} />
                     <Route path={paths.tendering.infoSheet} element={<Suspense fallback={<Loading />}><Tendering_InfoSheet /></Suspense>} />
                     <Route path={paths.tendering.tenderApproval} element={<Suspense fallback={<Loading />}><Tendering_TenderApproval /></Suspense>} />
                     <Route path={paths.tendering.phydocs} element={<Suspense fallback={<Loading />}><Tendering_PhysDocs /></Suspense>} />

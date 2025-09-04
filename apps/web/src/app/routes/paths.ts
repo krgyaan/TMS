@@ -5,6 +5,7 @@ export const paths = {
   },
   tendering: {
     tenders: "/tendering/tenders",
+    tenderCreate: "/tendering/tender/create",
     infoSheet: "/tendering/info-sheet",
     tenderApproval: "/tendering/tender-approval",
     phydocs: "/tendering/phydocs",

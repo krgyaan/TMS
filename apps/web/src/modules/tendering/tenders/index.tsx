@@ -1,15 +1,12 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { ColDef, RowSelectionOptions } from "ag-grid-community";
 import { useFetchJson } from "@/hooks/usFetchJson";
 import { dateCol, currencyCol, logoCol, booleanIconCol } from "@/components/data-grid";
 import DataTable from "@/components/ui/data-table";
-
-// Theme is globally provided via DataTable defaults (myAgTheme)
-
-
-// Using standardized cell renderers and formatters from components/data-grid
+import { NavLink } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 // Row Data Interface
 interface IRow {
@@ -45,14 +42,6 @@ const index = () => {
         { field: "rocket" },
     ]);
 
-    // Apply settings across all columns
-    const defaultColDef = useMemo<ColDef>(() => {
-        return {
-            filter: true,
-            editable: true,
-        };
-    }, []);
-
     // Container: Defines the grid's theme & dimensions.
     return (
         <Card className="">
@@ -64,7 +53,11 @@ const index = () => {
                     All tenders listed
                 </CardDescription>
                 <CardAction>
-                    <Button variant={"default"} onClick={() => alert("Adding...")}>Add New</Button>
+                    <Button variant={"default"} asChild>
+                        <NavLink to={paths.tendering.tenderCreate}>
+                            Add New Tender
+                        </NavLink>
+                    </Button>
                 </CardAction>
             </CardHeader>
             <CardContent className="h-screen px-0">
