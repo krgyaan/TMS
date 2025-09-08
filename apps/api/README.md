@@ -42,6 +42,22 @@ $ pnpm run start:dev
 
 # production mode
 $ pnpm run start:prod
+
+## Database & Drizzle ORM
+
+- Configure environment in `.env` (see `.env.example`). Required: `DATABASE_URL`.
+- Generate migrations: `pnpm run drizzle:generate`
+- Apply migrations: `pnpm run drizzle:migrate`
+- Seed sample data: `pnpm run db:seed`
+
+## API Endpoints
+
+- Health: `GET /health`
+- Users: `GET /api/v1/users`, `POST /api/v1/users`
+
+Notes:
+- The global prefix is configurable via `API_PREFIX` (default `api/v1`).
+- CORS is enabled for all origins by default.
 ```
 
 ## Run tests
