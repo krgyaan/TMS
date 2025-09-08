@@ -1,4 +1,5 @@
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -9,6 +10,8 @@ import { FieldWrapper } from "@/components/form/FieldWrapper"
 import { NumberInput } from "@/components/form/NumberInput"
 import { SelectField } from "@/components/form/SelectField"
 import { DateTimeInput } from "@/components/form/DateTimeInput"
+import { FileUploadField } from "@/components/form/FileUploadField"
+import { LucideStars } from "lucide-react"
 
 // Placeholder option lists for selects
 const organizations = [
@@ -57,7 +60,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-
 const create = () => {
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -80,8 +82,14 @@ const create = () => {
     })
 
     const onSubmit: SubmitHandler<FormValues> = (values) => {
-        const docs = values.documents as FileList | undefined
-        const fileNames = docs ? Array.from(docs).map((f) => f.name) : []
+        const docs = values.documents as unknown
+        const toFiles = (d: unknown): File[] => {
+            if (!d) return []
+            if (Array.isArray(d)) return d as File[]
+            if (d instanceof File) return [d]
+            return []
+        }
+        const fileNames = toFiles(docs).map((f) => f.name)
         console.log({ ...values, documents: fileNames })
     }
 
@@ -98,128 +106,161 @@ const create = () => {
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FieldWrapper<FormValues, "teamName"> control={form.control} name="teamName" label={"Team Name: AC/DC"}>
-                                {(field) => <Input placeholder="AC/DC" {...field} />}
-                            </FieldWrapper>
+                <Tabs defaultValue="manually" className="w-full">
+                    <TabsList className="m-auto mb-6">
+                        <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
+                        <TabsTrigger value="useAi">Use AI <LucideStars /> </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="manually">
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <FieldWrapper<FormValues, "teamName"> control={form.control} name="teamName" label={"Team Name: AC/DC"}>
+                                        {(field) => <Input placeholder="AC/DC" {...field} />}
+                                    </FieldWrapper>
 
-                            <FieldWrapper<FormValues, "tenderNo"> control={form.control} name="tenderNo" label={"Tender No"}>
-                                {(field) => <Input placeholder="Tender No" {...field} />}
-                            </FieldWrapper>
+                                    <FieldWrapper<FormValues, "tenderNo"> control={form.control} name="tenderNo" label={"Tender No"}>
+                                        {(field) => <Input placeholder="Tender No" {...field} />}
+                                    </FieldWrapper>
 
-                            <FieldWrapper<FormValues, "tenderName"> control={form.control} name="tenderName" label={"Tender Name"}>
-                                {(field) => <Input placeholder="Tender Name" {...field} />}
-                            </FieldWrapper>
+                                    <FieldWrapper<FormValues, "tenderName"> control={form.control} name="tenderName" label={"Tender Name"}>
+                                        {(field) => <Input placeholder="Tender Name" {...field} />}
+                                    </FieldWrapper>
 
-                            <SelectField<FormValues, "organization">
-                                control={form.control}
-                                name="organization"
-                                label="Organization"
-                                options={organizations.filter((o) => o.id !== "org-1")}
-                                placeholder="Select Organization"
-                            />
-
-                            <FieldWrapper<FormValues, "tenderValue"> control={form.control} name="tenderValue" label={"Tender Value (GST Inclusive) "}>
-                                {(field) => (
-                                    <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper<FormValues, "tenderFee"> control={form.control} name="tenderFee" label={"Tender Fee"}>
-                                {(field) => (
-                                    <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper<FormValues, "emd"> control={form.control} name="emd" label={"EMD"}>
-                                {(field) => (
-                                    <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
-                                )}
-                            </FieldWrapper>
-
-                            <SelectField<FormValues, "teamMember">
-                                control={form.control}
-                                name="teamMember"
-                                label="Team Member"
-                                options={users.filter((u) => u.id)}
-                                placeholder="Select User"
-                            />
-
-                            <FieldWrapper<FormValues, "dueDateTime">
-                                control={form.control}
-                                name="dueDateTime"
-                                label={"Due Date and Time"}
-                            >
-                                {(field) => (
-                                    <DateTimeInput
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                                    <SelectField<FormValues, "organization">
+                                        control={form.control}
+                                        name="organization"
+                                        label="Organization"
+                                        options={organizations.filter((o) => o.id !== "org-1")}
+                                        placeholder="Select Organization"
                                     />
-                                )}
-                            </FieldWrapper>
 
-                            <SelectField<FormValues, "location">
-                                control={form.control}
-                                name="location"
-                                label="Location"
-                                options={locations.filter((l) => l.id)}
-                                placeholder="Select Location"
-                            />
+                                    <FieldWrapper<FormValues, "tenderValue"> control={form.control} name="tenderValue" label={"Tender Value (GST Inclusive) "}>
+                                        {(field) => (
+                                            <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
+                                        )}
+                                    </FieldWrapper>
 
-                            <SelectField<FormValues, "website">
-                                control={form.control}
-                                name="website"
-                                label="Website"
-                                options={websites.filter((w) => w.id)}
-                                placeholder="Select Website"
-                            />
+                                    <FieldWrapper<FormValues, "tenderFee"> control={form.control} name="tenderFee" label={"Tender Fee"}>
+                                        {(field) => (
+                                            <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
+                                        )}
+                                    </FieldWrapper>
 
-                            <SelectField<FormValues, "item">
-                                control={form.control}
-                                name="item"
-                                label="Item"
-                                options={items.filter((i) => i.id)}
-                                placeholder="Select Item Name"
-                            />
+                                    <FieldWrapper<FormValues, "emd"> control={form.control} name="emd" label={"EMD"}>
+                                        {(field) => (
+                                            <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
+                                        )}
+                                    </FieldWrapper>
 
-                            <FieldWrapper<FormValues, "documents">
-                                control={form.control}
-                                name="documents"
-                                label="Upload Documents"
-                                description="Upload relevant tender documents (optional)"
-                              >
-                                {(field) => (
-                                  <Input type="file" multiple onChange={(e) => field.onChange(e.target.files)} />
-                                )}
-                            </FieldWrapper>
+                                    <SelectField<FormValues, "teamMember">
+                                        control={form.control}
+                                        name="teamMember"
+                                        label="Team Member"
+                                        options={users.filter((u) => u.id)}
+                                        placeholder="Select User"
+                                    />
 
-                            <FieldWrapper<FormValues, "remarks">
-                                control={form.control}
-                                name="remarks"
-                                label="Remarks"
-                                className="md:col-span-2"
-                              >
-                                {(field) => (
-                                  <textarea
-                                    className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                    placeholder="Remarks"
-                                    {...field}
-                                  />
-                                )}
-                            </FieldWrapper>
-                        </div>
+                                    <FieldWrapper<FormValues, "dueDateTime">
+                                        control={form.control}
+                                        name="dueDateTime"
+                                        label={"Due Date and Time"}
+                                    >
+                                        {(field) => (
+                                            <DateTimeInput
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                                            />
+                                        )}
+                                    </FieldWrapper>
 
-                        <div className="flex items-center gap-2">
-                            <Button type="submit">Submit</Button>
-                            <Button type="button" variant="outline" onClick={() => form.reset()}>
-                                Reset
-                            </Button>
-                        </div>
-                    </form>
-                </Form>
+                                    <SelectField<FormValues, "location">
+                                        control={form.control}
+                                        name="location"
+                                        label="Location"
+                                        options={locations.filter((l) => l.id)}
+                                        placeholder="Select Location"
+                                    />
+
+                                    <SelectField<FormValues, "website">
+                                        control={form.control}
+                                        name="website"
+                                        label="Website"
+                                        options={websites.filter((w) => w.id)}
+                                        placeholder="Select Website"
+                                    />
+
+                                    <SelectField<FormValues, "item">
+                                        control={form.control}
+                                        name="item"
+                                        label="Item"
+                                        options={items.filter((i) => i.id)}
+                                        placeholder="Select Item Name"
+                                    />
+
+                                    <FileUploadField<FormValues, "documents">
+                                        control={form.control}
+                                        name="documents"
+                                        label="Upload Documents"
+                                        description="Upload relevant tender documents (optional)"
+                                        allowMultiple
+                                        layout="grid"
+                                        gridCols={3}
+                                        acceptedFileTypes={['image/*']}
+                                    />
+
+                                    <FieldWrapper<FormValues, "remarks">
+                                        control={form.control}
+                                        name="remarks"
+                                        label="Remarks"
+                                        className="md:col-span-2"
+                                    >
+                                        {(field) => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Remarks"
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+
+                                <div className="w-full flex items-center justify-center gap-2">
+                                    <Button type="submit">Submit</Button>
+                                    <Button type="button" variant="outline" onClick={() => form.reset()}>
+                                        Reset
+                                    </Button>
+                                </div>
+                            </form>
+                        </Form>
+                    </TabsContent>
+                    <TabsContent value="useAi">
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                                <div className="w-full">
+                                    <FileUploadField<FormValues, "documents">
+                                        control={form.control}
+                                        name="documents"
+                                        label="Upload Documents"
+                                        description="Upload relevant tender documents (optional)"
+                                        allowMultiple
+                                        layout="grid"
+                                        gridCols={3}
+                                        acceptedFileTypes={['image/*']}
+                                    />
+                                </div>
+
+                                <div className="w-full flex items-center justify-center gap-2">
+                                    <Button type="submit">Submit</Button>
+                                    <Button type="button" variant="outline" onClick={() => form.reset()}>
+                                        Reset
+                                    </Button>
+                                </div>
+                            </form>
+                        </Form>
+                    </TabsContent>
+                </Tabs>
             </CardContent>
         </Card>
     );
