@@ -39,46 +39,6 @@ export function LoginForm({
                                     Login to your TMS account
                                 </p>
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="m@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                            <div className="grid gap-3">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    <a
-                                        href="#"
-                                        className="ml-auto text-sm underline-offset-2 hover:underline"
-                                    >
-                                        Forgot your password?
-                                    </a>
-                                </div>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                            </div>
-                            {error ? (
-                                <p className="text-red-500 px-0 mx-0 text-sm" role="alert">
-                                    {error}
-                                </p>
-                            ) : null}
-                            <Button type="submit" className="w-full">
-                                Login
-                            </Button>
-                            <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
-                                <span className="bg-card text-muted-foreground relative z-10 px-2">
-                                    Or continue with
-                                </span>
-                            </div>
                             <div className="">
                                 <Button variant="outline" type="button" className="w-full">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -88,6 +48,48 @@ export function LoginForm({
                                         />
                                     </svg>
                                     <span className="">Login with Google</span>
+                                </Button>
+                            </div>
+                            <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+                                <span className="bg-card text-muted-foreground relative z-10 px-2">
+                                    or continue with
+                                </span>
+                            </div>
+                            <div>
+                                <div className="grid gap-3 mb-3">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="m@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid gap-3 mb-3">
+                                    <div className="flex items-center">
+                                        <Label htmlFor="password">Password</Label>
+                                        <a
+                                            href="#"
+                                            className="ml-auto text-sm underline-offset-2 hover:underline"
+                                        >
+                                            Forgot your password?
+                                        </a>
+                                    </div>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                    />
+                                </div>
+                                {error ? (
+                                    <p className="text-red-500 px-0 mx-0 text-sm" role="alert">
+                                        {error}
+                                    </p>
+                                ) : null}
+                                <Button type="submit" className="w-full">
+                                    Login
                                 </Button>
                             </div>
                         </div>
