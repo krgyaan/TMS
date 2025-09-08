@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createDb, createPool } from './index';
-import { users } from './users.schema';
+import { roles } from './roles.schema';
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -9,9 +9,14 @@ async function main() {
   const pool = createPool(url);
   const db = createDb(pool);
 
-  await db.insert(users).values([
-    { email: 'alice@example.com', name: 'Alice' },
-    { email: 'bob@example.com', name: 'Bob' },
+  await db.insert(roles).values([
+    { name: 'Super User' },
+    { name: 'Admin (CEO/COO)' },
+    { name: 'Team Leader' },
+    { name: 'Coordinator' },
+    { name: 'Executive' },
+    { name: 'Engineer' },
+    { name: 'Field' },
   ]);
 
   await pool.end();
@@ -24,4 +29,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

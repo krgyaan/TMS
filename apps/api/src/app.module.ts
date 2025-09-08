@@ -8,6 +8,11 @@ import { HealthModule } from './modules/health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DocsModule } from './modules/docs/docs.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { DesignationsModule } from './modules/designations/designations.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { UserProfilesModule } from './modules/user-profiles/user-profiles.module';
+import { OauthAccountsModule } from './modules/oauth-accounts/oauth-accounts.module';
 
 @Module({
   imports: [
@@ -19,6 +24,11 @@ import { DocsModule } from './modules/docs/docs.module';
     }),
     DatabaseModule,
     UsersModule,
+    RolesModule,
+    DesignationsModule,
+    TeamsModule,
+    UserProfilesModule,
+    OauthAccountsModule,
     HealthModule,
     DocsModule,
   ],
