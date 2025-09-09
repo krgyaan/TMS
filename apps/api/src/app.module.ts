@@ -2,12 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
 import dbConfig, { validateDbEnv } from './config/db.config';
-import { DatabaseModule } from './database/database.module';
+import { DatabaseModule } from './db/database.module';
 import { UsersModule } from './modules/users/users.module';
 import { HealthModule } from './modules/health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DocsModule } from './modules/docs/docs.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DesignationsModule } from './modules/designations/designations.module';
 import { TeamsModule } from './modules/teams/teams.module';
@@ -30,7 +29,7 @@ import { OauthAccountsModule } from './modules/oauth-accounts/oauth-accounts.mod
     UserProfilesModule,
     OauthAccountsModule,
     HealthModule,
-    DocsModule,
+    
   ],
   controllers: [AppController],
   providers: [AppService],

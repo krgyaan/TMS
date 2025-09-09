@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../database/database.module';
+import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { teams, type NewTeam, type Team } from '../../db/teams.schema';
 
@@ -12,7 +12,7 @@ export class TeamsService {
   }
 
   async create(data: NewTeam): Promise<Team> {
-    const [created] = await this.db.insert(teams).values(data).returning();
-    return created;
+    const rows = (await this.db.insert(teams).values(data).returning()) as unknown as Team[];
+    return rows[0];
   }
 }

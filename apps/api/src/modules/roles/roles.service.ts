@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../database/database.module';
+import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import { roles, type NewRole, type Role } from '../../db/roles.schema';
 
@@ -12,7 +12,7 @@ export class RolesService {
   }
 
   async create(data: NewRole): Promise<Role> {
-    const [created] = await this.db.insert(roles).values(data).returning();
-    return created;
+    const rows = (await this.db.insert(roles).values(data).returning()) as unknown as Role[];
+    return rows[0];
   }
 }

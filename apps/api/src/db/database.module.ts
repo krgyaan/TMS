@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import dbConfig from '../config/db.config';
-import { createDb, createPool } from '../db';
+import { createDb, createPool } from '.';
 
 export const DB_POOL = Symbol('DB_POOL');
 export const DRIZZLE = Symbol('DRIZZLE_DB');
@@ -28,4 +28,3 @@ export const DRIZZLE = Symbol('DRIZZLE_DB');
   exports: [DB_POOL, DRIZZLE],
 })
 export class DatabaseModule {}
-
