@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../database/database.module';
+import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import {
   oauthAccounts,
@@ -16,7 +16,7 @@ export class OauthAccountsService {
   }
 
   async create(data: NewOauthAccount): Promise<OauthAccount> {
-    const [created] = await this.db.insert(oauthAccounts).values(data).returning();
-    return created;
+    const rows = (await this.db.insert(oauthAccounts).values(data).returning()) as unknown as OauthAccount[];
+    return rows[0];
   }
 }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../database/database.module';
+import { DRIZZLE } from '../../db/database.module';
 import type { DbInstance } from '../../db';
 import {
   userProfiles,
@@ -16,7 +16,7 @@ export class UserProfilesService {
   }
 
   async create(data: NewUserProfile): Promise<UserProfile> {
-    const [created] = await this.db.insert(userProfiles).values(data).returning();
-    return created;
+    const rows = (await this.db.insert(userProfiles).values(data).returning()) as unknown as UserProfile[];
+    return rows[0];
   }
 }

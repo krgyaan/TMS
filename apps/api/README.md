@@ -52,8 +52,7 @@ $ pnpm run start:prod
 
 ## API Endpoints
 
-- Health: `GET /health`
-- Users: `GET /api/v1/users`, `POST /api/v1/users`
+See `APIs.md` for the current list of endpoints and details.
 
 Notes:
 - The global prefix is configurable via `API_PREFIX` (default `api/v1`).
