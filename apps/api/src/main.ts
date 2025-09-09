@@ -17,5 +17,6 @@ async function bootstrap() {
   });
 
   await app.listen(appCfg?.port ?? 3000);
+  console.log(`App is Running on: http://localhost:${appCfg?.port ?? 3000}`)
 }
 bootstrap();
