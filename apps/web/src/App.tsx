@@ -10,7 +10,7 @@ const App = () => {
     return (
         <>
             <DocumentTitle title="Dashboard | TMS" />
-            <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+            <ThemeProvider defaultTheme="dark" storageKey="tms-ui-theme">
                 <AppRoutes />
             </ThemeProvider>
         </>
