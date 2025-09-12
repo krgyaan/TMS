@@ -296,7 +296,7 @@ const data = {
             items: [
                 {
                     title: "Employees",
-                    url: paths.master.employees,
+                    url: paths.master.users,
                 },
                 {
                     title: "Tender Statuses",

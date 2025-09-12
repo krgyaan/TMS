@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
-import DashboardLayout from "@/components/DashboardLayout";
+import DashboardLayout from "@/app/layout/DashboardLayout";
 import Login from "@/modules/auth/login";
 import Dashboard from "@/modules/dashboard";
 import { paths } from "@/app/routes/paths";
@@ -67,19 +67,45 @@ const Perf_Customer = lazy(() => import("@/modules/performance/customer-dashboar
 const Perf_Location = lazy(() => import("@/modules/performance/location-dashboard"));
 
 // Master (files, not folders)
-const Master_Employees = lazy(() => import("@/modules/master/employees"));
+const Master_Users = lazy(() => import("@/modules/master/user/users"));
+const Master_Users_Create = lazy(() => import("@/modules/master/user/create"));
+const Master_Users_Edit = lazy(() => import("@/modules/master/user/create"));
 const Master_Statuses = lazy(() => import("@/modules/master/statuses"));
+const Master_Statuses_Create = lazy(() => import("@/modules/master/statuses"));
+const Master_Statuses_Edit = lazy(() => import("@/modules/master/statuses"));
 const Master_Organizations = lazy(() => import("@/modules/master/organizations"));
+const Master_Organizations_Create = lazy(() => import("@/modules/master/organizations"));
+const Master_Organizations_Edit = lazy(() => import("@/modules/master/organizations"));
 const Master_Items = lazy(() => import("@/modules/master/items"));
+const Master_Items_Create = lazy(() => import("@/modules/master/items"));
+const Master_Items_Edit = lazy(() => import("@/modules/master/items"));
 const Master_Vendors = lazy(() => import("@/modules/master/vendors"));
+const Master_Vendors_Create = lazy(() => import("@/modules/master/vendors"));
+const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendors"));
 const Master_Websites = lazy(() => import("@/modules/master/websites"));
+const Master_Websites_Create = lazy(() => import("@/modules/master/websites"));
+const Master_Websites_Edit = lazy(() => import("@/modules/master/websites"));
 const Master_Locations = lazy(() => import("@/modules/master/locations"));
+const Master_Locations_Create = lazy(() => import("@/modules/master/locations"));
+const Master_Locations_Edit = lazy(() => import("@/modules/master/locations"));
 const Master_DocumentSubmitted = lazy(() => import("@/modules/master/document-submitted"));
+const Master_DocumentSubmitted_Create = lazy(() => import("@/modules/master/document-submitted"));
+const Master_DocumentSubmitted_Edit = lazy(() => import("@/modules/master/document-submitted"));
 const Master_ImprestCategory = lazy(() => import("@/modules/master/imprest-category"));
+const Master_ImprestCategory_Create = lazy(() => import("@/modules/master/imprest-category"));
+const Master_ImprestCategory_Edit = lazy(() => import("@/modules/master/imprest-category"));
 const Master_DocumentType = lazy(() => import("@/modules/master/document-type"));
+const Master_DocumentType_Create = lazy(() => import("@/modules/master/document-type"));
+const Master_DocumentType_Edit = lazy(() => import("@/modules/master/document-type"));
 const Master_FinancialYear = lazy(() => import("@/modules/master/financial-year"));
+const Master_FinancialYear_Create = lazy(() => import("@/modules/master/financial-year"));
+const Master_FinancialYear_Edit = lazy(() => import("@/modules/master/financial-year"));
 const Master_FollowupCategories = lazy(() => import("@/modules/master/followup-categories"));
+const Master_FollowupCategories_Create = lazy(() => import("@/modules/master/followup-categories"));
+const Master_FollowupCategories_Edit = lazy(() => import("@/modules/master/followup-categories"));
 const Master_EMDResponsibilities = lazy(() => import("@/modules/master/emds-responsibilities"));
+const Master_EMDResponsibilities_Create = lazy(() => import("@/modules/master/emds-responsibilities"));
+const Master_EMDResponsibilities_Edit = lazy(() => import("@/modules/master/emds-responsibilities"));
 
 // Shared
 const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-ups"));
@@ -158,19 +184,45 @@ export default function AppRoutes() {
                     <Route path={paths.performance.locationDashboard} element={<Suspense fallback={<Loading />}><Perf_Location /></Suspense>} />
 
                     {/* Master */}
-                    <Route path={paths.master.employees} element={<Suspense fallback={<Loading />}><Master_Employees /></Suspense>} />
+                    <Route path={paths.master.users} element={<Suspense fallback={<Loading />}><Master_Users /></Suspense>} />
+                    <Route path={paths.master.users_create} element={<Suspense fallback={<Loading />}><Master_Users_Create /></Suspense>} />
+                    <Route path={paths.master.users_edit} element={<Suspense fallback={<Loading />}><Master_Users_Edit /></Suspense>} />
                     <Route path={paths.master.statuses} element={<Suspense fallback={<Loading />}><Master_Statuses /></Suspense>} />
+                    <Route path={paths.master.statuses_create} element={<Suspense fallback={<Loading />}><Master_Statuses_Create /></Suspense>} />
+                    <Route path={paths.master.statuses_edit} element={<Suspense fallback={<Loading />}><Master_Statuses_Edit /></Suspense>} />
                     <Route path={paths.master.organizations} element={<Suspense fallback={<Loading />}><Master_Organizations /></Suspense>} />
+                    <Route path={paths.master.organizations_create} element={<Suspense fallback={<Loading />}><Master_Organizations_Create /></Suspense>} />
+                    <Route path={paths.master.organizations_edit} element={<Suspense fallback={<Loading />}><Master_Organizations_Edit /></Suspense>} />
                     <Route path={paths.master.items} element={<Suspense fallback={<Loading />}><Master_Items /></Suspense>} />
+                    <Route path={paths.master.items_create} element={<Suspense fallback={<Loading />}><Master_Items_Create /></Suspense>} />
+                    <Route path={paths.master.items_edit} element={<Suspense fallback={<Loading />}><Master_Items_Edit /></Suspense>} />
                     <Route path={paths.master.vendors} element={<Suspense fallback={<Loading />}><Master_Vendors /></Suspense>} />
+                    <Route path={paths.master.vendors_create} element={<Suspense fallback={<Loading />}><Master_Vendors_Create /></Suspense>} />
+                    <Route path={paths.master.vendors_edit} element={<Suspense fallback={<Loading />}><Master_Vendors_Edit /></Suspense>} />
                     <Route path={paths.master.websites} element={<Suspense fallback={<Loading />}><Master_Websites /></Suspense>} />
+                    <Route path={paths.master.websites_create} element={<Suspense fallback={<Loading />}><Master_Websites_Create /></Suspense>} />
+                    <Route path={paths.master.websites_edit} element={<Suspense fallback={<Loading />}><Master_Websites_Edit /></Suspense>} />
                     <Route path={paths.master.locations} element={<Suspense fallback={<Loading />}><Master_Locations /></Suspense>} />
+                    <Route path={paths.master.locations_create} element={<Suspense fallback={<Loading />}><Master_Locations_Create /></Suspense>} />
+                    <Route path={paths.master.locations_edit} element={<Suspense fallback={<Loading />}><Master_Locations_Edit /></Suspense>} />
                     <Route path={paths.master.documentSubmitted} element={<Suspense fallback={<Loading />}><Master_DocumentSubmitted /></Suspense>} />
+                    <Route path={paths.master.documentSubmitted_create} element={<Suspense fallback={<Loading />}><Master_DocumentSubmitted_Create /></Suspense>} />
+                    <Route path={paths.master.documentSubmitted_edit} element={<Suspense fallback={<Loading />}><Master_DocumentSubmitted_Edit /></Suspense>} />
                     <Route path={paths.master.imprestCategory} element={<Suspense fallback={<Loading />}><Master_ImprestCategory /></Suspense>} />
+                    <Route path={paths.master.imprestCategory_create} element={<Suspense fallback={<Loading />}><Master_ImprestCategory_Create /></Suspense>} />
+                    <Route path={paths.master.imprestCategory_edit} element={<Suspense fallback={<Loading />}><Master_ImprestCategory_Edit /></Suspense>} />
                     <Route path={paths.master.documentType} element={<Suspense fallback={<Loading />}><Master_DocumentType /></Suspense>} />
+                    <Route path={paths.master.documentType_create} element={<Suspense fallback={<Loading />}><Master_DocumentType_Create /></Suspense>} />
+                    <Route path={paths.master.documentType_edit} element={<Suspense fallback={<Loading />}><Master_DocumentType_Edit /></Suspense>} />
                     <Route path={paths.master.financialYear} element={<Suspense fallback={<Loading />}><Master_FinancialYear /></Suspense>} />
+                    <Route path={paths.master.financialYear_create} element={<Suspense fallback={<Loading />}><Master_FinancialYear_Create /></Suspense>} />
+                    <Route path={paths.master.financialYear_edit} element={<Suspense fallback={<Loading />}><Master_FinancialYear_Edit /></Suspense>} />
                     <Route path={paths.master.followupCategories} element={<Suspense fallback={<Loading />}><Master_FollowupCategories /></Suspense>} />
+                    <Route path={paths.master.followupCategories_create} element={<Suspense fallback={<Loading />}><Master_FollowupCategories_Create /></Suspense>} />
+                    <Route path={paths.master.followupCategories_edit} element={<Suspense fallback={<Loading />}><Master_FollowupCategories_Edit /></Suspense>} />
                     <Route path={paths.master.emdsResponsibilities} element={<Suspense fallback={<Loading />}><Master_EMDResponsibilities /></Suspense>} />
+                    <Route path={paths.master.emdsResponsibilities_create} element={<Suspense fallback={<Loading />}><Master_EMDResponsibilities_Create /></Suspense>} />
+                    <Route path={paths.master.emdsResponsibilities_edit} element={<Suspense fallback={<Loading />}><Master_EMDResponsibilities_Edit /></Suspense>} />
 
                     {/* Shared */}
                     <Route path={paths.shared.followUps} element={<Suspense fallback={<Loading />}><Shared_FollowUps /></Suspense>} />

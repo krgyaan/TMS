@@ -53,28 +53,24 @@ export default function Dashboard() {
                 <DocumentTitle title={documentTitle} />
                 <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-accent">
                     <div className="flex items-center gap-2 px-4">
-                        <SidebarTrigger className="-ml-1" />
+                        <SidebarTrigger className="-ml-1 cursor-ew-resize" />
                         <Separator
                             orientation="vertical"
                             className="mr-2 data-[orientation=vertical]:h-4"
                         />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
-                                </BreadcrumbItem>
-                                {crumbs.length > 0 && (
+                                {crumbs.length > 4 && (
                                     <BreadcrumbSeparator className="hidden md:block" />
                                 )}
-                                {crumbs.map((c, i) => (
-                                    i < crumbs.length - 1 ? (
+
+                                {crumbs.slice(1).map((c, i, slicedCrumbs) => (
+                                    i < slicedCrumbs.length - 1 ? (
                                         <Fragment key={c.path}>
                                             <BreadcrumbItem className="hidden md:block">
                                                 <BreadcrumbLink href={c.path}>{c.label}</BreadcrumbLink>
                                             </BreadcrumbItem>
-                                            {i < crumbs.length - 1 && (
-                                                <BreadcrumbSeparator className="hidden md:block" />
-                                            )}
+                                            <BreadcrumbSeparator className="hidden md:block" />
                                         </Fragment>
                                     ) : (
                                         <BreadcrumbItem key={c.path}>

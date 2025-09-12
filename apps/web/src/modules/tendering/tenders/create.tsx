@@ -11,7 +11,7 @@ import { NumberInput } from "@/components/form/NumberInput"
 import { SelectField } from "@/components/form/SelectField"
 import { DateTimeInput } from "@/components/form/DateTimeInput"
 import { FileUploadField } from "@/components/form/FileUploadField"
-import { LucideStars } from "lucide-react"
+import { Sparkles } from "lucide-react"
 
 // Placeholder option lists for selects
 const organizations = [
@@ -109,7 +109,7 @@ const create = () => {
                 <Tabs defaultValue="manually" className="w-full">
                     <TabsList className="m-auto mb-6">
                         <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
-                        <TabsTrigger value="useAi">Use AI <LucideStars /> </TabsTrigger>
+                        <TabsTrigger value="useAi">Use AI <Sparkles /> </TabsTrigger>
                     </TabsList>
                     <TabsContent value="manually">
                         <Form {...form}>
