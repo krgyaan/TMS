@@ -12,6 +12,7 @@ import { DesignationsModule } from './modules/designations/designations.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { UserProfilesModule } from './modules/user-profiles/user-profiles.module';
 import { OauthAccountsModule } from './modules/oauth-accounts/oauth-accounts.module';
+import { TenderStatusModule } from './modules/tender-status/tender-status.module';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { OauthAccountsModule } from './modules/oauth-accounts/oauth-accounts.mod
     UserProfilesModule,
     OauthAccountsModule,
     HealthModule,
-    
+    TenderStatusModule,
   ],
   controllers: [AppController],
   providers: [AppService],

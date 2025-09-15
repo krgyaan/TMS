@@ -50,6 +50,23 @@ Base URL prefix is configurable via `API_PREFIX` (default: `api/v1`). All routes
   - Body: `{ userId: number, provider: string, providerUserId: string, providerEmail?: string (email), avatar?: string, accessToken: string, refreshToken?: string, expiresAt?: string (ISO date), scopes?: string, rawPayload?: any }`
   - Response: `OauthAccount`
 
+- GET `/api/v1/tender-status` — List tender statuses
+  - Response: `TenderStatus[]`
+
+- GET `/api/v1/tender-status/:id` — Get a tender status
+  - Response: `TenderStatus`
+
+- POST `/api/v1/tender-status` — Create a tender status
+  - Body: `{ name: string, tenderCategory?: string, status?: boolean }`
+  - Response: `TenderStatus`
+
+- PATCH `/api/v1/tender-status/:id` — Update a tender status
+  - Body: `{ name?: string, tenderCategory?: string, status?: boolean }`
+  - Response: `TenderStatus`
+
+- DELETE `/api/v1/tender-status/:id` — Delete a tender status
+  - Response: `TenderStatus`
+
 Types
 - `User`:
   - `id`: number
@@ -64,3 +81,4 @@ Types
 - `Team`: `{ id: number, name: string, parentId?: number | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `UserProfile`: `{ id: number, userId: number, firstName?: string | null, lastName?: string | null, dateOfBirth?: string | null, gender?: string | null, employeeCode?: string | null, designationId?: number | null, primaryTeamId?: number | null, altEmail?: string | null, emergencyContactName?: string | null, emergencyContactPhone?: string | null, image?: string | null, signature?: string | null, dateOfJoining?: string | null, dateOfExit?: string | null, timezone?: string | null, locale?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `OauthAccount`: `{ id: number, userId: number, provider: string, providerUserId: string, providerEmail?: string | null, avatar?: string | null, accessToken: string, refreshToken?: string | null, expiresAt?: string | null, scopes?: string | null, rawPayload?: any | null, isActive: boolean, createdAt: string, updatedAt: string }`
+- `TenderStatus`: `{ id: number, name: string, tenderCategory?: string | null, status: boolean, createdAt: string, updatedAt: string }`
