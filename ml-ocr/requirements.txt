@@ -1,0 +1,14 @@
+opencv-python
+pytesseract
+pandas
+numpy
+pillow
+scikit-learn
+matplotlib
+seaborn
+requests
+spacy
+fastapi
+uvicorn
+python-multipart
+pymupdf
