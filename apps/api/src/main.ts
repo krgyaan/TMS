@@ -13,7 +13,7 @@ async function bootstrap() {
   }
 
   app.enableCors({
-    origin: '*',
+    origin: 'http://localhost:5173',
   });
 
   await app.listen(appCfg?.port ?? 3000);
