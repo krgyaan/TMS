@@ -3,16 +3,16 @@ import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
 import dbConfig, { validateDbEnv } from './config/db.config';
 import { DatabaseModule } from './db/database.module';
-import { UsersModule } from './modules/users/users.module';
-import { HealthModule } from './modules/health/health.module';
+import { UsersModule } from './modules/master/users/users.module';
+import { HealthModule } from './modules/master/health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RolesModule } from './modules/roles/roles.module';
-import { DesignationsModule } from './modules/designations/designations.module';
-import { TeamsModule } from './modules/teams/teams.module';
-import { UserProfilesModule } from './modules/user-profiles/user-profiles.module';
-import { OauthAccountsModule } from './modules/oauth-accounts/oauth-accounts.module';
-import { TenderStatusModule } from './modules/tender-status/tender-status.module';
+import { RolesModule } from './modules/master/roles/roles.module';
+import { DesignationsModule } from './modules/master/designations/designations.module';
+import { TeamsModule } from './modules/master/teams/teams.module';
+import { UserProfilesModule } from './modules/master/user-profiles/user-profiles.module';
+import { OauthAccountsModule } from './modules/master/oauth-accounts/oauth-accounts.module';
+import { TenderStatusModule } from './modules/master/tender-status/tender-status.module';
 
 @Module({
   imports: [

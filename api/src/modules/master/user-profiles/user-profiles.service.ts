@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
 import {
   userProfiles,
   type NewUserProfile,
   type UserProfile,
-} from '../../db/user-profiles.schema';
+} from '../../../db/user-profiles.schema';
 
 @Injectable()
 export class UserProfilesService {

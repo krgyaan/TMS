@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
-import { statuses, type NewStatus, type Status } from '../../db/statuses.schema';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
+import { statuses, type NewStatus, type Status } from '../../../db/statuses.schema';
 
 @Injectable()
 export class TenderStatusService {

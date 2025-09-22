@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
 import {
   oauthAccounts,
   type NewOauthAccount,
   type OauthAccount,
-} from '../../db/oauth-accounts.schema';
+} from '../../../db/oauth-accounts.schema';
 
 @Injectable()
 export class OauthAccountsService {

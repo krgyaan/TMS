@@ -10,6 +10,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper"
 import { NumberInput } from "@/components/form/NumberInput"
 import { SelectField } from "@/components/form/SelectField"
 import { DateTimeInput } from "@/components/form/DateTimeInput"
+import { DateInput } from "@/components/form/DateInput"
 import { FileUploadField } from "@/components/form/FileUploadField"
 import { Sparkles } from "lucide-react"
 
@@ -40,6 +41,11 @@ const items = [
     { id: "item-2", name: "Steel" },
 ]
 
+const aiTeams = [
+    { id: "ac", name: "AC" },
+    { id: "dc", name: "DC" },
+]
+
 // Zod Schema for form validation
 const formSchema = z.object({
     teamName: z.string().min(1, { message: "Team Name is required" }),
@@ -58,10 +64,30 @@ const formSchema = z.object({
     remarks: z.string().optional(),
 })
 
+const aiFormSchema = z.object({
+    team: z.string().min(1, { message: "Team is required" }),
+    tenderId: z.string().min(1, { message: "Tender ID is required" }),
+    startDate: z.string().min(1, { message: "Start date is required" }),
+    closingDate: z.string().min(1, { message: "Closing date is required" }),
+    files: z.any().optional(),
+})
+
 type FormValues = z.infer<typeof formSchema>
+type AiFormValues = z.infer<typeof aiFormSchema>
 
 const create = () => {
-    const form = useForm<FormValues>({
+    const aiForm = useForm<AiFormValues>({
+        resolver: zodResolver(aiFormSchema),
+        defaultValues: {
+            team: "",
+            tenderId: "",
+            startDate: "",
+            closingDate: "",
+            files: undefined,
+        },
+    })
+
+    const manualForm = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             teamName: "",
@@ -81,15 +107,20 @@ const create = () => {
         },
     })
 
-    const onSubmit: SubmitHandler<FormValues> = (values) => {
-        const docs = values.documents as unknown
-        const toFiles = (d: unknown): File[] => {
-            if (!d) return []
-            if (Array.isArray(d)) return d as File[]
-            if (d instanceof File) return [d]
-            return []
-        }
-        const fileNames = toFiles(docs).map((f) => f.name)
+    const toFiles = (d: unknown): File[] => {
+        if (!d) return []
+        if (Array.isArray(d)) return d as File[]
+        if (d instanceof File) return [d]
+        return []
+    }
+
+    const handleAiSubmit: SubmitHandler<AiFormValues> = (values) => {
+        const fileNames = toFiles(values.files as unknown).map((file) => file.name)
+        console.log({ ...values, files: fileNames })
+    }
+
+    const handleManualSubmit: SubmitHandler<FormValues> = (values) => {
+        const fileNames = toFiles(values.documents as unknown).map((file) => file.name)
         console.log({ ...values, documents: fileNames })
     }
 
@@ -106,55 +137,113 @@ const create = () => {
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="manually" className="w-full">
+                <Tabs defaultValue="useAi" className="w-full">
                     <TabsList className="m-auto mb-6">
-                        <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
                         <TabsTrigger value="useAi">Use AI <Sparkles /> </TabsTrigger>
+                        <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
                     </TabsList>
+                    <TabsContent value="useAi">
+                        <Form {...aiForm}>
+                            <form onSubmit={aiForm.handleSubmit(handleAiSubmit)} className="space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <SelectField<AiFormValues, "team">
+                                        control={aiForm.control}
+                                        name="team"
+                                        label="Team"
+                                        options={aiTeams}
+                                        placeholder="Select Team"
+                                    />
+
+                                    <FieldWrapper<AiFormValues, "tenderId">
+                                        control={aiForm.control}
+                                        name="tenderId"
+                                        label="Tender ID"
+                                    >
+                                        {(field) => <Input placeholder="Tender ID" {...field} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper<AiFormValues, "startDate">
+                                        control={aiForm.control}
+                                        name="startDate"
+                                        label="Start Date"
+                                    >
+                                        {(field) => (
+                                            <DateInput value={field.value ?? ""} onChange={field.onChange} />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper<AiFormValues, "closingDate">
+                                        control={aiForm.control}
+                                        name="closingDate"
+                                        label="Closing Date"
+                                    >
+                                        {(field) => (
+                                            <DateInput value={field.value ?? ""} onChange={field.onChange} />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+
+                                <div className="w-full md:w-1/2">
+                                    <FileUploadField<AiFormValues, "files">
+                                        control={aiForm.control}
+                                        name="files"
+                                        label="Choose Files"
+                                        allowMultiple
+                                        acceptedFileTypes={['application/pdf']}
+                                    />
+                                </div>
+
+                                <div className="w-full flex items-center justify-center gap-2">
+                                    <Button type="button" variant="outline" onClick={() => aiForm.reset()}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit">Submit</Button>
+                                </div>
+                            </form>
+                        </Form>
+                    </TabsContent>
                     <TabsContent value="manually">
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        <Form {...manualForm}>
+                            <form onSubmit={manualForm.handleSubmit(handleManualSubmit)} className="space-y-8">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <FieldWrapper<FormValues, "teamName"> control={form.control} name="teamName" label={"Team Name: AC/DC"}>
+                                    <FieldWrapper<FormValues, "teamName"> control={manualForm.control} name="teamName" label={"Team Name: AC/DC"}>
                                         {(field) => <Input placeholder="AC/DC" {...field} />}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<FormValues, "tenderNo"> control={form.control} name="tenderNo" label={"Tender No"}>
+                                    <FieldWrapper<FormValues, "tenderNo"> control={manualForm.control} name="tenderNo" label={"Tender No"}>
                                         {(field) => <Input placeholder="Tender No" {...field} />}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<FormValues, "tenderName"> control={form.control} name="tenderName" label={"Tender Name"}>
+                                    <FieldWrapper<FormValues, "tenderName"> control={manualForm.control} name="tenderName" label={"Tender Name"}>
                                         {(field) => <Input placeholder="Tender Name" {...field} />}
                                     </FieldWrapper>
 
                                     <SelectField<FormValues, "organization">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="organization"
                                         label="Organization"
                                         options={organizations.filter((o) => o.id !== "org-1")}
                                         placeholder="Select Organization"
                                     />
 
-                                    <FieldWrapper<FormValues, "tenderValue"> control={form.control} name="tenderValue" label={"Tender Value (GST Inclusive) "}>
+                                    <FieldWrapper<FormValues, "tenderValue"> control={manualForm.control} name="tenderValue" label={"Tender Value (GST Inclusive) "}>
                                         {(field) => (
                                             <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
                                         )}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<FormValues, "tenderFee"> control={form.control} name="tenderFee" label={"Tender Fee"}>
+                                    <FieldWrapper<FormValues, "tenderFee"> control={manualForm.control} name="tenderFee" label={"Tender Fee"}>
                                         {(field) => (
                                             <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
                                         )}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<FormValues, "emd"> control={form.control} name="emd" label={"EMD"}>
+                                    <FieldWrapper<FormValues, "emd"> control={manualForm.control} name="emd" label={"EMD"}>
                                         {(field) => (
                                             <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />
                                         )}
                                     </FieldWrapper>
 
                                     <SelectField<FormValues, "teamMember">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="teamMember"
                                         label="Team Member"
                                         options={users.filter((u) => u.id)}
@@ -162,7 +251,7 @@ const create = () => {
                                     />
 
                                     <FieldWrapper<FormValues, "dueDateTime">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="dueDateTime"
                                         label={"Due Date and Time"}
                                     >
@@ -176,7 +265,7 @@ const create = () => {
                                     </FieldWrapper>
 
                                     <SelectField<FormValues, "location">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="location"
                                         label="Location"
                                         options={locations.filter((l) => l.id)}
@@ -184,7 +273,7 @@ const create = () => {
                                     />
 
                                     <SelectField<FormValues, "website">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="website"
                                         label="Website"
                                         options={websites.filter((w) => w.id)}
@@ -192,7 +281,7 @@ const create = () => {
                                     />
 
                                     <SelectField<FormValues, "item">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="item"
                                         label="Item"
                                         options={items.filter((i) => i.id)}
@@ -200,7 +289,7 @@ const create = () => {
                                     />
 
                                     <FileUploadField<FormValues, "documents">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="documents"
                                         label="Upload Documents"
                                         description="Upload relevant tender documents (optional)"
@@ -211,7 +300,7 @@ const create = () => {
                                     />
 
                                     <FieldWrapper<FormValues, "remarks">
-                                        control={form.control}
+                                        control={manualForm.control}
                                         name="remarks"
                                         label="Remarks"
                                         className="md:col-span-2"
@@ -228,32 +317,7 @@ const create = () => {
 
                                 <div className="w-full flex items-center justify-center gap-2">
                                     <Button type="submit">Submit</Button>
-                                    <Button type="button" variant="outline" onClick={() => form.reset()}>
-                                        Reset
-                                    </Button>
-                                </div>
-                            </form>
-                        </Form>
-                    </TabsContent>
-                    <TabsContent value="useAi">
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                                <div className="w-full">
-                                    <FileUploadField<FormValues, "documents">
-                                        control={form.control}
-                                        name="documents"
-                                        label="Upload Documents"
-                                        description="Upload relevant tender documents (optional)"
-                                        allowMultiple
-                                        layout="grid"
-                                        gridCols={3}
-                                        acceptedFileTypes={['image/*']}
-                                    />
-                                </div>
-
-                                <div className="w-full flex items-center justify-center gap-2">
-                                    <Button type="submit">Submit</Button>
-                                    <Button type="button" variant="outline" onClick={() => form.reset()}>
+                                    <Button type="button" variant="outline" onClick={() => manualForm.reset()}>
                                         Reset
                                     </Button>
                                 </div>

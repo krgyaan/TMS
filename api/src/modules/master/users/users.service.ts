@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
-import { users, type NewUser, type User } from '../../db/users.schema';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
+import { users, type NewUser, type User } from '../../../db/users.schema';
 
 @Injectable()
 export class UsersService {

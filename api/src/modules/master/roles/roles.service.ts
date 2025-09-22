@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
-import { roles, type NewRole, type Role } from '../../db/roles.schema';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
+import { roles, type NewRole, type Role } from '../../../db/roles.schema';
 
 @Injectable()
 export class RolesService {

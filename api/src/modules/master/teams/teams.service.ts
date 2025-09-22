@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
-import { teams, type NewTeam, type Team } from '../../db/teams.schema';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
+import { teams, type NewTeam, type Team } from '../../../db/teams.schema';
 
 @Injectable()
 export class TeamsService {

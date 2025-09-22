@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE } from '../../db/database.module';
-import type { DbInstance } from '../../db';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
 import {
   designations,
   type NewDesignation,
   type Designation,
-} from '../../db/designations.schema';
+} from '../../../db/designations.schema';
 
 @Injectable()
 export class DesignationsService {
