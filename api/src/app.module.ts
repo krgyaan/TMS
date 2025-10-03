@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
 import dbConfig, { validateDbEnv } from './config/db.config';
@@ -13,6 +13,19 @@ import { TeamsModule } from './modules/master/teams/teams.module';
 import { UserProfilesModule } from './modules/master/user-profiles/user-profiles.module';
 import { OauthAccountsModule } from './modules/master/oauth-accounts/oauth-accounts.module';
 import { TenderStatusModule } from './modules/master/tender-status/tender-status.module';
+import { DocumentsSubmittedModule } from './modules/master/documents-submitted/documents-submitted.module';
+import { FollowupCategoriesModule } from './modules/master/followup-categories/followup-categories.module';
+import { ImprestCategoriesModule } from './modules/master/imprest-categories/imprest-categories.module';
+import { IndustriesModule } from './modules/master/industries/industries.module';
+import { ItemHeadingsModule } from './modules/master/item-headings/item-headings.module';
+import { ItemsModule } from './modules/master/items/items.module';
+import { LoanPartiesModule } from './modules/master/loan-parties/loan-parties.module';
+import { LocationsModule } from './modules/master/locations/locations.module';
+import { OrganizationsModule } from './modules/master/organizations/organizations.module';
+import { StatusesModule } from './modules/master/statuses/statuses.module';
+import { TqTypesModule } from './modules/master/tq-types/tq-types.module';
+import { VendorOrganizationsModule } from './modules/master/vendor-organizations/vendor-organizations.module';
+import { VendorsModule } from './modules/master/vendors/vendors.module';
 
 @Module({
   imports: [
@@ -31,6 +44,19 @@ import { TenderStatusModule } from './modules/master/tender-status/tender-status
     OauthAccountsModule,
     HealthModule,
     TenderStatusModule,
+    DocumentsSubmittedModule,
+    FollowupCategoriesModule,
+    ImprestCategoriesModule,
+    IndustriesModule,
+    ItemHeadingsModule,
+    ItemsModule,
+    LoanPartiesModule,
+    LocationsModule,
+    OrganizationsModule,
+    StatusesModule,
+    TqTypesModule,
+    VendorOrganizationsModule,
+    VendorsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

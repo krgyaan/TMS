@@ -82,3 +82,19 @@ Types
 - `UserProfile`: `{ id: number, userId: number, firstName?: string | null, lastName?: string | null, dateOfBirth?: string | null, gender?: string | null, employeeCode?: string | null, designationId?: number | null, primaryTeamId?: number | null, altEmail?: string | null, emergencyContactName?: string | null, emergencyContactPhone?: string | null, image?: string | null, signature?: string | null, dateOfJoining?: string | null, dateOfExit?: string | null, timezone?: string | null, locale?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `OauthAccount`: `{ id: number, userId: number, provider: string, providerUserId: string, providerEmail?: string | null, avatar?: string | null, accessToken: string, refreshToken?: string | null, expiresAt?: string | null, scopes?: string | null, rawPayload?: any | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `TenderStatus`: `{ id: number, name: string, tenderCategory?: string | null, status: boolean, createdAt: string, updatedAt: string }`
+
+## Additional Master GET Endpoints
+- /api/v1/documents-submitted — returns DocumentSubmitted[]
+- /api/v1/followup-categories — returns FollowupCategory[]
+- /api/v1/imprest-categories — returns ImprestCategory[]
+- /api/v1/industries — returns Industry[]
+- /api/v1/item-headings — returns ItemHeading[]
+- /api/v1/items — returns Item[]
+- /api/v1/loan-parties — returns LoanParty[]
+- /api/v1/locations — returns Location[]
+- /api/v1/organizations — returns Organization[]
+- /api/v1/statuses — returns Status[]
+- /api/v1/tq-types — returns TqType[]
+- /api/v1/vendor-organizations — returns VendorOrganization[]
+- /api/v1/vendors — returns Vendor[]
+
