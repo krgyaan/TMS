@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 import { z } from 'zod';
 import { CompaniesService } from './companies.service';
 
@@ -8,7 +8,7 @@ const DocumentSchema = z.object({
   isFolder: z.boolean().optional(),
 });
 
-const CreateCompanySchema = z.object({
+const CompanyDetailsSchema = z.object({
   name: z.string().min(1),
   entityType: z.string().min(1),
   registeredAddress: z.string().min(1),
@@ -21,10 +21,14 @@ const CreateCompanySchema = z.object({
   signatoryName: z.string().optional(),
   designation: z.string().optional(),
   tenderKeywords: z.array(z.string()).default([]),
+});
+
+const CompanyDocumentsSchema = z.object({
   documents: z.array(DocumentSchema).default([]),
 });
 
-export type CreateCompanyDto = z.infer<typeof CreateCompanySchema>;
+export type CompanyDetailsDto = z.infer<typeof CompanyDetailsSchema>;
+export type CompanyDocumentsDto = z.infer<typeof CompanyDocumentsSchema>;
 
 @Controller('companies')
 export class CompaniesController {
@@ -35,9 +39,30 @@ export class CompaniesController {
     return this.companiesService.findAll();
   }
 
+  @Get(':id')
+  async getOne(@Param('id', ParseIntPipe) id: number) {
+    const company = await this.companiesService.findOne(id);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    return company;
+  }
+
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateCompanySchema.parse(body) as CreateCompanyDto;
+    const parsed = CompanyDetailsSchema.parse(body) as CompanyDetailsDto;
     return this.companiesService.create(parsed);
+  }
+
+  @Put(':id')
+  async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    const parsed = CompanyDetailsSchema.parse(body) as CompanyDetailsDto;
+    return this.companiesService.update(id, parsed);
+  }
+
+  @Put(':id/documents')
+  async updateDocuments(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    const parsed = CompanyDocumentsSchema.parse(body) as CompanyDocumentsDto;
+    return this.companiesService.updateDocuments(id, parsed.documents);
   }
 }

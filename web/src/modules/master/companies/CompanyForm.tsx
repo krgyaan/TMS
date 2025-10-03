@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useMemo, useState, type ChangeEvent } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState, type ChangeEvent } from "react";
 import { X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
@@ -52,8 +53,10 @@ export type CompanyFormHandle = {
 };
 
 type CompanyFormProps = {
+    mode: "create" | "update";
+    initialValues?: PreparedCompanyValues | null;
     onSubmit: (values: PreparedCompanyValues) => Promise<boolean>;
-    onSuccess?: () => void;
+    onSuccess?: (values: PreparedCompanyValues) => void;
     onReset?: () => void;
     submitting: boolean;
     serverMessage: string | null;
@@ -103,8 +106,35 @@ const sanitizeArray = (items: string[] | undefined) =>
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
 
+const toFormValues = (values?: PreparedCompanyValues | null): CompanyFormValues => {
+    if (!values) {
+        return {
+            ...defaultValues,
+            branchAddresses: defaultValues.branchAddresses.map((entry) => ({ ...entry })),
+            tenderKeywords: [...(defaultValues.tenderKeywords ?? [])],
+        };
+    }
+
+    const branchList = (values.branchAddresses ?? []).length > 0 ? values.branchAddresses : [""];
+
+    return {
+        name: values.name,
+        entityType: values.entityType,
+        registeredAddress: values.registeredAddress,
+        branchAddresses: branchList.map((entry) => ({ value: entry })),
+        about: values.about ?? "",
+        website: values.website ?? "",
+        phone: values.phone ?? "",
+        email: values.email ?? "",
+        fax: values.fax ?? "",
+        signatoryName: values.signatoryName ?? "",
+        designation: values.designation ?? "",
+        tenderKeywords: [...(values.tenderKeywords ?? [])],
+    };
+};
+
 export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps>(
-    ({ onSubmit, onSuccess, onReset, submitting, serverMessage, serverError }, ref) => {
+    ({ mode, initialValues, onSubmit, onSuccess, onReset, submitting, serverMessage, serverError }, ref) => {
         const form = useForm<CompanyFormValues>({
             resolver: zodResolver(companyFormSchema),
             defaultValues,
@@ -114,6 +144,13 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
         const branchFields = useFieldArray({ control, name: "branchAddresses" });
         const tenderKeywords = watch("tenderKeywords") ?? [];
         const [tagInput, setTagInput] = useState("");
+
+        const initialFormValues = useMemo(() => toFormValues(initialValues), [initialValues]);
+
+        useEffect(() => {
+            reset(initialFormValues);
+            setTagInput("");
+        }, [initialFormValues, reset]);
 
         const entityOptions = useMemo(
             () => entityTypeOptions.filter((option) => option.id !== ""),
@@ -143,18 +180,19 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
         };
 
         const executeSubmit = handleSubmit(async (values) => {
-            const ok = await onSubmit(preparePayload(values));
+            const prepared = preparePayload(values);
+            const ok = await onSubmit(prepared);
             if (ok) {
-                reset(defaultValues);
+                reset(toFormValues(prepared));
                 setTagInput("");
-                onSuccess?.();
+                onSuccess?.(prepared);
             }
         });
 
         useImperativeHandle(ref, () => ({ submit: () => void executeSubmit() }));
 
         const handleReset = () => {
-            reset(defaultValues);
+            reset(initialFormValues);
             setTagInput("");
             onReset?.();
         };
@@ -179,11 +217,25 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
             setValue("tenderKeywords", next, { shouldDirty: true, shouldValidate: true });
         };
 
+        const isUpdate = mode === "update";
+        const cardTitle = isUpdate ? "Company Details" : "Create Company";
+        const cardDescription = isUpdate
+            ? "Review the saved company information and update it whenever needed."
+            : "Capture master information for a new company profile.";
+        const submitButtonLabel = submitting
+            ? isUpdate
+                ? "Saving..."
+                : "Submitting..."
+            : isUpdate
+                ? "Update Company"
+                : "Create Company";
+        const resetLabel = isUpdate ? "Revert Changes" : "Reset";
+
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Create Company</CardTitle>
-                    <CardDescription>Capture master information for a new company profile.</CardDescription>
+                    <CardTitle>{cardTitle}</CardTitle>
+                    <CardDescription>{cardDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
@@ -324,7 +376,7 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
 
                             <div className="flex items-center gap-2">
                                 <Button type="submit" disabled={submitting}>
-                                    {submitting ? "Submitting..." : "Submit"}
+                                    {submitButtonLabel}
                                 </Button>
                                 <Button
                                     type="button"
@@ -332,13 +384,15 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
                                     disabled={submitting}
                                     onClick={handleReset}
                                 >
-                                    Reset
+                                    {resetLabel}
                                 </Button>
                             </div>
-                            {serverMessage ? (
-                                <p className="text-sm text-emerald-500">{serverMessage}</p>
+                            {serverError ? (
+                                <FeedbackMessage tone="error" description={serverError} />
                             ) : null}
-                            {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
+                            {serverMessage && !serverError ? (
+                                <FeedbackMessage tone="success" description={serverMessage} />
+                            ) : null}
                         </form>
                     </Form>
                 </CardContent>
