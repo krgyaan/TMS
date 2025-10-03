@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
 import dbConfig, { validateDbEnv } from './config/db.config';
@@ -22,6 +22,7 @@ import { ItemsModule } from './modules/master/items/items.module';
 import { LoanPartiesModule } from './modules/master/loan-parties/loan-parties.module';
 import { LocationsModule } from './modules/master/locations/locations.module';
 import { OrganizationsModule } from './modules/master/organizations/organizations.module';
+import { CompaniesModule } from './modules/master/companies/companies.module';
 import { StatusesModule } from './modules/master/statuses/statuses.module';
 import { TqTypesModule } from './modules/master/tq-types/tq-types.module';
 import { VendorOrganizationsModule } from './modules/master/vendor-organizations/vendor-organizations.module';
@@ -53,6 +54,7 @@ import { VendorsModule } from './modules/master/vendors/vendors.module';
     LoanPartiesModule,
     LocationsModule,
     OrganizationsModule,
+    CompaniesModule,
     StatusesModule,
     TqTypesModule,
     VendorOrganizationsModule,

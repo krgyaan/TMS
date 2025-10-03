@@ -17,3 +17,5 @@ export * from './tq-types.schema';
 export * from './vendor-organizations.schema';
 export * from './vendors.schema';
 export * from './loan-parties.schema';
+export * from './companies.schema';
+export * from './company-documents.schema';

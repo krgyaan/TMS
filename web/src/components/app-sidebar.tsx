@@ -307,6 +307,10 @@ const data = {
                     url: paths.master.organizations,
                 },
                 {
+                    title: "Companies",
+                    url: paths.master.companies,
+                },
+                {
                     title: "Items and Headings",
                     url: paths.master.items,
                 },

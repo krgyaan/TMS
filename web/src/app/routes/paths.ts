@@ -74,6 +74,7 @@ export const paths = {
     organizations: "/master/organizations",
     organizations_create: "/master/organizations/create",
     organizations_edit: "/master/organizations/edit",
+    companies: "/master/companies",
     items: "/master/items",
     items_create: "/master/items/create",
     items_edit: "/master/items/edit",

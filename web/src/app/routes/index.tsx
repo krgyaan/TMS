@@ -76,6 +76,7 @@ const Master_Statuses_Edit = lazy(() => import("@/modules/master/statuses"));
 const Master_Organizations = lazy(() => import("@/modules/master/organizations"));
 const Master_Organizations_Create = lazy(() => import("@/modules/master/organizations"));
 const Master_Organizations_Edit = lazy(() => import("@/modules/master/organizations"));
+const Master_Companies = lazy(() => import("@/modules/master/companies"));
 const Master_Items = lazy(() => import("@/modules/master/items"));
 const Master_Items_Create = lazy(() => import("@/modules/master/items"));
 const Master_Items_Edit = lazy(() => import("@/modules/master/items"));
@@ -193,6 +194,7 @@ export default function AppRoutes() {
                     <Route path={paths.master.organizations} element={<Suspense fallback={<Loading />}><Master_Organizations /></Suspense>} />
                     <Route path={paths.master.organizations_create} element={<Suspense fallback={<Loading />}><Master_Organizations_Create /></Suspense>} />
                     <Route path={paths.master.organizations_edit} element={<Suspense fallback={<Loading />}><Master_Organizations_Edit /></Suspense>} />
+                    <Route path={paths.master.companies} element={<Suspense fallback={<Loading />}><Master_Companies /></Suspense>} />
                     <Route path={paths.master.items} element={<Suspense fallback={<Loading />}><Master_Items /></Suspense>} />
                     <Route path={paths.master.items_create} element={<Suspense fallback={<Loading />}><Master_Items_Create /></Suspense>} />
                     <Route path={paths.master.items_edit} element={<Suspense fallback={<Loading />}><Master_Items_Edit /></Suspense>} />
