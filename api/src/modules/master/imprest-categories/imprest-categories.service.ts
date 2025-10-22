@@ -1,7 +1,10 @@
 ﻿import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
-import { imprestCategories, type ImprestCategory } from '../../../db/imprest-categories.schema';
+import {
+  imprestCategories,
+  type ImprestCategory,
+} from '../../../db/imprest-categories.schema';
 
 @Injectable()
 export class ImprestCategoriesService {

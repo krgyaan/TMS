@@ -20,7 +20,7 @@ export class RolesController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateRoleSchema.parse(body) as CreateRoleDto;
+    const parsed = CreateRoleSchema.parse(body);
     return this.rolesService.create(parsed);
   }
 }

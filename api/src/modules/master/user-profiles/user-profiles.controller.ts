@@ -35,7 +35,7 @@ export class UserProfilesController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateUserProfileSchema.parse(body) as CreateUserProfileDto;
+    const parsed = CreateUserProfileSchema.parse(body);
     return this.userProfilesService.create(parsed);
   }
 }

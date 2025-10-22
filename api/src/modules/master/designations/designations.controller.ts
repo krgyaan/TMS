@@ -20,7 +20,7 @@ export class DesignationsController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateDesignationSchema.parse(body) as CreateDesignationDto;
+    const parsed = CreateDesignationSchema.parse(body);
     return this.designationsService.create(parsed);
   }
 }

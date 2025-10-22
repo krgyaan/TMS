@@ -1,7 +1,10 @@
 ﻿import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
-import { vendorOrganizations, type VendorOrganization } from '../../../db/vendor-organizations.schema';
+import {
+  vendorOrganizations,
+  type VendorOrganization,
+} from '../../../db/vendor-organizations.schema';
 
 @Injectable()
 export class VendorOrganizationsService {

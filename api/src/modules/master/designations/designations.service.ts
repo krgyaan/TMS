@@ -16,7 +16,10 @@ export class DesignationsService {
   }
 
   async create(data: NewDesignation): Promise<Designation> {
-    const rows = (await this.db.insert(designations).values(data).returning()) as unknown as Designation[];
+    const rows = (await this.db
+      .insert(designations)
+      .values(data)
+      .returning()) as unknown as Designation[];
     return rows[0];
   }
 }

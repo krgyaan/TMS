@@ -1,7 +1,10 @@
 ﻿import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
-import { documentsSubmitted, type DocumentSubmitted } from '../../../db/documents-submitted.schema';
+import {
+  documentsSubmitted,
+  type DocumentSubmitted,
+} from '../../../db/documents-submitted.schema';
 
 @Injectable()
 export class DocumentsSubmittedService {

@@ -16,7 +16,10 @@ export class OauthAccountsService {
   }
 
   async create(data: NewOauthAccount): Promise<OauthAccount> {
-    const rows = (await this.db.insert(oauthAccounts).values(data).returning()) as unknown as OauthAccount[];
+    const rows = (await this.db
+      .insert(oauthAccounts)
+      .values(data)
+      .returning()) as unknown as OauthAccount[];
     return rows[0];
   }
 }

@@ -28,7 +28,7 @@ export class OauthAccountsController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateOauthAccountSchema.parse(body) as CreateOauthAccountDto;
+    const parsed = CreateOauthAccountSchema.parse(body);
     if (parsed.expiresAt) {
       parsed.expiresAt = new Date(parsed.expiresAt) as any;
     }

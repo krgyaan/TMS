@@ -23,8 +23,7 @@ export class UsersController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateUserSchema.parse(body) as CreateUserDto;
+    const parsed = CreateUserSchema.parse(body);
     return this.usersService.create(parsed);
   }
 }
-

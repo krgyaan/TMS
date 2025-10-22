@@ -1,4 +1,11 @@
-import { pgTable, bigserial, varchar, text, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  bigserial,
+  varchar,
+  text,
+  timestamp,
+  jsonb,
+} from 'drizzle-orm/pg-core';
 
 export const companies = pgTable('companies', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
@@ -14,8 +21,12 @@ export const companies = pgTable('companies', {
   signatoryName: varchar('signatory_name', { length: 255 }),
   designation: varchar('designation', { length: 255 }),
   tenderKeywords: jsonb('tender_keywords').$type<string[]>().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type Company = typeof companies.$inferSelect;

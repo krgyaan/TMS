@@ -1,4 +1,13 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { CompaniesService } from './companies.service';
 
@@ -50,19 +59,22 @@ export class CompaniesController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CompanyDetailsSchema.parse(body) as CompanyDetailsDto;
+    const parsed = CompanyDetailsSchema.parse(body);
     return this.companiesService.create(parsed);
   }
 
   @Put(':id')
   async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
-    const parsed = CompanyDetailsSchema.parse(body) as CompanyDetailsDto;
+    const parsed = CompanyDetailsSchema.parse(body);
     return this.companiesService.update(id, parsed);
   }
 
   @Put(':id/documents')
-  async updateDocuments(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
-    const parsed = CompanyDocumentsSchema.parse(body) as CompanyDocumentsDto;
+  async updateDocuments(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+  ) {
+    const parsed = CompanyDocumentsSchema.parse(body);
     return this.companiesService.updateDocuments(id, parsed.documents);
   }
 }

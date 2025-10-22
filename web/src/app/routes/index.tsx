@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
@@ -6,6 +6,12 @@ import DashboardLayout from "@/app/layout/DashboardLayout";
 import Login from "@/modules/auth/login";
 import Dashboard from "@/modules/dashboard";
 import { paths } from "@/app/routes/paths";
+
+
+const Auth_GoogleCallback = lazy(() => import("@/modules/auth/google-callback"));
+// Integrations
+const Integrations_Google = lazy(() => import("@/modules/integrations/google"));
+const Integrations_GoogleStatus = lazy(() => import("@/modules/integrations/google/status"));
 
 // Tendering
 const Tendering_Tenders = lazy(() => import("@/modules/tendering/tenders"));
@@ -119,12 +125,16 @@ export default function AppRoutes() {
         <Routes>
             <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<Login />} />
+            <Route path={paths.auth.googleCallback} element={<Suspense fallback={<Loading />}><Auth_GoogleCallback /></Suspense>} />
             </Route>
+            <Route path={paths.integrations.googleStatus} element={<Suspense fallback={<Loading />}><Integrations_GoogleStatus /></Suspense>} />
 
             <Route element={<ProtectedRoute />}>
                 <Route element={<DashboardLayout />}>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                    {/* Integrations */}
+                    <Route path={paths.integrations.google} element={<Suspense fallback={<Loading />}><Integrations_Google /></Suspense>} />
                     {/* Tendering */}
                     <Route path={paths.tendering.tenders} element={<Suspense fallback={<Loading />}><Tendering_Tenders /></Suspense>} />
                     <Route path={paths.tendering.tenderCreate} element={<Suspense fallback={<Loading />}><Tender_Create /></Suspense>} />

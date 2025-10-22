@@ -1,9 +1,14 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import { createDb, createPool } from './index';
 import { roles } from './roles.schema';
 import { teams } from './teams.schema';
 import { designations } from './designations.schema';
+import { users } from './users.schema';
 import { sql } from 'drizzle-orm';
+import { hash } from 'argon2';
+
+const defaultAdminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
+const defaultAdminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -12,10 +17,24 @@ async function main() {
   const pool = createPool(url);
   const db = createDb(pool);
 
-   // --- RESET step: Clear existing data ---
-   await db.execute(sql`TRUNCATE TABLE ${roles} RESTART IDENTITY CASCADE`);
-   await db.execute(sql`TRUNCATE TABLE ${designations} RESTART IDENTITY CASCADE`);
-   await db.execute(sql`TRUNCATE TABLE ${teams} RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE ${users} RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE ${roles} RESTART IDENTITY CASCADE`);
+  await db.execute(
+    sql`TRUNCATE TABLE ${designations} RESTART IDENTITY CASCADE`,
+  );
+  await db.execute(sql`TRUNCATE TABLE ${teams} RESTART IDENTITY CASCADE`);
+
+  const adminPassword = await hash(defaultAdminPassword);
+
+  await db
+    .insert(users)
+    .values({
+      name: 'System Admin',
+      email: defaultAdminEmail,
+      password: adminPassword,
+      isActive: true,
+    })
+    .onConflictDoNothing({ target: users.email });
 
   await db
     .insert(roles)
@@ -56,19 +75,20 @@ async function main() {
   ];
   const existingTeams = await db.select({ name: teams.name }).from(teams);
   const existingTeamNames = new Set(existingTeams.map((t) => t.name));
-  const newTeams = teamNames.filter((name) => !existingTeamNames.has(name)).map((name) => ({ name }));
+  const newTeams = teamNames
+    .filter((name) => !existingTeamNames.has(name))
+    .map((name) => ({ name }));
   if (newTeams.length > 0) {
     await db.insert(teams).values(newTeams);
   }
 
-
   await pool.end();
-  // eslint-disable-next-line no-console
+
   console.log('Seed completed');
+  console.log(`Admin user: ${defaultAdminEmail} / ${defaultAdminPassword}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

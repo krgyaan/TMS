@@ -1,10 +1,22 @@
-import { ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { companies, type Company } from '../../../db/companies.schema';
-import { companyDocuments, type CompanyDocument } from '../../../db/company-documents.schema';
-import type { CompanyDetailsDto, CompanyDocumentsDto } from './companies.controller';
+import {
+  companyDocuments,
+  type CompanyDocument,
+} from '../../../db/company-documents.schema';
+import type {
+  CompanyDetailsDto,
+  CompanyDocumentsDto,
+} from './companies.controller';
 
 export type CompanyWithDocuments = Company & { documents: CompanyDocument[] };
 
@@ -18,11 +30,18 @@ export class CompaniesService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  private hydrateCompany(company: Company, documents: CompanyDocument[]): CompanyWithDocuments {
+  private hydrateCompany(
+    company: Company,
+    documents: CompanyDocument[],
+  ): CompanyWithDocuments {
     return {
       ...company,
-      branchAddresses: Array.isArray(company.branchAddresses) ? company.branchAddresses : [],
-      tenderKeywords: Array.isArray(company.tenderKeywords) ? company.tenderKeywords : [],
+      branchAddresses: Array.isArray(company.branchAddresses)
+        ? company.branchAddresses
+        : [],
+      tenderKeywords: Array.isArray(company.tenderKeywords)
+        ? company.tenderKeywords
+        : [],
       documents,
     } satisfies CompanyWithDocuments;
   }
@@ -40,11 +59,17 @@ export class CompaniesService {
       docsByCompany.set(doc.companyId, collection);
     }
 
-    return companyRows.map((company) => this.hydrateCompany(company, docsByCompany.get(company.id) ?? []));
+    return companyRows.map((company) =>
+      this.hydrateCompany(company, docsByCompany.get(company.id) ?? []),
+    );
   }
 
   async findOne(id: number): Promise<CompanyWithDocuments | null> {
-    const rows = (await this.db.select().from(companies).where(eq(companies.id, id)).limit(1)) as Company[];
+    const rows = (await this.db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, id))
+      .limit(1)) as Company[];
     const company = rows.at(0);
     if (!company) {
       return null;
@@ -65,7 +90,7 @@ export class CompaniesService {
       .filter((tag) => tag.length > 0);
 
     try {
-      const [company] = (await this.db
+      const [company] = await this.db
         .insert(companies)
         .values({
           name: data.name.trim(),
@@ -81,23 +106,32 @@ export class CompaniesService {
           designation: this.normalizeOptional(data.designation),
           tenderKeywords,
         })
-        .returning()) as Company[];
+        .returning();
 
       return this.hydrateCompany(company, []);
     } catch (error: any) {
       if (error?.code === '23505') {
         throw new ConflictException('Company name already exists');
       }
-      if (error?.message && typeof error.message === 'string' && error.message.includes('relation "companies"')) {
-        throw new InternalServerErrorException('Companies tables missing. Run database migrations and try again.');
+      if (
+        error?.message &&
+        typeof error.message === 'string' &&
+        error.message.includes('relation "companies"')
+      ) {
+        throw new InternalServerErrorException(
+          'Companies tables missing. Run database migrations and try again.',
+        );
       }
-      // eslint-disable-next-line no-console
+
       console.error('Failed to create company', error);
       throw new InternalServerErrorException('Unable to create company');
     }
   }
 
-  async update(id: number, data: CompanyDetailsDto): Promise<CompanyWithDocuments> {
+  async update(
+    id: number,
+    data: CompanyDetailsDto,
+  ): Promise<CompanyWithDocuments> {
     const branchAddresses = (data.branchAddresses ?? [])
       .map((addr) => addr.trim())
       .filter((addr) => addr.length > 0);
@@ -147,25 +181,40 @@ export class CompaniesService {
       if (error?.code === '23505') {
         throw new ConflictException('Company name already exists');
       }
-      if (error?.message && typeof error.message === 'string' && error.message.includes('relation "companies"')) {
-        throw new InternalServerErrorException('Companies tables missing. Run database migrations and try again.');
+      if (
+        error?.message &&
+        typeof error.message === 'string' &&
+        error.message.includes('relation "companies"')
+      ) {
+        throw new InternalServerErrorException(
+          'Companies tables missing. Run database migrations and try again.',
+        );
       }
-      // eslint-disable-next-line no-console
+
       console.error(`Failed to update company ${id}`, error);
       throw new InternalServerErrorException('Unable to update company');
     }
   }
 
-  async updateDocuments(id: number, payload: CompanyDocumentsDto['documents']): Promise<CompanyWithDocuments> {
+  async updateDocuments(
+    id: number,
+    payload: CompanyDocumentsDto['documents'],
+  ): Promise<CompanyWithDocuments> {
     try {
       await this.db.transaction(async (tx) => {
-        const rows = (await tx.select().from(companies).where(eq(companies.id, id)).limit(1)) as Company[];
+        const rows = (await tx
+          .select()
+          .from(companies)
+          .where(eq(companies.id, id))
+          .limit(1)) as Company[];
         const company = rows.at(0);
         if (!company) {
           throw new NotFoundException('Company not found');
         }
 
-        await tx.delete(companyDocuments).where(eq(companyDocuments.companyId, id));
+        await tx
+          .delete(companyDocuments)
+          .where(eq(companyDocuments.companyId, id));
 
         const documentsPayload = (payload ?? [])
           .map((doc) => ({
@@ -190,12 +239,20 @@ export class CompaniesService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      if (error?.message && typeof error.message === 'string' && error.message.includes('relation "company_documents"')) {
-        throw new InternalServerErrorException('Company documents table missing. Run database migrations and try again.');
+      if (
+        error?.message &&
+        typeof error.message === 'string' &&
+        error.message.includes('relation "company_documents"')
+      ) {
+        throw new InternalServerErrorException(
+          'Company documents table missing. Run database migrations and try again.',
+        );
       }
-      // eslint-disable-next-line no-console
+
       console.error(`Failed to update company documents for ${id}`, error);
-      throw new InternalServerErrorException('Unable to update company documents');
+      throw new InternalServerErrorException(
+        'Unable to update company documents',
+      );
     }
   }
 }

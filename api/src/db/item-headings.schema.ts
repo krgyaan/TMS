@@ -1,4 +1,11 @@
-import { pgTable, bigserial, varchar, boolean, timestamp, bigint } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  bigserial,
+  varchar,
+  boolean,
+  timestamp,
+  bigint,
+} from 'drizzle-orm/pg-core';
 import { teams } from './teams.schema';
 
 export const itemHeadings = pgTable('item_headings', {
@@ -6,10 +13,13 @@ export const itemHeadings = pgTable('item_headings', {
   name: varchar('name', { length: 100 }).notNull().unique(),
   teamId: bigint('team_id', { mode: 'number' }).references(() => teams.id),
   status: boolean('status').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type ItemHeading = typeof itemHeadings.$inferSelect;
 export type NewItemHeading = typeof itemHeadings.$inferInsert;
-

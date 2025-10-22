@@ -23,8 +23,12 @@ export const oauthAccounts = pgTable('oauth_accounts', {
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   scopes: text('scopes'),
   rawPayload: json('raw_payload'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type OauthAccount = typeof oauthAccounts.$inferSelect;

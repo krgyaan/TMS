@@ -12,7 +12,10 @@ export class TeamsService {
   }
 
   async create(data: NewTeam): Promise<Team> {
-    const rows = (await this.db.insert(teams).values(data).returning()) as unknown as Team[];
+    const rows = (await this.db
+      .insert(teams)
+      .values(data)
+      .returning()) as unknown as Team[];
     return rows[0];
   }
 }

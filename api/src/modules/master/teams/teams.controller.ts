@@ -20,7 +20,7 @@ export class TeamsController {
 
   @Post()
   async create(@Body() body: unknown) {
-    const parsed = CreateTeamSchema.parse(body) as CreateTeamDto;
+    const parsed = CreateTeamSchema.parse(body);
     return this.teamsService.create(parsed);
   }
 }

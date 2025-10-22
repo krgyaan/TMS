@@ -1,7 +1,12 @@
-export const paths = {
+﻿export const paths = {
   root: "/",
   auth: {
     login: "/login",
+    googleCallback: "/login/google",
+  },
+  integrations: {
+    google: "/integrations/google",
+    googleStatus: "/integrations/google/status",
   },
   tendering: {
     tenders: "/tendering/tenders",

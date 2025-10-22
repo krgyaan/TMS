@@ -1,6 +1,6 @@
-"use client"
+﻿"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
     AudioWaveform,
     Command,
@@ -14,19 +14,20 @@ import {
     Gauge,
     Settings,
     Share2,
-} from "lucide-react"
+} from "lucide-react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
-import { paths } from "@/app/routes/paths"
+import { NavMain } from "@/components/nav-main";
+import { NavUser } from "@/components/nav-user";
+import { TeamSwitcher } from "@/components/team-switcher";
+import { paths } from "@/app/routes/paths";
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
     SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { getStoredUser, clearAuthSession } from "@/lib/auth";
 
 const data = {
     user: {
@@ -79,15 +80,15 @@ const data = {
                     url: paths.tendering.rfqs,
                 },
                 {
-                    title: "EMD/Tender fee",
+                    title: "EMD/Tender fees",
                     url: paths.tendering.emdsTenderFees,
                 },
                 {
-                    title: "Document Checklist",
+                    title: "Checklists",
                     url: paths.tendering.checklists,
                 },
                 {
-                    title: "Costing Creation",
+                    title: "Costing Sheets",
                     url: paths.tendering.costingSheets,
                 },
                 {
@@ -95,35 +96,34 @@ const data = {
                     url: paths.tendering.costingApproval,
                 },
                 {
-                    title: "Bid Submission",
+                    title: "Bid Submissions",
                     url: paths.tendering.bidSubmissions,
                 },
                 {
-                    title: "TQ Management",
+                    title: "TQs",
                     url: paths.tendering.tqs,
                 },
                 {
-                    title: "RA Managaement",
+                    title: "RA",
                     url: paths.tendering.ras,
                 },
                 {
-                    title: "Result",
+                    title: "Results",
                     url: paths.tendering.results,
-                }
+                },
             ],
         },
         {
             title: "Operations",
             url: "#",
             icon: Wrench,
-            isActive: false,
             items: [
                 {
                     title: "Work Order",
                     url: paths.operations.workOrder,
                 },
                 {
-                    title: "Kick Off Meeting",
+                    title: "Kick Off",
                     url: paths.operations.kickOff,
                 },
                 {
@@ -133,21 +133,20 @@ const data = {
             ],
         },
         {
-            title: "Service",
+            title: "Services",
             url: "#",
             icon: Headset,
-            isActive: false,
             items: [
                 {
-                    title: "Customer Service",
+                    title: "Customer",
                     url: paths.services.customer,
                 },
                 {
-                    title: "Conference Call",
+                    title: "Conference",
                     url: paths.services.conference,
                 },
                 {
-                    title: "Service Visit",
+                    title: "Visit",
                     url: paths.services.visit,
                 },
                 {
@@ -160,30 +159,29 @@ const data = {
             title: "BI Dashboard",
             url: "#",
             icon: BarChart3,
-            isActive: false,
             items: [
                 {
-                    title: "Demand Drafts",
+                    title: "Demand Draft",
                     url: paths.bi.demandDraft,
                 },
                 {
-                    title: "FDRs",
+                    title: "FDR",
                     url: paths.bi.fdr,
                 },
                 {
-                    title: "Cheques",
+                    title: "Cheque",
                     url: paths.bi.cheque,
                 },
                 {
-                    title: "Bank Guarantees",
+                    title: "Bank Guarantee",
                     url: paths.bi.bankGuarantee,
                 },
                 {
-                    title: "Bank Transfers",
+                    title: "Bank Transfer",
                     url: paths.bi.bankTransfer,
                 },
                 {
-                    title: "Pay on Portals",
+                    title: "Pay on Portal",
                     url: paths.bi.payOnPortal,
                 },
             ],
@@ -192,14 +190,13 @@ const data = {
             title: "Accounts",
             url: "#",
             icon: Banknote,
-            isActive: false,
             items: [
                 {
-                    title: "Employee Imprest",
+                    title: "Imprests",
                     url: paths.accounts.imprests,
                 },
                 {
-                    title: "Finance Docs",
+                    title: "Financial Docs",
                     url: paths.accounts.financialDocs,
                 },
                 {
@@ -208,18 +205,22 @@ const data = {
                 },
                 {
                     title: "Projects",
-                    url: "#",
+                    url: paths.accounts.projects,
                 },
                 {
-                    title: "Account Checklists",
+                    title: "Accounts Checklists",
                     url: paths.accounts.accountChecklists,
+                },
+                {
+                    title: "TDS Checklists",
+                    url: paths.accounts.tdsChecklists,
                 },
                 {
                     title: "GST Checklists",
                     url: paths.accounts.gstChecklists,
                 },
                 {
-                    title: "Fixes Expense",
+                    title: "Fixed Expenses",
                     url: paths.accounts.fixedExpenses,
                 },
             ],
@@ -228,7 +229,6 @@ const data = {
             title: "CRM",
             url: "#",
             icon: Users,
-            isActive: false,
             items: [
                 {
                     title: "Leads",
@@ -239,7 +239,7 @@ const data = {
                     url: paths.crm.enquiries,
                 },
                 {
-                    title: "Approve Costing",
+                    title: "Costings",
                     url: paths.crm.costings,
                 },
                 {
@@ -252,7 +252,6 @@ const data = {
             title: "Performance",
             url: "#",
             icon: Gauge,
-            isActive: false,
             items: [
                 {
                     title: "Tender Executive",
@@ -263,100 +262,50 @@ const data = {
                     url: paths.performance.teamLeader,
                 },
                 {
-                    title: "Operation",
+                    title: "Operation Team",
                     url: paths.performance.operationTeam,
                 },
                 {
-                    title: "Accounts",
+                    title: "Account Team",
                     url: paths.performance.accountTeam,
                 },
                 {
-                    title: "OEMs",
+                    title: "OEM Dashboard",
                     url: paths.performance.oemDashboard,
                 },
                 {
-                    title: "Business",
+                    title: "Business Dashboard",
                     url: paths.performance.businessDashboard,
                 },
                 {
-                    title: "Customer",
+                    title: "Customer Dashboard",
                     url: paths.performance.customerDashboard,
                 },
                 {
-                    title: "Location",
+                    title: "Location Dashboard",
                     url: paths.performance.locationDashboard,
                 },
             ],
         },
         {
-            title: "Master",
+            title: "Settings",
             url: "#",
             icon: Settings,
-            isActive: false,
             items: [
                 {
-                    title: "Employees",
+                    title: "Users",
                     url: paths.master.users,
                 },
                 {
-                    title: "Tender Statuses",
+                    title: "Roles",
                     url: paths.master.statuses,
-                },
-                {
-                    title: "Tender Orgs",
-                    url: paths.master.organizations,
-                },
-                {
-                    title: "Companies",
-                    url: paths.master.companies,
-                },
-                {
-                    title: "Items and Headings",
-                    url: paths.master.items,
-                },
-                {
-                    title: "Vendors/OEM",
-                    url: paths.master.vendors,
-                },
-                {
-                    title: "Tender Websites",
-                    url: paths.master.websites,
-                },
-                {
-                    title: "Tender Locations",
-                    url: paths.master.locations,
-                },
-                {
-                    title: "Document Submitted",
-                    url: paths.master.documentSubmitted,
-                },
-                {
-                    title: "Imprest Categories",
-                    url: paths.master.imprestCategory,
-                },
-                {
-                    title: "Document Types",
-                    url: paths.master.documentType,
-                },
-                {
-                    title: "Financial Year",
-                    url: paths.master.financialYear,
-                },
-                {
-                    title: "Followup Categories",
-                    url: paths.master.followupCategories,
-                },
-                {
-                    title: "EMD Responsibilities",
-                    url: paths.master.emdsResponsibilities,
                 },
             ],
         },
         {
-            title: 'Shared',
-            url: '#',
+            title: "Shared",
+            url: "#",
             icon: Share2,
-            isActive: true,
             items: [
                 {
                     title: "Follow Ups",
@@ -372,10 +321,24 @@ const data = {
                 }
             ],
         },
-    ]
-}
+    ],
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const storedUser = getStoredUser();
+    const currentUser = storedUser ?? {
+        id: 0,
+        name: data.user.name,
+        email: data.user.email,
+        username: null,
+        mobile: null,
+    };
+
+    const handleLogout = React.useCallback(() => {
+        clearAuthSession();
+        window.location.href = "/login";
+    }, []);
+
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
@@ -385,9 +348,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavMain items={data.navMain} />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser user={data.user} />
+                <NavUser user={currentUser} onLogout={handleLogout} />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
-    )
+    );
 }

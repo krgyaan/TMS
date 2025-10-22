@@ -1,6 +1,8 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
+import authConfig, { validateAuthEnv } from './config/auth.config';
+import googleConfig, { validateGoogleEnv } from './config/google.config';
 import dbConfig, { validateDbEnv } from './config/db.config';
 import { DatabaseModule } from './db/database.module';
 import { UsersModule } from './modules/master/users/users.module';
@@ -27,14 +29,21 @@ import { StatusesModule } from './modules/master/statuses/statuses.module';
 import { TqTypesModule } from './modules/master/tq-types/tq-types.module';
 import { VendorOrganizationsModule } from './modules/master/vendor-organizations/vendor-organizations.module';
 import { VendorsModule } from './modules/master/vendors/vendors.module';
+import { GoogleIntegrationModule } from './modules/integrations/google/google.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       expandVariables: true,
-      load: [appConfig, dbConfig],
-      validate: (env) => ({ ...validateAppEnv(env), ...validateDbEnv(env) }),
+      load: [appConfig, dbConfig, googleConfig, authConfig],
+      validate: (env) => ({
+        ...validateAppEnv(env),
+        ...validateDbEnv(env),
+        ...validateGoogleEnv(env),
+        ...validateAuthEnv(env),
+      }),
     }),
     DatabaseModule,
     UsersModule,
@@ -59,6 +68,9 @@ import { VendorsModule } from './modules/master/vendors/vendors.module';
     TqTypesModule,
     VendorOrganizationsModule,
     VendorsModule,
+    GoogleIntegrationModule,
+    AuthModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

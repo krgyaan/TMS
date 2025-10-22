@@ -3,7 +3,9 @@ import { DocumentsSubmittedService } from './documents-submitted.service';
 
 @Controller('documents-submitted')
 export class DocumentsSubmittedController {
-  constructor(private readonly documentsSubmittedService: DocumentsSubmittedService) {}
+  constructor(
+    private readonly documentsSubmittedService: DocumentsSubmittedService,
+  ) {}
 
   @Get()
   async list() {

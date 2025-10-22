@@ -20,8 +20,12 @@ export const userProfiles = pgTable('user_profiles', {
   dateOfBirth: date('date_of_birth'),
   gender: varchar('gender', { length: 20 }),
   employeeCode: varchar('employee_code', { length: 50 }).unique(),
-  designationId: bigint('designation_id', { mode: 'number' }).references(() => designations.id),
-  primaryTeamId: bigint('primary_team_id', { mode: 'number' }).references(() => teams.id),
+  designationId: bigint('designation_id', { mode: 'number' }).references(
+    () => designations.id,
+  ),
+  primaryTeamId: bigint('primary_team_id', { mode: 'number' }).references(
+    () => teams.id,
+  ),
   altEmail: varchar('alt_email', { length: 255 }),
   emergencyContactName: varchar('emergency_contact_name', { length: 255 }),
   emergencyContactPhone: varchar('emergency_contact_phone', { length: 20 }),
@@ -29,10 +33,16 @@ export const userProfiles = pgTable('user_profiles', {
   signature: varchar('signature', { length: 255 }),
   dateOfJoining: date('date_of_joining'),
   dateOfExit: date('date_of_exit'),
-  timezone: varchar('timezone', { length: 50 }).notNull().default('Asia/Kolkata'),
+  timezone: varchar('timezone', { length: 50 })
+    .notNull()
+    .default('Asia/Kolkata'),
   locale: varchar('locale', { length: 10 }).notNull().default('en'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type UserProfile = typeof userProfiles.$inferSelect;

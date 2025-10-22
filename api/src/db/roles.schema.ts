@@ -1,4 +1,10 @@
-import { pgTable, bigserial, varchar, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  bigserial,
+  varchar,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const roles = pgTable(
   'roles',
@@ -6,11 +12,18 @@ export const roles = pgTable(
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     guardName: varchar('guard_name', { length: 50 }).notNull().default('web'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => ({
-    nameGuardIdx: uniqueIndex('roles_name_guard_index').on(table.name, table.guardName),
+    nameGuardIdx: uniqueIndex('roles_name_guard_index').on(
+      table.name,
+      table.guardName,
+    ),
   }),
 );
 

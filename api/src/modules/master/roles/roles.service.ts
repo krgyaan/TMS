@@ -12,7 +12,10 @@ export class RolesService {
   }
 
   async create(data: NewRole): Promise<Role> {
-    const rows = (await this.db.insert(roles).values(data).returning()) as unknown as Role[];
+    const rows = (await this.db
+      .insert(roles)
+      .values(data)
+      .returning()) as unknown as Role[];
     return rows[0];
   }
 }

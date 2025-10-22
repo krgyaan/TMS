@@ -16,7 +16,10 @@ export class UserProfilesService {
   }
 
   async create(data: NewUserProfile): Promise<UserProfile> {
-    const rows = (await this.db.insert(userProfiles).values(data).returning()) as unknown as UserProfile[];
+    const rows = (await this.db
+      .insert(userProfiles)
+      .values(data)
+      .returning()) as unknown as UserProfile[];
     return rows[0];
   }
 }

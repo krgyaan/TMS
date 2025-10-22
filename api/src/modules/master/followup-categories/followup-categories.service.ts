@@ -1,7 +1,10 @@
 ﻿import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
-import { followupCategories, type FollowupCategory } from '../../../db/followup-categories.schema';
+import {
+  followupCategories,
+  type FollowupCategory,
+} from '../../../db/followup-categories.schema';
 
 @Injectable()
 export class FollowupCategoriesService {

@@ -14,7 +14,10 @@ export const DRIZZLE = Symbol('DRIZZLE_DB');
       provide: DB_POOL,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const cfg = config.get<{ url: string; ssl: boolean; maxPool: number }>('db', { infer: true });
+        const cfg = config.get<{ url: string; ssl: boolean; maxPool: number }>(
+          'db',
+          { infer: true },
+        );
         if (!cfg?.url) throw new Error('DATABASE_URL not configured');
         return createPool(cfg.url, cfg.maxPool, cfg.ssl);
       },

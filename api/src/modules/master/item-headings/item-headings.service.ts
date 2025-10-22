@@ -1,7 +1,10 @@
 ﻿import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
-import { itemHeadings, type ItemHeading } from '../../../db/item-headings.schema';
+import {
+  itemHeadings,
+  type ItemHeading,
+} from '../../../db/item-headings.schema';
 
 @Injectable()
 export class ItemHeadingsService {

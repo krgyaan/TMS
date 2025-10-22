@@ -20,8 +20,12 @@ export const users = pgTable(
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     isActive: boolean('is_active').notNull().default(true),
     rememberToken: varchar('remember_token', { length: 255 }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => ({
