@@ -1,4 +1,5 @@
 myenv
 .env
-ml-ocr/__pycache__
-ml-ocr/CONSTANTS.py
+*/__pycache__
+*/CONSTANTS.py
+*/samples
