@@ -70,7 +70,6 @@ import { AuthModule } from './modules/auth/auth.module';
     VendorsModule,
     GoogleIntegrationModule,
     AuthModule,
-    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

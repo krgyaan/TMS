@@ -1,5 +1,6 @@
 ﻿import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
 import authConfig, { type AuthConfig } from '../../config/auth.config';
 import { UsersModule } from '../master/users/users.module';
@@ -10,6 +11,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
+    PassportModule,
     ConfigModule.forFeature(authConfig),
     JwtModule.registerAsync({
       imports: [ConfigModule.forFeature(authConfig)],

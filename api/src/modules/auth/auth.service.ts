@@ -38,6 +38,9 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive');
+    }
     return this.issueSession(user.id);
   }
 

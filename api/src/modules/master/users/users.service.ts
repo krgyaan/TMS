@@ -84,14 +84,11 @@ export class UsersService {
   }
 
   async verifyPassword(user: User, candidate: string): Promise<boolean> {
-    if (!candidate) {
+    if (!candidate || !user.password) {
       return false;
     }
     try {
-      if (user.password?.startsWith('$argon2')) {
-        return await verify(user.password, candidate);
-      }
-      return user.password === candidate;
+      return await verify(user.password, candidate);
     } catch {
       return false;
     }
