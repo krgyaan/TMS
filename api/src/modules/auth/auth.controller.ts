@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { Public } from './decorators/public.decorator';
 import type { SafeUser } from '../master/users/users.service';
 import authConfig, { type AuthConfig } from '../../config/auth.config';
 
@@ -35,6 +36,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Public()
   async login(@Body() body: unknown) {
     const { email, password } = LoginSchema.parse(body);
     return this.authService.loginWithPassword(email, password);
@@ -47,11 +49,13 @@ export class AuthController {
   }
 
   @Get('google/url')
+  @Public()
   async googleUrl() {
     return this.authService.generateGoogleLoginUrl();
   }
 
   @Get('google/callback')
+  @Public()
   async googleCallback(
     @Query() query: Record<string, unknown>,
     @Res() res: Response,

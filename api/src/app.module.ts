@@ -1,4 +1,5 @@
 ﻿import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import appConfig, { validateAppEnv } from './config/app.config';
 import authConfig, { validateAuthEnv } from './config/auth.config';
@@ -31,6 +32,7 @@ import { VendorOrganizationsModule } from './modules/master/vendor-organizations
 import { VendorsModule } from './modules/master/vendors/vendors.module';
 import { GoogleIntegrationModule } from './modules/integrations/google/google.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -72,6 +74,12 @@ import { AuthModule } from './modules/auth/auth.module';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
