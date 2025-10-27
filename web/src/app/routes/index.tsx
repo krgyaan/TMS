@@ -123,9 +123,9 @@ const Loading = () => <div style={{ padding: 12 }}>Loading...</div>;
 export default function AppRoutes() {
     return (
         <Routes>
+            <Route path={paths.auth.googleCallback} element={<Suspense fallback={<Loading />}><Auth_GoogleCallback /></Suspense>} />
             <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<Login />} />
-            <Route path={paths.auth.googleCallback} element={<Suspense fallback={<Loading />}><Auth_GoogleCallback /></Suspense>} />
             </Route>
             <Route path={paths.integrations.googleStatus} element={<Suspense fallback={<Loading />}><Integrations_GoogleStatus /></Suspense>} />
 

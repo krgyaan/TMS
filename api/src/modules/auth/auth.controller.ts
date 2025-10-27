@@ -37,9 +37,36 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  async login(@Body() body: unknown) {
+  async login(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const { email, password } = LoginSchema.parse(body);
-    return this.authService.loginWithPassword(email, password);
+    const session = await this.authService.loginWithPassword(email, password);
+
+    // Set httpOnly cookie
+    res.cookie(
+      this.config.cookie.name,
+      session.accessToken,
+      this.config.cookie,
+    );
+
+    // Return only user data, not the token
+    return { user: session.user };
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Res({ passthrough: true }) res: Response) {
+    // Clear the cookie
+    res.clearCookie(this.config.cookie.name, {
+      httpOnly: this.config.cookie.httpOnly,
+      secure: this.config.cookie.secure,
+      sameSite: this.config.cookie.sameSite,
+      path: this.config.cookie.path,
+    });
+
+    return { message: 'Logged out successfully' };
   }
 
   @Get('me')
@@ -66,13 +93,22 @@ export class AuthController {
         code,
         state,
       );
+
+      // Set httpOnly cookie
+      res.cookie(
+        this.config.cookie.name,
+        session.accessToken,
+        this.config.cookie,
+      );
+
+      // Redirect with success status (no token in URL)
       const redirect = new URL(this.config.googleRedirect);
       redirect.searchParams.set('status', 'success');
-      redirect.searchParams.set('token', session.accessToken);
       redirect.searchParams.set(
         'user',
         Buffer.from(JSON.stringify(session.user)).toString('base64url'),
       );
+
       return res.redirect(redirect.toString());
     } catch (error) {
       const message =

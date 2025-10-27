@@ -1,52 +1,47 @@
-﻿import { useEffect, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import {
-  isAuthenticated,
-  getStoredUser,
-  fetchCurrentUser,
-  clearAuthSession,
-} from "@/lib/auth";
+﻿import { useEffect, useState } from "react"
+import { Navigate, Outlet, useLocation } from "react-router-dom"
+import { useCurrentUser } from "@/hooks/api/useAuth"
+import { isAuthenticated, clearAuthSession } from "@/lib/auth"
 
 export default function ProtectedRoute() {
-  const location = useLocation();
-  const [checking, setChecking] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+    const location = useLocation()
+    const [shouldFetch, setShouldFetch] = useState(false)
 
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      setAllowed(false);
-      setChecking(false);
-      return;
+    // Check if we have local user data
+    const hasLocalAuth = isAuthenticated()
+
+    // Only fetch current user if we have local data
+    // (which means we might have a valid cookie)
+    const { data: user, isLoading, error } = useCurrentUser(hasLocalAuth)
+
+    useEffect(() => {
+        if (!hasLocalAuth) {
+            setShouldFetch(false)
+            return
+        }
+        setShouldFetch(true)
+    }, [hasLocalAuth])
+
+    // Loading state while checking authentication
+    if (hasLocalAuth && isLoading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center text-sm text-muted-foreground">
+                Restoring session...
+            </div>
+        )
     }
 
-    if (getStoredUser()) {
-      setAllowed(true);
-      setChecking(false);
-      return;
+    // If there's an error or no local auth, redirect to login
+    if (error || !hasLocalAuth) {
+        clearAuthSession()
+        return <Navigate to="/login" replace state={{ from: location }} />
     }
 
-    fetchCurrentUser()
-      .then(() => {
-        setAllowed(true);
-      })
-      .catch(() => {
-        clearAuthSession();
-        setAllowed(false);
-      })
-      .finally(() => setChecking(false));
-  }, []);
+    // If we have a valid user, allow access
+    if (user) {
+        return <Outlet />
+    }
 
-  if (checking) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center text-sm text-muted-foreground">
-        Restoring session...
-      </div>
-    );
-  }
-
-  if (!allowed) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  return <Outlet />;
+    // Default: redirect to login
+    return <Navigate to="/login" replace state={{ from: location }} />
 }

@@ -11,6 +11,10 @@ import { UsersService, type SafeUser } from '../master/users/users.service';
 import { GoogleService } from '../integrations/google/google.service';
 
 type AuthSession = {
+  user: SafeUser;
+};
+
+type SessionWithToken = {
   accessToken: string;
   user: SafeUser;
 };
@@ -29,7 +33,7 @@ export class AuthService {
   async loginWithPassword(
     email: string,
     password: string,
-  ): Promise<AuthSession> {
+  ): Promise<SessionWithToken> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -63,7 +67,7 @@ export class AuthService {
   async handleGoogleLoginCallback(
     code: string,
     state?: string,
-  ): Promise<AuthSession> {
+  ): Promise<SessionWithToken> {
     if (!state) {
       throw new BadRequestException('Missing OAuth state parameter');
     }
@@ -101,7 +105,7 @@ export class AuthService {
     return this.issueSession(user.id);
   }
 
-  private async issueSession(userId: number): Promise<AuthSession> {
+  private async issueSession(userId: number): Promise<SessionWithToken> {
     const user = await this.usersService.ensureUser(userId);
     const payload = { sub: user.id, email: user.email };
     const accessToken = await this.jwtService.signAsync(payload);

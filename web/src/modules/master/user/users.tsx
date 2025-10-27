@@ -1,67 +1,60 @@
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card"
 import DataTable from "@/components/ui/data-table"
-import type { ColDef, ICellRendererParams, RowSelectionOptions } from "ag-grid-community";
-import { useEffect, useState } from "react";
+import type { ColDef, ICellRendererParams, RowSelectionOptions } from "ag-grid-community"
+import { useState } from "react"
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer"
 import type { ActionItem } from "@/components/ui/ActionMenu"
-import { NavLink } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-
-type User = {
-    id: string;
-    name: string;
-    username?: string;
-    email: string;
-    team: string;
-    role: string;
-    designation: string;
-}
-
-const employeeActions: ActionItem<User>[] = [
-    {
-        label: "Edit",
-        onClick: (row) => {
-            console.log("Edit", row)
-        },
-    },
-    {
-        label: "Delete",
-        className: "text-red-600",
-        onClick: (row) => {
-            console.log("Delete", row)
-        },
-    },
-]
+import { NavLink } from "react-router-dom"
+import { paths } from "@/app/routes/paths"
+import { useUsers, useDeleteUser } from "@/hooks/api/useUsers"
+import type { User } from "@/types/api.types"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
     headerCheckbox: false,
-};
+}
 
 const Employees = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState<boolean>(true)
+    // Use React Query hooks
+    const { data: users, isLoading, error, refetch } = useUsers()
+    const deleteUser = useDeleteUser()
 
-    useEffect(() => {
-        (async () => {
-            try {
-                setLoading(true)
-                const res = await fetch("http://localhost:3000/api/v1/users")
-                const data = await res.json()
-
-                if (Array.isArray(data)) {
-                    setUsers(data)
-                } else {
-                    setUsers([])
+    // Employee actions with delete mutation
+    const employeeActions: ActionItem<User>[] = [
+        {
+            label: "Edit",
+            onClick: (row) => {
+                console.log("Edit", row)
+                // Navigate to edit page or open modal
+                // navigate(`${paths.master.users_edit}/${row.id}`)
+            },
+        },
+        {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async (row) => {
+                if (confirm(`Are you sure you want to delete ${row.name}?`)) {
+                    try {
+                        await deleteUser.mutateAsync(row.id)
+                    } catch (error) {
+                        // Error is already handled by the hook with toast
+                        console.error('Delete failed:', error)
+                    }
                 }
-            } catch (error) {
-                setUsers([])
-            } finally {
-                setLoading(false)
-            }
-        })()
-    }, [])
+            },
+        },
+    ]
 
     const [colDefs] = useState<ColDef[]>([
         {
@@ -70,7 +63,9 @@ const Employees = () => {
             cellRenderer: ({ data }: ICellRendererParams) => (
                 <div>
                     <div style={{ fontWeight: 500 }}>{data.name}</div>
-                    <div style={{ fontSize: '12px', color: 'gray' }}>@{data.username ?? (data.email ? data.email.split('@')[0] : '')}</div>
+                    <div style={{ fontSize: '12px', color: 'gray' }}>
+                        @{data.username ?? (data.email ? data.email.split('@')[0] : '')}
+                    </div>
                 </div>
             )
         },
@@ -88,13 +83,56 @@ const Employees = () => {
         },
     ])
 
+    // Loading state
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-64 mt-2" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-96 w-full" />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Employees</CardTitle>
+                    <CardDescription>List of all Employees</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                            Error loading employees: {error.message}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => refetch()}
+                                className="ml-4"
+                            >
+                                Retry
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Employees</CardTitle>
-                <CardDescription>List of all Emloyees</CardDescription>
+                <CardDescription>List of all Employees</CardDescription>
                 <CardAction>
-                    <Button variant={"default"} asChild>
+                    <Button variant="default" asChild>
                         <NavLink to={paths.master.users_create}>
                             Add New Employee
                         </NavLink>
@@ -105,7 +143,7 @@ const Employees = () => {
                 <DataTable
                     data={users || []}
                     columnDefs={colDefs}
-                    loading={loading}
+                    loading={isLoading || deleteUser.isPending}
                     gridOptions={{
                         defaultColDef: { editable: true, filter: true },
                         rowSelection,
