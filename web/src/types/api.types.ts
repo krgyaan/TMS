@@ -36,6 +36,54 @@ export interface Location {
     updatedAt?: string
 }
 
+export interface Team {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface ItemHeading {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  // Item type with relations
+  export interface Item {
+    id: number;
+    name: string;
+    teamId?: number | null;
+    headingId?: number | null;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+
+    // Related data (populated by backend join)
+    team?: {
+      id: number;
+      name: string;
+    } | null;
+    heading?: {
+      id: number;
+      name: string;
+    } | null;
+  }
+
+export interface Status {
+    id: number
+    name: string
+    tenderCategory: string | null
+    status?: boolean
+    createdAt?: string
+    updatedAt?: string
+}
+
 export interface ApiResponse<T = any> {
     data?: T
     user?: T

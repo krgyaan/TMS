@@ -55,18 +55,26 @@ const Location = () => {
     ]
 
     const [colDefs] = useState<ColDef[]>([
-        { field: "acronym", headerName: "Acronym" },
-        { field: "name", headerName: "Location" },
-        { field: "state", headerName: "State" },
-        { field: "region", headerName: "Region" },
-        { field: "status", headerName: "Status" },
+        { field: "acronym", headerName: "Acronym", width: 50 },
+        { field: "name", headerName: "Location", flex: 1 },
+        { field: "state", headerName: "State", flex: 1 },
+        { field: "region", headerName: "Region", flex: 1 },
+        {
+            field: "status", headerName: "Status", flex: 1,
+            cellRenderer: (params: any) => (
+                <span className={params.value ? 'text-green-600' : 'text-red-600'}>
+                    {params.value ? 'Active' : 'Inactive'}
+                </span>
+            ),
+        },
         {
             headerName: "Actions",
             field: "actions",
             filter: false,
             cellRenderer: createActionColumnRenderer(locationActions),
             sortable: false,
-            pinned: "right"
+            pinned: "right",
+            width: 100
         },
     ])
 
