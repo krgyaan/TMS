@@ -20,7 +20,18 @@ export interface User {
     role?: string
     designation?: string
     team?: string
-    isActive?: boolean
+    status?: boolean
+    createdAt?: string
+    updatedAt?: string
+}
+
+export interface Location {
+    id: number
+    name: string
+    acronym: string
+    state: string | null
+    region: string | null
+    status?: boolean
     createdAt?: string
     updatedAt?: string
 }

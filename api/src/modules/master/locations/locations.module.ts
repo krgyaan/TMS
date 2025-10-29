@@ -7,5 +7,6 @@ import { LocationsService } from './locations.service';
   imports: [DatabaseModule],
   controllers: [LocationsController],
   providers: [LocationsService],
+  exports: [LocationsService],
 })
 export class LocationsModule {}
