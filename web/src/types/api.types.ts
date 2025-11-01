@@ -54,7 +54,6 @@ export interface Team {
     updatedAt: string;
   }
 
-  // Item type with relations
   export interface Item {
     id: number;
     name: string;
@@ -64,7 +63,6 @@ export interface Team {
     createdAt: string;
     updatedAt: string;
 
-    // Related data (populated by backend join)
     team?: {
       id: number;
       name: string;
@@ -84,6 +82,30 @@ export interface Status {
     updatedAt?: string
 }
 
+export interface Industry {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface Organization {
+    id: number;
+    name: string;
+    acronym?: string;
+    industryId?: number | null;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+
+    industry?: {
+      id: number;
+      name: string;
+    } | null;
+  }
+
 export interface ApiResponse<T = any> {
     data?: T
     user?: T
@@ -96,7 +118,7 @@ export interface ApiError {
     statusCode: number
     error?: string
 }
-// Company types
+
 export interface Company {
     id: string
     name: string
@@ -107,3 +129,13 @@ export interface Company {
     createdAt: string
     updatedAt: string
 }
+
+// DTOs
+export interface CreateOrganizationDto {
+    name: string;
+    acronym?: string;
+    industryId?: number;
+    status?: boolean;
+  }
+
+  export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
