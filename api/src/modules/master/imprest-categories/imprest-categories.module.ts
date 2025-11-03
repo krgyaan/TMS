@@ -4,8 +4,9 @@ import { ImprestCategoriesController } from './imprest-categories.controller';
 import { ImprestCategoriesService } from './imprest-categories.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [ImprestCategoriesController],
-  providers: [ImprestCategoriesService],
+    imports: [DatabaseModule],
+    controllers: [ImprestCategoriesController],
+    providers: [ImprestCategoriesService],
+    exports: [ImprestCategoriesService],
 })
-export class ImprestCategoriesModule {}
+export class ImprestCategoriesModule { }

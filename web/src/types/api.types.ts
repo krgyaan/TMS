@@ -211,6 +211,15 @@ export interface Website {
     updatedAt: string;
 }
 
+export interface ImprestCategory {
+    id: number;
+    name: string;
+    heading?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
 
 /* ===================== */
 /*          DTOs        */
@@ -248,3 +257,11 @@ export interface CreateWebsiteDto {
 }
 
 export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }
+
+export interface CreateImprestCategoryDto {
+    name: string;
+    heading?: string;
+    status?: boolean;
+}
+
+export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
