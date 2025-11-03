@@ -43,18 +43,18 @@ export interface Team {
     status: boolean;
     createdAt: string;
     updatedAt: string;
-  }
+}
 
-  export interface ItemHeading {
+export interface ItemHeading {
     id: number;
     name: string;
     description?: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
-  }
+}
 
-  export interface Item {
+export interface Item {
     id: number;
     name: string;
     teamId?: number | null;
@@ -64,14 +64,14 @@ export interface Team {
     updatedAt: string;
 
     team?: {
-      id: number;
-      name: string;
+        id: number;
+        name: string;
     } | null;
     heading?: {
-      id: number;
-      name: string;
+        id: number;
+        name: string;
     } | null;
-  }
+}
 
 export interface Status {
     id: number
@@ -89,9 +89,9 @@ export interface Industry {
     status: boolean;
     createdAt: string;
     updatedAt: string;
-  }
+}
 
-  export interface Organization {
+export interface Organization {
     id: number;
     name: string;
     acronym?: string;
@@ -101,10 +101,10 @@ export interface Industry {
     updatedAt: string;
 
     industry?: {
-      id: number;
-      name: string;
+        id: number;
+        name: string;
     } | null;
-  }
+}
 
 export interface ApiResponse<T = any> {
     data?: T
@@ -130,12 +130,103 @@ export interface Company {
     updatedAt: string
 }
 
-// DTOs
+export interface VendorOrganization {
+    id: number;
+    name: string;
+    address?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VendorFile {
+    id: number;
+    vendorId: number;
+    name: string;
+    filePath: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VendorGst {
+    id: number;
+    org: number;
+    gstState: string;
+    gstNum: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VendorAcc {
+    id: number;
+    org: number;
+    accountName: string;
+    accountNum: string;
+    accountIfsc: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Vendor {
+    id: number;
+    organizationId?: number | null;
+    name: string;
+    email?: string;
+    address?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+
+    organization?: {
+        id: number;
+        name: string;
+        address?: string;
+    } | null;
+}
+
+export interface VendorWithRelations extends Vendor {
+    files?: VendorFile[];
+}
+
+export interface VendorOrganizationWithRelations extends VendorOrganization {
+    persons: Vendor[];
+    gsts: VendorGst[];
+    accounts: VendorAcc[];
+    _counts?: {
+        persons: number;
+        gsts: number;
+        accounts: number;
+    };
+}
+
+/* ===================== */
+/*          DTOs        */
+/* ===================== */
+
+export interface CreateVendorDto {
+    organizationId?: number;
+    name: string;
+    email?: string;
+    address?: string;
+    status?: boolean;
+}
+export interface CreateVendorOrganizationDto {
+    organizationId?: number;
+    name: string;
+    address?: string;
+    status?: boolean;
+}
+export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
+export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
+
 export interface CreateOrganizationDto {
     name: string;
     acronym?: string;
     industryId?: number;
     status?: boolean;
-  }
+}
 
-  export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
+export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }

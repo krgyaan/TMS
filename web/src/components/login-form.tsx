@@ -116,7 +116,7 @@ export function LoginForm({ className, onPasswordLogin, onGoogleLogin, ...props 
           </form>
           <div className="bg-muted relative hidden md:block">
             <img
-              src="../../public/ve_logo.png"
+              src="ve_logo.png"
               alt="Image"
               className="absolute inset-0 h-full w-full object-contain"
             />
