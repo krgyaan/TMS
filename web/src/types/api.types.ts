@@ -202,6 +202,16 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
     };
 }
 
+export interface Website {
+    id: number;
+    name: string;
+    url?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+
 /* ===================== */
 /*          DTOs        */
 /* ===================== */
@@ -230,3 +240,11 @@ export interface CreateOrganizationDto {
 }
 
 export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }
+
+export interface CreateWebsiteDto {
+    name: string;
+    url?: string;
+    status?: boolean;
+}
+
+export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }

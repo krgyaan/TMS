@@ -33,6 +33,7 @@ import { VendorsModule } from './modules/master/vendors/vendors.module';
 import { GoogleIntegrationModule } from './modules/integrations/google/google.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { WebsitesModule } from './modules/master/websites/websites.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     VendorsModule,
     GoogleIntegrationModule,
     AuthModule,
+    WebsitesModule,
   ],
   controllers: [AppController],
   providers: [
