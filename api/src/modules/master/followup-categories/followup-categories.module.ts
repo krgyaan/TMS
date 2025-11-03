@@ -4,8 +4,9 @@ import { FollowupCategoriesController } from './followup-categories.controller';
 import { FollowupCategoriesService } from './followup-categories.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [FollowupCategoriesController],
-  providers: [FollowupCategoriesService],
+    imports: [DatabaseModule],
+    controllers: [FollowupCategoriesController],
+    providers: [FollowupCategoriesService],
+    exports: [FollowupCategoriesService],
 })
-export class FollowupCategoriesModule {}
+export class FollowupCategoriesModule { }

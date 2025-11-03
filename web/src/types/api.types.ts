@@ -220,6 +220,14 @@ export interface ImprestCategory {
     updatedAt: string;
 }
 
+export interface FollowupCategory {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
 
 /* ===================== */
 /*          DTOs        */
@@ -232,14 +240,17 @@ export interface CreateVendorDto {
     address?: string;
     status?: boolean;
 }
+
+export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
+
 export interface CreateVendorOrganizationDto {
     organizationId?: number;
     name: string;
     address?: string;
     status?: boolean;
 }
+
 export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
-export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
 
 export interface CreateOrganizationDto {
     name: string;
@@ -265,3 +276,10 @@ export interface CreateImprestCategoryDto {
 }
 
 export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
+
+export interface CreateFollowupCategoryDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }

@@ -72,7 +72,7 @@ export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => 
                 createPortal(
                     <div
                         ref={menuRef}
-                        className="z-50 w-40 border rounded shadow"
+                        className="z-50 w-40 border rounded shadow bg-accent"
                         style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
                     >
                         {actions.map((action, idx) => (
