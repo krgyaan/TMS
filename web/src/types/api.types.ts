@@ -228,10 +228,44 @@ export interface FollowupCategory {
     updatedAt: string;
 }
 
+export interface CreateFollowupCategoryDto {
+    name: string;
+    status?: boolean;
+}
 
-/* ===================== */
-/*          DTOs        */
-/* ===================== */
+export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }
+
+export interface Designation {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateDesignationDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateDesignationDto extends Partial<CreateDesignationDto> { }
+
+export interface DocumentSubmitted {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateDocumentSubmittedDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateDocumentSubmittedDto
+    extends Partial<CreateDocumentSubmittedDto> { }
+
 
 export interface CreateVendorDto {
     organizationId?: number;
@@ -276,10 +310,3 @@ export interface CreateImprestCategoryDto {
 }
 
 export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
-
-export interface CreateFollowupCategoryDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }

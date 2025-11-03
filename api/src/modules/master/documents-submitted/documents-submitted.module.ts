@@ -4,8 +4,9 @@ import { DocumentsSubmittedController } from './documents-submitted.controller';
 import { DocumentsSubmittedService } from './documents-submitted.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [DocumentsSubmittedController],
-  providers: [DocumentsSubmittedService],
+    imports: [DatabaseModule],
+    controllers: [DocumentsSubmittedController],
+    providers: [DocumentsSubmittedService],
+    exports: [DocumentsSubmittedService],
 })
-export class DocumentsSubmittedModule {}
+export class DocumentsSubmittedModule { }
