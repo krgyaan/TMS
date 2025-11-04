@@ -1,7 +1,7 @@
-const CreateFollowupCategory = () => {
+const CreateFollowupCategoryPage = () => {
     return (
         <div>Create Followup Category</div>
     )
 }
 
-export default CreateFollowupCategory
+export default CreateFollowupCategoryPage

@@ -51,7 +51,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const Vendors = () => {
+const VendorsPage = () => {
     const {
         data: organizations,
         isLoading,
@@ -565,4 +565,4 @@ const Vendors = () => {
     );
 };
 
-export default Vendors;
+export default VendorsPage;

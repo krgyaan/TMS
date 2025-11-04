@@ -1,7 +1,7 @@
-const CreateTeam = () => {
+const CreateTeamPage = () => {
     return (
         <div>Create Team</div>
     )
 }
 
-export default CreateTeam
+export default CreateTeamPage

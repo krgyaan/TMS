@@ -1,7 +1,7 @@
-const EditTqType = () => {
+const EditTqTypePage = () => {
     return (
         <div>Edit Tq Type</div>
     )
 }
 
-export default EditTqType
+export default EditTqTypePage

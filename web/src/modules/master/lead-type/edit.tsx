@@ -1,7 +1,7 @@
-const EditLeadType = () => {
+const EditLeadTypePage = () => {
     return (
         <div>Edit Lead Type</div>
     )
 }
 
-export default EditLeadType
+export default EditLeadTypePage

@@ -29,7 +29,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const DocumentsSubmitted = () => {
+const DocumentsSubmittedPage = () => {
     const {
         data: documents,
         isLoading,
@@ -148,7 +148,7 @@ const DocumentsSubmitted = () => {
                 </CardDescription>
                 <CardAction>
                     <Button variant="default" asChild>
-                        <NavLink to={paths.master.documents_submitted_create}>
+                        <NavLink to={paths.master.documentSubmitted_create}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add Document Type
                         </NavLink>
@@ -183,4 +183,4 @@ const DocumentsSubmitted = () => {
     );
 };
 
-export default DocumentsSubmitted;
+export default DocumentsSubmittedPage;

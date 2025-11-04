@@ -1,7 +1,7 @@
-const CreateProject = () => {
+const CreateProjectPage = () => {
     return (
         <div>Create Project</div>
     )
 }
 
-export default CreateProject
+export default CreateProjectPage

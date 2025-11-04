@@ -29,7 +29,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const ImprestCategory = () => {
+const ImprestCategoryPage = () => {
     const {
         data: categories,
         isLoading,
@@ -192,4 +192,4 @@ const ImprestCategory = () => {
     );
 };
 
-export default ImprestCategory;
+export default ImprestCategoryPage;

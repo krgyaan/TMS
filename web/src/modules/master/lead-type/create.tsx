@@ -1,7 +1,7 @@
-const CreateLeadType = () => {
+const CreateLeadTypePage = () => {
     return (
         <div>Create Lead Type</div>
     )
 }
 
-export default CreateLeadType
+export default CreateLeadTypePage

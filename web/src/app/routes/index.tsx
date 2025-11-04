@@ -131,6 +131,10 @@ const Master_Designation = lazy(() => import("@/modules/master/designation"));
 const Master_Designation_Create = lazy(() => import("@/modules/master/designation/create"));
 const Master_Designation_Edit = lazy(() => import("@/modules/master/designation/edit"));
 
+const Master_Role = lazy(() => import("@/modules/master/role"));
+const Master_Role_Create = lazy(() => import("@/modules/master/role/create"));
+const Master_Role_Edit = lazy(() => import("@/modules/master/role/edit"));
+
 const Master_Industry = lazy(() => import("@/modules/master/industry"));
 const Master_Industry_Create = lazy(() => import("@/modules/master/industry/create"));
 const Master_Industry_Edit = lazy(() => import("@/modules/master/industry/edit"));
@@ -298,6 +302,9 @@ export default function AppRoutes() {
                     <Route path={paths.master.designations} element={<Suspense fallback={<Loading />}><Master_Designation /></Suspense>} />
                     <Route path={paths.master.designations_create} element={<Suspense fallback={<Loading />}><Master_Designation_Create /></Suspense>} />
                     <Route path={paths.master.designations_edit} element={<Suspense fallback={<Loading />}><Master_Designation_Edit /></Suspense>} />
+                    <Route path={paths.master.roles} element={<Suspense fallback={<Loading />}><Master_Role /></Suspense>} />
+                    <Route path={paths.master.roles_create} element={<Suspense fallback={<Loading />}><Master_Role_Create /></Suspense>} />
+                    <Route path={paths.master.roles_edit} element={<Suspense fallback={<Loading />}><Master_Role_Edit /></Suspense>} />
                     <Route path={paths.master.industries} element={<Suspense fallback={<Loading />}><Master_Industry /></Suspense>} />
                     <Route path={paths.master.industries_create} element={<Suspense fallback={<Loading />}><Master_Industry_Create /></Suspense>} />
                     <Route path={paths.master.industries_edit} element={<Suspense fallback={<Loading />}><Master_Industry_Edit /></Suspense>} />

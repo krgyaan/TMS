@@ -4,8 +4,9 @@ import { IndustriesController } from './industries.controller';
 import { IndustriesService } from './industries.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [IndustriesController],
-  providers: [IndustriesService],
+    imports: [DatabaseModule],
+    controllers: [IndustriesController],
+    providers: [IndustriesService],
+    exports: [IndustriesService],
 })
-export class IndustriesModule {}
+export class IndustriesModule { }

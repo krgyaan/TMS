@@ -25,7 +25,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 }
 
-const Location = () => {
+const LocationPage = () => {
     // Use React Query hooks
     const { data: locations, isLoading, error, refetch } = useLocations()
     const deleteLocation = useDeleteLocation()
@@ -155,4 +155,4 @@ const Location = () => {
     )
 }
 
-export default Location
+export default LocationPage

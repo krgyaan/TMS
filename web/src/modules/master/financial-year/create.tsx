@@ -1,7 +1,7 @@
-const CreateFinancialYear = () => {
+const CreateFinancialYearPage = () => {
     return (
         <div>Create Financial Year</div>
     )
 }
 
-export default CreateFinancialYear
+export default CreateFinancialYearPage

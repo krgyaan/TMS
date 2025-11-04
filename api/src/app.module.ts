@@ -34,54 +34,58 @@ import { GoogleIntegrationModule } from './modules/integrations/google/google.mo
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { WebsitesModule } from './modules/master/websites/websites.module';
+import { StatesModule } from './modules/master/states/states.module';
+import { LeadTypesModule } from './modules/master/lead-types/lead-types.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      expandVariables: true,
-      load: [appConfig, dbConfig, googleConfig, authConfig],
-      validate: (env) => ({
-        ...validateAppEnv(env),
-        ...validateDbEnv(env),
-        ...validateGoogleEnv(env),
-        ...validateAuthEnv(env),
-      }),
-    }),
-    DatabaseModule,
-    UsersModule,
-    RolesModule,
-    DesignationsModule,
-    TeamsModule,
-    UserProfilesModule,
-    OauthAccountsModule,
-    HealthModule,
-    TenderStatusModule,
-    DocumentsSubmittedModule,
-    FollowupCategoriesModule,
-    ImprestCategoriesModule,
-    IndustriesModule,
-    ItemHeadingsModule,
-    ItemsModule,
-    LoanPartiesModule,
-    LocationsModule,
-    OrganizationsModule,
-    CompaniesModule,
-    StatusesModule,
-    TqTypesModule,
-    VendorOrganizationsModule,
-    VendorsModule,
-    GoogleIntegrationModule,
-    AuthModule,
-    WebsitesModule,
-  ],
-  controllers: [AppController],
-  providers: [
-    AppService,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-  ],
+    imports: [
+        ConfigModule.forRoot({
+            isGlobal: true,
+            expandVariables: true,
+            load: [appConfig, dbConfig, googleConfig, authConfig],
+            validate: (env) => ({
+                ...validateAppEnv(env),
+                ...validateDbEnv(env),
+                ...validateGoogleEnv(env),
+                ...validateAuthEnv(env),
+            }),
+        }),
+        DatabaseModule,
+        UsersModule,
+        RolesModule,
+        DesignationsModule,
+        TeamsModule,
+        UserProfilesModule,
+        OauthAccountsModule,
+        HealthModule,
+        TenderStatusModule,
+        DocumentsSubmittedModule,
+        FollowupCategoriesModule,
+        ImprestCategoriesModule,
+        IndustriesModule,
+        ItemHeadingsModule,
+        ItemsModule,
+        LoanPartiesModule,
+        LocationsModule,
+        OrganizationsModule,
+        CompaniesModule,
+        StatusesModule,
+        TqTypesModule,
+        VendorOrganizationsModule,
+        VendorsModule,
+        GoogleIntegrationModule,
+        AuthModule,
+        WebsitesModule,
+        StatesModule,
+        LeadTypesModule,
+    ],
+    controllers: [AppController],
+    providers: [
+        AppService,
+        {
+            provide: APP_GUARD,
+            useClass: JwtAuthGuard,
+        },
+    ],
 })
-export class AppModule {}
+export class AppModule { }

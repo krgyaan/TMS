@@ -1,7 +1,7 @@
-const EditItem = () => {
+const EditItemPage = () => {
     return (
         <div>Edit Item</div>
     )
 }
 
-export default EditItem
+export default EditItemPage

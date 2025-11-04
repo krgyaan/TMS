@@ -29,7 +29,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const FollowupCategory = () => {
+const FollowupCategoryPage = () => {
     const {
         data: categories,
         isLoading,
@@ -183,4 +183,4 @@ const FollowupCategory = () => {
     );
 };
 
-export default FollowupCategory;
+export default FollowupCategoryPage;

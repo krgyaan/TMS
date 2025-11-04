@@ -1,7 +1,7 @@
-const EditEmdResponsibility = () => {
+const EditEmdResponsibilityPage = () => {
     return (
         <div>Edit EMD Resposibility</div>
     )
 }
 
-export default EditEmdResponsibility
+export default EditEmdResponsibilityPage

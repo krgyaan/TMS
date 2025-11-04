@@ -310,3 +310,128 @@ export interface CreateImprestCategoryDto {
 }
 
 export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
+
+
+// ========== INDUSTRIES ==========
+export interface Industry {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateIndustryDto {
+    name: string;
+    description?: string;
+    status?: boolean;
+}
+
+export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
+
+// ========== TEAMS ==========
+export interface Team {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateTeamDto {
+    name: string;
+    description?: string;
+    status?: boolean;
+}
+
+export interface UpdateTeamDto extends Partial<CreateTeamDto> { }
+
+// ========== ROLES ==========
+export interface Role {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateRoleDto {
+    name: string;
+    description?: string;
+    status?: boolean;
+}
+
+export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
+
+// ========== STATES ==========
+export interface State {
+    id: number;
+    name: string;
+    code?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateStateDto {
+    name: string;
+    code?: string;
+    status?: boolean;
+}
+
+export interface UpdateStateDto extends Partial<CreateStateDto> { }
+
+// ========== TQ TYPES ==========
+export interface TqType {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateTqTypeDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
+
+// ========== LEAD TYPES ==========
+export interface LeadType {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLeadTypeDto {
+    name: string;
+    description?: string;
+    status?: boolean;
+}
+
+export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> { }
+
+// ========== LOAN PARTY ==========
+export interface LoanParty {
+    id: number;
+    name: string;
+    description?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLoanPartyDto {
+    name: string;
+    description?: string;
+    status?: boolean;
+}
+
+export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }

@@ -25,7 +25,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 }
 
-const Employees = () => {
+const UserPage = () => {
     // Use React Query hooks
     const { data: users, isLoading, error, refetch } = useUsers()
     const deleteUser = useDeleteUser()
@@ -160,4 +160,4 @@ const Employees = () => {
     )
 }
 
-export default Employees
+export default UserPage

@@ -1,7 +1,7 @@
-const EditLoaction = () => {
+const EditLoactionPage = () => {
     return (
         <div>Edit Loaction</div>
     )
 }
 
-export default EditLoaction
+export default EditLoactionPage

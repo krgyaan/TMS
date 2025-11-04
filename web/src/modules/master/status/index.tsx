@@ -25,7 +25,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 }
 
-const Status = () => {
+const StatusPage = () => {
     // Use React Query hooks
     const { data: Statuses, isLoading, error, refetch } = useStatuses()
     const deleteStatus = useDeleteStatus()
@@ -154,4 +154,4 @@ const Status = () => {
     )
 }
 
-export default Status
+export default StatusPage

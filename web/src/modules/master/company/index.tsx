@@ -1,7 +1,7 @@
-const Company = () => {
+const CompanyPage = () => {
     return (
         <div>Company Details</div>
     )
 }
 
-export default Company
+export default CompanyPage

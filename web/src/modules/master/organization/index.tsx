@@ -25,7 +25,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const Organization = () => {
+const OrganizationPage = () => {
     const { data: organizations, isLoading, error, refetch } = useOrganizations();
     const deleteOrganization = useDeleteOrganization();
 
@@ -172,4 +172,4 @@ const Organization = () => {
     );
 };
 
-export default Organization;
+export default OrganizationPage;

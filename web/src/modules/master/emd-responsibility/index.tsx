@@ -1,7 +1,7 @@
-const EmdResponsibility = () => {
+const EmdResponsibilityPage = () => {
     return (
         <div>EMD Resposibility</div>
     )
 }
 
-export default EmdResponsibility
+export default EmdResponsibilityPage

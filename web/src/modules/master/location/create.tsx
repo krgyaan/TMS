@@ -1,7 +1,7 @@
-const CreateLoaction = () => {
+const CreateLoactionPage = () => {
     return (
         <div>Create Loaction</div>
     )
 }
 
-export default CreateLoaction
+export default CreateLoactionPage

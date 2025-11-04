@@ -1,7 +1,7 @@
-const CreateItem = () => {
+const CreateItemPage = () => {
     return (
         <div>Create Item</div>
     )
 }
 
-export default CreateItem
+export default CreateItemPage

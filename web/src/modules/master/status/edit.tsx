@@ -1,7 +1,7 @@
-const EditStatus = () => {
+const EditStatusPage = () => {
     return (
         <div>Edit Status</div>
     )
 }
 
-export default EditStatus
+export default EditStatusPage

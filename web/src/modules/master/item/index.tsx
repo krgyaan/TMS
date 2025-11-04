@@ -25,7 +25,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 }
 
-const Item = () => {
+const ItemPage = () => {
     // Use React Query hooks
     const { data: Items, isLoading, error, refetch } = useItems()
     const deleteItem = useDeleteItem()
@@ -155,4 +155,4 @@ const Item = () => {
     )
 }
 
-export default Item
+export default ItemPage;

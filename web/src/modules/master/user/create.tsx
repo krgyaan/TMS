@@ -66,7 +66,7 @@ type User = { id: number; email: string; name?: string | null };
 type Designation = { id: number; name: string };
 type Team = { id: number; name: string };
 
-export default function CreateUser() {
+export default function CreateUserPage() {
     const [userId, setUserId] = useState<number | null>(null);
     const [savingAccount, setSavingAccount] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);

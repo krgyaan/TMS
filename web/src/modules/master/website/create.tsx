@@ -1,7 +1,7 @@
-const CreateWebsite = () => {
+const CreateWebsitePage = () => {
     return (
         <div>Create Website</div>
     )
 }
 
-export default CreateWebsite
+export default CreateWebsitePage

@@ -1,7 +1,7 @@
-const CreateDocumentSubmitted = () => {
+const CreateDocumentSubmittedPage = () => {
     return (
         <div>Create Document Submitted</div>
     )
 }
 
-export default CreateDocumentSubmitted
+export default CreateDocumentSubmittedPage

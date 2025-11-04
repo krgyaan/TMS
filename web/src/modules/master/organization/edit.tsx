@@ -1,7 +1,7 @@
-const EditOrganization = () => {
+const EditOrganizationPage = () => {
     return (
         <div>Edit Organization</div>
     )
 }
 
-export default EditOrganization
+export default EditOrganizationPage

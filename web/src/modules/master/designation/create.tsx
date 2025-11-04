@@ -1,7 +1,7 @@
-const CreateDesignation = () => {
+const CreateDesignationPage = () => {
     return (
         <div>Create Designation</div>
     )
 }
 
-export default CreateDesignation
+export default CreateDesignationPage

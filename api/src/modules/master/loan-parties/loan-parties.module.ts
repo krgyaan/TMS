@@ -4,8 +4,9 @@ import { LoanPartiesController } from './loan-parties.controller';
 import { LoanPartiesService } from './loan-parties.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [LoanPartiesController],
-  providers: [LoanPartiesService],
+    imports: [DatabaseModule],
+    controllers: [LoanPartiesController],
+    providers: [LoanPartiesService],
+    exports: [LoanPartiesService],
 })
-export class LoanPartiesModule {}
+export class LoanPartiesModule { }

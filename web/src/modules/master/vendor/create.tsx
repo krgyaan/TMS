@@ -1,7 +1,7 @@
-const CreateVendor = () => {
+const CreateVendorPage = () => {
     return (
         <div>Create Vendor</div>
     )
 }
 
-export default CreateVendor
+export default CreateVendorPage

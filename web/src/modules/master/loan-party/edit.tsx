@@ -1,7 +1,7 @@
-const EditLoanParty = () => {
+const EditLoanPartyPage = () => {
     return (
         <div>Edit Loan Party</div>
     )
 }
 
-export default EditLoanParty
+export default EditLoanPartyPage

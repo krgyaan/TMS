@@ -26,7 +26,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const Websites = () => {
+const WebsitesPage = () => {
     const { data: websites, isLoading, error, refetch } = useWebsites();
     const deleteWebsite = useDeleteWebsite();
 
@@ -196,4 +196,4 @@ const Websites = () => {
     );
 };
 
-export default Websites;
+export default WebsitesPage;

@@ -1,7 +1,7 @@
-const CreateImprestCategory = () => {
+const CreateImprestCategoryPage = () => {
     return (
         <div>Create Imprest Category</div>
     )
 }
 
-export default CreateImprestCategory
+export default CreateImprestCategoryPage

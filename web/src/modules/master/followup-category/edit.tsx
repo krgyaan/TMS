@@ -1,7 +1,7 @@
-const EditFollowupCategory = () => {
+const EditFollowupCategoryPage = () => {
     return (
         <div>Edit Followup Category</div>
     )
 }
 
-export default EditFollowupCategory
+export default EditFollowupCategoryPage

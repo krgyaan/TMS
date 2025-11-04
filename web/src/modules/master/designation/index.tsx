@@ -29,7 +29,7 @@ const rowSelection: RowSelectionOptions = {
     headerCheckbox: false,
 };
 
-const Designation = () => {
+const DesignationPage = () => {
     const {
         data: categories,
         isLoading,
@@ -183,4 +183,4 @@ const Designation = () => {
     );
 };
 
-export default Designation;
+export default DesignationPage;
