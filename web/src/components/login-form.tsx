@@ -99,6 +99,7 @@ export function LoginForm({ className, onPasswordLogin, onGoogleLogin, ...props 
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="off"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />

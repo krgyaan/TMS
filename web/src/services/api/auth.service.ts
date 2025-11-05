@@ -31,6 +31,10 @@ class AuthService extends BaseApiService {
     async getGoogleAuthUrl(): Promise<GoogleAuthUrlResponse> {
         return this.get<GoogleAuthUrlResponse>('/google/url')
     }
+
+    async googleCallback(code: string): Promise<LoginResponse> {
+        return this.post<LoginResponse>('/google/callback', { code })
+    }
 }
 
 export const authService = new AuthService()

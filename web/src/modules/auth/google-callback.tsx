@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { setStoredUser, clearAuthSession, type AuthUser } from "@/lib/auth"
@@ -22,11 +22,18 @@ const GoogleLoginCallback = () => {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const params = useMemo(() => new URLSearchParams(location.search), [location.search])
+    const processed = useRef(false) 
 
     const [message, setMessage] = useState("Completing sign-in...")
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
+        if (processed.current) {
+            console.log("⏭️ Google Callback - Already processed, skipping...")
+            return
+        }
+        processed.current = true
+
         console.log("🔍 Google Callback - Processing...")
         console.log("📋 URL Params:", Object.fromEntries(params.entries()))
 
@@ -51,16 +58,13 @@ const GoogleLoginCallback = () => {
         if (user) {
             console.log("✅ Storing user data...")
 
-            // Store user data locally
             setStoredUser(user)
 
-            // Update React Query cache
             queryClient.setQueryData(authKeys.currentUser, user)
 
             console.log("✅ User stored, navigating to dashboard...")
             toast.success(`Welcome back, ${user.name}!`)
 
-            // Use setTimeout to ensure state updates complete
             setTimeout(() => {
                 navigate("/", { replace: true })
             }, 100)
