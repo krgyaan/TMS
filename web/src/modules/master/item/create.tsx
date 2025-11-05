@@ -1,7 +1,5 @@
-const CreateItemPage = () => {
-    return (
-        <div>Create Item</div>
-    )
-}
+import { ItemForm } from './components/ItemForm';
 
-export default CreateItemPage
+export default function ItemCreatePage() {
+    return <ItemForm mode="create" />;
+}

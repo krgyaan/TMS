@@ -1,7 +1,5 @@
-const CreateRolePage = () => {
-    return (
-        <div></div>
-    )
-}
+import { RoleForm } from './components/RoleForm';
 
-export default CreateRolePage
+export default function RoleCreatePage() {
+    return <RoleForm mode="create" />;
+}

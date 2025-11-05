@@ -1,7 +1,5 @@
-const CreateTeamPage = () => {
-    return (
-        <div>Create Team</div>
-    )
-}
+import { TeamForm } from './components/TeamForm';
 
-export default CreateTeamPage
+export default function TeamCreatePage() {
+    return <TeamForm mode="create" />;
+}
