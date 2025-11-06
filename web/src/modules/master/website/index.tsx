@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useWebsites, useDeleteWebsite } from '@/hooks/api/useWebsites';
+import { useWebsites } from '@/hooks/api/useWebsites';
 import type { Website } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -28,7 +28,7 @@ const rowSelection: RowSelectionOptions = {
 
 const WebsitesPage = () => {
     const { data: websites, isLoading, error, refetch } = useWebsites();
-    const deleteWebsite = useDeleteWebsite();
+    // const deleteWebsite = useDeleteWebsite();
     const navigate = useNavigate()
 
     // Website actions
@@ -46,7 +46,7 @@ const WebsitesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteWebsite.mutateAsync(row.id);
+                        // await deleteWebsite.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -174,7 +174,7 @@ const WebsitesPage = () => {
                 <DataTable
                     data={websites || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteWebsite.isPending}
+                    // loading={isLoading || deleteWebsite.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

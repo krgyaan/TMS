@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useRoles, useDeleteRole } from '@/hooks/api/useRoles';
+import { useRoles } from '@/hooks/api/useRoles';
 import type { Role } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +21,7 @@ const rowSelection: RowSelectionOptions = {
 
 const RolesPage = () => {
     const { data: roles, isLoading, error, refetch } = useRoles();
-    const deleteRole = useDeleteRole();
+    // const deleteRole = useDeleteRole();
     const navigate = useNavigate()
 
     const roleActions: ActionItem<Role>[] = [
@@ -38,7 +38,7 @@ const RolesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteRole.mutateAsync(row.id);
+                        // await deleteRole.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -145,7 +145,7 @@ const RolesPage = () => {
                 <DataTable
                     data={roles || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteRole.isPending}
+                    // loading={isLoading || deleteRole.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

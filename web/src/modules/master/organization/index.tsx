@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import { useOrganizations, useDeleteOrganization } from "@/hooks/api/useOrganizations";
+import { useOrganizations } from "@/hooks/api/useOrganizations";
 import type { Organization } from "@/types/api.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,7 +27,7 @@ const rowSelection: RowSelectionOptions = {
 
 const OrganizationPage = () => {
     const { data: organizations, isLoading, error, refetch } = useOrganizations();
-    const deleteOrganization = useDeleteOrganization();
+    // const deleteOrganization = useDeleteOrganization();
     const navigate = useNavigate()
 
     // Organization actions
@@ -45,7 +45,7 @@ const OrganizationPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete ${row.name}?`)) {
                     try {
-                        await deleteOrganization.mutateAsync(row.id);
+                        // await deleteOrganization.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -149,7 +149,7 @@ const OrganizationPage = () => {
                 <DataTable
                     data={organizations || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteOrganization.isPending}
+                    // loading={isLoading || deleteOrganization.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

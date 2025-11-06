@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useLeadTypes, useDeleteLeadType } from '@/hooks/api/useLeadTypes';
+import { useLeadTypes } from '@/hooks/api/useLeadTypes';
 import type { LeadType } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -28,7 +28,7 @@ const rowSelection: RowSelectionOptions = {
 
 const LeadTypesPage = () => {
     const { data: leadTypes, isLoading, error, refetch } = useLeadTypes();
-    const deleteLeadType = useDeleteLeadType();
+    // const deleteLeadType = useDeleteLeadType();
     const navigate = useNavigate();
 
     // Lead Type actions
@@ -46,7 +46,7 @@ const LeadTypesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteLeadType.mutateAsync(row.id);
+                        // await deleteLeadType.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -160,7 +160,7 @@ const LeadTypesPage = () => {
                 <DataTable
                     data={leadTypes || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteLeadType.isPending}
+                    // loading={isLoading || deleteLeadType.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

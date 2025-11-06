@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu"
 import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
-import { useStatuses, useDeleteStatus } from "@/hooks/api/useStatuses"
+import { useStatuses } from "@/hooks/api/useStatuses"
 import type { User } from "@/types/api.types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,7 +28,7 @@ const rowSelection: RowSelectionOptions = {
 const StatusPage = () => {
     // Use React Query hooks
     const { data: Statuses, isLoading, error, refetch } = useStatuses()
-    const deleteStatus = useDeleteStatus()
+    // const deleteStatus = useDeleteStatus()
     const navigate = useNavigate()
 
     // Status actions with delete mutation
@@ -46,7 +46,7 @@ const StatusPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete ${row.name}?`)) {
                     try {
-                        await deleteStatus.mutateAsync(row.id)
+                        // await deleteStatus.mutateAsync(row.id)
                     } catch (error) {
                         // Error is already handled by the hook with toast
                         console.error('Delete failed:', error)
@@ -139,7 +139,7 @@ const StatusPage = () => {
                 <DataTable
                     data={Statuses || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteStatus.isPending}
+                    // loading={isLoading || deleteStatus.isPending}
                     gridOptions={{
                         defaultColDef: { editable: true, filter: true },
                         rowSelection,

@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu"
 import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
-import { useUsers, useDeleteUser } from "@/hooks/api/useUsers"
+import { useUsers } from "@/hooks/api/useUsers"
 import type { User } from "@/types/api.types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -29,7 +29,7 @@ const UserPage = () => {
     const navigate = useNavigate()
     // Use React Query hooks
     const { data: users, isLoading, error, refetch } = useUsers()
-    const deleteUser = useDeleteUser()
+    // const deleteUser = useDeleteUser()
 
     // Employee actions with delete mutation
     const employeeActions: ActionItem<User>[] = [
@@ -46,10 +46,10 @@ const UserPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete ${row.name}?`)) {
                     try {
-                        await deleteUser.mutateAsync(row.id)
+                        // await deleteUser.mutateAsync(row.id)
                     } catch (error) {
                         // Error is already handled by the hook with toast
-                        console.error('Delete failed:', error)  
+                        console.error('Delete failed:', error)
                     }
                 }
             },
@@ -143,7 +143,7 @@ const UserPage = () => {
                 <DataTable
                     data={users || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteUser.isPending}
+                    // loading={isLoading || deleteUser.isPending}
                     gridOptions={{
                         defaultColDef: { editable: true, filter: true },
                         rowSelection,

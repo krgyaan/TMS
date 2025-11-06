@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useTeams, useDeleteTeam } from '@/hooks/api/useTeams';
+import { useTeams } from '@/hooks/api/useTeams';
 import type { Team } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +21,7 @@ const rowSelection: RowSelectionOptions = {
 
 const TeamsPage = () => {
     const { data: teams, isLoading, error, refetch } = useTeams();
-    const deleteTeam = useDeleteTeam();
+    // const deleteTeam = useDeleteTeam();
     const navigate = useNavigate()
 
     const teamActions: ActionItem<Team>[] = [
@@ -38,7 +38,7 @@ const TeamsPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteTeam.mutateAsync(row.id);
+                        // await deleteTeam.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -83,7 +83,6 @@ const TeamsPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(teamActions),
@@ -146,7 +145,7 @@ const TeamsPage = () => {
                 <DataTable
                     data={teams || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteTeam.isPending}
+                    // loading={isLoading || deleteTeam.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

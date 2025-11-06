@@ -16,7 +16,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useImprestCategories,
-    useDeleteImprestCategory,
 } from '@/hooks/api/useImprestCategories';
 import type { ImprestCategory } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +35,7 @@ const ImprestCategoryPage = () => {
         error,
         refetch,
     } = useImprestCategories();
-    const deleteCategory = useDeleteImprestCategory();
+    // const deleteCategory = useDeleteImprestCategory();
     const navigate = useNavigate()
 
     // Category actions
@@ -54,7 +53,7 @@ const ImprestCategoryPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteCategory.mutateAsync(row.id);
+                        // await deleteCategory.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -170,7 +169,7 @@ const ImprestCategoryPage = () => {
                 <DataTable
                     data={categories || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteCategory.isPending}
+                    // loading={isLoading || deleteCategory.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useStates, useDeleteState } from '@/hooks/api/useStates';
+import { useStates } from '@/hooks/api/useStates';
 import type { State } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +21,7 @@ const rowSelection: RowSelectionOptions = {
 
 const StatesPage = () => {
     const { data: states, isLoading, error, refetch } = useStates();
-    const deleteState = useDeleteState();
+    // const deleteState = useDeleteState();
     const navigate = useNavigate()
 
     const stateActions: ActionItem<State>[] = [
@@ -38,7 +38,7 @@ const StatesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteState.mutateAsync(row.id);
+                        // await deleteState.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -146,7 +146,7 @@ const StatesPage = () => {
                 <DataTable
                     data={states || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteState.isPending}
+                    // loading={isLoading || deleteState.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,
