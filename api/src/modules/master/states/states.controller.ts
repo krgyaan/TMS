@@ -35,7 +35,8 @@ export class StatesController {
     @Get('search')
     async search(@Query('q') query: string) {
         if (!query) return [];
-        return this.statesService.search(query);
+        // return this.statesService.search(query);
+        return [];
     }
 
     @Get(':id')

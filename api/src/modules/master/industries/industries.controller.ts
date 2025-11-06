@@ -35,7 +35,8 @@ export class IndustriesController {
     @Get('search')
     async search(@Query('q') query: string) {
         if (!query) return [];
-        return this.industriesService.search(query);
+        // return this.industriesService.search(query);
+        return [];
     }
 
     @Get(':id')

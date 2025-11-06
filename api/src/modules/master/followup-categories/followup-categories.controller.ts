@@ -41,7 +41,8 @@ export class FollowupCategoriesController {
         if (!query) {
             return [];
         }
-        return this.followupCategoriesService.search(query);
+        // return this.followupCategoriesService.search(query);
+        return [];
     }
 
     @Get(':id')

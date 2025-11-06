@@ -33,7 +33,7 @@ export const useLeadType = (id: number | null) => {
 export const useLeadTypeSearch = (query: string) => {
     return useQuery({
         queryKey: [...leadTypesKey.all, 'search', query],
-        queryFn: () => leadTypesService.search(query),
+        // queryFn: () => leadTypesService.search(query),
         enabled: query.length > 0,
     });
 };

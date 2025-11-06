@@ -41,7 +41,8 @@ export class DesignationsController {
         if (!query) {
             return [];
         }
-        return this.designationsService.search(query);
+        // return this.designationsService.search(query);
+        return [];
     }
 
     @Get(':id')

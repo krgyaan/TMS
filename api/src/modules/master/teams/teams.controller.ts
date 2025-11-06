@@ -35,7 +35,8 @@ export class TeamsController {
     @Get('search')
     async search(@Query('q') query: string) {
         if (!query) return [];
-        return this.teamsService.search(query);
+        // return this.teamsService.search(query);
+        return [];
     }
 
     @Get(':id')

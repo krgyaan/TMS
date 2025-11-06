@@ -36,7 +36,7 @@ export const useFollowupCategory = (id: number | null) => {
 export const useFollowupCategorySearch = (query: string) => {
     return useQuery({
         queryKey: [...followupCategoriesKey.all, 'search', query],
-        queryFn: () => followupCategoriesService.search(query),
+        // queryFn: () => followupCategoriesService.search(query),
         enabled: query.length > 0,
     });
 };

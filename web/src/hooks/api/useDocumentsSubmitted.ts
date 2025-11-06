@@ -37,7 +37,7 @@ export const useDocumentSubmitted = (id: number | null) => {
 export const useDocumentSubmittedSearch = (query: string) => {
     return useQuery({
         queryKey: [...documentsSubmittedKey.all, 'search', query],
-        queryFn: () => documentsSubmittedService.search(query),
+        // queryFn: () => documentsSubmittedService.search(query),
         enabled: query.length > 0,
     });
 };

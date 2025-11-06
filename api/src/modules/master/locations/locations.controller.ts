@@ -11,30 +11,30 @@
     HttpCode,
     HttpStatus,
     NotFoundException,
-  } from '@nestjs/common';
-  import { z } from 'zod';
-  import { LocationsService } from './locations.service';
+} from '@nestjs/common';
+import { z } from 'zod';
+import { LocationsService } from './locations.service';
 
-  // Validation Schema
-  const CreateLocationSchema = z.object({
+// Validation Schema
+const CreateLocationSchema = z.object({
     name: z.string()
-      .min(1, 'Name is required')
-      .max(100, 'Name cannot be longer than 100 characters'),
+        .min(1, 'Name is required')
+        .max(100, 'Name cannot be longer than 100 characters'),
     address: z.string().max(500).optional(),
     state: z.string().max(100).optional(),
     acronym: z.string().max(20).optional(),
     region: z.string().max(100).optional(),
     status: z.boolean().optional().default(true),
-  });
+});
 
-  const UpdateLocationSchema = CreateLocationSchema.partial();
+const UpdateLocationSchema = CreateLocationSchema.partial();
 
-  type CreateLocationDto = z.infer<typeof CreateLocationSchema>;
-  type UpdateLocationDto = z.infer<typeof UpdateLocationSchema>;
+type CreateLocationDto = z.infer<typeof CreateLocationSchema>;
+type UpdateLocationDto = z.infer<typeof UpdateLocationSchema>;
 
-  @Controller('locations')
-  export class LocationsController {
-    constructor(private readonly locationsService: LocationsService) {}
+@Controller('locations')
+export class LocationsController {
+    constructor(private readonly locationsService: LocationsService) { }
 
     /**
      * GET /locations
@@ -42,7 +42,7 @@
      */
     @Get()
     async list() {
-      return this.locationsService.findAll();
+        return this.locationsService.findAll();
     }
 
     /**
@@ -51,10 +51,11 @@
      */
     @Get('search')
     async search(@Query('q') query: string) {
-      if (!query) {
+        if (!query) {
+            return [];
+        }
+        //   return this.locationsService.search(query);
         return [];
-      }
-      return this.locationsService.search(query);
     }
 
 
@@ -64,11 +65,11 @@
      */
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
-      const location = await this.locationsService.findById(id);
-      if (!location) {
-        throw new NotFoundException(`Location with ID ${id} not found`);
-      }
-      return location;
+        const location = await this.locationsService.findById(id);
+        if (!location) {
+            throw new NotFoundException(`Location with ID ${id} not found`);
+        }
+        return location;
     }
 
     /**
@@ -78,8 +79,8 @@
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() body: unknown) {
-      const parsed = CreateLocationSchema.parse(body);
-      return this.locationsService.create(parsed);
+        const parsed = CreateLocationSchema.parse(body);
+        return this.locationsService.create(parsed);
     }
 
     /**
@@ -88,11 +89,11 @@
      */
     @Patch(':id')
     async update(
-      @Param('id', ParseIntPipe) id: number,
-      @Body() body: unknown,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
     ) {
-      const parsed = UpdateLocationSchema.parse(body);
-      return this.locationsService.update(id, parsed);
+        const parsed = UpdateLocationSchema.parse(body);
+        return this.locationsService.update(id, parsed);
     }
 
     /**
@@ -104,4 +105,4 @@
     // async delete(@Param('id', ParseIntPipe) id: number) {
     //   await this.locationsService.delete(id);
     // }
-  }
+}

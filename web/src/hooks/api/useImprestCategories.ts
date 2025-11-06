@@ -36,7 +36,7 @@ export const useImprestCategory = (id: number | null) => {
 export const useImprestCategorySearch = (query: string) => {
     return useQuery({
         queryKey: [...imprestCategoriesKey.all, 'search', query],
-        queryFn: () => imprestCategoriesService.search(query),
+        // queryFn: () => imprestCategoriesService.search(query),
         enabled: query.length > 0,
     });
 };

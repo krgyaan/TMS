@@ -42,7 +42,8 @@ export class ImprestCategoriesController {
         if (!query) {
             return [];
         }
-        return this.imprestCategoriesService.search(query);
+        // return this.imprestCategoriesService.search(query);
+        return [];
     }
 
     @Get(':id')
