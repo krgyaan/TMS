@@ -99,9 +99,9 @@
      * DELETE /locations/:id
      * Soft delete location
      */
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-      await this.locationsService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //   await this.locationsService.delete(id);
+    // }
   }

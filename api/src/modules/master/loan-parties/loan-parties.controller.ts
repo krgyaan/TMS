@@ -65,9 +65,9 @@ export class LoanPartiesController {
         return this.loanPartiesService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.loanPartiesService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.loanPartiesService.delete(id);
+    // }
 }

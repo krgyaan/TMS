@@ -73,17 +73,17 @@ export const useUpdateLeadType = () => {
 };
 
 // Delete lead type
-export const useDeleteLeadType = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteLeadType = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => leadTypesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: leadTypesKey.lists() });
-            toast.success('Lead Type deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => leadTypesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: leadTypesKey.lists() });
+//             toast.success('Lead Type deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

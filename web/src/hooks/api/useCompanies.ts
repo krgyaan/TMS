@@ -59,17 +59,17 @@ export const useUpdateCompany = () => {
     })
 }
 
-export const useDeleteCompany = () => {
-    const queryClient = useQueryClient()
+// export const useDeleteCompany = () => {
+//     const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (id: string) => companiesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: companyKeys.lists() })
-            toast.success('Company deleted successfully')
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
-        },
-    })
-}
+//     return useMutation({
+//         mutationFn: (id: string) => companiesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: companyKeys.lists() })
+//             toast.success('Company deleted successfully')
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error))
+//         },
+//     })
+// }

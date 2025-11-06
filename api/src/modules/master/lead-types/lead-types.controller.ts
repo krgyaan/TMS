@@ -65,9 +65,9 @@ export class LeadTypesController {
         return this.leadTypesService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.leadTypesService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.leadTypesService.delete(id);
+    // }
 }

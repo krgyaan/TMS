@@ -73,17 +73,17 @@ export const useUpdateWebsite = () => {
 };
 
 // Delete website
-export const useDeleteWebsite = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteWebsite = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => websitesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: websitesKey.lists() });
-            toast.success('Website deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => websitesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: websitesKey.lists() });
+//             toast.success('Website deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

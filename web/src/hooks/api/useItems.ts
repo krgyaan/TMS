@@ -64,17 +64,17 @@ export const useUpdateItem = () => {
 }
 
 // Delete status
-export const useDeleteItem = () => {
-    const queryClient = useQueryClient()
+// export const useDeleteItem = () => {
+//     const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (id: number) => itemsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: itemsKey.lists() })
-            toast.success('Item deleted successfully')
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
-        },
-    })
-}
+//     return useMutation({
+//         mutationFn: (id: number) => itemsService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: itemsKey.lists() })
+//             toast.success('Item deleted successfully')
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error))
+//         },
+//     })
+// }

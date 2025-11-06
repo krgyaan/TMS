@@ -76,17 +76,17 @@ export const useUpdateVendor = () => {
     });
 };
 
-export const useDeleteVendor = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteVendor = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => vendorsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
-            toast.success('Vendor deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => vendorsService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
+//             toast.success('Vendor deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

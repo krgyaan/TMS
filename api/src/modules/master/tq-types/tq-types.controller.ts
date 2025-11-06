@@ -64,9 +64,9 @@ export class TqTypesController {
         return this.tqTypesService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.tqTypesService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.tqTypesService.delete(id);
+    // }
 }

@@ -59,17 +59,17 @@ export const useUpdateState = () => {
     });
 };
 
-export const useDeleteState = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteState = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => statesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: statesKey.lists() });
-            toast.success('State deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => statesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: statesKey.lists() });
+//             toast.success('State deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

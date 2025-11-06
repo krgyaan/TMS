@@ -70,9 +70,9 @@ export class DocumentsSubmittedController {
         return this.documentsSubmittedService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.documentsSubmittedService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.documentsSubmittedService.delete(id);
+    // }
 }

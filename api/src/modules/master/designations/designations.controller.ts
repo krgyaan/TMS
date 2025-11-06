@@ -68,9 +68,9 @@ export class DesignationsController {
         return this.designationsService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.designationsService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.designationsService.delete(id);
+    // }
 }

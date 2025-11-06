@@ -64,17 +64,17 @@ export const useUpdateLocation = () => {
 }
 
 // Delete location
-export const useDeleteLocation = () => {
-    const queryClient = useQueryClient()
+// export const useDeleteLocation = () => {
+//     const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (id: number) => locationsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: locationKey.lists() })
-            toast.success('Location deleted successfully')
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
-        },
-    })
-}
+//     return useMutation({
+//         mutationFn: (id: number) => locationsService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: locationKey.lists() })
+//             toast.success('Location deleted successfully')
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error))
+//         },
+//     })
+// }

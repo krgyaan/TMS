@@ -87,22 +87,22 @@ export const useUpdateVendorOrganization = () => {
   });
 };
 
-export const useDeleteVendorOrganization = () => {
-  const queryClient = useQueryClient();
+// export const useDeleteVendorOrganization = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (id: number) => vendorOrganizationsService.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: vendorOrganizationsKey.lists(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: vendorOrganizationsKey.withRelations(),
-      });
-      toast.success('Vendor Organization deleted successfully');
-    },
-    onError: (error) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
+//   return useMutation({
+//     mutationFn: (id: number) => vendorOrganizationsService.delete(id),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({
+//         queryKey: vendorOrganizationsKey.lists(),
+//       });
+//       queryClient.invalidateQueries({
+//         queryKey: vendorOrganizationsKey.withRelations(),
+//       });
+//       toast.success('Vendor Organization deleted successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(handleQueryError(error));
+//     },
+//   });
+// };

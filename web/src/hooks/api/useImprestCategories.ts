@@ -79,17 +79,17 @@ export const useUpdateImprestCategory = () => {
 };
 
 // Delete imprest category
-export const useDeleteImprestCategory = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteImprestCategory = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => imprestCategoriesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: imprestCategoriesKey.lists() });
-            toast.success('Imprest Category deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => imprestCategoriesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: imprestCategoriesKey.lists() });
+//             toast.success('Imprest Category deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

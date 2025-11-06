@@ -64,17 +64,17 @@ export const useUpdateItemHeading = () => {
 }
 
 // Delete status
-export const useDeleteItemHeading = () => {
-    const queryClient = useQueryClient()
+// export const useDeleteItemHeading = () => {
+//     const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (id: number) => itemsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: itemHeadingKey.lists() })
-            toast.success('Item Heading deleted successfully')
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
-        },
-    })
-}
+//     return useMutation({
+//         mutationFn: (id: number) => itemsService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: itemHeadingKey.lists() })
+//             toast.success('Item Heading deleted successfully')
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error))
+//         },
+//     })
+// }
