@@ -59,17 +59,17 @@ export const useUpdateRole = () => {
     });
 };
 
-export const useDeleteRole = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteRole = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => rolesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
-            toast.success('Role deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => rolesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
+//             toast.success('Role deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

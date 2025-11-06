@@ -60,9 +60,9 @@ export class VendorOrganizationsController {
         return this.vendorOrganizationsService.update(id, parsed);
     }
 
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async delete(@Param('id', ParseIntPipe) id: number) {
-        await this.vendorOrganizationsService.delete(id);
-    }
+    // @Delete(':id')
+    // @HttpCode(HttpStatus.NO_CONTENT)
+    // async delete(@Param('id', ParseIntPipe) id: number) {
+    //     await this.vendorOrganizationsService.delete(id);
+    // }
 }

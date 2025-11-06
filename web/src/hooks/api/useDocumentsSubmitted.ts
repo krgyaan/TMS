@@ -80,17 +80,17 @@ export const useUpdateDocumentSubmitted = () => {
 };
 
 // Delete document submitted
-export const useDeleteDocumentSubmitted = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteDocumentSubmitted = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => documentsSubmittedService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: documentsSubmittedKey.lists() });
-            toast.success('Document type deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => documentsSubmittedService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: documentsSubmittedKey.lists() });
+//             toast.success('Document type deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

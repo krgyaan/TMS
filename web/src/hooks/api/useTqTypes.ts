@@ -73,17 +73,17 @@ export const useUpdateTqType = () => {
 };
 
 // Delete TQ type
-export const useDeleteTqType = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteTqType = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => tqTypesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: tqTypesKey.lists() });
-            toast.success('TQ Type deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => tqTypesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: tqTypesKey.lists() });
+//             toast.success('TQ Type deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

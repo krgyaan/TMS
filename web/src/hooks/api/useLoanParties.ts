@@ -73,17 +73,17 @@ export const useUpdateLoanParty = () => {
 };
 
 // Delete lead type
-export const useDeleteLoanParty = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteLoanParty = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => loanPartiesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
-            toast.success('Lead Type deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => loanPartiesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
+//             toast.success('Lead Type deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

@@ -75,17 +75,17 @@ export const useUpdateOrganization = () => {
   });
 };
 
-export const useDeleteOrganization = () => {
-  const queryClient = useQueryClient();
+// export const useDeleteOrganization = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (id: number) => organizationsService.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationsKey.lists() });
-      toast.success('Organization deleted successfully');
-    },
-    onError: (error) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
+//   return useMutation({
+//     mutationFn: (id: number) => organizationsService.delete(id),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: organizationsKey.lists() });
+//       toast.success('Organization deleted successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(handleQueryError(error));
+//     },
+//   });
+// };

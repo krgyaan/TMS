@@ -49,8 +49,8 @@ export class TenderStatusController {
     return this.service.update(id, parsed);
   }
 
-  @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.delete(id);
-  }
+//   @Delete(':id')
+//   async remove(@Param('id', ParseIntPipe) id: number) {
+//     return this.service.delete(id);
+//   }
 }

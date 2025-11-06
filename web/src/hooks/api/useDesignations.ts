@@ -79,17 +79,17 @@ export const useUpdateDesignation = () => {
 };
 
 // Delete followup category
-export const useDeleteDesignation = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteDesignation = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => followupCategoriesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
-            toast.success('Followup Category deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => followupCategoriesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
+//             toast.success('Followup Category deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };

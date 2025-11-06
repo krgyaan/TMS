@@ -59,17 +59,17 @@ export const useUpdateTeam = () => {
   });
 };
 
-export const useDeleteTeam = () => {
-  const queryClient = useQueryClient();
+// export const useDeleteTeam = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (id: number) => teamsService.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
-      toast.success('Team deleted successfully');
-    },
-    onError: (error) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
+//   return useMutation({
+//     mutationFn: (id: number) => teamsService.delete(id),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
+//       toast.success('Team deleted successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(handleQueryError(error));
+//     },
+//   });
+// };

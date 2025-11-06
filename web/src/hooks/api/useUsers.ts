@@ -64,17 +64,17 @@ export const useUpdateUser = () => {
 }
 
 // Delete user
-export const useDeleteUser = () => {
-    const queryClient = useQueryClient()
+// export const useDeleteUser = () => {
+//     const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (id: number) => usersService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: userKeys.lists() })
-            toast.success('User deleted successfully')
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
-        },
-    })
-}
+//     return useMutation({
+//         mutationFn: (id: number) => usersService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+//             toast.success('User deleted successfully')
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error))
+//         },
+//     })
+// }

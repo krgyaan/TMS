@@ -59,17 +59,17 @@ export const useUpdateIndustry = () => {
     });
 };
 
-export const useDeleteIndustry = () => {
-    const queryClient = useQueryClient();
+// export const useDeleteIndustry = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: (id: number) => industriesService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: industriesKey.lists() });
-            toast.success('Industry deleted successfully');
-        },
-        onError: (error) => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: (id: number) => industriesService.delete(id),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: industriesKey.lists() });
+//             toast.success('Industry deleted successfully');
+//         },
+//         onError: (error) => {
+//             toast.error(handleQueryError(error));
+//         },
+//     });
+// };
