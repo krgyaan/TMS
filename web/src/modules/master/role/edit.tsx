@@ -40,5 +40,5 @@ export default function RoleEditPage() {
         );
     }
 
-    return <RoleForm role={role} mode="edit" />;
+    return <></>;
 }

@@ -36,7 +36,6 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import {
     useVendorOrganizationsWithRelations,
-    useDeleteVendorOrganization,
 } from '@/hooks/api/useVendorOrganizations';
 import type {
     VendorOrganizationWithRelations,
@@ -58,7 +57,7 @@ const VendorsPage = () => {
         error,
         refetch,
     } = useVendorOrganizationsWithRelations();
-    const deleteOrganization = useDeleteVendorOrganization();
+    // const deleteOrganization = useDeleteVendorOrganization();
 
     // Modal states
     const [gstModal, setGstModal] = useState<{
@@ -97,7 +96,7 @@ const VendorsPage = () => {
                     )
                 ) {
                     try {
-                        await deleteOrganization.mutateAsync(row.id);
+                        // await deleteOrganization.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -411,7 +410,7 @@ const VendorsPage = () => {
                     <DataTable
                         data={organizations || []}
                         columnDefs={colDefs}
-                        loading={isLoading || deleteOrganization.isPending}
+                        // loading={isLoading || deleteOrganization.isPending}
                         gridOptions={{
                             defaultColDef: {
                                 editable: false,
