@@ -29,13 +29,13 @@ class FollowupCategoriesService extends BaseApiService {
         return this.patch<FollowupCategory>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<FollowupCategory[]> {
-        return this.get<FollowupCategory[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<FollowupCategory[]> {
+    //     return this.get<FollowupCategory[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const followupCategoriesService = new FollowupCategoriesService();

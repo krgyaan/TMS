@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from "ag-grid-community"
 import { useState } from "react"
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer"
 import type { ActionItem } from "@/components/ui/ActionMenu"
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
 import { useStatuses, useDeleteStatus } from "@/hooks/api/useStatuses"
 import type { User } from "@/types/api.types"
@@ -29,6 +29,7 @@ const StatusPage = () => {
     // Use React Query hooks
     const { data: Statuses, isLoading, error, refetch } = useStatuses()
     const deleteStatus = useDeleteStatus()
+    const navigate = useNavigate()
 
     // Status actions with delete mutation
     const StatusActions: ActionItem<User>[] = [
@@ -36,6 +37,7 @@ const StatusPage = () => {
             label: "Edit",
             onClick: (row) => {
                 console.log("Edit", row)
+                navigate(paths.master.statuses_edit(row.id));
             },
         },
         {

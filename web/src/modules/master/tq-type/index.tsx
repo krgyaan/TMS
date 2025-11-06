@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useTqTypes, useDeleteTqType } from '@/hooks/api/useTqTypes';
 import type { TqType } from '@/types/api.types';
@@ -29,6 +29,7 @@ const rowSelection: RowSelectionOptions = {
 const TqTypesPage = () => {
     const { data: tqTypes, isLoading, error, refetch } = useTqTypes();
     const deleteTqType = useDeleteTqType();
+    const navigate = useNavigate()
 
     // TQ Type actions
     const tqTypeActions: ActionItem<TqType>[] = [
@@ -36,6 +37,7 @@ const TqTypesPage = () => {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.tqTypes_edit(row.id));
             },
         },
         {
@@ -88,7 +90,6 @@ const TqTypesPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(tqTypeActions),

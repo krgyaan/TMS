@@ -11,6 +11,10 @@ export interface ApiError {
     error?: string
 }
 
+export interface Company {
+
+}
+
 export interface User {
     id: number
     name: string

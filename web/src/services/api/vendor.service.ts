@@ -35,9 +35,9 @@ class VendorsService extends BaseApiService {
         return this.patch<Vendor>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 }
 
 export const vendorsService = new VendorsService();

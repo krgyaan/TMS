@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useLeadTypes, useDeleteLeadType } from '@/hooks/api/useLeadTypes';
 import type { LeadType } from '@/types/api.types';
@@ -29,6 +29,7 @@ const rowSelection: RowSelectionOptions = {
 const LeadTypesPage = () => {
     const { data: leadTypes, isLoading, error, refetch } = useLeadTypes();
     const deleteLeadType = useDeleteLeadType();
+    const navigate = useNavigate();
 
     // Lead Type actions
     const leadTypeActions: ActionItem<LeadType>[] = [
@@ -36,6 +37,7 @@ const LeadTypesPage = () => {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.leadTypes_edit(row.id));
             },
         },
         {
@@ -89,7 +91,6 @@ const LeadTypesPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(leadTypeActions),

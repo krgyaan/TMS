@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useWebsites, useDeleteWebsite } from '@/hooks/api/useWebsites';
 import type { Website } from '@/types/api.types';
@@ -29,6 +29,7 @@ const rowSelection: RowSelectionOptions = {
 const WebsitesPage = () => {
     const { data: websites, isLoading, error, refetch } = useWebsites();
     const deleteWebsite = useDeleteWebsite();
+    const navigate = useNavigate()
 
     // Website actions
     const websiteActions: ActionItem<Website>[] = [
@@ -36,6 +37,7 @@ const WebsitesPage = () => {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.websites_edit(row.id));
             },
         },
         {

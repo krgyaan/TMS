@@ -22,13 +22,13 @@ class LoanPartiesService extends BaseApiService {
         return this.patch<LoanParty>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<LoanParty[]> {
-        return this.get<LoanParty[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<LoanParty[]> {
+    //     return this.get<LoanParty[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const loanPartiesService = new LoanPartiesService();

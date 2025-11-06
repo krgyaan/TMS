@@ -22,13 +22,13 @@ class WebsitesService extends BaseApiService {
         return this.patch<Website>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<Website[]> {
-        return this.get<Website[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<Website[]> {
+    //     return this.get<Website[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const websitesService = new WebsitesService();

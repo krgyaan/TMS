@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useDocumentsSubmitted,
@@ -37,6 +37,7 @@ const DocumentsSubmittedPage = () => {
         refetch,
     } = useDocumentsSubmitted();
     const deleteDocument = useDeleteDocumentSubmitted();
+    const navigate = useNavigate();
 
     // Document actions
     const documentActions: ActionItem<DocumentSubmitted>[] = [
@@ -44,6 +45,7 @@ const DocumentsSubmittedPage = () => {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.documentSubmitted_edit(row.id));
             },
         },
         {

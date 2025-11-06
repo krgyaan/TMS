@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from "ag-grid-community";
 import { useState } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useOrganizations, useDeleteOrganization } from "@/hooks/api/useOrganizations";
 import type { Organization } from "@/types/api.types";
@@ -28,6 +28,7 @@ const rowSelection: RowSelectionOptions = {
 const OrganizationPage = () => {
     const { data: organizations, isLoading, error, refetch } = useOrganizations();
     const deleteOrganization = useDeleteOrganization();
+    const navigate = useNavigate()
 
     // Organization actions
     const organizationActions: ActionItem<Organization>[] = [
@@ -35,7 +36,7 @@ const OrganizationPage = () => {
             label: "Edit",
             onClick: (row) => {
                 console.log("Edit", row);
-                // Navigate to edit page or open modal
+                navigate(paths.master.organizations_edit(row.id));
             },
         },
         {

@@ -29,13 +29,13 @@ class DesignationsService extends BaseApiService {
         return this.patch<Designation>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<Designation[]> {
-        return this.get<Designation[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<Designation[]> {
+    //     return this.get<Designation[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const designationsService = new DesignationsService();

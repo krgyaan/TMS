@@ -22,13 +22,13 @@ class TqTypesService extends BaseApiService {
         return this.patch<TqType>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<TqType[]> {
-        return this.get<TqType[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<TqType[]> {
+    //     return this.get<TqType[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const tqTypesService = new TqTypesService();

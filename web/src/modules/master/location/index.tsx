@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from "ag-grid-community"
 import { useState } from "react"
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer"
 import type { ActionItem } from "@/components/ui/ActionMenu"
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
 import { useLocations, useDeleteLocation } from "@/hooks/api/useLocations"
 import type { User } from "@/types/api.types"
@@ -29,6 +29,7 @@ const LocationPage = () => {
     // Use React Query hooks
     const { data: locations, isLoading, error, refetch } = useLocations()
     const deleteLocation = useDeleteLocation()
+    const navigate = useNavigate()
 
     // Employee actions with delete mutation
     const locationActions: ActionItem<User>[] = [
@@ -36,6 +37,7 @@ const LocationPage = () => {
             label: "Edit",
             onClick: (row) => {
                 console.log("Edit", row)
+                navigate(paths.master.locations_edit(row.id));
             },
         },
         {

@@ -22,13 +22,13 @@ class LeadTypesService extends BaseApiService {
         return this.patch<LeadType>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<LeadType[]> {
-        return this.get<LeadType[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<LeadType[]> {
+    //     return this.get<LeadType[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const leadTypesService = new LeadTypesService();

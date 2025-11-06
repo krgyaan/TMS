@@ -5,7 +5,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useIndustries, useDeleteIndustry } from '@/hooks/api/useIndustries';
 import type { Industry } from '@/types/api.types';
@@ -22,12 +22,14 @@ const rowSelection: RowSelectionOptions = {
 const IndustriesPage = () => {
     const { data: industries, isLoading, error, refetch } = useIndustries();
     const deleteIndustry = useDeleteIndustry();
+    const navigate = useNavigate()
 
     const industryActions: ActionItem<Industry>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.industries_edit(row.id));
             },
         },
         {

@@ -5,7 +5,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useTeams, useDeleteTeam } from '@/hooks/api/useTeams';
 import type { Team } from '@/types/api.types';
@@ -22,12 +22,14 @@ const rowSelection: RowSelectionOptions = {
 const TeamsPage = () => {
     const { data: teams, isLoading, error, refetch } = useTeams();
     const deleteTeam = useDeleteTeam();
+    const navigate = useNavigate()
 
     const teamActions: ActionItem<Team>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.teams_edit(row.id));
             },
         },
         {

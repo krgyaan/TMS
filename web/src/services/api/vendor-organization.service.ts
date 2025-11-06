@@ -44,9 +44,9 @@ class VendorOrganizationsService extends BaseApiService {
     return this.patch<VendorOrganization>(`/${id}`, data);
   }
 
-  async delete(id: number): Promise<void> {
-    return this.delete<void>(`/${id}`);
-  }
+//   async delete(id: number): Promise<void> {
+//     return this.delete<void>(`/${id}`);
+//   }
 }
 
 export const vendorOrganizationsService = new VendorOrganizationsService();

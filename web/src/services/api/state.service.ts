@@ -22,13 +22,13 @@ class StatesService extends BaseApiService {
         return this.patch<State>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<State[]> {
-        return this.get<State[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<State[]> {
+    //     return this.get<State[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const statesService = new StatesService();

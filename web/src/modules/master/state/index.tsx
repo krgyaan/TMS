@@ -5,7 +5,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useStates, useDeleteState } from '@/hooks/api/useStates';
 import type { State } from '@/types/api.types';
@@ -22,12 +22,14 @@ const rowSelection: RowSelectionOptions = {
 const StatesPage = () => {
     const { data: states, isLoading, error, refetch } = useStates();
     const deleteState = useDeleteState();
+    const navigate = useNavigate()
 
     const stateActions: ActionItem<State>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.states_edit(row.id));
             },
         },
         {

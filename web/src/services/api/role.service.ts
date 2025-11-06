@@ -22,13 +22,13 @@ class RolesService extends BaseApiService {
         return this.patch<Role>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<Role[]> {
-        return this.get<Role[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<Role[]> {
+    //     return this.get<Role[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const rolesService = new RolesService();

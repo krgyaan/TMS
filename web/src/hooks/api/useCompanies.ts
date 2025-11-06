@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { companiesService } from '@/services/api'
-import { Company } from '@/types/api.types'
+import { type Company } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 

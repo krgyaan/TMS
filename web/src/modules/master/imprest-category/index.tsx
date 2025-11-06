@@ -12,7 +12,7 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useImprestCategories,
@@ -37,6 +37,7 @@ const ImprestCategoryPage = () => {
         refetch,
     } = useImprestCategories();
     const deleteCategory = useDeleteImprestCategory();
+    const navigate = useNavigate()
 
     // Category actions
     const categoryActions: ActionItem<ImprestCategory>[] = [
@@ -44,6 +45,7 @@ const ImprestCategoryPage = () => {
             label: 'Edit',
             onClick: (row) => {
                 console.log('Edit', row);
+                navigate(paths.master.imprestCategories_edit(row.id));
             },
         },
         {

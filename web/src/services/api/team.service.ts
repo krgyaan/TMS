@@ -22,13 +22,13 @@ class TeamsService extends BaseApiService {
         return this.patch<Team>(`/${id}`, data);
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`);
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`);
+    // }
 
-    async search(query: string): Promise<Team[]> {
-        return this.get<Team[]>('/search', { params: { q: query } });
-    }
+    // async search(query: string): Promise<Team[]> {
+    //     return this.get<Team[]>('/search', { params: { q: query } });
+    // }
 }
 
 export const teamsService = new TeamsService();

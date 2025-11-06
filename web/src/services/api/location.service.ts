@@ -22,9 +22,9 @@ class LocationsService extends BaseApiService {
         return this.patch<Location>(`/${id}`, data)
     }
 
-    async delete(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`)
-    }
+    // async delete(id: number): Promise<void> {
+    //     return this.delete<void>(`/${id}`)
+    // }
 }
 
 export const locationsService = new LocationsService()

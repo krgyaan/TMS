@@ -12,7 +12,7 @@ import type { ColDef, ICellRendererParams, RowSelectionOptions } from "ag-grid-c
 import { useState } from "react"
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer"
 import type { ActionItem } from "@/components/ui/ActionMenu"
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
 import { useUsers, useDeleteUser } from "@/hooks/api/useUsers"
 import type { User } from "@/types/api.types"
@@ -26,6 +26,7 @@ const rowSelection: RowSelectionOptions = {
 }
 
 const UserPage = () => {
+    const navigate = useNavigate()
     // Use React Query hooks
     const { data: users, isLoading, error, refetch } = useUsers()
     const deleteUser = useDeleteUser()
@@ -36,8 +37,7 @@ const UserPage = () => {
             label: "Edit",
             onClick: (row) => {
                 console.log("Edit", row)
-                // Navigate to edit page or open modal
-                // navigate(`${paths.master.users_edit}/${row.id}`)
+                navigate(paths.master.users_edit(row.id));
             },
         },
         {
@@ -49,7 +49,7 @@ const UserPage = () => {
                         await deleteUser.mutateAsync(row.id)
                     } catch (error) {
                         // Error is already handled by the hook with toast
-                        console.error('Delete failed:', error)
+                        console.error('Delete failed:', error)  
                     }
                 }
             },
