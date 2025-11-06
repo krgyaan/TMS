@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsSubmittedService } from '@/services/api';
 import type {
-    DocumentSubmitted,
     CreateDocumentSubmittedDto,
     UpdateDocumentSubmittedDto,
 } from '@/types/api.types';
