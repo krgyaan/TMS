@@ -4,8 +4,9 @@ import { VendorOrganizationsController } from './vendor-organizations.controller
 import { VendorOrganizationsService } from './vendor-organizations.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [VendorOrganizationsController],
-  providers: [VendorOrganizationsService],
+    imports: [DatabaseModule],
+    controllers: [VendorOrganizationsController],
+    providers: [VendorOrganizationsService],
+    exports: [VendorOrganizationsService],
 })
-export class VendorOrganizationsModule {}
+export class VendorOrganizationsModule { }

@@ -297,9 +297,61 @@ const data = {
                     url: paths.master.users,
                 },
                 {
-                    title: "Roles",
+                    title: "Status",
                     url: paths.master.statuses,
                 },
+                {
+                    title: "Items",
+                    url: paths.master.items,
+                },
+                {
+                    title: "Locations",
+                    url: paths.master.locations,
+                },
+                {
+                    title: "Organizations",
+                    url: paths.master.organizations,
+                },
+                {
+                    title: "Vendors",
+                    url: paths.master.vendors,
+                },
+                {
+                    title: "Websites",
+                    url: paths.master.websites,
+                },
+                {
+                    title: "Document Submitted",
+                    url: paths.master.documentSubmitted,
+                },
+                {
+                    title: "Imprest Categories",
+                    url: paths.master.imprestCategories,
+                },
+                {
+                    title: "Followup Categories",
+                    url: paths.master.followupCategories,
+                },
+                {
+                    title: "Financial Year",
+                    url: paths.master.financialYears,
+                },
+                {
+                    title: "EMDs Responsibilities",
+                    url: paths.master.emdsResponsibilities,
+                },
+                {
+                    title: "Lead Types",
+                    url: paths.master.leadTypes,
+                },
+                {
+                    title: "TQ Types",
+                    url: paths.master.tqTypes,
+                },
+                {
+                    title: "Loan Parties",
+                    url: paths.master.loanParties,
+                }
             ],
         },
         {

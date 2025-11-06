@@ -18,6 +18,8 @@ async function bootstrap() {
     // Enable cookie parser
     app.use(cookieParser());
 
+    app.setGlobalPrefix('api/v1');
+
     app.enableCors({
         origin: 'http://localhost:5173', // Frontend URL
         credentials: true, // Important: Allow cookies

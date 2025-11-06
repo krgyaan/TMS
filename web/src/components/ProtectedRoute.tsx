@@ -12,7 +12,7 @@ export default function ProtectedRoute() {
 
     // Only fetch current user if we have local data
     // (which means we might have a valid cookie)
-    const { data: user, isLoading, error } = useCurrentUser(hasLocalAuth)
+    const { data: user, isLoading, error } = useCurrentUser()
 
     useEffect(() => {
         if (!hasLocalAuth) {
@@ -26,7 +26,7 @@ export default function ProtectedRoute() {
     if (hasLocalAuth && isLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center text-sm text-muted-foreground">
-                Restoring session...
+                Restoring session... {shouldFetch}
             </div>
         )
     }

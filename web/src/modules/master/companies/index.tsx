@@ -82,14 +82,14 @@ const toPreparedValues = (company: CompanyResponse): PreparedCompanyValues => ({
 const toDocumentRows = (docs: CompanyDocumentResponse[] | null | undefined): DocumentRow[] =>
     Array.isArray(docs)
         ? docs.map((doc) => ({
-              id: String(doc.id ?? `${doc.companyId ?? "company"}-${doc.name}`),
-              name: doc.name,
-              size: typeof doc.size === "number" ? doc.size : 0,
-              isFolder: Boolean(doc.isFolder),
-              file: null,
-              previewUrl: null,
-              url: doc.url ?? null,
-          }))
+            id: String(doc.id ?? `${doc.companyId ?? "company"}-${doc.name}`),
+            name: doc.name,
+            size: typeof doc.size === "number" ? doc.size : 0,
+            isFolder: Boolean(doc.isFolder),
+            file: null,
+            previewUrl: null,
+            url: doc.url ?? null,
+        }))
         : [];
 
 const Companies = () => {
