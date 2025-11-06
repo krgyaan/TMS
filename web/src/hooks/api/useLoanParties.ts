@@ -33,7 +33,7 @@ export const useLoanParty = (id: number | null) => {
 export const useLoanPartySearch = (query: string) => {
     return useQuery({
         queryKey: [...loanPartiesKey.all, 'search', query],
-        queryFn: () => loanPartiesService.search(query),
+        // queryFn: () => loanPartiesService.search(query),
         enabled: query.length > 0,
     });
 };

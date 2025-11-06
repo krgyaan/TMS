@@ -40,7 +40,8 @@ export class WebsitesController {
         if (!query) {
             return [];
         }
-        return this.websitesService.search(query);
+        // return this.websitesService.search(query);
+        return [];
     }
 
     @Get(':id')

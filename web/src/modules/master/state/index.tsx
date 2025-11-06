@@ -83,7 +83,6 @@ const StatesPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(stateActions),

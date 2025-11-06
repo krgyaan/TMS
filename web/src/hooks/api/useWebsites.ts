@@ -33,7 +33,7 @@ export const useWebsite = (id: number | null) => {
 export const useWebsiteSearch = (query: string) => {
     return useQuery({
         queryKey: [...websitesKey.all, 'search', query],
-        queryFn: () => websitesService.search(query),
+        // queryFn: () => websitesService.search(query),
         enabled: query.length > 0,
     });
 };

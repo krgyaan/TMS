@@ -36,7 +36,7 @@ export const useDesignation = (id: number | null) => {
 export const useDesignationSearch = (query: string) => {
     return useQuery({
         queryKey: [...followupCategoriesKey.all, 'search', query],
-        queryFn: () => followupCategoriesService.search(query),
+        // queryFn: () => followupCategoriesService.search(query),
         enabled: query.length > 0,
     });
 };

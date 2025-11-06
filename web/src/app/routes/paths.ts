@@ -63,6 +63,8 @@
         accountChecklists: '/accounts/account-checklists',
         gstChecklists: '/accounts/gst-checklists',
         fixedExpenses: '/accounts/fixed-expenses',
+        projects: '/projects',
+        tdsChecklists: '/accounts/tds-checklists'
     },
 
     // ==================== CRM ====================

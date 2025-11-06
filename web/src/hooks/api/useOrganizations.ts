@@ -30,7 +30,7 @@ export const useOrganization = (id: number | null) => {
 export const useOrganizationSearch = (query: string) => {
   return useQuery({
     queryKey: [...organizationsKey.all, 'search', query],
-    queryFn: () => organizationsService.search(query),
+    // queryFn: () => organizationsService.search(query),
     enabled: query.length > 0,
   });
 };

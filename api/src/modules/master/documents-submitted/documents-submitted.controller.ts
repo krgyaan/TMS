@@ -45,7 +45,8 @@ export class DocumentsSubmittedController {
         if (!query) {
             return [];
         }
-        return this.documentsSubmittedService.search(query);
+        // return this.documentsSubmittedService.search(query);
+        return [];
     }
 
     @Get(':id')

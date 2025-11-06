@@ -33,7 +33,7 @@ export const useTqType = (id: number | null) => {
 export const useTqTypeSearch = (query: string) => {
     return useQuery({
         queryKey: [...tqTypesKey.all, 'search', query],
-        queryFn: () => tqTypesService.search(query),
+        // queryFn: () => tqTypesService.search(query),
         enabled: query.length > 0,
     });
 };

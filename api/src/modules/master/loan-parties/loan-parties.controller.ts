@@ -40,7 +40,8 @@ export class LoanPartiesController {
         if (!query) {
             return [];
         }
-        return this.loanPartiesService.search(query);
+        // return this.loanPartiesService.search(query);
+        return [];
     }
 
     @Get(':id')

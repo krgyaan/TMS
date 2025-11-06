@@ -40,7 +40,8 @@ export class LeadTypesController {
         if (!query) {
             return [];
         }
-        return this.leadTypesService.search(query);
+        // return this.leadTypesService.search(query);
+        return [];
     }
 
     @Get(':id')

@@ -39,7 +39,8 @@ export class TqTypesController {
         if (!query) {
             return [];
         }
-        return this.tqTypesService.search(query);
+        // return this.tqTypesService.search(query);
+        return [];
     }
 
     @Get(':id')

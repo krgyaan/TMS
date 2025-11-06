@@ -35,7 +35,8 @@ export class RolesController {
     @Get('search')
     async search(@Query('q') query: string) {
         if (!query) return [];
-        return this.rolesService.search(query);
+        // return this.rolesService.search(query);
+        return [];
     }
 
     @Get(':id')
