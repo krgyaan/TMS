@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useTqTypes, useDeleteTqType } from '@/hooks/api/useTqTypes';
+import { useTqTypes } from '@/hooks/api/useTqTypes';
 import type { TqType } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -28,7 +28,7 @@ const rowSelection: RowSelectionOptions = {
 
 const TqTypesPage = () => {
     const { data: tqTypes, isLoading, error, refetch } = useTqTypes();
-    const deleteTqType = useDeleteTqType();
+    // const deleteTqType = useDeleteTqType();
     const navigate = useNavigate()
 
     // TQ Type actions
@@ -46,7 +46,7 @@ const TqTypesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteTqType.mutateAsync(row.id);
+                        // await deleteTqType.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -159,7 +159,7 @@ const TqTypesPage = () => {
                 <DataTable
                     data={tqTypes || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteTqType.isPending}
+                    // loading={isLoading || deleteTqType.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

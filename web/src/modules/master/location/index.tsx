@@ -14,7 +14,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu"
 import { NavLink, useNavigate } from "react-router-dom"
 import { paths } from "@/app/routes/paths"
-import { useLocations, useDeleteLocation } from "@/hooks/api/useLocations"
+import { useLocations } from "@/hooks/api/useLocations"
 import type { User } from "@/types/api.types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,7 +28,7 @@ const rowSelection: RowSelectionOptions = {
 const LocationPage = () => {
     // Use React Query hooks
     const { data: locations, isLoading, error, refetch } = useLocations()
-    const deleteLocation = useDeleteLocation()
+    // const deleteLocation = useDeleteLocation()
     const navigate = useNavigate()
 
     // Employee actions with delete mutation
@@ -46,7 +46,7 @@ const LocationPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete ${row.name}?`)) {
                     try {
-                        await deleteLocation.mutateAsync(row.id)
+                        // await deleteLocation.mutateAsync(row.id)
                     } catch (error) {
                         // Error is already handled by the hook with toast
                         console.error('Delete failed:', error)
@@ -140,7 +140,7 @@ const LocationPage = () => {
                 <DataTable
                     data={locations || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteLocation.isPending}
+                    // loading={isLoading || deleteLocation.isPending}
                     gridOptions={{
                         defaultColDef: { editable: true, filter: true },
                         rowSelection,

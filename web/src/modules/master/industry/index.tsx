@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useIndustries, useDeleteIndustry } from '@/hooks/api/useIndustries';
+import { useIndustries } from '@/hooks/api/useIndustries';
 import type { Industry } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +21,7 @@ const rowSelection: RowSelectionOptions = {
 
 const IndustriesPage = () => {
     const { data: industries, isLoading, error, refetch } = useIndustries();
-    const deleteIndustry = useDeleteIndustry();
+    // const deleteIndustry = useDeleteIndustry();
     const navigate = useNavigate()
 
     const industryActions: ActionItem<Industry>[] = [
@@ -38,7 +38,7 @@ const IndustriesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteIndustry.mutateAsync(row.id);
+                        // await deleteIndustry.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -145,7 +145,7 @@ const IndustriesPage = () => {
                 <DataTable
                     data={industries || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteIndustry.isPending}
+                    // loading={isLoading || deleteIndustry.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

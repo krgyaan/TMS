@@ -16,7 +16,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useDocumentsSubmitted,
-    useDeleteDocumentSubmitted,
 } from '@/hooks/api/useDocumentsSubmitted';
 import type { DocumentSubmitted } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +35,7 @@ const DocumentsSubmittedPage = () => {
         error,
         refetch,
     } = useDocumentsSubmitted();
-    const deleteDocument = useDeleteDocumentSubmitted();
+    // const deleteDocument = useDeleteDocumentSubmitted();
     const navigate = useNavigate();
 
     // Document actions
@@ -54,7 +53,7 @@ const DocumentsSubmittedPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteDocument.mutateAsync(row.id);
+                        // await deleteDocument.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -161,7 +160,7 @@ const DocumentsSubmittedPage = () => {
                 <DataTable
                     data={documents || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteDocument.isPending}
+                    // loading={isLoading || deleteDocument.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

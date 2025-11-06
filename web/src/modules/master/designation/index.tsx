@@ -16,7 +16,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useDesignations,
-    useDeleteDesignation,
 } from '@/hooks/api/useDesignations';
 import type { Designation } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +35,7 @@ const DesignationPage = () => {
         error,
         refetch,
     } = useDesignations();
-    const deleteCategory = useDeleteDesignation();
+    // const deleteCategory = useDeleteDesignation();
     const navigate = useNavigate()
 
     // Category actions
@@ -54,7 +53,7 @@ const DesignationPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteCategory.mutateAsync(row.id);
+                        // await deleteCategory.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -161,7 +160,7 @@ const DesignationPage = () => {
                 <DataTable
                     data={categories || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteCategory.isPending}
+                    // loading={isLoading || deleteCategory.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,

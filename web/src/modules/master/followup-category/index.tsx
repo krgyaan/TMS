@@ -16,7 +16,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import {
     useFollowupCategories,
-    useDeleteFollowupCategory,
 } from '@/hooks/api/useFollowupCategories';
 import type { FollowupCategory } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +35,7 @@ const FollowupCategoryPage = () => {
         error,
         refetch,
     } = useFollowupCategories();
-    const deleteCategory = useDeleteFollowupCategory();
+    // const deleteCategory = useDeleteFollowupCategory();
     const navigate = useNavigate();
 
     // Category actions
@@ -54,7 +53,7 @@ const FollowupCategoryPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        await deleteCategory.mutateAsync(row.id);
+                        // await deleteCategory.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -161,7 +160,7 @@ const FollowupCategoryPage = () => {
                 <DataTable
                     data={categories || []}
                     columnDefs={colDefs}
-                    loading={isLoading || deleteCategory.isPending}
+                    // loading={isLoading || deleteCategory.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,
