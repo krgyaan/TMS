@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tqTypesService } from '@/services/api';
-import type { TqType, CreateTqTypeDto, UpdateTqTypeDto } from '@/types/api.types';
+import type { CreateTqTypeDto, UpdateTqTypeDto } from '@/types/api.types';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 
