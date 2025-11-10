@@ -16,9 +16,9 @@ const Login = () => {
 
     // Check authentication status and redirect if already logged in
     useEffect(() => {
-        console.log("🔍 Login page - checking auth status...")
+        // console.log("🔍 Login page - checking auth status...")
         const user = getStoredUser()
-        console.log("👤 Current user:", user)
+        // console.log("👤 Current user:", user)
 
         if (isAuthenticated() && user) {
             console.log("✅ Already authenticated, redirecting to:", redirectTo)
@@ -41,7 +41,7 @@ const Login = () => {
 
     const handleGoogleLogin = useCallback(async () => {
         try {
-            console.log("🔍 Starting Google login...")
+            // console.log("🔍 Starting Google login...")
             const { data } = await getGoogleUrl()
             console.log("📋 Google auth URL:", data?.url)
 

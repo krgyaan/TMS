@@ -48,7 +48,27 @@ export function NavMain({
         <SidebarGroup>
             <SidebarMenu>
                 {items.map((item) => {
-                    const parentActive = item.items?.some((s) => location.pathname.startsWith(s.url))
+                    // Render single menu item without dropdown
+                    if (!item.items || item.items.length === 0) {
+                        const active = location.pathname === item.url || location.pathname.startsWith(item.url + "/")
+                        return (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton
+                                    asChild
+                                    tooltip={item.title}
+                                    isActive={active}
+                                >
+                                    <NavLink to={item.url}>
+                                        {item.icon && <item.icon />}
+                                        <span className="text-sm font-medium">{item.title}</span>
+                                    </NavLink>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        )
+                    }
+
+                    // Render collapsible menu with dropdown
+                    const parentActive = item.items.some((s) => location.pathname.startsWith(s.url))
                     const isOpen = openKey === item.title
                     return (
                         <Collapsible
@@ -72,7 +92,7 @@ export function NavMain({
                                 </CollapsibleTrigger>
                                 <CollapsibleContent className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
                                     <SidebarMenuSub>
-                                        {item.items?.map((subItem) => {
+                                        {item.items.map((subItem) => {
                                             const active = location.pathname === subItem.url || location.pathname.startsWith(subItem.url + "/")
                                             return (
                                                 <SidebarMenuSubItem key={subItem.title}>
