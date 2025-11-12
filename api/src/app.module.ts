@@ -36,6 +36,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { WebsitesModule } from './modules/master/websites/websites.module';
 import { StatesModule } from './modules/master/states/states.module';
 import { LeadTypesModule } from './modules/master/lead-types/lead-types.module';
+import { TendersModule } from './modules/tendering/tenders/tenders.module';
 
 @Module({
     imports: [
@@ -78,6 +79,7 @@ import { LeadTypesModule } from './modules/master/lead-types/lead-types.module';
         WebsitesModule,
         StatesModule,
         LeadTypesModule,
+        TendersModule
     ],
     controllers: [AppController],
     providers: [

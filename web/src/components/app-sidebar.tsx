@@ -14,6 +14,7 @@ import {
     Gauge,
     Settings,
     Share2,
+    LayoutDashboard,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -53,6 +54,12 @@ const data = {
         }
     ],
     navMain: [
+        {
+            title: "Dashboard",
+            url: paths.dashboard,
+            icon: LayoutDashboard,
+            isActive: false,
+        },
         {
             title: "Tendering",
             url: "#",

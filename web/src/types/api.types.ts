@@ -98,7 +98,7 @@ export interface Industry {
 export interface Organization {
     id: number;
     name: string;
-    acronym?: string;
+    acronym: string;
     industryId?: number | null;
     status: boolean;
     createdAt: string;
@@ -439,3 +439,59 @@ export interface CreateLoanPartyDto {
 }
 
 export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
+
+export interface TenderInfo {
+    id: number;
+    team: number;
+    tenderNo: string;
+    organisation: string | null;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    remarks: string | null;
+    status: number;
+    location: number | null;
+    website: number | null;
+    deleteStatus: "0" | "1";
+    tlStatus: "0" | "1" | "2" | "3";
+    tlRemarks: string | null;
+    rfqTo: string | null;
+    courierAddress: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateTenderInfoDto {
+    team: number;
+    tenderNo: string;
+    organisation?: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    remarks?: string;
+    status: number;
+    location?: number;
+    website?: number;
+
+    deleteStatus?: "0" | "1";
+    tlStatus?: "0" | "1" | "2" | "3";
+    tlRemarks?: string;
+    rfqTo?: string;
+    courierAddress?: string;
+}
+
+export interface UpdateTenderInfoDto extends Partial<CreateTenderInfoDto> { }
+
+export type TenderInfoView = TenderInfo & {
+    organizationName?: number | null;
+    teamMemberName?: number | null;
+    statusName?: number | null;
+};

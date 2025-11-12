@@ -47,7 +47,7 @@ const DataTable = <T extends Record<string, any>>({
     onGridReady,
     className = '',
     enablePagination = true,
-    pageSize = 20,
+    pageSize = 50,
     enableSorting = true,
     enableFiltering = true,
     enableColumnResizing = true,

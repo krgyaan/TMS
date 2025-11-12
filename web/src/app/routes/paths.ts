@@ -12,6 +12,10 @@
     },
 
     // ==================== TENDERING ====================
+
+    dashboard: '/',
+
+    // ==================== TENDERING ====================
     tendering: {
         tenders: '/tendering/tenders',
         tenderCreate: '/tendering/tenders/create',
