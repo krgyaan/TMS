@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service'
-import type { TenderInfoView } from '@/types/api.types'
+import type { CreateTenderInfoDto, TenderInfo, TenderInfoWithNames, UpdateTenderInfoDto } from '@/types/api.types'
 
 type TenderListParams = {
     statusIds?: number[]
@@ -11,26 +11,26 @@ class TenderInfosService extends BaseApiService {
         super('/tenders')
     }
 
-    async getAll(params?: TenderListParams): Promise<TenderInfoView[]> {
+    async getAll(params?: TenderListParams): Promise<TenderInfoWithNames[]> {
         if (!params || (!params.statusIds?.length && !params.unallocated)) {
-            return this.get<TenderInfoView[]>('')
+            return this.get<TenderInfoWithNames[]>('')
         }
         const search = new URLSearchParams()
         if (params.statusIds?.length) search.set('statusIds', params.statusIds.join(','))
         if (params.unallocated) search.set('unallocated', 'true')
-        return this.get<TenderInfoView[]>(`?${search.toString()}`)
+        return this.get<TenderInfoWithNames[]>(`?${search.toString()}`)
     }
 
-    async getById(id: number): Promise<TenderInfoView> {
-        return this.get<TenderInfoView>(`/${id}`)
+    async getById(id: number): Promise<TenderInfoWithNames> {
+        return this.get<TenderInfoWithNames>(`/${id}`)
     }
 
-    async create(data: Partial<TenderInfoView>): Promise<TenderInfoView> {
-        return this.post<TenderInfoView>('', data)
+    async create(data: CreateTenderInfoDto): Promise<TenderInfo> {
+        return this.post<TenderInfo>('', data)
     }
 
-    async update(id: number, data: Partial<TenderInfoView>): Promise<TenderInfoView> {
-        return this.patch<TenderInfoView>(`/${id}`, data)
+    async update(id: number, data: UpdateTenderInfoDto): Promise<TenderInfo> {
+        return this.patch<TenderInfo>(`/${id}`, data)
     }
 
     async remove(id: number): Promise<void> {

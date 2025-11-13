@@ -20,6 +20,7 @@
         tenders: '/tendering/tenders',
         tenderCreate: '/tendering/tenders/create',
         tenderEdit: (id: number | string) => `/tendering/tenders/${id}/edit`,
+        tenderView: (id: number | string) => `/tendering/tenders/${id}`,
         infoSheet: '/tendering/info-sheet',
         tenderApproval: '/tendering/tender-approval',
         phydocs: '/tendering/phydocs',

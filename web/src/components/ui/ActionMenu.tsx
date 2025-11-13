@@ -78,12 +78,13 @@ export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => 
                         {actions.map((action, idx) => (
                             <button
                                 key={idx}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${action.className || ""}`}
+                                className={`w-full text-left px-4 py-2 border flex gap-2 text-sm hover:bg-gray-700 cursor-pointer ${action.className || ""}`}
                                 onClick={() => {
                                     setOpen(false)
                                     action.onClick(rowData)
                                 }}
                             >
+                                <span>{action?.icon}</span>
                                 {action.label}
                             </button>
                         ))}

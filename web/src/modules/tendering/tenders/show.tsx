@@ -1,27 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { TenderForm } from './components/TenderForm';
 import { useTender } from '@/hooks/api/useTenders';
-import { Skeleton } from '@/components/ui/skeleton';
+import { TenderView } from './components/TenderView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
 
-export default function TenderEditPage() {
+export default function TenderShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { data: tender, isLoading, error } = useTender(id ? Number(id) : null);
 
-    if (isLoading) {
-        return (
-            <div className="space-y-4">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-96 w-full" />
-            </div>
-        );
-    }
-
-    if (error || !tender) {
+    if (error || (!isLoading && !tender)) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -40,5 +30,14 @@ export default function TenderEditPage() {
         );
     }
 
-    return <TenderForm key={tender.id} tender={tender} mode="edit" />;
+    return (
+        <TenderView
+            tender={tender!}
+            isLoading={isLoading}
+            showEditButton
+            showBackButton
+            onEdit={() => navigate(paths.tendering.tenderEdit(id!))}
+            onBack={() => navigate(paths.tendering.tenders)}
+        />
+    );
 }

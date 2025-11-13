@@ -28,7 +28,7 @@ const decimalField = (message: string, required = true) => {
 const CreateTenderInfoSchema = z.object({
     team: z.coerce.number().int().positive("Team is required"),
     tenderNo: z.string().min(1, "Tender number is required").max(255),
-    organisation: z.string().max(255).optional(),
+    organization: z.coerce.number().int().positive().optional(),
     tenderName: z.string().min(1, "Tender name is required").max(255),
     item: z.coerce.number().int().positive("Item is required"),
 
@@ -55,7 +55,7 @@ const CreateTenderInfoSchema = z.object({
 const UpdateTenderInfoSchema = z.object({
     team: z.coerce.number().int().positive("Team is required").optional(),
     tenderNo: z.string().min(1, "Tender number is required").max(255).optional(),
-    organisation: z.string().max(255).optional(),
+    organization: z.coerce.number().int().positive().optional(),
     tenderName: z.string().min(1, "Tender name is required").max(255).optional(),
     item: z.coerce.number().int().positive("Item is required").optional(),
 

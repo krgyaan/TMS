@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderInfosService } from '@/services/api';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { CreateTenderInfoDto, UpdateTenderInfoDto, TenderInfoView } from '@/types/api.types';
+import type { CreateTenderInfoDto, UpdateTenderInfoDto } from '@/types/api.types';
 
 export const tendersKey = {
     all: ['tenders'] as const,
@@ -21,7 +21,6 @@ export const useTenders = (activeTab?: string, statusIds: number[] = []) => {
     return useQuery({
         queryKey: tendersKey.list(filters),
         queryFn: () => tenderInfosService.getAll(filters),
-        keepPreviousData: true,
     });
 };
 

@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
+import type { ColDef } from 'ag-grid-community';
 import { useState, useMemo, useEffect } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
@@ -9,26 +9,13 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDeleteTender, useTenders } from '@/hooks/api/useTenders';
 import { useStatuses } from '@/hooks/api/useStatuses';
-import type { TenderInfo } from '@/types/api.types';
+import type { TenderInfoWithNames } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Eye, Pencil, Plus, Trash } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
-    headerCheckbox: false,
-};
-
-// Helper function to format currency in INR
-const formatINR = (value: string | number) => {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-    }).format(Number(value));
-};
+import { formatINR } from '@/hooks/useINRFormatter';
+import { formatDateTime } from '@/hooks/useFormatedDate';
 
 const TendersPage = () => {
     const { data: statuses, isLoading: statusesLoading, error: statusesError } = useStatuses();
@@ -81,12 +68,16 @@ const TendersPage = () => {
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
 
-    const tenderActions: ActionItem<TenderInfo>[] = [
+    const tenderActions: ActionItem<TenderInfoWithNames>[] = [
+        {
+            label: 'View',
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
+            icon: <Eye className="h-4 w-4" />,
+        },
         {
             label: 'Edit',
-            onClick: (row) => {
-                navigate(paths.tendering.tenderEdit(row.id));
-            },
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
+            icon: <Pencil className="h-4 w-4" />,
         },
         {
             label: 'Delete',
@@ -100,21 +91,15 @@ const TendersPage = () => {
                     }
                 }
             },
+            icon: <Trash className='h-4 w-4' />
         },
     ];
 
     const [colDefs] = useState<ColDef<any>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
-            width: 80,
-            filter: false,
-            sortable: false,
-        },
-        {
             field: 'tenderNo',
             headerName: 'Tender No',
-            width: 150,
+            width: 200,
         },
         {
             field: 'tenderName',
@@ -122,67 +107,67 @@ const TendersPage = () => {
             flex: 2,
         },
         {
-            field: 'organizationName',
-            headerName: 'Organization',
-            width: 200,
+            field: 'organizationAcronym',
+            headerName: 'Org.',
+            width: 100,
             cellRenderer: (params: any) => {
-                return params.value || <span className="text-gray-400">—</span>;
+                return <span title={params.data.organizationName}>{params.value || '-'}</span>;
+            },
+        },
+        {
+            field: 'itemName',
+            headerName: 'Item',
+            width: 150,
+            cellRenderer: (params: any) => {
+                return params.value || <span className="text-gray-400">-</span>;
             },
         },
         {
             field: 'teamMemberName',
-            headerName: 'Team Member',
+            headerName: 'Member',
             width: 150,
             cellRenderer: (params: any) => {
-                return params.value || <span className="text-gray-400">Unassigned</span>;
+                const { value, data } = params;
+                return (
+                    <span title={data?.teamMemberUsername}>
+                        {value ? value : <b className='text-gray-400'>Unassigned</b>}
+                    </span>
+                );
             },
+        },
+        {
+            field: 'gstValues',
+            headerName: 'Tender Value',
+            width: 130,
+            cellRenderer: (p: { value: number | string | null | undefined }) =>
+                p.value !== null && p.value !== undefined
+                    ? formatINR(p.value)
+                    : <span className="text-gray-400">—</span>,
+        },
+        {
+            field: 'tenderFees',
+            headerName: 'Tender Fee',
+            width: 130,
+            cellRenderer: (p: { value: number | string | null | undefined }) =>
+                p.value !== null && p.value !== undefined
+                    ? formatINR(p.value)
+                    : <span className="text-gray-400">—</span>,
+        },
+        {
+            field: 'emd',
+            headerName: 'EMD',
+            width: 130,
+            cellRenderer: (p: { value: number | string | null | undefined }) =>
+                p.value !== null && p.value !== undefined
+                    ? formatINR(p.value)
+                    : <span className="text-gray-400">—</span>,
         },
         {
             field: 'dueDate',
             headerName: 'Due Date',
             width: 150,
             cellRenderer: (params: { value: string | Date }) => {
-                if (!params.value) return <span className="text-gray-400">—</span>;
-
-                const date = new Date(params.value);
-                const formattedDate = date.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                }).replace(/\//g, '-');
-
-                const formattedTime = date.toLocaleTimeString('en-IN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                });
-
-                return (
-                    <div className="flex flex-col">
-                        <span>{formattedDate}</span>
-                        <span className="text-xs text-gray-500">{formattedTime}</span>
-                    </div>
-                );
-            },
-        },
-        {
-            field: 'gstValues',
-            headerName: 'GST Value',
-            width: 130,
-            cellRenderer: (params: { value: string | number }) => {
-                return params.value
-                    ? formatINR(params.value)
-                    : <span className="text-gray-400">—</span>;
-            },
-        },
-        {
-            field: 'emd',
-            headerName: 'EMD',
-            width: 130,
-            cellRenderer: (params: { value: string | number }) => {
-                return params.value
-                    ? formatINR(params.value)
-                    : <span className="text-gray-400">—</span>;
+                return params.value ? formatDateTime(params.value) : '-';
             },
         },
         {
@@ -191,7 +176,7 @@ const TendersPage = () => {
             width: 150,
             cellRenderer: (params: any) => {
                 return params.value ? (
-                    <Badge variant="default">{params.value}</Badge>
+                    <b>{params.value}</b>
                 ) : (
                     <span className="text-gray-400">—</span>
                 );
@@ -203,10 +188,10 @@ const TendersPage = () => {
             sortable: false,
             cellRenderer: createActionColumnRenderer(tenderActions),
             pinned: 'right',
-            width: 100,
+            width: 50,
         },
     ]);
-    console.log('tenders ->', tenders, 'isArray:', Array.isArray(tenders));
+
     if (statusesLoading) {
         return (
             <Card>
@@ -317,18 +302,12 @@ const TendersPage = () => {
                                     columnDefs={colDefs}
                                     loading={tendersLoading}
                                     gridOptions={{
-                                        defaultColDef: { editable: false, filter: true, sortable: true, resizable: true },
-                                        rowSelection,
+                                        defaultColDef: { editable: true, filter: true, sortable: true, resizable: true },
                                         pagination: true,
-                                        paginationPageSize: 20,
-                                        paginationPageSizeSelector: [10, 20, 50, 100],
                                         overlayNoRowsTemplate: '<span style="padding: 10px;">No data found</span>',
                                     }}
                                     enablePagination
-                                    enableRowSelection
-                                    selectionType="multiple"
-                                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                                    height="100vh"
+                                    height="auto"
                                 />
                             ) : null}
                         </TabsContent>

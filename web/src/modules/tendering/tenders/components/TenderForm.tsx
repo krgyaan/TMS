@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm } from 'react-hook-form';
@@ -10,26 +10,29 @@ import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { NumberInput } from '@/components/form/NumberInput';
-import { SelectField, type SelectOption } from '@/components/form/SelectField';
+import { SelectField } from '@/components/form/SelectField';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
 import { DateInput } from '@/components/form/DateInput';
 import { FileUploadField } from '@/components/form/FileUploadField';
 import { useCreateTender, useUpdateTender } from '@/hooks/api/useTenders';
-import { useOrganizations } from '@/hooks/api/useOrganizations';
-import { useUsers } from '@/hooks/api/useUsers';
-import { useLocations } from '@/hooks/api/useLocations';
-import { useWebsites } from '@/hooks/api/useWebsites';
-import { useItems } from '@/hooks/api/useItems';
-import { useTeams } from '@/hooks/api/useTeams';
-import type { TenderInfo } from '@/types/api.types';
+import type { TenderInfoWithNames } from '@/types/api.types';
 import { paths } from '@/app/routes/paths';
-import { Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
+
+import {
+    useTeamOptions,
+    useOrganizationOptions,
+    useUserOptions,
+    useLocationOptions,
+    useWebsiteOptions,
+    useItemOptions,
+} from '@/hooks/useSelectOptions';
 
 const ManualFormSchema = z.object({
     team: z.coerce.number().int().positive({ message: 'Team is required' }),
     tenderNo: z.string().min(1, { message: 'Tender No is required' }),
     tenderName: z.string().min(1, { message: 'Tender Name is required' }),
-    organization: z.string().max(255).optional(),
+    organization: z.coerce.number().int().positive().optional(),
     gstValues: z.coerce.number().nonnegative({ message: 'Enter a valid amount' }).default(0),
     tenderFees: z.coerce.number().nonnegative({ message: 'Enter a valid amount' }).default(0),
     emd: z.coerce.number().nonnegative({ message: 'Enter a valid amount' }).default(0),
@@ -38,7 +41,7 @@ const ManualFormSchema = z.object({
     location: z.coerce.number().int().positive().optional(),
     website: z.coerce.number().int().positive().optional(),
     item: z.coerce.number().int().positive({ message: 'Item is required' }),
-    status: z.coerce.number().int().min(0).default(0),
+    status: z.coerce.number().int().min(0).default(1),
     documents: z.any().optional(),
     remarks: z.string().max(200).optional(),
 
@@ -61,7 +64,7 @@ type ManualFormValues = z.infer<typeof ManualFormSchema>;
 type AiFormValues = z.infer<typeof AiFormSchema>;
 
 interface TenderFormProps {
-    tender?: TenderInfo;
+    tender?: TenderInfoWithNames;
     mode: 'create' | 'edit';
 }
 
@@ -70,39 +73,38 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const createTender = useCreateTender();
     const updateTender = useUpdateTender();
 
-    // API Data
-    const { data: teams = [] } = useTeams();
-    const { data: organizations = [] } = useOrganizations();
-    const { data: users = [] } = useUsers();
-    const { data: locations = [] } = useLocations();
-    const { data: websites = [] } = useWebsites();
-    const { data: items = [] } = useItems();
+    const teamOptions = useTeamOptions([1, 2]);
+    const organizationOptions = useOrganizationOptions();
+    const userOptions = useUserOptions();
+    const locationOptions = useLocationOptions();
+    const websiteOptions = useWebsiteOptions();
+    const itemOptions = useItemOptions();
 
     const manualForm = useForm<ManualFormValues>({
-        resolver: zodResolver(ManualFormSchema),
+        resolver: zodResolver(ManualFormSchema) as any,
         defaultValues: {
-            team: 0,
+            team: undefined as any,
             tenderNo: '',
             tenderName: '',
-            organization: '',
+            organization: undefined,
             gstValues: 0,
             tenderFees: 0,
             emd: 0,
-            teamMember: 0,
+            teamMember: undefined as any,
             dueDate: '',
             location: undefined,
             website: undefined,
-            item: 0,
-            status: 0,
+            item: undefined as any,
+            status: 1,
             documents: undefined,
             remarks: '',
         },
     });
 
     const aiForm = useForm<AiFormValues>({
-        resolver: zodResolver(AiFormSchema),
+        resolver: zodResolver(AiFormSchema) as any,
         defaultValues: {
-            team: 0,
+            team: undefined as any,
             tenderNo: '',
             startDate: '',
             closingDate: '',
@@ -111,55 +113,30 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     });
 
     useEffect(() => {
-        if (tender && mode === 'edit') {
+        if (!tender || mode !== 'edit') {
+            return;
+        }
+        try {
             manualForm.reset({
-                team: tender.team,
-                tenderNo: tender.tenderNo,
-                tenderName: tender.tenderName,
-                organization: tender.organization || '',
-                gstValues: parseFloat(tender.gstValues),
-                tenderFees: parseFloat(tender.tenderFees),
-                emd: parseFloat(tender.emd),
-                teamMember: tender.teamMember,
-                dueDate: tender.dueDate, // ISO string
-                location: tender.location || undefined,
-                website: tender.website || undefined,
-                item: tender.item,
-                status: tender.status,
+                team: Number(tender.team) || undefined as any,
+                tenderNo: tender.tenderNo || '',
+                tenderName: tender.tenderName || '',
+                organization: tender.organization ? Number(tender.organization) : undefined,
+                gstValues: tender.gstValues != null ? Number(tender.gstValues) : 0,
+                tenderFees: tender.tenderFees != null ? Number(tender.tenderFees) : 0,
+                emd: tender.emd != null ? Number(tender.emd) : 0,
+                teamMember: Number(tender.teamMember) || undefined as any,
+                dueDate: tender.dueDate || '',
+                location: tender.location ? Number(tender.location) : undefined,
+                website: tender.website ? Number(tender.website) : undefined,
+                item: Number(tender.item) || undefined as any,
+                status: Number(tender.status) ?? 1,
                 remarks: tender.remarks || '',
             });
+        } catch (err) {
+            console.error('Error resetting form:', err);
         }
-    }, [tender, mode, manualForm]);
-
-    const teamOptions: SelectOption[] = useMemo(
-        () => teams.map((t) => ({ id: String(t.id), name: t.name })),
-        [teams]
-    );
-
-    const organizationOptions: SelectOption[] = useMemo(
-        () => organizations.map((o) => ({ id: o.acronym, name: o.acronym })),
-        [organizations]
-    );
-
-    const userOptions: SelectOption[] = useMemo(
-        () => users.map((u) => ({ id: String(u.id), name: u.name })),
-        [users]
-    );
-
-    const locationOptions: SelectOption[] = useMemo(
-        () => locations.map((l) => ({ id: String(l.id), name: l.name })),
-        [locations]
-    );
-
-    const websiteOptions: SelectOption[] = useMemo(
-        () => websites.map((w) => ({ id: String(w.id), name: w.name })),
-        [websites]
-    );
-
-    const itemOptions: SelectOption[] = useMemo(
-        () => items.map((i) => ({ id: String(i.id), name: i.name })),
-        [items]
-    );
+    }, [tender, mode]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async (values) => {
         try {
@@ -167,21 +144,18 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 team: values.team,
                 tenderNo: values.tenderNo,
                 tenderName: values.tenderName,
-                organization: values.organization || undefined,
+                organization: values.organization,
                 gstValues: values.gstValues,
                 tenderFees: values.tenderFees,
                 emd: values.emd,
                 teamMember: values.teamMember,
-                dueDate: values.dueDate, // Send as ISO string
+                dueDate: values.dueDate,
                 location: values.location || undefined,
                 website: values.website || undefined,
                 item: values.item,
                 status: values.status,
                 remarks: values.remarks || undefined,
-                // Handle file upload separately based on your API
-                // documents: values.documents,
             };
-
             if (mode === 'create') {
                 await createTender.mutateAsync(payload);
             } else if (tender) {
@@ -194,18 +168,9 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         }
     };
 
-    const handleAiSubmit: SubmitHandler<AiFormValues> = async (values) => {
+    const handleAiSubmit: SubmitHandler<AiFormValues> = async (_values) => {
         try {
-            // Handle AI-based tender creation
-            const payload = {
-                team: values.team,
-                tenderNo: values.tenderNo,
-                startDate: values.startDate,
-                closingDate: values.closingDate,
-                // Handle file processing
-            };
-
-            console.log('AI Submission:', payload);
+            // TODO: Implement AI-based tender creation workflow
             // await createTender.mutateAsync(payload);
             // navigate(paths.tendering.tenders);
         } catch (error) {
@@ -220,17 +185,14 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             <CardHeader>
                 <CardTitle>{mode === 'create' ? 'Create Tender' : 'Edit Tender'}</CardTitle>
                 <CardAction>
-                    {tender && mode === 'edit' && (
-                        <span className="text-sm text-muted-foreground">ID: {tender.id}</span>
-                    )}
                     <Button variant="outline" onClick={() => navigate(paths.tendering.tenders)}>
-                        Return Back
+                        <ArrowLeft /> Return Back
                     </Button>
                 </CardAction>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="manually" className="w-full">
-                    <TabsList className="m-auto mb-6">
+                    <TabsList className={mode == 'edit' ? 'hidden' : 'm-auto mb-6'}>
                         <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
                         <TabsTrigger value="useAi">
                             Use AI <Sparkles className="ml-1 h-4 w-4" />

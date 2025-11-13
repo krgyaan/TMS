@@ -24,7 +24,7 @@ export interface User {
     role?: string
     designation?: string
     team?: string
-    status?: boolean
+    isActive?: boolean
     createdAt?: string
     updatedAt?: string
 }
@@ -44,7 +44,6 @@ export interface Team {
     id: number;
     name: string;
     description?: string;
-    status: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -444,7 +443,7 @@ export interface TenderInfo {
     id: number;
     team: number;
     tenderNo: string;
-    organisation: string | null;
+    organization?: number | null;
     tenderName: string;
     item: number;
     gstValues: number;
@@ -452,15 +451,15 @@ export interface TenderInfo {
     emd: number;
     teamMember: number;
     dueDate: string;
-    remarks: string | null;
+    remarks?: string | null;
     status: number;
-    location: number | null;
-    website: number | null;
+    location?: number | null;
+    website?: number | null;
     deleteStatus: "0" | "1";
     tlStatus: "0" | "1" | "2" | "3";
-    tlRemarks: string | null;
-    rfqTo: string | null;
-    courierAddress: string | null;
+    tlRemarks?: string | null;
+    rfqTo?: string | null;
+    courierAddress?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -468,19 +467,18 @@ export interface TenderInfo {
 export interface CreateTenderInfoDto {
     team: number;
     tenderNo: string;
-    organisation?: string;
     tenderName: string;
     item: number;
-    gstValues: number;
-    tenderFees: number;
-    emd: number;
     teamMember: number;
     dueDate: string;
-    remarks?: string;
-    status: number;
+    gstValues?: number;
+    tenderFees?: number;
+    emd?: number;
+    organization?: number;
+    status?: number;
     location?: number;
     website?: number;
-
+    remarks?: string;
     deleteStatus?: "0" | "1";
     tlStatus?: "0" | "1" | "2" | "3";
     tlRemarks?: string;
@@ -490,8 +488,15 @@ export interface CreateTenderInfoDto {
 
 export interface UpdateTenderInfoDto extends Partial<CreateTenderInfoDto> { }
 
-export type TenderInfoView = TenderInfo & {
-    organizationName?: number | null;
-    teamMemberName?: number | null;
-    statusName?: number | null;
+export interface TenderInfoWithNames extends TenderInfo {
+    organizationName: string | null;
+    teamMemberName: string | null;
+    teamMemberUsername: string | null;
+    statusName: string | null;
+    itemName: string | null;
+    organizationAcronym: string | null;
+    locationName: string | null;
+    locationState: string | null;
+    websiteName: string | null;
+    websiteLink: string | null;
 };

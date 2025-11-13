@@ -9,7 +9,7 @@ export const myAgTheme = themeQuartz
             foregroundColor: "#181D1F",
             backgroundColor: "#fff",
             headerFontSize: 12,
-            dataFontSize: 12
+            dataFontSize: 10
         },
         "light"
     )
@@ -20,7 +20,7 @@ export const myAgTheme = themeQuartz
             foregroundColor: "#F5F5F5",
             backgroundColor: "#18181b",
             headerFontSize: 12,
-            dataFontSize: 12
+            dataFontSize: 10
         },
         "dark"
     );

@@ -62,6 +62,7 @@ const DataTable = <T extends Record<string, any>>({
         pagination: enablePagination,
         paginationPageSize: pageSize,
         paginationPageSizeSelector: [10, 20, 50, 100],
+        domLayout: 'autoHeight',
 
         // Enable sorting
         defaultColDef: {
