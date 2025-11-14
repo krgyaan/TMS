@@ -13,88 +13,82 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SelectField } from '@/components/form/SelectField'
 import type { SelectOption } from '@/components/form/SelectField'
-import { useTeams } from '@/hooks/api/useTeams'
-import { useItemHeadings } from '@/hooks/api/useItemHeadings'
-import { useCreateItem, useUpdateItem } from '@/hooks/api/useItems'
-import type { Item } from '@/types/api.types'
+import { useIndustries } from '@/hooks/api/useIndustries'
+import { useCreateOrganization, useUpdateOrganization } from '@/hooks/api/useOrganizations'
+import type { Organization } from '@/types/api.types'
 
-const ItemFormSchema = z.object({
+const OrganizationFormSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    teamId: z.string().optional(),
-    headingId: z.string().optional(),
+    acronym: z.string().max(50, 'Acronym cannot exceed 50 characters').optional().nullable(),
+    industryId: z.string().optional(),
     status: z.boolean().default(true),
 })
 
-type ItemFormValues = z.infer<typeof ItemFormSchema>
+type OrganizationFormValues = z.infer<typeof OrganizationFormSchema>
 
-type ItemFormProps = {
+type OrganizationFormProps = {
     mode: 'create' | 'edit'
-    item?: Item
+    organization?: Organization
 }
 
-export const ItemForm = ({ mode, item }: ItemFormProps) => {
+export const OrganizationForm = ({ mode, organization }: OrganizationFormProps) => {
     const navigate = useNavigate()
-    const { data: teams = [] } = useTeams()
-    const { data: headings = [] } = useItemHeadings()
-    const createItem = useCreateItem()
-    const updateItem = useUpdateItem()
+    const { data: industries = [] } = useIndustries()
+    const createOrganization = useCreateOrganization()
+    const updateOrganization = useUpdateOrganization()
 
-    const teamOptions = useMemo<SelectOption[]>(
-        () => teams.map((team) => ({ id: String(team.id), name: team.name })),
-        [teams],
-    )
-    const headingOptions = useMemo<SelectOption[]>(
-        () => headings.map((heading) => ({ id: String(heading.id), name: heading.name })),
-        [headings],
+    const industryOptions = useMemo<SelectOption[]>(
+        () => industries.filter((industry) => industry.status).map((industry) => ({ id: String(industry.id), name: industry.name })),
+        [industries],
     )
 
-    const form = useForm<ItemFormValues>({
-        resolver: zodResolver(ItemFormSchema),
+    const form = useForm<OrganizationFormValues>({
+        resolver: zodResolver(OrganizationFormSchema),
         defaultValues: {
             name: '',
-            teamId: '',
-            headingId: '',
+            acronym: '',
+            industryId: '',
             status: true,
         },
     })
 
     useEffect(() => {
-        if (mode === 'edit' && item) {
+        if (mode === 'edit' && organization) {
             form.reset({
-                name: item.name ?? '',
-                teamId: item.teamId ? String(item.teamId) : '',
-                headingId: item.headingId ? String(item.headingId) : '',
-                status: item.status ?? true,
+                name: organization.name ?? '',
+                acronym: organization.acronym ?? '',
+                industryId: organization.industryId ? String(organization.industryId) : '',
+                status: organization.status ?? true,
             })
         }
-    }, [form, mode, item])
+    }, [form, mode, organization])
 
-    const saving = createItem.isPending || updateItem.isPending
+    const saving = createOrganization.isPending || updateOrganization.isPending
 
-    const handleSubmit = async (values: ItemFormValues) => {
+    const handleSubmit = async (values: OrganizationFormValues) => {
         const payload = {
             name: values.name.trim(),
-            teamId: values.teamId ? Number(values.teamId) : null,
-            headingId: values.headingId ? Number(values.headingId) : null,
+            acronym: values.acronym?.trim() ? values.acronym.trim() : null,
+            industryId: values.industryId ? Number(values.industryId) : null,
             status: values.status,
         }
 
         if (mode === 'create') {
-            await createItem.mutateAsync(payload)
-        } else if (item) {
-            await updateItem.mutateAsync({ id: item.id, data: payload })
+            await createOrganization.mutateAsync(payload)
+        } else if (organization) {
+            await updateOrganization.mutateAsync({ id: organization.id, data: payload })
         }
 
-        navigate(paths.master.items)
+        navigate(paths.master.organizations)
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>{mode === 'create' ? 'Create Item' : 'Edit Item'}</CardTitle>
-                <CardDescription>Manage items, teams and headings</CardDescription>
+                <CardTitle>{mode === 'create' ? 'Create Organization' : 'Edit Organization'}</CardTitle>
+                <CardDescription>Manage organizations and their industries</CardDescription>
                 <CardAction>
-                    <Button variant="outline" onClick={() => navigate(paths.master.items)}>
+                    <Button variant="outline" onClick={() => navigate(paths.master.organizations)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to list
                     </Button>
@@ -104,22 +98,18 @@ export const ItemForm = ({ mode, item }: ItemFormProps) => {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
-                            <FieldWrapper control={form.control} name="name" label="Item Name">
-                                {(field) => <Input placeholder="Enter item name" {...field} />}
+                            <FieldWrapper control={form.control} name="name" label="Organization Name">
+                                {(field) => <Input placeholder="Enter organization name" {...field} />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="acronym" label="Acronym (optional)">
+                                {(field) => <Input placeholder="Short code" {...field} />}
                             </FieldWrapper>
                             <SelectField
                                 control={form.control}
-                                name="teamId"
-                                label="Team (optional)"
-                                options={teamOptions}
-                                placeholder="Select team"
-                            />
-                            <SelectField
-                                control={form.control}
-                                name="headingId"
-                                label="Heading (optional)"
-                                options={headingOptions}
-                                placeholder="Select heading"
+                                name="industryId"
+                                label="Industry (optional)"
+                                options={industryOptions}
+                                placeholder="Select industry"
                             />
                         </div>
 
@@ -130,7 +120,7 @@ export const ItemForm = ({ mode, item }: ItemFormProps) => {
                                 <FormItem className="flex flex-row items-center justify-between rounded-md border p-4">
                                     <div className="space-y-0.5">
                                         <FormLabel>Status</FormLabel>
-                                        <FormDescription>Inactive items are hidden from selection lists.</FormDescription>
+                                        <FormDescription>Inactive organizations will be hidden across the app.</FormDescription>
                                     </div>
                                     <FormControl>
                                         <Checkbox
@@ -148,7 +138,7 @@ export const ItemForm = ({ mode, item }: ItemFormProps) => {
                                 Reset
                             </Button>
                             <Button type="submit" disabled={saving}>
-                                {saving ? 'Saving...' : mode === 'create' ? 'Create Item' : 'Update Item'}
+                                {saving ? 'Saving...' : mode === 'create' ? 'Create Organization' : 'Update Organization'}
                             </Button>
                         </div>
                     </form>
@@ -157,5 +147,3 @@ export const ItemForm = ({ mode, item }: ItemFormProps) => {
         </Card>
     )
 }
-
-export default ItemForm

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
+    SidebarFooter,
     SidebarInset,
     SidebarProvider,
     SidebarTrigger,
@@ -88,7 +89,12 @@ export default function Dashboard() {
                 <div className="p-2">
                     <Outlet />
                 </div>
+            <SidebarFooter className="absolute bottom-0 left-0 right-0 p-2">
+                <span className="text-sm text-muted-foreground text-end">
+                    Copyright © 2025 Volks Energie. All rights reserved.
+                </span>
+            </SidebarFooter>
             </SidebarInset>
         </SidebarProvider>
-    )
+    );
 }

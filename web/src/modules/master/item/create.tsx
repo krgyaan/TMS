@@ -1,3 +1,5 @@
+import { ItemForm } from './components/ItemForm'
+
 export default function ItemCreatePage() {
-    return <></>
+    return <ItemForm mode="create" />
 }

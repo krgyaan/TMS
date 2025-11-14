@@ -15,19 +15,59 @@ export interface Company {
 
 }
 
+export interface NamedEntity {
+    id: number | null
+    name: string | null
+}
+
+export interface UserProfile {
+    id?: number
+    userId: number
+    firstName?: string | null
+    lastName?: string | null
+    dateOfBirth?: string | null
+    gender?: string | null
+    employeeCode?: string | null
+    designationId?: number | null
+    primaryTeamId?: number | null
+    altEmail?: string | null
+    emergencyContactName?: string | null
+    emergencyContactPhone?: string | null
+    image?: string | null
+    signature?: string | null
+    dateOfJoining?: string | null
+    dateOfExit?: string | null
+    timezone?: string | null
+    locale?: string | null
+    createdAt?: string
+    updatedAt?: string
+}
+
 export interface User {
     id: number
     name: string
     email: string
     username: string | null
     mobile: string | null
-    role?: string
-    designation?: string
-    team?: string
+    role?: string | null
     isActive?: boolean
     createdAt?: string
     updatedAt?: string
+    team?: NamedEntity | null
+    designation?: NamedEntity | null
+    profile?: UserProfile | null
 }
+
+export interface CreateUserDto {
+    name: string
+    email: string
+    username?: string | null
+    mobile?: string | null
+    password: string
+    isActive?: boolean
+}
+
+export interface UpdateUserDto extends Partial<CreateUserDto> { }
 
 export interface Location {
     id: number

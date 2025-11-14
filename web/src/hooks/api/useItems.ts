@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { itemsService } from '@/services/api'
 import type { Item } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
@@ -12,7 +12,6 @@ export const itemsKey = {
     detail: (id: number) => [...itemsKey.details(), id] as const,
 }
 
-// Get all statuses
 export const useItems = () => {
     return useQuery({
         queryKey: itemsKey.lists(),
@@ -20,7 +19,6 @@ export const useItems = () => {
     })
 }
 
-// Get status by ID
 export const useItem = (id: number) => {
     return useQuery({
         queryKey: itemsKey.detail(id),
@@ -29,7 +27,6 @@ export const useItem = (id: number) => {
     })
 }
 
-// Create status
 export const useCreateItem = () => {
     const queryClient = useQueryClient()
 
@@ -45,7 +42,6 @@ export const useCreateItem = () => {
     })
 }
 
-// Update status
 export const useUpdateItem = () => {
     const queryClient = useQueryClient()
 
@@ -63,18 +59,17 @@ export const useUpdateItem = () => {
     })
 }
 
-// Delete status
-// export const useDeleteItem = () => {
-//     const queryClient = useQueryClient()
+export const useDeleteItem = () => {
+    const queryClient = useQueryClient()
 
-//     return useMutation({
-//         mutationFn: (id: number) => itemsService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: itemsKey.lists() })
-//             toast.success('Item deleted successfully')
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error))
-//         },
-//     })
-// }
+    return useMutation({
+        mutationFn: (id: number) => itemsService.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: itemsKey.lists() })
+            toast.success('Item deleted successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}

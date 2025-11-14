@@ -1,7 +1,7 @@
+import { OrganizationForm } from './components/OrganizationForm'
+
 const CreateOrganizationPage = () => {
-    return (
-        <div>Create Organization</div>
-    )
+    return <OrganizationForm mode="create" />
 }
 
 export default CreateOrganizationPage
