@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { locationsService } from '@/services/api'
 import type { Location } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
@@ -12,7 +12,6 @@ export const locationKey = {
     detail: (id: number) => [...locationKey.details(), id] as const,
 }
 
-// Get all locations
 export const useLocations = () => {
     return useQuery({
         queryKey: locationKey.lists(),
@@ -20,7 +19,6 @@ export const useLocations = () => {
     })
 }
 
-// Get location by ID
 export const useLocation = (id: number) => {
     return useQuery({
         queryKey: locationKey.detail(id),
@@ -29,7 +27,6 @@ export const useLocation = (id: number) => {
     })
 }
 
-// Create location
 export const useCreateLocation = () => {
     const queryClient = useQueryClient()
 
@@ -45,7 +42,6 @@ export const useCreateLocation = () => {
     })
 }
 
-// Update location
 export const useUpdateLocation = () => {
     const queryClient = useQueryClient()
 
@@ -63,18 +59,17 @@ export const useUpdateLocation = () => {
     })
 }
 
-// Delete location
-// export const useDeleteLocation = () => {
-//     const queryClient = useQueryClient()
+export const useDeleteLocation = () => {
+    const queryClient = useQueryClient()
 
-//     return useMutation({
-//         mutationFn: (id: number) => locationsService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: locationKey.lists() })
-//             toast.success('Location deleted successfully')
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error))
-//         },
-//     })
-// }
+    return useMutation({
+        mutationFn: (id: number) => locationsService.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: locationKey.lists() })
+            toast.success('Location deleted successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}

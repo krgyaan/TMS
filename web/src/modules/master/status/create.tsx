@@ -1,7 +1,7 @@
-const EditStatusPage = () => {
-    return (
-        <div>Edit Status</div>
-    )
+import { StatusForm } from './components/StatusForm'
+
+const CreateStatusPage = () => {
+    return <StatusForm mode="create" />
 }
 
-export default EditStatusPage
+export default CreateStatusPage

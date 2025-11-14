@@ -1,7 +1,7 @@
-const CreateLoactionPage = () => {
-    return (
-        <div>Create Loaction</div>
-    )
+import { LocationForm } from './components/LocationForm'
+
+const CreateLocationPage = () => {
+    return <LocationForm mode="create" />
 }
 
-export default CreateLoactionPage
+export default CreateLocationPage

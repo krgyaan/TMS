@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { statusesService } from '@/services/api'
 import type { Status } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
@@ -12,7 +12,6 @@ export const statusKey = {
     detail: (id: number) => [...statusKey.details(), id] as const,
 }
 
-// Get all statuses
 export const useStatuses = () => {
     return useQuery({
         queryKey: statusKey.lists(),
@@ -20,7 +19,6 @@ export const useStatuses = () => {
     })
 }
 
-// Get status by ID
 export const useStatus = (id: number) => {
     return useQuery({
         queryKey: statusKey.detail(id),
@@ -29,7 +27,6 @@ export const useStatus = (id: number) => {
     })
 }
 
-// Create status
 export const useCreateStatus = () => {
     const queryClient = useQueryClient()
 
@@ -45,7 +42,6 @@ export const useCreateStatus = () => {
     })
 }
 
-// Update status
 export const useUpdateStatus = () => {
     const queryClient = useQueryClient()
 
@@ -63,18 +59,17 @@ export const useUpdateStatus = () => {
     })
 }
 
-// Delete status
-// export const useDeleteStatus = () => {
-//     const queryClient = useQueryClient()
+export const useDeleteStatus = () => {
+    const queryClient = useQueryClient()
 
-//     return useMutation({
-//         mutationFn: (id: number) => statusesService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: statusKey.lists() })
-//             toast.success('Status deleted successfully')
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error))
-//         },
-//     })
-// }
+    return useMutation({
+        mutationFn: (id: number) => statusesService.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: statusKey.lists() })
+            toast.success('Status deleted successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}
