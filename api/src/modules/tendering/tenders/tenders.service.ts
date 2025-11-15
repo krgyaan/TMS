@@ -10,12 +10,12 @@ import { organizations } from 'src/db/organizations.schema';
 import { locations } from 'src/db/locations.schema';
 import { websites } from 'src/db/websites.schema';
 
-type TenderListFilters = {
+export type TenderListFilters = {
     statusIds?: number[];
     unallocated?: boolean; // team_member IS NULL
 };
 
-type TenderInfoWithNames = TenderInfo & {
+export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
     teamMemberName: string | null;
     teamMemberUsername: string | null;

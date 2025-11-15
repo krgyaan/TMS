@@ -12,7 +12,7 @@ import { useStatuses } from '@/hooks/api/useStatuses';
 import type { TenderInfoWithNames } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Pencil, Plus, Trash } from 'lucide-react';
+import { AlertCircle, Eye, FilePlus, Pencil, Plus, Trash } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -69,6 +69,11 @@ const TendersPage = () => {
     const navigate = useNavigate();
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
+        {
+            label: 'Fill Info Sheet',
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.infoSheetCreate(row.id)),
+            icon: <FilePlus className="h-4 w-4" />,
+        },
         {
             label: 'View',
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),

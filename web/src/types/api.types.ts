@@ -540,3 +540,147 @@ export interface TenderInfoWithNames extends TenderInfo {
     websiteName: string | null;
     websiteLink: string | null;
 };
+
+export interface TenderInfoSheetClient {
+    id?: number;
+    clientName: string;
+    clientDesignation?: string | null;
+    clientMobile?: string | null;
+    clientEmail?: string | null;
+}
+
+export interface TenderInfoSheet {
+    id: number;
+    tenderId: number;
+
+    teRecommendation: 'YES' | 'NO';
+    teRejectionReason: number | null;
+    teRejectionRemarks: string | null;
+    teRemark: string | null;
+
+    tenderFeeAmount: number | null;
+    tenderFeeMode: 'DD' | 'POP' | 'BT' | null;
+
+    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdMode: 'BT' | 'POP' | 'DD' | 'FDR' | 'PBG' | 'SB' | null;
+
+    reverseAuctionApplicable: 'YES' | 'NO' | null;
+    paymentTermsSupply: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
+    paymentTermsInstallation: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
+
+    pbgRequired: 'YES' | 'NO' | null;
+    pbgPercentage: number | null;
+    pbgDurationMonths: number | null;
+
+    securityDepositMode: 'NA' | 'DD' | 'DEDUCTION' | 'FDR' | 'PBG' | 'SB' | null;
+    securityDepositPercentage: number | null;
+    sdDurationMonths: number | null;
+
+    bidValidityDays: number | null;
+    commercialEvaluation: 'YES' | 'NO' | null;
+    mafRequired: 'YES' | 'NO' | null;
+
+    deliveryTimeSupply: number | null;
+    deliveryTimeInstallation: number | null;
+
+    ldPercentagePerWeek: number | null;
+    maxLdPercentage: number | null;
+
+    physicalDocsRequired: 'YES' | 'NO' | null;
+    physicalDocsDeadline: string | null;
+
+    techEligibilityAgeYears: number | null;
+    orderValue1: number | null;
+    orderValue2: number | null;
+    orderValue3: number | null;
+
+    avgAnnualTurnoverRequired: 'YES' | 'NO' | null;
+    avgAnnualTurnoverValue: number | null;
+
+    workingCapitalRequired: 'YES' | 'NO' | null;
+    workingCapitalValue: number | null;
+
+    solvencyCertificateRequired: 'YES' | 'NO' | null;
+    solvencyCertificateValue: number | null;
+
+    netWorthRequired: 'YES' | 'NO' | null;
+    netWorthValue: number | null;
+
+    technicalEligible: boolean;
+    financialEligible: boolean;
+
+    rejectionRemark: string | null;
+
+    clients: TenderInfoSheetClient[];
+    technicalDocuments: string[];
+    financialDocuments: string[];
+    pqcDocuments: string[];
+
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SaveTenderInfoSheetDto {
+    teRecommendation: 'YES' | 'NO';
+    teRejectionReason?: number | null;
+    teRejectionRemarks?: string | null;
+    teRemark?: string | null;
+
+    tenderFeeAmount?: number | null;
+    tenderFeeMode?: 'DD' | 'POP' | 'BT' | null;
+
+    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdMode?: 'BT' | 'POP' | 'DD' | 'FDR' | 'PBG' | 'SB' | null;
+
+    reverseAuctionApplicable?: 'YES' | 'NO' | null;
+    paymentTermsSupply?: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
+    paymentTermsInstallation?: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
+
+    pbgRequired?: 'YES' | 'NO' | null;
+    pbgPercentage?: number | null;
+    pbgDurationMonths?: number | null;
+
+    securityDepositMode?: 'NA' | 'DD' | 'DEDUCTION' | 'FDR' | 'PBG' | 'SB' | null;
+    securityDepositPercentage?: number | null;
+    sdDurationMonths?: number | null;
+
+    bidValidityDays?: number | null;
+    commercialEvaluation?: 'YES' | 'NO' | null;
+    mafRequired?: 'YES' | 'NO' | null;
+
+    deliveryTimeSupply?: number | null;
+    deliveryTimeInstallation?: number | null;
+
+    ldPercentagePerWeek?: number | null;
+    maxLdPercentage?: number | null;
+
+    physicalDocsRequired?: 'YES' | 'NO' | null;
+    physicalDocsDeadline?: string | null;
+
+    techEligibilityAgeYears?: number | null;
+    orderValue1?: number | null;
+    orderValue2?: number | null;
+    orderValue3?: number | null;
+
+    avgAnnualTurnoverRequired?: 'YES' | 'NO' | null;
+    avgAnnualTurnoverValue?: number | null;
+
+    workingCapitalRequired?: 'YES' | 'NO' | null;
+    workingCapitalValue?: number | null;
+
+    solvencyCertificateRequired?: 'YES' | 'NO' | null;
+    solvencyCertificateValue?: number | null;
+
+    netWorthRequired?: 'YES' | 'NO' | null;
+    netWorthValue?: number | null;
+
+    technicalEligible?: boolean;
+    financialEligible?: boolean;
+
+    rejectionRemark?: string | null;
+
+    clients: Array<Omit<TenderInfoSheetClient, 'id'>>;
+    technicalDocuments?: string[];
+    financialDocuments?: string[];
+    pqcDocuments?: string[];
+}
