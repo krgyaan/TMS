@@ -27,6 +27,4 @@ export * from './vendor-gsts.schema';
 export * from './states.schema';
 export * from './websites.schema';
 export * from './tenders.schema';
-export * from './tender_clients.schema';
-export * from './tender_documents.schema';
-export * from './info-sheets.schema';
+export * from './tender-info-sheet.schema';
