@@ -36,39 +36,54 @@ const documentsSchema = z
     .optional()
     .transform((value) => value ?? []);
 
+const commercialEvaluationTypeEnum = z.enum([
+    'ITEM_WISE_GST_INCLUSIVE',
+    'ITEM_WISE_PRE_GST',
+    'OVERALL_GST_INCLUSIVE',
+    'OVERALL_PRE_GST'
+]);
+
+const mafRequiredTypeEnum = z.enum(['YES_GENERAL', 'YES_PROJECT_SPECIFIC', 'NO']);
+const pbgSdFormEnum = z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']);
+const financialCriteriaEnum = z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']);
+
 export const TenderInfoSheetPayloadSchema = z.object({
     teRecommendation: yesNoEnum,
     teRejectionReason: optionalNumber(z.coerce.number().int().positive()),
     teRejectionRemarks: optionalString,
     teRemark: optionalString,
 
+    processingFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
+    processingFeeModes: z.array(z.string()).optional().nullable(),
+
     tenderFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
-    tenderFeeMode: feeModeEnum.optional(),
+    tenderFeeModes: z.array(z.string()).optional().nullable(),
 
     emdRequired: emdRequiredEnum.optional(),
-    emdMode: emdModeEnum.optional(),
+    emdModes: z.array(z.string()).optional().nullable(),
 
     reverseAuctionApplicable: yesNoEnum.optional(),
-    paymentTermsSupply: paymentTermsEnum.optional(),
-    paymentTermsInstallation: paymentTermsEnum.optional(),
+    paymentTermsSupply: optionalNumber(z.coerce.number().min(0).max(100)),
+    paymentTermsInstallation: optionalNumber(z.coerce.number().min(0).max(100)),
 
-    pbgRequired: yesNoEnum.optional(),
+    bidValidityDays: optionalNumber(z.coerce.number().int().min(0).max(366)),
+    commercialEvaluation: commercialEvaluationTypeEnum.optional(),
+    mafRequired: mafRequiredTypeEnum.optional(),
+
+    deliveryTimeSupply: optionalNumber(z.coerce.number().int().positive()),
+    deliveryTimeInstallationInclusive: z.boolean().optional().default(false),
+    deliveryTimeInstallation: optionalNumber(z.coerce.number().int().positive()),
+
+    pbgForm: pbgSdFormEnum.optional(),
     pbgPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
-    pbgDurationMonths: optionalNumber(z.coerce.number().int().positive()),
+    pbgDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120)),
 
-    securityDepositMode: sdModeEnum.optional(),
+    sdForm: pbgSdFormEnum.optional(),
     securityDepositPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     sdDurationMonths: optionalNumber(z.coerce.number().int().positive()),
 
-    bidValidityDays: optionalNumber(z.coerce.number().int().positive()),
-    commercialEvaluation: yesNoEnum.optional(),
-    mafRequired: yesNoEnum.optional(),
-
-    deliveryTimeSupply: optionalNumber(z.coerce.number().int().positive()),
-    deliveryTimeInstallation: optionalNumber(z.coerce.number().int().positive()),
-
-    ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(100)),
-    maxLdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
+    ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(5)),
+    maxLdPercentage: optionalNumber(z.coerce.number().int().min(0).max(20)),
 
     physicalDocsRequired: yesNoEnum.optional(),
     physicalDocsDeadline: optionalString,
@@ -78,26 +93,24 @@ export const TenderInfoSheetPayloadSchema = z.object({
     orderValue2: optionalNumber(z.coerce.number().nonnegative()),
     orderValue3: optionalNumber(z.coerce.number().nonnegative()),
 
-    technicalEligible: z.boolean().optional().default(false),
-
-    avgAnnualTurnoverRequired: yesNoEnum.optional(),
+    avgAnnualTurnoverCriteria: financialCriteriaEnum.optional(),
     avgAnnualTurnoverValue: optionalNumber(z.coerce.number().nonnegative()),
 
-    workingCapitalRequired: yesNoEnum.optional(),
+    workingCapitalCriteria: financialCriteriaEnum.optional(),
     workingCapitalValue: optionalNumber(z.coerce.number().nonnegative()),
 
-    solvencyCertificateRequired: yesNoEnum.optional(),
+    solvencyCertificateCriteria: financialCriteriaEnum.optional(),
     solvencyCertificateValue: optionalNumber(z.coerce.number().nonnegative()),
 
-    netWorthRequired: yesNoEnum.optional(),
+    netWorthCriteria: financialCriteriaEnum.optional(),
     netWorthValue: optionalNumber(z.coerce.number().nonnegative()),
 
-    financialEligible: z.boolean().optional().default(false),
+    clientOrganization: optionalString,
+    courierAddress: optionalString,
 
     clients: z.array(clientSchema).min(1, 'At least one client is required'),
-    technicalDocuments: documentsSchema,
-    financialDocuments: documentsSchema,
-    pqcDocuments: documentsSchema,
+    technicalWorkOrders: documentsSchema,
+    commercialDocuments: documentsSchema,
 
     rejectionRemark: optionalString,
 });

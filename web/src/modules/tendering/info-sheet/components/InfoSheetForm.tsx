@@ -1,101 +1,118 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { NumberInput } from '@/components/form/NumberInput';
 import { SelectField } from '@/components/form/SelectField';
+import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import {
-    ArrowLeft,
-    ArrowRight,
-    Check,
-    Plus,
-    Trash2,
-    User,
-    FileText,
-    DollarSign,
-    AlertCircle,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@/components/ui/accordion';
+import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
+import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import type { SaveTenderInfoSheetDto, TenderInfoSheet, TenderInfoWithNames } from '@/types/api.types';
-import { useCreateInfoSheet } from '@/hooks/api/useInfoSheets';
+import {
+    yesNoOptions,
+    emdRequiredOptions,
+    paymentModeOptions,
+    paymentTermsOptions,
+    bidValidityOptions,
+    commercialEvaluationOptions,
+    mafRequiredOptions,
+    pbgFormOptions,
+    sdFormOptions,
+    pbgDurationOptions,
+    ldPerWeekOptions,
+    maxLdOptions,
+    financialCriteriaOptions,
+    rejectionReasonOptions,
+    dummyTechnicalDocuments,
+    dummyFinancialDocuments,
+} from '@/constants/tenderInfoOptions';
+import { TenderView } from '../../tenders/components/TenderView';
 
 // Zod Schema
 const TenderInformationFormSchema = z.object({
-    // Step 1: TE Evaluation & Financial Terms
-    teRecommendation: z.enum(['YES', 'NO']).optional(),
-    teRejectionReason: z.enum([
-        '9', '10', '11', '12',
-        '13', '14', '15', '29',
-        '30', '35', '36'
-    ]).optional(),
-    teRejectionRemarks: z.string().max(500).optional(),
-    teRemark: z.string().max(500).optional(),
+    teRecommendation: z.enum(['YES', 'NO']),
+    teRejectionReason: z.coerce.number().int().min(1).nullable().optional(),
+    teRejectionRemarks: z.string().max(1000).optional(),
+
+    processingFeeAmount: z.coerce.number().nonnegative().optional(),
+    processingFeeModes: z.array(z.string()).optional(),
 
     tenderFeeAmount: z.coerce.number().nonnegative().optional(),
-    tenderFeeMode: z.enum(['DD', 'POP', 'BT']).optional(),
+    tenderFeeModes: z.array(z.string()).optional(),
 
     emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional(),
-    emdMode: z.enum(['BT', 'POP', 'DD', 'FDR', 'PBG', 'SB']).optional(),
+    emdModes: z.array(z.string()).optional(),
 
     reverseAuctionApplicable: z.enum(['YES', 'NO']).optional(),
-    paymentTermsSupply: z.enum(['ADVANCE', 'AGAINST_DELIVERY', 'CREDIT']).optional(),
-    paymentTermsInstallation: z.enum(['ADVANCE', 'AGAINST_DELIVERY', 'CREDIT']).optional(),
+    paymentTermsSupply: z.coerce.number().min(0).max(100).optional(),
+    paymentTermsInstallation: z.coerce.number().min(0).max(100).optional(),
 
-    pbgRequired: z.enum(['YES', 'NO']).optional(),
+    bidValidityDays: z.coerce.number().int().min(0).max(366).optional(),
+    commercialEvaluation: z.enum([
+        'ITEM_WISE_GST_INCLUSIVE',
+        'ITEM_WISE_PRE_GST',
+        'OVERALL_GST_INCLUSIVE',
+        'OVERALL_PRE_GST'
+    ]).optional(),
+    mafRequired: z.enum(['YES_GENERAL', 'YES_PROJECT_SPECIFIC', 'NO']).optional(),
+
+    deliveryTimeSupply: z.coerce.number().int().positive().optional(),
+    deliveryTimeInstallationInclusive: z.boolean().default(false),
+    deliveryTimeInstallation: z.coerce.number().int().positive().optional(),
+
+    pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
     pbgPercentage: z.coerce.number().min(0).max(100).optional(),
-    pbgDurationMonths: z.coerce.number().int().positive().optional(),
+    pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
-    securityDepositMode: z.enum(['NA', 'DD', 'DEDUCTION', 'FDR', 'PBG', 'SB']).optional(),
+    sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
     securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
     sdDurationMonths: z.coerce.number().int().positive().optional(),
 
-    bidValidityDays: z.coerce.number().int().positive().optional(),
-    commercialEvaluation: z.enum(['YES', 'NO']).optional(),
-    mafRequired: z.enum(['YES', 'NO']).optional(),
-
-    deliveryTimeSupply: z.coerce.number().int().positive().optional(),
-    deliveryTimeInstallation: z.coerce.number().int().positive().optional(),
-
-    ldPercentagePerWeek: z.coerce.number().min(0).max(100).optional(),
-    maxLdPercentage: z.coerce.number().min(0).max(100).optional(),
+    ldPercentagePerWeek: z.coerce.number().min(0).max(5).optional(),
+    maxLdPercentage: z.coerce.number().int().min(0).max(20).optional(),
 
     physicalDocsRequired: z.enum(['YES', 'NO']).optional(),
     physicalDocsDeadline: z.string().optional(),
 
-    // Step 2: Technical & Financial Eligibility
     techEligibilityAgeYears: z.coerce.number().int().nonnegative().optional(),
     orderValue1: z.coerce.number().nonnegative().optional(),
     orderValue2: z.coerce.number().nonnegative().optional(),
     orderValue3: z.coerce.number().nonnegative().optional(),
-    technicalEligible: z.boolean().default(false),
 
-    avgAnnualTurnoverRequired: z.enum(['YES', 'NO']).optional(),
+    technicalWorkOrders: z.array(z.string()).optional(),
+    commercialDocuments: z.array(z.string()).optional(),
+
+    avgAnnualTurnoverCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     avgAnnualTurnoverValue: z.coerce.number().nonnegative().optional(),
 
-    workingCapitalRequired: z.enum(['YES', 'NO']).optional(),
+    workingCapitalCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     workingCapitalValue: z.coerce.number().nonnegative().optional(),
 
-    solvencyCertificateRequired: z.enum(['YES', 'NO']).optional(),
+    solvencyCertificateCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     solvencyCertificateValue: z.coerce.number().nonnegative().optional(),
 
-    netWorthRequired: z.enum(['YES', 'NO']).optional(),
+    netWorthCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     netWorthValue: z.coerce.number().nonnegative().optional(),
 
-    financialEligible: z.boolean().default(false),
+    clientOrganization: z.string().max(255).optional(),
 
-    // Step 3: Client Information & Documents
     clients: z.array(z.object({
         clientName: z.string().min(1, 'Client name is required'),
         clientDesignation: z.string().optional(),
@@ -103,28 +120,176 @@ const TenderInformationFormSchema = z.object({
         clientEmail: z.string().email('Invalid email').optional(),
     })).min(1, 'At least one client is required'),
 
-    technicalDocuments: z.array(z.string()).optional(),
-    financialDocuments: z.array(z.string()).optional(),
-    pqcDocuments: z.array(z.string()).optional(),
-
-    rejectionRemark: z.string().max(500).optional(),
-}).superRefine((values, ctx) => {
-    if (!values.teRecommendation) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'TE Recommendation is required',
-            path: ['teRecommendation'],
-        });
-    }
-
-    if (values.physicalDocsRequired === 'YES' && !values.physicalDocsDeadline) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Physical docs deadline is required',
-            path: ['physicalDocsDeadline'],
-        });
-    }
+    courierAddress: z.string().max(1000).optional(),
+    teRemark: z.string().max(1000).optional(),
 });
+
+const mapInitialDataToForm = (data: TenderInfoSheet | null): FormValues => {
+    if (!data) {
+        return buildDefaultValues();
+    }
+
+    return {
+        teRecommendation: data.teRecommendation ?? 'YES',
+        teRejectionReason: data.teRejectionReason ?? null,
+        teRejectionRemarks: data.teRejectionRemarks ?? '',
+
+        processingFeeAmount: data.processingFeeAmount ?? 0,
+        processingFeeModes: data.processingFeeModes ?? [],
+
+        tenderFeeAmount: data.tenderFeeAmount ?? 0,
+        tenderFeeModes: data.tenderFeeModes ?? [],
+
+        emdRequired: data.emdRequired ?? undefined,
+        emdModes: data.emdModes ?? [],
+
+        reverseAuctionApplicable: data.reverseAuctionApplicable ?? undefined,
+        paymentTermsSupply: data.paymentTermsSupply ?? 0,
+        paymentTermsInstallation: data.paymentTermsInstallation ?? 0,
+
+        bidValidityDays: data.bidValidityDays ?? 0,
+        commercialEvaluation: data.commercialEvaluation ?? undefined,
+        mafRequired: data.mafRequired ?? undefined,
+
+        deliveryTimeSupply: data.deliveryTimeSupply ?? 0,
+        deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
+        deliveryTimeInstallation: data.deliveryTimeInstallation ?? 0,
+
+        pbgForm: data.pbgForm ?? undefined,
+        pbgPercentage: data.pbgPercentage ?? 0,
+        pbgDurationMonths: data.pbgDurationMonths ?? 0,
+
+        sdForm: data.sdForm ?? undefined,
+        securityDepositPercentage: data.securityDepositPercentage ?? 0,
+        sdDurationMonths: data.sdDurationMonths ?? 0,
+
+        ldPercentagePerWeek: data.ldPercentagePerWeek ?? 0,
+        maxLdPercentage: data.maxLdPercentage ?? 0,
+
+        physicalDocsRequired: data.physicalDocsRequired ?? undefined,
+        physicalDocsDeadline: data.physicalDocsDeadline ?? '',
+
+        techEligibilityAgeYears: data.techEligibilityAgeYears ?? 0,
+        orderValue1: data.orderValue1 ?? 0,
+        orderValue2: data.orderValue2 ?? 0,
+        orderValue3: data.orderValue3 ?? 0,
+
+        technicalWorkOrders: data.technicalWorkOrders ?? [],
+        commercialDocuments: data.commercialDocuments ?? [],
+
+        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverCriteria ?? undefined,
+        avgAnnualTurnoverValue: data.avgAnnualTurnoverValue ?? 0,
+
+        workingCapitalCriteria: data.workingCapitalCriteria ?? undefined,
+        workingCapitalValue: data.workingCapitalValue ?? 0,
+
+        solvencyCertificateCriteria: data.solvencyCertificateCriteria ?? undefined,
+        solvencyCertificateValue: data.solvencyCertificateValue ?? 0,
+
+        netWorthCriteria: data.netWorthCriteria ?? undefined,
+        netWorthValue: data.netWorthValue ?? 0,
+
+        clientOrganization: data.clientOrganization ?? '',
+        courierAddress: data.courierAddress ?? '',
+
+        clients: data.clients && data.clients.length > 0
+            ? data.clients.map(client => ({
+                clientName: client.clientName ?? '',
+                clientDesignation: client.clientDesignation ?? '',
+                clientMobile: client.clientMobile ?? '',
+                clientEmail: client.clientEmail ?? '',
+            }))
+            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+
+        teRemark: data.teRemark ?? '',
+    };
+};
+
+// Helper function to map form values to API payload
+const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
+    return {
+        teRecommendation: values.teRecommendation,
+        teRejectionReason: values.teRejectionReason ?? null,
+        teRejectionRemarks: values.teRejectionRemarks || null,
+
+        processingFeeAmount: values.processingFeeAmount ?? null,
+        processingFeeModes: values.processingFeeModes && values.processingFeeModes.length > 0
+            ? values.processingFeeModes
+            : null,
+
+        tenderFeeAmount: values.tenderFeeAmount ?? null,
+        tenderFeeModes: values.tenderFeeModes && values.tenderFeeModes.length > 0
+            ? values.tenderFeeModes
+            : null,
+
+        emdRequired: values.emdRequired ?? null,
+        emdModes: values.emdModes && values.emdModes.length > 0
+            ? values.emdModes
+            : null,
+
+        reverseAuctionApplicable: values.reverseAuctionApplicable ?? null,
+        paymentTermsSupply: values.paymentTermsSupply ?? null,
+        paymentTermsInstallation: values.paymentTermsInstallation ?? null,
+
+        bidValidityDays: values.bidValidityDays ?? null,
+        commercialEvaluation: values.commercialEvaluation ?? null,
+        mafRequired: values.mafRequired ?? null,
+
+        deliveryTimeSupply: values.deliveryTimeSupply ?? null,
+        deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
+        deliveryTimeInstallation: values.deliveryTimeInstallation ?? null,
+
+        pbgForm: values.pbgForm ?? null,
+        pbgPercentage: values.pbgPercentage ?? null,
+        pbgDurationMonths: values.pbgDurationMonths ?? null,
+
+        sdForm: values.sdForm ?? null,
+        securityDepositPercentage: values.securityDepositPercentage ?? null,
+        sdDurationMonths: values.sdDurationMonths ?? null,
+
+        ldPercentagePerWeek: values.ldPercentagePerWeek ?? null,
+        maxLdPercentage: values.maxLdPercentage ?? null,
+
+        physicalDocsRequired: values.physicalDocsRequired ?? null,
+        physicalDocsDeadline: values.physicalDocsDeadline || null,
+
+        techEligibilityAgeYears: values.techEligibilityAgeYears ?? null,
+        orderValue1: values.orderValue1 ?? null,
+        orderValue2: values.orderValue2 ?? null,
+        orderValue3: values.orderValue3 ?? null,
+
+        technicalWorkOrders: values.technicalWorkOrders && values.technicalWorkOrders.length > 0
+            ? values.technicalWorkOrders
+            : null,
+        commercialDocuments: values.commercialDocuments && values.commercialDocuments.length > 0
+            ? values.commercialDocuments
+            : null,
+
+        avgAnnualTurnoverCriteria: values.avgAnnualTurnoverCriteria ?? null,
+        avgAnnualTurnoverValue: values.avgAnnualTurnoverValue ?? null,
+
+        workingCapitalCriteria: values.workingCapitalCriteria ?? null,
+        workingCapitalValue: values.workingCapitalValue ?? null,
+
+        solvencyCertificateCriteria: values.solvencyCertificateCriteria ?? null,
+        solvencyCertificateValue: values.solvencyCertificateValue ?? null,
+
+        netWorthCriteria: values.netWorthCriteria ?? null,
+        netWorthValue: values.netWorthValue ?? null,
+
+        clientOrganization: values.clientOrganization || null,
+        courierAddress: values.courierAddress || null,
+
+        clients: values.clients.map(client => ({
+            clientName: client.clientName,
+            clientDesignation: client.clientDesignation || null,
+            clientMobile: client.clientMobile || null,
+            clientEmail: client.clientEmail || null,
+        })),
+
+        teRemark: values.teRemark || null,
+    };
+};
 
 type FormValues = z.infer<typeof TenderInformationFormSchema>;
 
@@ -137,87 +302,31 @@ interface TenderInformationFormProps {
     isInfoSheetLoading?: boolean;
 }
 
-// Options for dropdowns
-const yesNoOptions = [
-    { value: 'YES', label: 'Yes' },
-    { value: 'NO', label: 'No' },
-];
-
-const emdRequiredOptions = [
-    { value: 'YES', label: 'Yes' },
-    { value: 'NO', label: 'No' },
-    { value: 'EXEMPT', label: 'Exempt' },
-];
-
-const feeModeOptions = [
-    { value: 'DD', label: 'DD (Demand Draft)' },
-    { value: 'POP', label: 'POP' },
-    { value: 'BT', label: 'BT (Bank Transfer)' },
-];
-
-const emdModeOptions = [
-    { value: 'BT', label: 'BT (Bank Transfer)' },
-    { value: 'POP', label: 'POP' },
-    { value: 'DD', label: 'DD (Demand Draft)' },
-    { value: 'FDR', label: 'FDR (Fixed Deposit Receipt)' },
-    { value: 'PBG', label: 'PBG (Performance Bank Guarantee)' },
-    { value: 'SB', label: 'SB (Surety Bond)' },
-];
-
-const paymentTermsOptions = [
-    { value: 'ADVANCE', label: 'Advance' },
-    { value: 'AGAINST_DELIVERY', label: 'Against Delivery' },
-    { value: 'CREDIT', label: 'Credit' },
-];
-
-const sdModeOptions = [
-    { value: 'NA', label: 'NA (Not Applicable)' },
-    { value: 'DD', label: 'DD (Demand Draft)' },
-    { value: 'DEDUCTION', label: 'Deduction' },
-    { value: 'FDR', label: 'FDR' },
-    { value: 'PBG', label: 'PBG' },
-    { value: 'SB', label: 'SB' },
-];
-
-const rejectionReasonOptions = [
-    { value: '9', label: 'Status 9' },
-    { value: '10', label: 'Status 10' },
-    { value: '11', label: 'Status 11' },
-    { value: '12', label: 'Status 12' },
-    { value: '13', label: 'Status 13' },
-    { value: '14', label: 'Status 14' },
-    { value: '15', label: 'Status 15' },
-    { value: '29', label: 'Status 29' },
-    { value: '30', label: 'Status 30' },
-    { value: '35', label: 'Status 35' },
-    { value: '36', label: 'Status 36' },
-];
-
-type FormValues = z.infer<typeof TenderInformationFormSchema>;
-
 const buildDefaultValues = (): FormValues => ({
-    teRecommendation: undefined,
-    teRejectionReason: undefined,
+    teRecommendation: 'YES',
+    teRejectionReason: null,
     teRejectionRemarks: '',
-    teRemark: '',
+    processingFeeAmount: 0,
+    processingFeeModes: [],
     tenderFeeAmount: 0,
-    tenderFeeMode: undefined,
+    tenderFeeModes: [],
     emdRequired: undefined,
-    emdMode: undefined,
+    emdModes: [],
     reverseAuctionApplicable: undefined,
-    paymentTermsSupply: undefined,
-    paymentTermsInstallation: undefined,
-    pbgRequired: undefined,
-    pbgPercentage: 0,
-    pbgDurationMonths: 0,
-    securityDepositMode: undefined,
-    securityDepositPercentage: 0,
-    sdDurationMonths: 0,
+    paymentTermsSupply: 0,
+    paymentTermsInstallation: 0,
     bidValidityDays: 0,
     commercialEvaluation: undefined,
     mafRequired: undefined,
     deliveryTimeSupply: 0,
+    deliveryTimeInstallationInclusive: false,
     deliveryTimeInstallation: 0,
+    pbgForm: undefined,
+    pbgPercentage: 0,
+    pbgDurationMonths: 0,
+    sdForm: undefined,
+    securityDepositPercentage: 0,
+    sdDurationMonths: 0,
     ldPercentagePerWeek: 0,
     maxLdPercentage: 0,
     physicalDocsRequired: undefined,
@@ -226,142 +335,21 @@ const buildDefaultValues = (): FormValues => ({
     orderValue1: 0,
     orderValue2: 0,
     orderValue3: 0,
-    technicalEligible: false,
-    avgAnnualTurnoverRequired: undefined,
+    technicalWorkOrders: [],
+    commercialDocuments: [],
+    avgAnnualTurnoverCriteria: undefined,
     avgAnnualTurnoverValue: 0,
-    workingCapitalRequired: undefined,
+    workingCapitalCriteria: undefined,
     workingCapitalValue: 0,
-    solvencyCertificateRequired: undefined,
+    solvencyCertificateCriteria: undefined,
     solvencyCertificateValue: 0,
-    netWorthRequired: undefined,
+    netWorthCriteria: undefined,
     netWorthValue: 0,
-    financialEligible: false,
+    clientOrganization: '',
+    courierAddress: '',
     clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
-    technicalDocuments: [],
-    financialDocuments: [],
-    pqcDocuments: [],
-    rejectionRemark: '',
+    teRemark: '',
 });
-
-const mapInfoSheetToForm = (info?: TenderInfoSheet | null): FormValues => {
-    if (!info) {
-        return buildDefaultValues();
-    }
-
-    return {
-        teRecommendation: info.teRecommendation ?? undefined,
-        teRejectionReason: info.teRejectionReason ? String(info.teRejectionReason) : undefined,
-        teRejectionRemarks: info.teRejectionRemarks ?? '',
-        teRemark: info.teRemark ?? '',
-        tenderFeeAmount: info.tenderFeeAmount ?? 0,
-        tenderFeeMode: info.tenderFeeMode ?? undefined,
-        emdRequired: info.emdRequired ?? undefined,
-        emdMode: info.emdMode ?? undefined,
-        reverseAuctionApplicable: info.reverseAuctionApplicable ?? undefined,
-        paymentTermsSupply: info.paymentTermsSupply ?? undefined,
-        paymentTermsInstallation: info.paymentTermsInstallation ?? undefined,
-        pbgRequired: info.pbgRequired ?? undefined,
-        pbgPercentage: info.pbgPercentage ?? 0,
-        pbgDurationMonths: info.pbgDurationMonths ?? 0,
-        securityDepositMode: info.securityDepositMode ?? undefined,
-        securityDepositPercentage: info.securityDepositPercentage ?? 0,
-        sdDurationMonths: info.sdDurationMonths ?? 0,
-        bidValidityDays: info.bidValidityDays ?? 0,
-        commercialEvaluation: info.commercialEvaluation ?? undefined,
-        mafRequired: info.mafRequired ?? undefined,
-        deliveryTimeSupply: info.deliveryTimeSupply ?? 0,
-        deliveryTimeInstallation: info.deliveryTimeInstallation ?? 0,
-        ldPercentagePerWeek: info.ldPercentagePerWeek ?? 0,
-        maxLdPercentage: info.maxLdPercentage ?? 0,
-        physicalDocsRequired: info.physicalDocsRequired ?? undefined,
-        physicalDocsDeadline: info.physicalDocsDeadline ?? '',
-        techEligibilityAgeYears: info.techEligibilityAgeYears ?? 0,
-        orderValue1: info.orderValue1 ?? 0,
-        orderValue2: info.orderValue2 ?? 0,
-        orderValue3: info.orderValue3 ?? 0,
-        technicalEligible: info.technicalEligible ?? false,
-        avgAnnualTurnoverRequired: info.avgAnnualTurnoverRequired ?? undefined,
-        avgAnnualTurnoverValue: info.avgAnnualTurnoverValue ?? 0,
-        workingCapitalRequired: info.workingCapitalRequired ?? undefined,
-        workingCapitalValue: info.workingCapitalValue ?? 0,
-        solvencyCertificateRequired: info.solvencyCertificateRequired ?? undefined,
-        solvencyCertificateValue: info.solvencyCertificateValue ?? 0,
-        netWorthRequired: info.netWorthRequired ?? undefined,
-        netWorthValue: info.netWorthValue ?? 0,
-        financialEligible: info.financialEligible ?? false,
-        clients: info.clients.length
-            ? info.clients.map((client) => ({
-                clientName: client.clientName ?? '',
-                clientDesignation: client.clientDesignation ?? '',
-                clientMobile: client.clientMobile ?? '',
-                clientEmail: client.clientEmail ?? '',
-            }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
-        technicalDocuments: info.technicalDocuments ?? [],
-        financialDocuments: info.financialDocuments ?? [],
-        pqcDocuments: info.pqcDocuments ?? [],
-        rejectionRemark: info.rejectionRemark ?? '',
-    };
-};
-
-const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
-    if (!values.teRecommendation) {
-        throw new Error('TE Recommendation is required');
-    }
-
-    return {
-        teRecommendation: values.teRecommendation,
-        teRejectionReason: values.teRejectionReason ? Number(values.teRejectionReason) : null,
-        teRejectionRemarks: values.teRejectionRemarks?.trim() || null,
-        teRemark: values.teRemark?.trim() || null,
-        tenderFeeAmount: values.tenderFeeAmount ?? 0,
-        tenderFeeMode: values.tenderFeeMode ?? null,
-        emdRequired: values.emdRequired ?? null,
-        emdMode: values.emdMode ?? null,
-        reverseAuctionApplicable: values.reverseAuctionApplicable ?? null,
-        paymentTermsSupply: values.paymentTermsSupply ?? null,
-        paymentTermsInstallation: values.paymentTermsInstallation ?? null,
-        pbgRequired: values.pbgRequired ?? null,
-        pbgPercentage: values.pbgPercentage ?? null,
-        pbgDurationMonths: values.pbgDurationMonths ?? null,
-        securityDepositMode: values.securityDepositMode ?? null,
-        securityDepositPercentage: values.securityDepositPercentage ?? null,
-        sdDurationMonths: values.sdDurationMonths ?? null,
-        bidValidityDays: values.bidValidityDays ?? null,
-        commercialEvaluation: values.commercialEvaluation ?? null,
-        mafRequired: values.mafRequired ?? null,
-        deliveryTimeSupply: values.deliveryTimeSupply ?? null,
-        deliveryTimeInstallation: values.deliveryTimeInstallation ?? null,
-        ldPercentagePerWeek: values.ldPercentagePerWeek ?? null,
-        maxLdPercentage: values.maxLdPercentage ?? null,
-        physicalDocsRequired: values.physicalDocsRequired ?? null,
-        physicalDocsDeadline: values.physicalDocsDeadline || null,
-        techEligibilityAgeYears: values.techEligibilityAgeYears ?? null,
-        orderValue1: values.orderValue1 ?? null,
-        orderValue2: values.orderValue2 ?? null,
-        orderValue3: values.orderValue3 ?? null,
-        technicalEligible: values.technicalEligible ?? false,
-        avgAnnualTurnoverRequired: values.avgAnnualTurnoverRequired ?? null,
-        avgAnnualTurnoverValue: values.avgAnnualTurnoverValue ?? null,
-        workingCapitalRequired: values.workingCapitalRequired ?? null,
-        workingCapitalValue: values.workingCapitalValue ?? null,
-        solvencyCertificateRequired: values.solvencyCertificateRequired ?? null,
-        solvencyCertificateValue: values.solvencyCertificateValue ?? null,
-        netWorthRequired: values.netWorthRequired ?? null,
-        netWorthValue: values.netWorthValue ?? null,
-        financialEligible: values.financialEligible ?? false,
-        rejectionRemark: values.rejectionRemark?.trim() || null,
-        clients: values.clients.map((client) => ({
-            clientName: client.clientName.trim(),
-            clientDesignation: client.clientDesignation?.trim() || null,
-            clientMobile: client.clientMobile?.trim() || null,
-            clientEmail: client.clientEmail?.trim() || null,
-        })),
-        technicalDocuments: values.technicalDocuments ?? [],
-        financialDocuments: values.financialDocuments ?? [],
-        pqcDocuments: values.pqcDocuments ?? [],
-    };
-};
 
 export function TenderInformationForm({
     tenderId,
@@ -372,12 +360,12 @@ export function TenderInformationForm({
     isInfoSheetLoading,
 }: TenderInformationFormProps) {
     const navigate = useNavigate();
-    const [currentStep, setCurrentStep] = useState(1);
-    const totalSteps = 3;
 
-    const initialFormValues = useMemo(() => mapInfoSheetToForm(initialData), [initialData]);
+    const initialFormValues = useMemo(() => {
+        return mapInitialDataToForm(initialData ?? null);
+    }, [initialData]);
 
-    const form = useForm<FormValues>({
+    const form = useForm({
         resolver: zodResolver(TenderInformationFormSchema),
         defaultValues: initialFormValues,
     });
@@ -393,112 +381,43 @@ export function TenderInformationForm({
 
     // Watch for conditional fields
     const teRecommendation = form.watch('teRecommendation');
-    const emdRequired = form.watch('emdRequired');
-    const pbgRequired = form.watch('pbgRequired');
     const physicalDocsRequired = form.watch('physicalDocsRequired');
-    const avgAnnualTurnoverRequired = form.watch('avgAnnualTurnoverRequired');
-    const workingCapitalRequired = form.watch('workingCapitalRequired');
-    const solvencyCertificateRequired = form.watch('solvencyCertificateRequired');
-    const netWorthRequired = form.watch('netWorthRequired');
+    const deliveryTimeInstallationInclusive = form.watch('deliveryTimeInstallationInclusive');
+    const avgAnnualTurnoverCriteria = form.watch('avgAnnualTurnoverCriteria');
+    const workingCapitalCriteria = form.watch('workingCapitalCriteria');
+    const solvencyCertificateCriteria = form.watch('solvencyCertificateCriteria');
+    const netWorthCriteria = form.watch('netWorthCriteria');
 
-    const createInfoSheet = useCreateInfoSheet();
-    const isSubmitting = createInfoSheet.isPending;
     const isLoading = isTenderLoading || (mode === 'edit' && isInfoSheetLoading);
+    const createInfoSheet = useCreateInfoSheet();
+    const updateInfoSheet = useUpdateInfoSheet();
+    const isSubmitting = createInfoSheet.isPending || updateInfoSheet.isPending;
 
     const handleSubmit: SubmitHandler<FormValues> = async (values) => {
-        if (!values.teRecommendation) {
-            form.setError('teRecommendation', {
-                type: 'manual',
-                message: 'TE Recommendation is required',
-            });
-            return;
-        }
-
-        const payload = mapFormToPayload(values);
-
         try {
-            await createInfoSheet.mutateAsync({ tenderId, data: payload });
+            const payload = mapFormToPayload(values);
+
+            if (mode === 'create') {
+                await createInfoSheet.mutateAsync({ tenderId, data: payload });
+            } else {
+                await updateInfoSheet.mutateAsync({ tenderId, data: payload });
+            }
+
             navigate(paths.tendering.tenderView(tenderId));
-        } catch {
-            // handled by react-query onError
+        } catch (error) {
+            console.error('Form submission error:', error);
         }
     };
-
-    const nextStep = async () => {
-        let fieldsToValidate: (keyof FormValues)[] = [];
-
-        if (currentStep === 1) {
-            fieldsToValidate = [
-                'teRecommendation',
-                'teRejectionReason',
-                'teRejectionRemarks',
-                'teRemark',
-                'tenderFeeAmount',
-                'tenderFeeMode',
-                'emdRequired',
-                'emdMode',
-                'reverseAuctionApplicable',
-                'paymentTermsSupply',
-                'paymentTermsInstallation',
-                'pbgRequired',
-                'pbgPercentage',
-                'pbgDurationMonths',
-                'securityDepositMode',
-                'securityDepositPercentage',
-                'sdDurationMonths',
-                'bidValidityDays',
-                'commercialEvaluation',
-                'mafRequired',
-                'deliveryTimeSupply',
-                'deliveryTimeInstallation',
-                'ldPercentagePerWeek',
-                'maxLdPercentage',
-                'physicalDocsRequired',
-                'physicalDocsDeadline',
-            ];
-        } else if (currentStep === 2) {
-            fieldsToValidate = [
-                'techEligibilityAgeYears',
-                'orderValue1',
-                'orderValue2',
-                'orderValue3',
-                'technicalEligible',
-                'avgAnnualTurnoverRequired',
-                'avgAnnualTurnoverValue',
-                'workingCapitalRequired',
-                'workingCapitalValue',
-                'solvencyCertificateRequired',
-                'solvencyCertificateValue',
-                'netWorthRequired',
-                'netWorthValue',
-                'financialEligible',
-            ];
-        }
-
-        const isValid = await form.trigger(fieldsToValidate as any);
-        if (isValid && currentStep < totalSteps) {
-            setCurrentStep(currentStep + 1);
-        }
-    };
-
-    const prevStep = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
-
-    const progress = (currentStep / totalSteps) * 100;
 
     if (isLoading) {
         return (
-            <Card className="max-w-6xl mx-auto">
+            <Card className="max-w-7xl mx-auto">
                 <CardHeader>
                     <Skeleton className="h-8 w-64" />
                     <Skeleton className="h-4 w-48 mt-2" />
                 </CardHeader>
                 <CardContent>
-                    <Skeleton className="h-6 w-full mb-4" />
-                    <Skeleton className="h-[500px] w-full" />
+                    <Skeleton className="h-[800px] w-full" />
                 </CardContent>
             </Card>
         );
@@ -514,14 +433,11 @@ export function TenderInformationForm({
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Create a new info sheet to continue.
-                        </AlertDescription>
+                        <AlertDescription>Create a new info sheet to continue.</AlertDescription>
                     </Alert>
                     <div className="mt-6 flex gap-3">
                         <Button variant="outline" onClick={() => navigate(-1)}>
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
                         </Button>
                         <Button onClick={() => navigate(paths.tendering.infoSheetCreate(tenderId))}>
                             Fill Info Sheet
@@ -533,546 +449,450 @@ export function TenderInformationForm({
     }
 
     return (
-        <Card className="max-w-6xl mx-auto">
+        <Card className="max-w-7xl mx-auto">
             <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                    <span>{mode === 'create' ? 'Create' : 'Edit'} Tender Information</span>
-                    <Button variant="outline" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                </CardTitle>
-                <CardDescription>
-                    {tender ? (
-                        <>
-                            <span className="font-medium">{tender.tenderName}</span> • Tender No: {tender.tenderNo}
-                        </>
-                    ) : (
-                        'Linked tender details'
-                    )}
-                </CardDescription>
-
-                {/* Progress Bar */}
-                <div className="mt-6">
-                    <div className="flex justify-between mb-2">
-                        <span className="text-sm font-medium">Step {currentStep} of {totalSteps}</span>
-                        <span className="text-sm text-muted-foreground">{Math.round(progress)}% Complete</span>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>{mode === 'create' ? 'Create' : 'Edit'} Tender Information</CardTitle>
+                        <CardDescription className="mt-2">
+                            {tender ? (
+                                <>
+                                    <span className="font-medium">{tender.tenderName}</span> • Tender No: {tender.tenderNo}
+                                </>
+                            ) : (
+                                'Linked tender details'
+                            )}
+                        </CardDescription>
                     </div>
-                    <Progress value={progress} className="h-2" />
-                </div>
-
-                {/* Step Indicators */}
-                <div className="flex items-center justify-between mt-6">
-                    <StepIndicator
-                        number={1}
-                        title="Financial Terms"
-                        active={currentStep === 1}
-                        completed={currentStep > 1}
-                        icon={<DollarSign className="h-5 w-5" />}
-                    />
-                    <Separator className="flex-1 mx-2" />
-                    <StepIndicator
-                        number={2}
-                        title="Eligibility"
-                        active={currentStep === 2}
-                        completed={currentStep > 2}
-                        icon={<FileText className="h-5 w-5" />}
-                    />
-                    <Separator className="flex-1 mx-2" />
-                    <StepIndicator
-                        number={3}
-                        title="Client & Documents"
-                        active={currentStep === 3}
-                        completed={currentStep > 3}
-                        icon={<User className="h-5 w-5" />}
-                    />
+                    <CardAction>
+                        <Button variant="outline" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    </CardAction>
                 </div>
             </CardHeader>
 
             <CardContent>
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="tender-details">
+                        <AccordionTrigger className="text-lg font-semibold bg-accent p-4 rounded-md cursor-pointer">
+                            Tender Basic Details
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <TenderView tender={tender as TenderInfoWithNames} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                        {/* STEP 1: TE Evaluation & Financial Terms */}
-                        {currentStep === 1 && (
-                            <div className="space-y-8 animate-in fade-in-50 duration-500">
-                                {/* TE Evaluation Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">TE Evaluation</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <SelectField
-                                            control={form.control}
-                                            name="teRecommendation"
-                                            label="TE Recommendation"
-                                            options={yesNoOptions}
-                                            placeholder="Select recommendation"
-                                            required
-                                        />
+                    <form onSubmit={form.handleSubmit(handleSubmit)}>
+                        <div className="space-y-8 pt-4">
+                            {/* TE Recommendation */}
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <SelectField
+                                        control={form.control}
+                                        name="teRecommendation"
+                                        label="TE Recommendation"
+                                        options={yesNoOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select recommendation"
+                                    />
 
-                                        {teRecommendation === 'NO' && (
-                                            <>
-                                                <SelectField
-                                                    control={form.control}
-                                                    name="teRejectionReason"
-                                                    label="Rejection Reason"
-                                                    options={rejectionReasonOptions}
-                                                    placeholder="Select reason"
-                                                />
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="teRejectionRemarks"
-                                                    label="TE Rejection Remarks"
-                                                    className="md:col-span-2"
-                                                >
-                                                    {(field) => (
-                                                        <textarea
-                                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                            placeholder="Enter rejection remarks..."
-                                                            maxLength={500}
-                                                            {...field}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            </>
-                                        )}
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="teRemark"
-                                            label="TE Final Remark"
-                                            className="md:col-span-2"
-                                        >
-                                            {(field) => (
-                                                <textarea
-                                                    className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                    placeholder="Enter final remarks..."
-                                                    maxLength={500}
-                                                    {...field}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* Tender Fee & EMD Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Tender Fee & EMD</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="tenderFeeAmount"
-                                            label="Tender Fee Amount"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="tenderFeeMode"
-                                            label="Tender Fee Mode"
-                                            options={feeModeOptions}
-                                            placeholder="Select mode"
-                                        />
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="emdRequired"
-                                            label="EMD Required"
-                                            options={emdRequiredOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        {emdRequired === 'YES' && (
+                                    {teRecommendation === 'NO' && (
+                                        <>
                                             <SelectField
                                                 control={form.control}
-                                                name="emdMode"
-                                                label="EMD Mode"
-                                                options={emdModeOptions}
-                                                placeholder="Select mode"
+                                                name="teRejectionReason"
+                                                label="TE Reason of Rejection"
+                                                options={rejectionReasonOptions.map(option => ({
+                                                    value: String(option.value),
+                                                    label: option.label
+                                                }))}
+                                                placeholder="Select reason"
                                             />
-                                        )}
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* Payment Terms Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Payment & Auction Terms</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <SelectField
-                                            control={form.control}
-                                            name="reverseAuctionApplicable"
-                                            label="Reverse Auction Applicable"
-                                            options={yesNoOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="paymentTermsSupply"
-                                            label="Payment Terms - Supply"
-                                            options={paymentTermsOptions}
-                                            placeholder="Select terms"
-                                        />
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="paymentTermsInstallation"
-                                            label="Payment Terms - Installation"
-                                            options={paymentTermsOptions}
-                                            placeholder="Select terms"
-                                        />
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* PBG & Security Deposit Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Performance Bank Guarantee & Security Deposit</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <SelectField
-                                            control={form.control}
-                                            name="pbgRequired"
-                                            label="PBG Required"
-                                            options={yesNoOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        {pbgRequired === 'YES' && (
-                                            <>
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="pbgPercentage"
-                                                    label="PBG Percentage (%)"
-                                                >
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={field.value}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="pbgDurationMonths"
-                                                    label="PBG Duration (Months)"
-                                                >
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={1}
-                                                            placeholder="0"
-                                                            value={field.value}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            </>
-                                        )}
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="securityDepositMode"
-                                            label="Security Deposit Mode"
-                                            options={sdModeOptions}
-                                            placeholder="Select mode"
-                                        />
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="securityDepositPercentage"
-                                            label="Security Deposit Percentage (%)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="sdDurationMonths"
-                                            label="SD Duration (Months)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="0"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* Bid & Delivery Terms Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Bid & Delivery Terms</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="bidValidityDays"
-                                            label="Bid Validity (Days)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="0"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="commercialEvaluation"
-                                            label="Commercial Evaluation Required"
-                                            options={yesNoOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="mafRequired"
-                                            label="MAF Required"
-                                            options={yesNoOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="deliveryTimeSupply"
-                                            label="Delivery Time - Supply (Days)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="0"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="deliveryTimeInstallation"
-                                            label="Delivery Time - Installation (Days)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="0"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* LD & Physical Docs Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Liquidated Damages & Documentation</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="ldPercentagePerWeek"
-                                            label="LD % Per Week"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="maxLdPercentage"
-                                            label="Maximum LD %"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <SelectField
-                                            control={form.control}
-                                            name="physicalDocsRequired"
-                                            label="Physical Documents Required"
-                                            options={yesNoOptions}
-                                            placeholder="Select option"
-                                        />
-
-                                        {physicalDocsRequired === 'YES' && (
                                             <FieldWrapper
                                                 control={form.control}
-                                                name="physicalDocsDeadline"
-                                                label="Physical Docs Submission Deadline"
+                                                name="teRejectionRemarks"
+                                                label="TE Rejection Remarks"
                                             >
                                                 {(field) => (
-                                                    <DateTimeInput
-                                                        value={field.value}
-                                                        onChange={field.onChange}
-                                                        className="bg-background"
+                                                    <textarea
+                                                        className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                        placeholder="Enter rejection remarks..."
+                                                        maxLength={1000}
+                                                        {...field}
                                                     />
                                                 )}
                                             </FieldWrapper>
-                                        )}
-                                    </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                        )}
+                            {/* Processing Fee & Tender Fee */}
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="processingFeeAmount"
+                                        label="Processing Fee - Amount"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
 
-                        {/* STEP 2: Technical & Financial Eligibility */}
-                        {currentStep === 2 && (
-                            <div className="space-y-8 animate-in fade-in-50 duration-500">
-                                {/* Technical Eligibility Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Technical Eligibility Criteria</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <MultiSelectField
+                                        control={form.control}
+                                        name="processingFeeModes"
+                                        label="Processing Fee (Mode of Payment)"
+                                        options={paymentModeOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select payment modes"
+                                    />
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="tenderFeeAmount"
+                                        label="Tender Fee - Amount"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
+                                    <MultiSelectField
+                                        control={form.control}
+                                        name="tenderFeeModes"
+                                        label="Tender Fee (Mode of Payment)"
+                                        options={paymentModeOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select payment modes"
+                                    />
+                                    {/* EMD */}
+                                    <SelectField
+                                        control={form.control}
+                                        name="emdRequired"
+                                        label="EMD Required"
+                                        options={emdRequiredOptions}
+                                        placeholder="Select option"
+                                    />
+
+                                    <MultiSelectField
+                                        control={form.control}
+                                        name="emdModes"
+                                        label="EMD (Mode of Payment)"
+                                        options={paymentModeOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select payment modes"
+                                    />
+                                    {/* Payment Terms */}
+                                    <SelectField
+                                        control={form.control}
+                                        name="reverseAuctionApplicable"
+                                        label="Reverse Auction Applicable"
+                                        options={yesNoOptions}
+                                        placeholder="Select option"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="paymentTermsSupply"
+                                        label="Payment Terms on Supply (%)"
+                                        options={paymentTermsOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select percentage"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="paymentTermsInstallation"
+                                        label="Payment Terms on Installation (%)"
+                                        options={paymentTermsOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select percentage"
+                                    />
+                                    {/* Bid & Evaluation */}
+                                    <SelectField
+                                        control={form.control}
+                                        name="bidValidityDays"
+                                        label="Bid Validity (Days)"
+                                        options={bidValidityOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select days"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="commercialEvaluation"
+                                        label="Commercial Evaluation"
+                                        options={commercialEvaluationOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select evaluation type"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="mafRequired"
+                                        label="MAF Required"
+                                        options={mafRequiredOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select option"
+                                    />
+                                    {/* Delivery Time */}
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="deliveryTimeSupply"
+                                        label="Delivery Time (Supply/Total) - Days"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={1}
+                                                placeholder="Enter number of days"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="deliveryTimeInstallationInclusive"
+                                        label="Delivery Time for Installation"
+                                    >
+                                        {(field) => (
+                                            <div className="flex items-center space-x-2 h-10">
+                                                <Checkbox
+                                                    id="deliveryTimeInstallationInclusive"
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                                <label
+                                                    htmlFor="deliveryTimeInstallationInclusive"
+                                                    className="text-sm font-medium cursor-pointer"
+                                                >
+                                                    Inclusive in Supply/Total time
+                                                </label>
+                                            </div>
+                                        )}
+                                    </FieldWrapper>
+
+                                    {!deliveryTimeInstallationInclusive && (
                                         <FieldWrapper
                                             control={form.control}
-                                            name="techEligibilityAgeYears"
-                                            label="Company Age (Years)"
+                                            name="deliveryTimeInstallation"
+                                            label="Installation Days (if not inclusive)"
                                         >
                                             {(field) => (
                                                 <NumberInput
                                                     step={1}
-                                                    placeholder="0"
-                                                    value={field.value}
+                                                    placeholder="Enter number of days"
+                                                    value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
                                                     onChange={field.onChange}
                                                 />
                                             )}
                                         </FieldWrapper>
+                                    )}
+                                    {/* PBG & SD */}
+                                    <SelectField
+                                        control={form.control}
+                                        name="pbgForm"
+                                        label="PBG (in form of)"
+                                        options={pbgFormOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select form"
+                                    />
 
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="pbgPercentage"
+                                        label="PBG Percentage (%)"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="pbgDurationMonths"
+                                        label="PBG Duration (Months)"
+                                        options={pbgDurationOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select duration"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="sdForm"
+                                        label="SD (in form of)"
+                                        options={sdFormOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select form"
+                                    />
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="securityDepositPercentage"
+                                        label="Security Deposit Percentage (%)"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="sdDurationMonths"
+                                        label="SD Duration (Months)"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={1}
+                                                placeholder="Enter months"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    {/* LD & Physical Docs */}
+                                    <SelectField
+                                        control={form.control}
+                                        name="ldPercentagePerWeek"
+                                        label="LD/PRS Percentage (per week)"
+                                        options={ldPerWeekOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select percentage"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="maxLdPercentage"
+                                        label="Maximum LD Percentage"
+                                        options={maxLdOptions.map(option => ({
+                                            value: String(option.value),
+                                            label: option.label
+                                        }))}
+                                        placeholder="Select percentage"
+                                    />
+
+                                    <SelectField
+                                        control={form.control}
+                                        name="physicalDocsRequired"
+                                        label="Physical Documents Submission Required"
+                                        options={yesNoOptions}
+                                        placeholder="Select option"
+                                    />
+
+                                    {physicalDocsRequired === 'YES' && (
                                         <FieldWrapper
                                             control={form.control}
-                                            name="orderValue1"
-                                            label="Order Value 1"
+                                            name="physicalDocsDeadline"
+                                            label="Physical Documents Submission Deadline"
                                         >
                                             {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
+                                                <DateTimeInput
+                                                    value={typeof field.value === "string" ? field.value : field.value === "" ? null : field.value}
                                                     onChange={field.onChange}
+                                                    className="bg-background"
                                                 />
                                             )}
                                         </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="orderValue2"
-                                            label="Order Value 2"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="orderValue3"
-                                            label="Order Value 3"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="technicalEligible"
-                                            label="Is Technically Eligible"
-                                        >
-                                            {(field) => (
-                                                <div className="flex items-center space-x-2 h-10">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="technicalEligible"
-                                                        checked={field.value}
-                                                        onChange={(e) => field.onChange(e.target.checked)}
-                                                        className="h-4 w-4 rounded border-gray-300"
-                                                    />
-                                                    <label htmlFor="technicalEligible" className="text-sm font-medium">
-                                                        Mark as technically eligible
-                                                    </label>
-                                                </div>
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
+                                    )}
+                                    {/* Technical Eligibility */}
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="techEligibilityAgeYears"
+                                        label="Technical Eligibility Criterion Age (Years)"
+                                    >
+                                        {(field) => (
+                                            <NumberInput
+                                                step={1}
+                                                placeholder="Enter number of years"
+                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 </div>
 
-                                <Separator />
-
-                                {/* Financial Eligibility Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Financial Eligibility Criteria</h3>
-
-                                    {/* Avg Annual Turnover */}
-                                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-                                        <h4 className="font-medium text-sm">Average Annual Turnover</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <SelectField
-                                                control={form.control}
-                                                name="avgAnnualTurnoverRequired"
-                                                label="Required"
-                                                options={yesNoOptions}
-                                                placeholder="Select option"
-                                            />
-
-                                            {avgAnnualTurnoverRequired === 'YES' && (
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="avgAnnualTurnoverValue"
-                                                    label="Value"
-                                                >
+                                <div className="space-y-2">
+                                    {/* Average Annual Turnover */}
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
+                                            <div>
+                                                <label className="text-sm font-medium">Technical Eligibility Criterion Value</label>
+                                                <FieldWrapper control={form.control} name="orderValue1" label="1 Order Of">
                                                     {(field) => (
                                                         <NumberInput
                                                             step={0.01}
                                                             placeholder="0.00"
-                                                            value={field.value}
+                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                            onChange={field.onChange}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                            </div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="avgAnnualTurnoverCriteria"
+                                                label="Average Annual Turnover"
+                                                options={financialCriteriaOptions}
+                                                placeholder="Select criteria"
+                                            />
+
+                                            {avgAnnualTurnoverCriteria === 'AMOUNT' && (
+                                                <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
                                                             onChange={field.onChange}
                                                         />
                                                     )}
@@ -1082,28 +902,33 @@ export function TenderInformationForm({
                                     </div>
 
                                     {/* Working Capital */}
-                                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-                                        <h4 className="font-medium text-sm">Working Capital</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
+                                            <FieldWrapper control={form.control} name="orderValue2" label="2 Order Of">
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        placeholder="0.00"
+                                                        value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
                                             <SelectField
                                                 control={form.control}
-                                                name="workingCapitalRequired"
-                                                label="Required"
-                                                options={yesNoOptions}
-                                                placeholder="Select option"
+                                                name="workingCapitalCriteria"
+                                                label="Working Capital"
+                                                options={financialCriteriaOptions}
+                                                placeholder="Select criteria"
                                             />
 
-                                            {workingCapitalRequired === 'YES' && (
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="workingCapitalValue"
-                                                    label="Value"
-                                                >
+                                            {workingCapitalCriteria === 'AMOUNT' && (
+                                                <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
                                                     {(field) => (
                                                         <NumberInput
                                                             step={0.01}
                                                             placeholder="0.00"
-                                                            value={field.value}
+                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
                                                             onChange={field.onChange}
                                                         />
                                                     )}
@@ -1113,28 +938,37 @@ export function TenderInformationForm({
                                     </div>
 
                                     {/* Solvency Certificate */}
-                                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-                                        <h4 className="font-medium text-sm">Solvency Certificate</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
+                                            <FieldWrapper control={form.control} name="orderValue3" label="3 Order Of">
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        placeholder="0.00"
+                                                        value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
                                             <SelectField
                                                 control={form.control}
-                                                name="solvencyCertificateRequired"
-                                                label="Required"
-                                                options={yesNoOptions}
-                                                placeholder="Select option"
+                                                name="solvencyCertificateCriteria"
+                                                label="Solvency Certificate"
+                                                options={financialCriteriaOptions}
+                                                placeholder="Select criteria"
                                             />
 
-                                            {solvencyCertificateRequired === 'YES' && (
+                                            {solvencyCertificateCriteria === 'AMOUNT' && (
                                                 <FieldWrapper
                                                     control={form.control}
                                                     name="solvencyCertificateValue"
-                                                    label="Value"
+                                                    label="Amount"
                                                 >
                                                     {(field) => (
                                                         <NumberInput
                                                             step={0.01}
                                                             placeholder="0.00"
-                                                            value={field.value}
+                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
                                                             onChange={field.onChange}
                                                         />
                                                     )}
@@ -1144,28 +978,24 @@ export function TenderInformationForm({
                                     </div>
 
                                     {/* Net Worth */}
-                                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-                                        <h4 className="font-medium text-sm">Net Worth</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
+                                            <div></div>
                                             <SelectField
                                                 control={form.control}
-                                                name="netWorthRequired"
-                                                label="Required"
-                                                options={yesNoOptions}
-                                                placeholder="Select option"
+                                                name="netWorthCriteria"
+                                                label="Net Worth"
+                                                options={financialCriteriaOptions}
+                                                placeholder="Select criteria"
                                             />
 
-                                            {netWorthRequired === 'YES' && (
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="netWorthValue"
-                                                    label="Value"
-                                                >
+                                            {netWorthCriteria === 'AMOUNT' && (
+                                                <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
                                                     {(field) => (
                                                         <NumberInput
                                                             step={0.01}
                                                             placeholder="0.00"
-                                                            value={field.value}
+                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
                                                             onChange={field.onChange}
                                                         />
                                                     )}
@@ -1173,290 +1003,163 @@ export function TenderInformationForm({
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Financial Eligible Checkbox */}
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="financialEligible"
-                                        label="Is Financially Eligible"
-                                    >
-                                        {(field) => (
-                                            <div className="flex items-center space-x-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="financialEligible"
-                                                    checked={field.value}
-                                                    onChange={(e) => field.onChange(e.target.checked)}
-                                                    className="h-4 w-4 rounded border-gray-300"
-                                                />
-                                                <label htmlFor="financialEligible" className="text-sm font-medium">
-                                                    Mark as financially eligible
-                                                </label>
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 space-y-2">
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="technicalWorkOrders"
+                                            label="Work Orders to be submitted to meet technical eligibility criteria"
+                                            options={dummyTechnicalDocuments}
+                                            placeholder="Select documents"
+                                        />
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="commercialDocuments"
+                                            label="Documents to be submitted to meet commercial eligibility criteria"
+                                            options={dummyFinancialDocuments}
+                                            placeholder="Select documents"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        )}
-
-                        {/* STEP 3: Client Information & Documents */}
-                        {currentStep === 3 && (
-                            <div className="space-y-8 animate-in fade-in-50 duration-500">
-                                {/* Client Information Section */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between border-b pb-2">
-                                        <h3 className="text-lg font-semibold">Client Information</h3>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => appendClient({
+                            {/* Client Organization */}
+                            <div className="space-y-4">
+                                <FieldWrapper control={form.control} name="clientOrganization" label="Client Organisation">
+                                    {(field) => <Input placeholder="Enter client organisation" {...field} />}
+                                </FieldWrapper>
+                            </div>
+                            {/* Client Details */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-medium text-sm text-primary border-b pb-2">Add Client Details</h4>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            appendClient({
                                                 clientName: '',
                                                 clientDesignation: '',
                                                 clientMobile: '',
-                                                clientEmail: ''
-                                            })}
-                                        >
-                                            <Plus className="mr-2 h-4 w-4" /> Add Client
-                                        </Button>
-                                    </div>
-
-                                    {clientFields.map((field, index) => (
-                                        <div key={field.id} className="p-4 border rounded-lg space-y-4 bg-muted/30">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="font-medium text-sm">Client {index + 1}</h4>
-                                                {clientFields.length > 1 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removeClient(index)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                )}
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name={`clients.${index}.clientName`}
-                                                    label="Client Name"
-                                                >
-                                                    {(field) => (
-                                                        <Input placeholder="Enter client name" {...field} />
-                                                    )}
-                                                </FieldWrapper>
-
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name={`clients.${index}.clientDesignation`}
-                                                    label="Designation"
-                                                >
-                                                    {(field) => (
-                                                        <Input placeholder="Enter designation" {...field} />
-                                                    )}
-                                                </FieldWrapper>
-
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name={`clients.${index}.clientMobile`}
-                                                    label="Mobile Number"
-                                                >
-                                                    {(field) => (
-                                                        <Input placeholder="Enter mobile number" {...field} />
-                                                    )}
-                                                </FieldWrapper>
-
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name={`clients.${index}.clientEmail`}
-                                                    label="Email"
-                                                >
-                                                    {(field) => (
-                                                        <Input type="email" placeholder="Enter email" {...field} />
-                                                    )}
-                                                </FieldWrapper>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <Separator />
-
-                                {/* Documents Section */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Required Documents</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="technicalDocuments"
-                                            label="Technical Documents"
-                                        >
-                                            {(field) => (
-                                                <textarea
-                                                    className="border-input placeholder:text-muted-foreground h-32 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                    placeholder="Enter one document per line"
-                                                    value={(field.value ?? []).join('\n')}
-                                                    onChange={(event) => {
-                                                        const lines = event.target.value
-                                                            .split('\n')
-                                                            .map((line) => line.trim())
-                                                            .filter((line) => line.length);
-                                                        field.onChange(lines);
-                                                    }}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="financialDocuments"
-                                            label="Financial Documents"
-                                        >
-                                            {(field) => (
-                                                <textarea
-                                                    className="border-input placeholder:text-muted-foreground h-32 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                    placeholder="Enter one document per line"
-                                                    value={(field.value ?? []).join('\n')}
-                                                    onChange={(event) => {
-                                                        const lines = event.target.value
-                                                            .split('\n')
-                                                            .map((line) => line.trim())
-                                                            .filter((line) => line.length);
-                                                        field.onChange(lines);
-                                                    }}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="pqcDocuments"
-                                            label="PQC / Company Documents"
-                                        >
-                                            {(field) => (
-                                                <textarea
-                                                    className="border-input placeholder:text-muted-foreground h-32 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                    placeholder="Enter one document per line"
-                                                    value={(field.value ?? []).join('\n')}
-                                                    onChange={(event) => {
-                                                        const lines = event.target.value
-                                                            .split('\n')
-                                                            .map((line) => line.trim())
-                                                            .filter((line) => line.length);
-                                                        field.onChange(lines);
-                                                    }}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* Final Rejection Remark */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2">Final Remarks</h3>
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="rejectionRemark"
-                                        label="Final Rejection Remark (if applicable)"
+                                                clientEmail: '',
+                                            })
+                                        }
                                     >
+                                        <Plus className="mr-2 h-4 w-4" /> Add Client
+                                    </Button>
+                                </div>
+
+                                {clientFields.map((field, index) => (
+                                    <div key={field.id} className="p-4 border rounded-lg space-y-4 bg-muted/20">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-medium text-sm">Client {index + 1}</h5>
+                                            {clientFields.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeClient(index)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name={`clients.${index}.clientName`}
+                                                label="Client Name"
+                                            >
+                                                {(field) => <Input placeholder="Enter client name" {...field} />}
+                                            </FieldWrapper>
+
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name={`clients.${index}.clientDesignation`}
+                                                label="Designation"
+                                            >
+                                                {(field) => <Input placeholder="Enter designation" {...field} />}
+                                            </FieldWrapper>
+
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name={`clients.${index}.clientMobile`}
+                                                label="Mobile"
+                                            >
+                                                {(field) => <Input placeholder="Enter mobile number" {...field} />}
+                                            </FieldWrapper>
+
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name={`clients.${index}.clientEmail`}
+                                                label="Email"
+                                            >
+                                                {(field) => <Input type="email" placeholder="Enter email" {...field} />}
+                                            </FieldWrapper>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* Courier Address */}
+                            <div className="space-y-4">
+                                <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                                    <FieldWrapper control={form.control} name="courierAddress" label="Courier Address">
                                         {(field) => (
                                             <textarea
                                                 className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter final rejection remarks if needed..."
-                                                maxLength={500}
+                                                placeholder="Enter courier address..."
+                                                maxLength={1000}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    {/* TE Final Remark */}
+                                    <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
+                                        {(field) => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Enter final remarks..."
+                                                maxLength={1000}
                                                 {...field}
                                             />
                                         )}
                                     </FieldWrapper>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between pt-6 border-t">
+                        {/* Submit Buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-6 border-t mt-6">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                                Cancel
+                            </Button>
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={prevStep}
-                                disabled={currentStep === 1 || isSubmitting}
+                                onClick={() => form.reset(initialFormValues)}
+                                disabled={isSubmitting}
                             >
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Previous
+                                Reset
                             </Button>
-
-                            <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => form.reset(initialFormValues)}
-                                    disabled={isSubmitting}
-                                >
-                                    Reset
-                                </Button>
-
-                                {currentStep < totalSteps ? (
-                                    <Button type="button" onClick={nextStep} disabled={isSubmitting}>
-                                        Next
-                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? (
+                                    <>
+                                        <span className="animate-spin mr-2">⏳</span>
+                                        {mode === 'create' ? 'Creating...' : 'Updating...'}
+                                    </>
                                 ) : (
-                                    <Button type="submit" disabled={isSubmitting}>
-                                        {isSubmitting ? (
-                                            'Saving...'
-                                        ) : (
-                                            <>
-                                                <Check className="mr-2 h-4 w-4" />
-                                                {mode === 'create' ? 'Create' : 'Update'} Tender
-                                            </>
-                                        )}
-                                    </Button>
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        {mode === 'create' ? 'Create' : 'Update'} Tender Information
+                                    </>
                                 )}
-                            </div>
+                            </Button>
                         </div>
                     </form>
                 </Form>
             </CardContent>
-        </Card>
-    );
-}
-
-// Step Indicator Component
-interface StepIndicatorProps {
-    number: number;
-    title: string;
-    active: boolean;
-    completed: boolean;
-    icon: React.ReactNode;
-}
-
-function StepIndicator({ number, title, active, completed, icon }: StepIndicatorProps) {
-    return (
-        <div className="flex flex-col items-center gap-2">
-            <div
-                className={cn(
-                    'flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all',
-                    {
-                        'border-primary bg-primary text-primary-foreground': active,
-                        'border-primary bg-primary/10 text-primary': completed && !active,
-                        'border-muted-foreground/30 bg-background text-muted-foreground': !active && !completed,
-                    }
-                )}
-            >
-                {completed && !active ? <Check className="h-6 w-6" /> : icon}
-            </div>
-            <div className="text-center">
-                <p className={cn('text-sm font-medium', {
-                    'text-primary': active || completed,
-                    'text-muted-foreground': !active && !completed,
-                })}>
-                    {title}
-                </p>
-                <p className="text-xs text-muted-foreground">Step {number}</p>
-            </div>
-        </div>
+        </Card >
     );
 }

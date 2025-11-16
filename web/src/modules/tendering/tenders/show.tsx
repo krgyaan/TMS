@@ -66,7 +66,7 @@ export default function TenderShowPage() {
                         <InfoSheetView
                             infoSheet={infoSheet}
                             tender={tender ?? null}
-                            onEdit={() => navigate(paths.tendering.infoSheetCreate(tenderId!))}
+                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
                         />
                     ) : infoSheetError ? (
                         <Alert variant="destructive">

@@ -6,6 +6,7 @@ import {
     HttpStatus,
     Param,
     ParseIntPipe,
+    Patch,
     Post,
 } from '@nestjs/common';
 import { TenderInfoSheetsService } from './info-sheets.service';
@@ -28,5 +29,14 @@ export class TenderInfoSheetsController {
     ) {
         const payload = TenderInfoSheetPayloadSchema.parse(body);
         return this.infoSheetsService.create(tenderId, payload);
+    }
+
+    @Patch(':tenderId')
+    async update(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Body() body: unknown,
+    ) {
+        const payload = TenderInfoSheetPayloadSchema.parse(body);
+        return this.infoSheetsService.update(tenderId, payload);
     }
 }

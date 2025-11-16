@@ -22,6 +22,7 @@
         tenderEdit: (id: number | string) => `/tendering/tenders/${id}/edit`,
         tenderView: (id: number | string) => `/tendering/tenders/${id}`,
         infoSheetCreate: (tenderId: number | string) => `/tendering/info-sheet/create/${tenderId}`,
+        infoSheetEdit: (tenderId: number | string) => `/tendering/info-sheet/edit/${tenderId}`,
         tenderApproval: '/tendering/tender-approval',
         phydocs: '/tendering/phydocs',
         rfqs: '/tendering/rfqs',

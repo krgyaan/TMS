@@ -7,12 +7,10 @@ import {
     tenderClients,
     tenderTechnicalDocuments,
     tenderFinancialDocuments,
-    tenderPqcDocuments,
     type TenderInformation as TenderInformationRow,
     type TenderClient as TenderClientRow,
     type TenderTechnicalDocument,
     type TenderFinancialDocument,
-    type TenderPqcDocument,
 } from '../../../db/tender-info-sheet.schema';
 import { TenderInfosService } from '../tenders/tenders.service';
 import type { TenderInfoSheetPayload } from './dto/info-sheet.dto';
@@ -34,29 +32,33 @@ export interface TenderInfoSheetDetails {
     teRejectionRemarks: string | null;
     teRemark: string | null;
 
+    processingFeeAmount: number | null;
+    processingFeeModes: string[] | null;
+
     tenderFeeAmount: number | null;
-    tenderFeeMode: 'DD' | 'POP' | 'BT' | null;
+    tenderFeeModes: string[] | null;
 
     emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdMode: 'BT' | 'POP' | 'DD' | 'FDR' | 'PBG' | 'SB' | null;
+    emdModes: string[] | null;
 
     reverseAuctionApplicable: 'YES' | 'NO' | null;
-    paymentTermsSupply: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
-    paymentTermsInstallation: 'ADVANCE' | 'AGAINST_DELIVERY' | 'CREDIT' | null;
+    paymentTermsSupply: number | null;
+    paymentTermsInstallation: number | null;
 
-    pbgRequired: 'YES' | 'NO' | null;
+    pbgForm: string | null;
     pbgPercentage: number | null;
     pbgDurationMonths: number | null;
 
-    securityDepositMode: 'NA' | 'DD' | 'DEDUCTION' | 'FDR' | 'PBG' | 'SB' | null;
+    sdForm: string | null;
     securityDepositPercentage: number | null;
     sdDurationMonths: number | null;
 
     bidValidityDays: number | null;
-    commercialEvaluation: 'YES' | 'NO' | null;
-    mafRequired: 'YES' | 'NO' | null;
+    commercialEvaluation: string | null;
+    mafRequired: string | null;
 
     deliveryTimeSupply: number | null;
+    deliveryTimeInstallationInclusive: boolean;
     deliveryTimeInstallation: number | null;
 
     ldPercentagePerWeek: number | null;
@@ -70,27 +72,26 @@ export interface TenderInfoSheetDetails {
     orderValue2: number | null;
     orderValue3: number | null;
 
-    avgAnnualTurnoverRequired: 'YES' | 'NO' | null;
+    avgAnnualTurnoverCriteria: string | null;
     avgAnnualTurnoverValue: number | null;
 
-    workingCapitalRequired: 'YES' | 'NO' | null;
+    workingCapitalCriteria: string | null;
     workingCapitalValue: number | null;
 
-    solvencyCertificateRequired: 'YES' | 'NO' | null;
+    solvencyCertificateCriteria: string | null;
     solvencyCertificateValue: number | null;
 
-    netWorthRequired: 'YES' | 'NO' | null;
+    netWorthCriteria: string | null;
     netWorthValue: number | null;
 
-    technicalEligible: boolean;
-    financialEligible: boolean;
+    clientOrganization: string | null;
+    courierAddress: string | null;
 
     rejectionRemark: string | null;
 
     clients: TenderInfoSheetClient[];
-    technicalDocuments: string[];
-    financialDocuments: string[];
-    pqcDocuments: string[];
+    technicalWorkOrders: string[];
+    commercialDocuments: string[];
 
     createdAt: string;
     updatedAt: string;
@@ -114,14 +115,13 @@ export class TenderInfoSheetsService {
             throw new NotFoundException('Info sheet not found');
         }
 
-        const [clients, technicalDocs, financialDocs, pqcDocs] = await Promise.all([
+        const [clients, technicalDocs, financialDocs] = await Promise.all([
             this.db.select().from(tenderClients).where(eq(tenderClients.tenderId, tenderId)),
             this.db.select().from(tenderTechnicalDocuments).where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
             this.db.select().from(tenderFinancialDocuments).where(eq(tenderFinancialDocuments.tenderId, tenderId)),
-            this.db.select().from(tenderPqcDocuments).where(eq(tenderPqcDocuments.tenderId, tenderId)),
         ]);
 
-        return this.hydrateInfoSheet(info, clients, technicalDocs, financialDocs, pqcDocs);
+        return this.hydrateInfoSheet(info, clients, technicalDocs, financialDocs);
     }
 
     async create(tenderId: number, payload: TenderInfoSheetPayload): Promise<TenderInfoSheetDetails> {
@@ -139,6 +139,31 @@ export class TenderInfoSheetsService {
 
         await this.db.transaction(async (tx) => {
             await tx.insert(tenderInformation).values(this.buildInfoRecord(tenderId, payload));
+            await this.replaceClients(tx, tenderId, payload.clients);
+            await this.replaceDocuments(tx, tenderId, payload);
+        });
+
+        return this.findByTenderId(tenderId);
+    }
+
+    async update(tenderId: number, payload: TenderInfoSheetPayload): Promise<TenderInfoSheetDetails> {
+        await this.ensureTenderExists(tenderId);
+
+        const existing = await this.db
+            .select({ id: tenderInformation.id })
+            .from(tenderInformation)
+            .where(eq(tenderInformation.tenderId, tenderId))
+            .limit(1);
+
+        if (!existing.length) {
+            throw new NotFoundException('Info sheet not found for this tender');
+        }
+
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderInformation)
+                .set(this.buildInfoRecord(tenderId, payload))
+                .where(eq(tenderInformation.tenderId, tenderId));
             await this.replaceClients(tx, tenderId, payload.clients);
             await this.replaceDocuments(tx, tenderId, payload);
         });
@@ -170,25 +195,28 @@ export class TenderInfoSheetsService {
             teRecommendation: payload.teRecommendation,
             teRejectionReason: payload.teRejectionReason ?? null,
             teRejectionRemarks: payload.teRejectionRemarks ?? null,
-            teRemark: payload.teRemark ?? null,
+            teFinalRemark: payload.teRemark ?? null,
+            processingFeeAmount: this.toNumericString(payload.processingFeeAmount),
+            processingFeeMode: payload.processingFeeModes ?? null,
             tenderFeeAmount: this.toNumericString(payload.tenderFeeAmount),
-            tenderFeeMode: payload.tenderFeeMode ?? null,
+            tenderFeeMode: payload.tenderFeeModes ?? null,
             emdRequired: payload.emdRequired ?? null,
-            emdMode: payload.emdMode ?? null,
+            emdMode: payload.emdModes ?? null,
             reverseAuctionApplicable: payload.reverseAuctionApplicable ?? null,
             paymentTermsSupply: payload.paymentTermsSupply ?? null,
             paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-            pbgRequired: payload.pbgRequired ?? null,
+            pbgInFormOf: payload.pbgForm ?? null,
             pbgPercentage: this.toNumericString(payload.pbgPercentage),
             pbgDurationMonths: payload.pbgDurationMonths ?? null,
-            securityDepositMode: payload.securityDepositMode ?? null,
+            sdInFormOf: payload.sdForm ?? null,
             securityDepositPercentage: this.toNumericString(payload.securityDepositPercentage),
             sdDurationMonths: payload.sdDurationMonths ?? null,
             bidValidityDays: payload.bidValidityDays ?? null,
             commercialEvaluation: payload.commercialEvaluation ?? null,
             mafRequired: payload.mafRequired ?? null,
             deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-            deliveryTimeInstallation: payload.deliveryTimeInstallation ?? null,
+            deliveryTimeInstallationInclusive: payload.deliveryTimeInstallationInclusive ?? false,
+            deliveryTimeInstallationDays: payload.deliveryTimeInstallation ?? null,
             ldPercentagePerWeek: this.toNumericString(payload.ldPercentagePerWeek),
             maxLdPercentage: this.toNumericString(payload.maxLdPercentage),
             physicalDocsRequired: payload.physicalDocsRequired ?? null,
@@ -197,16 +225,16 @@ export class TenderInfoSheetsService {
             orderValue1: this.toNumericString(payload.orderValue1),
             orderValue2: this.toNumericString(payload.orderValue2),
             orderValue3: this.toNumericString(payload.orderValue3),
-            avgAnnualTurnoverRequired: payload.avgAnnualTurnoverRequired ?? null,
+            avgAnnualTurnoverType: payload.avgAnnualTurnoverCriteria ?? null,
             avgAnnualTurnoverValue: this.toNumericString(payload.avgAnnualTurnoverValue),
-            workingCapitalRequired: payload.workingCapitalRequired ?? null,
+            workingCapitalType: payload.workingCapitalCriteria ?? null,
             workingCapitalValue: this.toNumericString(payload.workingCapitalValue),
-            solvencyCertificateRequired: payload.solvencyCertificateRequired ?? null,
+            solvencyCertificateType: payload.solvencyCertificateCriteria ?? null,
             solvencyCertificateValue: this.toNumericString(payload.solvencyCertificateValue),
-            netWorthRequired: payload.netWorthRequired ?? null,
+            netWorthType: payload.netWorthCriteria ?? null,
             netWorthValue: this.toNumericString(payload.netWorthValue),
-            technicalEligible: payload.technicalEligible ?? false,
-            financialEligible: payload.financialEligible ?? false,
+            clientOrganisation: payload.clientOrganization ?? null,
+            courierAddress: payload.courierAddress ?? null,
             rejectionRemark: payload.rejectionRemark ?? null,
         };
     }
@@ -230,32 +258,21 @@ export class TenderInfoSheetsService {
     private async replaceDocuments(db: DbInstance, tenderId: number, payload: TenderInfoSheetPayload) {
         await db.delete(tenderTechnicalDocuments).where(eq(tenderTechnicalDocuments.tenderId, tenderId));
         await db.delete(tenderFinancialDocuments).where(eq(tenderFinancialDocuments.tenderId, tenderId));
-        await db.delete(tenderPqcDocuments).where(eq(tenderPqcDocuments.tenderId, tenderId));
 
-        if (payload.technicalDocuments?.length) {
+        if (payload.technicalWorkOrders?.length) {
             await db.insert(tenderTechnicalDocuments).values(
-                payload.technicalDocuments.map((documentName) => ({
+                payload.technicalWorkOrders.map((documentName) => ({
                     tenderId,
                     documentName,
                 })),
             );
         }
 
-        if (payload.financialDocuments?.length) {
+        if (payload.commercialDocuments?.length) {
             await db.insert(tenderFinancialDocuments).values(
-                payload.financialDocuments.map((documentName) => ({
+                payload.commercialDocuments.map((documentName) => ({
                     tenderId,
                     documentName,
-                })),
-            );
-        }
-
-        if (payload.pqcDocuments?.length) {
-            await db.insert(tenderPqcDocuments).values(
-                payload.pqcDocuments.map((documentName) => ({
-                    tenderId,
-                    documentName,
-                    autoAttached: true,
                 })),
             );
         }
@@ -266,7 +283,6 @@ export class TenderInfoSheetsService {
         clients: TenderClientRow[],
         technicalDocs: TenderTechnicalDocument[],
         financialDocs: TenderFinancialDocument[],
-        pqcDocs: TenderPqcDocument[],
     ): TenderInfoSheetDetails {
         const asNumber = (value: number | string | null | undefined) => {
             if (value === null || value === undefined) return null;
@@ -283,25 +299,28 @@ export class TenderInfoSheetsService {
             teRecommendation: info.teRecommendation,
             teRejectionReason: info.teRejectionReason ?? null,
             teRejectionRemarks: info.teRejectionRemarks ?? null,
-            teRemark: info.teRemark ?? null,
+            teRemark: info.teFinalRemark ?? null,
+            processingFeeAmount: asNumber(info.processingFeeAmount),
+            processingFeeModes: info.processingFeeMode ?? null,
             tenderFeeAmount: asNumber(info.tenderFeeAmount),
-            tenderFeeMode: info.tenderFeeMode ?? null,
+            tenderFeeModes: info.tenderFeeMode ?? null,
             emdRequired: info.emdRequired ?? null,
-            emdMode: info.emdMode ?? null,
+            emdModes: info.emdMode ?? null,
             reverseAuctionApplicable: info.reverseAuctionApplicable ?? null,
-            paymentTermsSupply: info.paymentTermsSupply ?? null,
-            paymentTermsInstallation: info.paymentTermsInstallation ?? null,
-            pbgRequired: info.pbgRequired ?? null,
+            paymentTermsSupply: asNumber(info.paymentTermsSupply),
+            paymentTermsInstallation: asNumber(info.paymentTermsInstallation),
+            pbgForm: info.pbgInFormOf ?? null,
             pbgPercentage: asNumber(info.pbgPercentage),
             pbgDurationMonths: asNumber(info.pbgDurationMonths),
-            securityDepositMode: info.securityDepositMode ?? null,
+            sdForm: info.sdInFormOf ?? null,
             securityDepositPercentage: asNumber(info.securityDepositPercentage),
             sdDurationMonths: asNumber(info.sdDurationMonths),
             bidValidityDays: asNumber(info.bidValidityDays),
             commercialEvaluation: info.commercialEvaluation ?? null,
             mafRequired: info.mafRequired ?? null,
             deliveryTimeSupply: asNumber(info.deliveryTimeSupply),
-            deliveryTimeInstallation: asNumber(info.deliveryTimeInstallation),
+            deliveryTimeInstallationInclusive: info.deliveryTimeInstallationInclusive ?? false,
+            deliveryTimeInstallation: asNumber(info.deliveryTimeInstallationDays),
             ldPercentagePerWeek: asNumber(info.ldPercentagePerWeek),
             maxLdPercentage: asNumber(info.maxLdPercentage),
             physicalDocsRequired: info.physicalDocsRequired ?? null,
@@ -310,16 +329,16 @@ export class TenderInfoSheetsService {
             orderValue1: asNumber(info.orderValue1),
             orderValue2: asNumber(info.orderValue2),
             orderValue3: asNumber(info.orderValue3),
-            avgAnnualTurnoverRequired: info.avgAnnualTurnoverRequired ?? null,
+            avgAnnualTurnoverCriteria: info.avgAnnualTurnoverType ?? null,
             avgAnnualTurnoverValue: asNumber(info.avgAnnualTurnoverValue),
-            workingCapitalRequired: info.workingCapitalRequired ?? null,
+            workingCapitalCriteria: info.workingCapitalType ?? null,
             workingCapitalValue: asNumber(info.workingCapitalValue),
-            solvencyCertificateRequired: info.solvencyCertificateRequired ?? null,
+            solvencyCertificateCriteria: info.solvencyCertificateType ?? null,
             solvencyCertificateValue: asNumber(info.solvencyCertificateValue),
-            netWorthRequired: info.netWorthRequired ?? null,
+            netWorthCriteria: info.netWorthType ?? null,
             netWorthValue: asNumber(info.netWorthValue),
-            technicalEligible: info.technicalEligible ?? false,
-            financialEligible: info.financialEligible ?? false,
+            clientOrganization: info.clientOrganisation ?? null,
+            courierAddress: info.courierAddress ?? null,
             rejectionRemark: info.rejectionRemark ?? null,
             clients: clients.map((client) => ({
                 id: client.id,
@@ -328,9 +347,8 @@ export class TenderInfoSheetsService {
                 clientMobile: client.clientMobile ?? null,
                 clientEmail: client.clientEmail ?? null,
             })),
-            technicalDocuments: technicalDocs.map((doc) => doc.documentName),
-            financialDocuments: financialDocs.map((doc) => doc.documentName),
-            pqcDocuments: pqcDocs.map((doc) => doc.documentName),
+            technicalWorkOrders: technicalDocs.map((doc) => doc.documentName),
+            commercialDocuments: financialDocs.map((doc) => doc.documentName),
             createdAt: toIso(info.createdAt) ?? new Date().toISOString(),
             updatedAt: toIso(info.updatedAt) ?? new Date().toISOString(),
         };

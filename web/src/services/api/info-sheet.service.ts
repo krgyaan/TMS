@@ -14,6 +14,9 @@ class InfoSheetsService extends BaseApiService {
         return this.post<TenderInfoSheet, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
     }
 
+    async update(tenderId: number, data: SaveTenderInfoSheetDto): Promise<TenderInfoSheet> {
+        return this.patch<TenderInfoSheet, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
+    }
 }
 
 export const infoSheetsService = new InfoSheetsService()

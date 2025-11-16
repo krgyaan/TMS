@@ -26,7 +26,25 @@ export const useCreateInfoSheet = () => {
             infoSheetsService.create(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: infoSheetsKey.detail(variables.tenderId) })
+            queryClient.invalidateQueries({ queryKey: infoSheetsKey.all })
             toast.success('Tender info sheet created successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}
+
+export const useUpdateInfoSheet = () => {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: SaveTenderInfoSheetDto }) =>
+            infoSheetsService.update(tenderId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: infoSheetsKey.detail(variables.tenderId) })
+            queryClient.invalidateQueries({ queryKey: infoSheetsKey.all })
+            toast.success('Tender info sheet updated successfully')
         },
         onError: (error) => {
             toast.error(handleQueryError(error))

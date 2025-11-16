@@ -7,20 +7,20 @@ import { AlertCircle } from "lucide-react"
 import { useEffect } from "react"
 import { paths } from "@/app/routes/paths"
 
-const InfoSheetCreatePage = () => {
+const InfoSheetEditPage = () => {
     const { tenderId } = useParams<{ tenderId: string }>()
     const navigate = useNavigate()
     const numericId = tenderId ? Number(tenderId) : NaN
 
     const { data: tender, isLoading: isTenderLoading } = useTender(Number.isNaN(numericId) ? null : numericId)
-    const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(Number.isNaN(numericId) ? null : numericId)
+    const { data: infoSheet, isLoading: isInfoSheetLoading, error: infoSheetError } = useInfoSheet(Number.isNaN(numericId) ? null : numericId)
 
     useEffect(() => {
-        // If info sheet already exists, redirect to edit page
-        if (!isInfoSheetLoading && infoSheet && numericId) {
-            navigate(paths.tendering.infoSheetEdit(numericId), { replace: true })
+        // If info sheet doesn't exist, redirect to create page
+        if (!isInfoSheetLoading && infoSheetError && numericId) {
+            navigate(paths.tendering.infoSheetCreate(numericId))
         }
-    }, [isInfoSheetLoading, infoSheet, navigate, numericId])
+    }, [isInfoSheetLoading, infoSheetError, navigate, numericId])
 
     if (!tenderId || Number.isNaN(numericId)) {
         return (
@@ -31,27 +31,16 @@ const InfoSheetCreatePage = () => {
         )
     }
 
-    // Show loading state while checking if info sheet exists
-    if (isInfoSheetLoading) {
-        return (
-            <TenderInformationForm
-                mode="create"
-                tenderId={numericId}
-                tender={tender ?? null}
-                isTenderLoading={isTenderLoading}
-                isInfoSheetLoading={true}
-            />
-        )
-    }
-
     return (
         <TenderInformationForm
-            mode="create"
+            mode="edit"
             tenderId={numericId}
             tender={tender ?? null}
+            initialData={infoSheet ?? null}
             isTenderLoading={isTenderLoading}
+            isInfoSheetLoading={isInfoSheetLoading}
         />
     )
 }
 
-export default InfoSheetCreatePage
+export default InfoSheetEditPage
