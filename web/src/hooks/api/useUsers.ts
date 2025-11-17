@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usersService } from '@/services/api'
-import type { User } from '@/types/api.types'
+import type { CreateUserDto, UpdateUserDto } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 
@@ -12,7 +12,6 @@ export const userKeys = {
     detail: (id: number) => [...userKeys.details(), id] as const,
 }
 
-// Get all users
 export const useUsers = () => {
     return useQuery({
         queryKey: userKeys.lists(),
@@ -20,7 +19,6 @@ export const useUsers = () => {
     })
 }
 
-// Get user by ID
 export const useUser = (id: number) => {
     return useQuery({
         queryKey: userKeys.detail(id),
@@ -29,12 +27,11 @@ export const useUser = (id: number) => {
     })
 }
 
-// Create user
 export const useCreateUser = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (data: Partial<User>) => usersService.create(data),
+        mutationFn: (data: CreateUserDto) => usersService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
             toast.success('User created successfully')
@@ -45,12 +42,11 @@ export const useCreateUser = () => {
     })
 }
 
-// Update user
 export const useUpdateUser = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Partial<User> }) =>
+        mutationFn: ({ id, data }: { id: number; data: UpdateUserDto }) =>
             usersService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
@@ -63,18 +59,17 @@ export const useUpdateUser = () => {
     })
 }
 
-// Delete user
-// export const useDeleteUser = () => {
-//     const queryClient = useQueryClient()
+export const useDeleteUser = () => {
+    const queryClient = useQueryClient()
 
-//     return useMutation({
-//         mutationFn: (id: number) => usersService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
-//             toast.success('User deleted successfully')
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error))
-//         },
-//     })
-// }
+    return useMutation({
+        mutationFn: (id: number) => usersService.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+            toast.success('User deleted successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}

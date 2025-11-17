@@ -4,7 +4,9 @@ export { companiesService } from './companies.service'
 export { locationsService } from './location.service'
 export { statusesService } from './status.service'
 export { itemsService } from './items.service'
+export { itemHeadingsService } from './item-heading.service'
 export { organizationsService } from './organization.service'
+export { userProfilesService } from './user-profile.service'
 export { vendorsService } from './vendor.service'
 export { vendorOrganizationsService } from './vendor-organization.service'
 export { websitesService } from './website.service'
@@ -19,3 +21,4 @@ export { statesService } from './state.service';
 export { tqTypesService } from './tq-type.service';
 export { leadTypesService } from './lead-type.service';
 export { loanPartiesService } from './loan-party.service';
+export { tenderInfosService } from './tenders.service';

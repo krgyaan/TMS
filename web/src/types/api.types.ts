@@ -15,19 +15,59 @@ export interface Company {
 
 }
 
+export interface NamedEntity {
+    id: number | null
+    name: string | null
+}
+
+export interface UserProfile {
+    id?: number
+    userId: number
+    firstName?: string | null
+    lastName?: string | null
+    dateOfBirth?: string | null
+    gender?: string | null
+    employeeCode?: string | null
+    designationId?: number | null
+    primaryTeamId?: number | null
+    altEmail?: string | null
+    emergencyContactName?: string | null
+    emergencyContactPhone?: string | null
+    image?: string | null
+    signature?: string | null
+    dateOfJoining?: string | null
+    dateOfExit?: string | null
+    timezone?: string | null
+    locale?: string | null
+    createdAt?: string
+    updatedAt?: string
+}
+
 export interface User {
     id: number
     name: string
     email: string
     username: string | null
     mobile: string | null
-    role?: string
-    designation?: string
-    team?: string
-    status?: boolean
+    role?: string | null
+    isActive?: boolean
     createdAt?: string
     updatedAt?: string
+    team?: NamedEntity | null
+    designation?: NamedEntity | null
+    profile?: UserProfile | null
 }
+
+export interface CreateUserDto {
+    name: string
+    email: string
+    username?: string | null
+    mobile?: string | null
+    password: string
+    isActive?: boolean
+}
+
+export interface UpdateUserDto extends Partial<CreateUserDto> { }
 
 export interface Location {
     id: number
@@ -44,7 +84,6 @@ export interface Team {
     id: number;
     name: string;
     description?: string;
-    status: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -98,7 +137,7 @@ export interface Industry {
 export interface Organization {
     id: number;
     name: string;
-    acronym?: string;
+    acronym: string;
     industryId?: number | null;
     status: boolean;
     createdAt: string;
@@ -439,3 +478,65 @@ export interface CreateLoanPartyDto {
 }
 
 export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
+
+export interface TenderInfo {
+    id: number;
+    team: number;
+    tenderNo: string;
+    organization?: number | null;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    remarks?: string | null;
+    status: number;
+    location?: number | null;
+    website?: number | null;
+    deleteStatus: "0" | "1";
+    tlStatus: "0" | "1" | "2" | "3";
+    tlRemarks?: string | null;
+    rfqTo?: string | null;
+    courierAddress?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateTenderInfoDto {
+    team: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    teamMember: number;
+    dueDate: string;
+    gstValues?: number;
+    tenderFees?: number;
+    emd?: number;
+    organization?: number;
+    status?: number;
+    location?: number;
+    website?: number;
+    remarks?: string;
+    deleteStatus?: "0" | "1";
+    tlStatus?: "0" | "1" | "2" | "3";
+    tlRemarks?: string;
+    rfqTo?: string;
+    courierAddress?: string;
+}
+
+export interface UpdateTenderInfoDto extends Partial<CreateTenderInfoDto> { }
+
+export interface TenderInfoWithNames extends TenderInfo {
+    organizationName: string | null;
+    teamMemberName: string | null;
+    teamMemberUsername: string | null;
+    statusName: string | null;
+    itemName: string | null;
+    organizationAcronym: string | null;
+    locationName: string | null;
+    locationState: string | null;
+    websiteName: string | null;
+    websiteLink: string | null;
+};

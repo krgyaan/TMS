@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service'
-import type { User } from '@/types/api.types'
+import type { User, CreateUserDto, UpdateUserDto } from '@/types/api.types'
 
 class UsersService extends BaseApiService {
     constructor() {
@@ -14,17 +14,17 @@ class UsersService extends BaseApiService {
         return this.get<User>(`/${id}`)
     }
 
-    async create(data: Partial<User>): Promise<User> {
+    async create(data: CreateUserDto): Promise<User> {
         return this.post<User>('', data)
     }
 
-    async update(id: number, data: Partial<User>): Promise<User> {
+    async update(id: number, data: UpdateUserDto): Promise<User> {
         return this.patch<User>(`/${id}`, data)
     }
 
-    // async delete(id: number): Promise<void> {
-    //     return this.delete<void>(`/${id}`)
-    // }
+    async delete(id: number): Promise<void> {
+        await super.delete<void>(`/${id}`)
+    }
 }
 
 export const usersService = new UsersService()

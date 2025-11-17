@@ -1,0 +1,133 @@
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    ParseIntPipe,
+    Patch,
+    Post,
+    Query,
+    HttpCode,
+    HttpStatus,
+    NotFoundException,
+} from '@nestjs/common';
+import { z } from 'zod';
+import { TenderInfosService } from './tenders.service';
+
+// Reusable decimal field transformer
+const decimalField = (message: string, required = true) => {
+    const schema = z.coerce
+        .number()
+        .nonnegative(message)
+        .transform((val) => val.toString());
+
+    return required ? schema : schema.optional();
+};
+
+const CreateTenderInfoSchema = z.object({
+    team: z.coerce.number().int().positive("Team is required"),
+    tenderNo: z.string().min(1, "Tender number is required").max(255),
+    organization: z.coerce.number().int().positive().optional(),
+    tenderName: z.string().min(1, "Tender name is required").max(255),
+    item: z.coerce.number().int().positive("Item is required"),
+
+    gstValues: decimalField("GST value must be positive").default(0.00),
+    tenderFees: decimalField("Tender fees must be positive").default(0.00),
+    emd: decimalField("EMD must be positive").default(0.00),
+
+    teamMember: z.coerce.number().int().positive("Team member is required"),
+    dueDate: z.string().min(1, "Due date is required").transform((val) => new Date(val)),
+
+    remarks: z.string().max(200).optional(),
+    status: z.coerce.number().int().min(0, "Invalid status").default(0),
+
+    location: z.coerce.number().int().positive().optional(),
+    website: z.coerce.number().int().positive().optional(),
+
+    deleteStatus: z.enum(["0", "1"]).optional(),
+    tlStatus: z.enum(["0", "1", "2", "3"]).optional(),
+    tlRemarks: z.string().max(200).optional(),
+    rfqTo: z.string().max(15).optional(),
+    courierAddress: z.string().optional(),
+});
+
+const UpdateTenderInfoSchema = z.object({
+    team: z.coerce.number().int().positive("Team is required").optional(),
+    tenderNo: z.string().min(1, "Tender number is required").max(255).optional(),
+    organization: z.coerce.number().int().positive().optional(),
+    tenderName: z.string().min(1, "Tender name is required").max(255).optional(),
+    item: z.coerce.number().int().positive("Item is required").optional(),
+
+    gstValues: decimalField("GST value must be positive", false),
+    tenderFees: decimalField("Tender fees must be positive", false),
+    emd: decimalField("EMD must be positive", false),
+
+    teamMember: z.coerce.number().int().positive("Team member is required").optional(),
+    dueDate: z.string().min(1, "Due date is required").transform((val) => new Date(val)).optional(),
+
+    remarks: z.string().max(200).optional(),
+    status: z.coerce.number().int().min(0, "Invalid status").optional(),
+
+    location: z.coerce.number().int().positive().optional(),
+    website: z.coerce.number().int().positive().optional(),
+
+    deleteStatus: z.enum(["0", "1"]).optional(),
+    tlStatus: z.enum(["0", "1", "2", "3"]).optional(),
+    tlRemarks: z.string().max(200).optional(),
+    rfqTo: z.string().max(15).optional(),
+    courierAddress: z.string().optional(),
+});
+
+type CreateTenderDto = z.infer<typeof CreateTenderInfoSchema>;
+type UpdateTenderDto = z.infer<typeof UpdateTenderInfoSchema>;
+
+@Controller('tenders')
+export class TenderInfoController {
+    constructor(private readonly tenderInfosService: TenderInfosService) { }
+
+    @Get()
+    async list(
+        @Query('statusIds') statusIds?: string,
+        @Query('unallocated') unallocated?: string,
+    ) {
+        const toNumArray = (v?: string) =>
+            (v ?? '')
+                .split(',')
+                .map((s) => parseInt(s.trim(), 10))
+                .filter((n) => !Number.isNaN(n));
+
+        return this.tenderInfosService.findAll({
+            statusIds: toNumArray(statusIds),
+            unallocated: unallocated === 'true' || unallocated === '1',
+        });
+    }
+
+    @Get(':id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        const tender = await this.tenderInfosService.findById(id);
+        if (!tender) {
+            throw new NotFoundException(`Tender with ID ${id} not found`);
+        }
+        return tender;
+    }
+
+    @Post()
+    @HttpCode(HttpStatus.CREATED)
+    async create(@Body() body: unknown) {
+        const parsed = CreateTenderInfoSchema.parse(body);
+        return this.tenderInfosService.create(parsed);
+    }
+
+    @Patch(':id')
+    async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+        const parsed = UpdateTenderInfoSchema.parse(body);
+        return this.tenderInfosService.update(id, parsed);
+    }
+
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param('id', ParseIntPipe) id: number) {
+        await this.tenderInfosService.delete(id);
+    }
+}

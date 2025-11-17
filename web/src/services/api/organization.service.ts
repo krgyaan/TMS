@@ -22,9 +22,9 @@ class OrganizationsService extends BaseApiService {
         return this.patch<Organization>(`/${id}`, data);
     }
 
-    //   async delete(id: number): Promise<void> {
-    //     return this.delete<void>(`/${id}`);
-    //   }
+    async delete(id: number): Promise<void> {
+        await super.delete<void>(`/${id}`);
+    }
 
     //   async search(query: string): Promise<Organization[]> {
     //     return this.get<Organization[]>('/search', { params: { q: query } });

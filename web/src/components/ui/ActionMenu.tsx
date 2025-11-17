@@ -1,6 +1,7 @@
 import { EllipsisVertical } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
-import { createPortal } from "react-dom"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export type ActionItem<T = any> = {
     label: string
@@ -15,81 +16,26 @@ type Props<T> = {
 }
 
 export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => {
-    const [open, setOpen] = useState(false)
-    const triggerRef = useRef<HTMLButtonElement>(null)
-    const menuRef = useRef<HTMLDivElement>(null)
-    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node
-            if (
-                (menuRef.current && menuRef.current.contains(target)) ||
-                (triggerRef.current && triggerRef.current.contains(target))
-            ) {
-                return
-            }
-            setOpen(false)
-        }
-        document.addEventListener("mousedown", handleClickOutside)
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside)
-        }
-    }, [])
-
-    useEffect(() => {
-        const updatePos = () => {
-            if (!triggerRef.current) return
-            const rect = triggerRef.current.getBoundingClientRect()
-            // Align right edge of menu (10rem width) with trigger's right
-            const width = 160 // w-40 (10rem) assuming 16px root font-size
-            const top = rect.bottom + 8 // ~ mt-2 spacing
-            const left = rect.right - width
-            setMenuPos({ top, left })
-        }
-        if (open) {
-            updatePos()
-            window.addEventListener("scroll", updatePos, true)
-            window.addEventListener("resize", updatePos)
-        }
-        return () => {
-            window.removeEventListener("scroll", updatePos, true)
-            window.removeEventListener("resize", updatePos)
-        }
-    }, [open])
-
     return (
-        <div className="h-full w-full flex items-center">
-            <button
-                ref={triggerRef}
-                onClick={() => setOpen((prev) => !prev)}
-                className="cursor-pointer"
-            >
-                <EllipsisVertical />
-            </button>
-
-            {open && menuPos &&
-                createPortal(
-                    <div
-                        ref={menuRef}
-                        className="z-50 w-40 border rounded shadow bg-accent"
-                        style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <EllipsisVertical className="h-4 w-4" />
+                    <span className="sr-only">Open row actions</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={4} className="w-40">
+                {actions.map((action, idx) => (
+                    <DropdownMenuItem
+                        key={`${action.label}-${idx}`}
+                        className={cn('flex items-center gap-2', action.className)}
+                        onClick={() => action.onClick(rowData)}
                     >
-                        {actions.map((action, idx) => (
-                            <button
-                                key={idx}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${action.className || ""}`}
-                                onClick={() => {
-                                    setOpen(false)
-                                    action.onClick(rowData)
-                                }}
-                            >
-                                {action.label}
-                            </button>
-                        ))}
-                    </div>,
-                    document.body
-                )}
-        </div>
+                        {action.icon ? <span className="text-muted-foreground">{action.icon}</span> : null}
+                        {action.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
     )
 }

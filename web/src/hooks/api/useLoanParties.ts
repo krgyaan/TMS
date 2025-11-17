@@ -46,7 +46,7 @@ export const useCreateLoanParty = () => {
         mutationFn: (data: CreateLoanPartyDto) => loanPartiesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
-            toast.success('Lead Type created successfully');
+            toast.success('Loan Party created successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
@@ -64,7 +64,7 @@ export const useUpdateLoanParty = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.detail(variables.id) });
-            toast.success('Lead Type updated successfully');
+            toast.success('Loan Party updated successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
@@ -80,7 +80,7 @@ export const useUpdateLoanParty = () => {
 //         mutationFn: (id: number) => loanPartiesService.delete(id),
 //         onSuccess: () => {
 //             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
-//             toast.success('Lead Type deleted successfully');
+//             toast.success('Loan Party deleted successfully');
 //         },
 //         onError: (error) => {
 //             toast.error(handleQueryError(error));

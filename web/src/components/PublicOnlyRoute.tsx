@@ -6,10 +6,10 @@ export default function PublicOnlyRoute() {
     const authenticated = isAuthenticated()
     const user = getStoredUser()
 
-    console.log("🔍 PublicOnlyRoute check:")
-    console.log("  - Location:", location.pathname)
+    // console.log("🔍 PublicOnlyRoute check:")
+    // console.log("  - Location:", location.pathname)
     console.log("  - Authenticated:", authenticated)
-    console.log("  - User:", user)
+    // console.log("  - User:", user)
 
     if (authenticated && user) {
         const redirectTo = (location.state as any)?.from?.pathname || "/"

@@ -1,85 +1,118 @@
-import { Button } from "@/components/ui/button"
+﻿import { useState, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 import {
     Card,
     CardAction,
     CardContent,
     CardDescription,
     CardHeader,
-    CardTitle
-} from "@/components/ui/card"
-import DataTable from "@/components/ui/data-table"
-import type { ColDef, RowSelectionOptions } from "ag-grid-community"
-import { useState } from "react"
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer"
-import type { ActionItem } from "@/components/ui/ActionMenu"
-import { NavLink, useNavigate } from "react-router-dom"
-import { paths } from "@/app/routes/paths"
-import { useStatuses } from "@/hooks/api/useStatuses"
-import type { User } from "@/types/api.types"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+    CardTitle,
+} from '@/components/ui/card'
+import DataTable from '@/components/ui/data-table'
+import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
+import type { ActionItem } from '@/components/ui/ActionMenu'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { paths } from '@/app/routes/paths'
+import { useStatuses, useDeleteStatus } from '@/hooks/api/useStatuses'
+import type { Status } from '@/types/api.types'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
 
 const rowSelection: RowSelectionOptions = {
-    mode: "multiRow",
+    mode: 'multiRow',
     headerCheckbox: false,
 }
 
-const StatusPage = () => {
-    // Use React Query hooks
-    const { data: Statuses, isLoading, error, refetch } = useStatuses()
-    // const deleteStatus = useDeleteStatus()
-    const navigate = useNavigate()
+const formatDate = (value?: string | null) => {
+    if (!value) {
+        return '—'
+    }
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
+}
 
-    // Status actions with delete mutation
-    const StatusActions: ActionItem<User>[] = [
+const DetailItem = ({ label, children }: { label: string; children: ReactNode }) => (
+    <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-sm font-semibold text-foreground/90">{children}</p>
+    </div>
+)
+
+const StatusPage = () => {
+    const navigate = useNavigate()
+    const { data: statuses, isLoading, error, refetch } = useStatuses()
+    const deleteStatus = useDeleteStatus()
+
+    const [viewState, setViewState] = useState<{ open: boolean; data: Status | null }>({
+        open: false,
+        data: null,
+    })
+
+    const statusActions: ActionItem<Status>[] = [
         {
-            label: "Edit",
-            onClick: (row) => {
-                console.log("Edit", row)
-                navigate(paths.master.statuses_edit(row.id));
-            },
+            label: 'View',
+            onClick: (row) => setViewState({ open: true, data: row }),
         },
         {
-            label: "Delete",
-            className: "text-red-600",
+            label: 'Edit',
+            onClick: (row) => navigate(paths.master.statuses_edit(row.id)),
+        },
+        {
+            label: 'Delete',
+            className: 'text-red-600',
             onClick: async (row) => {
-                if (confirm(`Are you sure you want to delete ${row.name}?`)) {
-                    try {
-                        // await deleteStatus.mutateAsync(row.id)
-                    } catch (error) {
-                        // Error is already handled by the hook with toast
-                        console.error('Delete failed:', error)
-                    }
+                if (!confirm(`Delete status "${row.name}"?`)) {
+                    return
+                }
+                try {
+                    await deleteStatus.mutateAsync(row.id)
+                } catch (err) {
+                    console.error('Delete failed', err)
                 }
             },
         },
     ]
 
-    const [colDefs] = useState<ColDef[]>([
-        { field: "id", headerName: "ID", width: 10 },
-        { field: "name", headerName: "Status", flex: 1 },
-        { field: "tenderCategory", headerName: "Category", flex: 1 },
+    const colDefs: ColDef<Status>[] = [
+        { field: 'id', headerName: 'ID', width: 80 },
+        { field: 'name', headerName: 'Status', flex: 1 },
         {
-            field: "status", headerName: "Status", flex: 1,
+            field: 'tenderCategory',
+            headerName: 'Tender Category',
+            flex: 1,
+            valueGetter: (params) => params.data?.tenderCategory || '—',
+        },
+        {
+            field: 'status',
+            headerName: 'State',
+            flex: 0.6,
             cellRenderer: (params: any) => (
-                <span className={params.value ? 'text-green-600' : 'text-red-600'}>
+                <Badge variant={params.value ? 'default' : 'secondary'}>
                     {params.value ? 'Active' : 'Inactive'}
-                </span>
+                </Badge>
             ),
         },
         {
-            headerName: "Actions",
-            field: "actions",
+            headerName: 'Actions',
+            field: 'actions',
             filter: false,
-            cellRenderer: createActionColumnRenderer(StatusActions),
+            cellRenderer: createActionColumnRenderer(statusActions),
             sortable: false,
-            pinned: "right",
-            width: 100
+            pinned: 'right',
+            width: 120,
         },
-    ])
+    ]
 
-    // Loading state
     if (isLoading) {
         return (
             <Card>
@@ -94,25 +127,19 @@ const StatusPage = () => {
         )
     }
 
-    // Error state
     if (error) {
         return (
             <Card>
                 <CardHeader>
                     <CardTitle>Status</CardTitle>
-                    <CardDescription>List of all Status</CardDescription>
+                    <CardDescription>List of all status records</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Error loading Status: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            Error loading statuses: {error.message}
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -123,36 +150,69 @@ const StatusPage = () => {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Status</CardTitle>
-                <CardDescription>List of all Status</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.statuses_create}>
-                            Add New Status
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={Statuses || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteStatus.isPending}
-                    gridOptions={{
-                        defaultColDef: { editable: true, filter: true },
-                        rowSelection,
-                        pagination: true,
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log("Row Selected!", rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Status</CardTitle>
+                    <CardDescription>Manage tender statuses and their categories</CardDescription>
+                    <CardAction>
+                        <Button variant="default" asChild>
+                            <NavLink to={paths.master.statuses_create}>Add New Status</NavLink>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={statuses || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: { editable: false, filter: true },
+                            rowSelection,
+                            pagination: true,
+                        }}
+                        enablePagination
+                        enableRowSelection
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Row Selected!', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+
+            <Dialog
+                open={viewState.open}
+                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
+            >
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{viewState.data?.name}</DialogTitle>
+                        <DialogDescription>
+                            Tender status details and metadata
+                        </DialogDescription>
+                    </DialogHeader>
+                    {viewState.data ? (
+                        <div className="space-y-6">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <DetailItem label="Status">
+                                    <Badge variant={viewState.data.status ? 'default' : 'secondary'}>
+                                        {viewState.data.status ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </DetailItem>
+                                <DetailItem label="Tender Category">
+                                    {viewState.data.tenderCategory || '—'}
+                                </DetailItem>
+                                <DetailItem label="Created">
+                                    {formatDate(viewState.data.createdAt)}
+                                </DetailItem>
+                                <DetailItem label="Updated">
+                                    {formatDate(viewState.data.updatedAt)}
+                                </DetailItem>
+                            </div>
+                        </div>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }
 
