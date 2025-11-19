@@ -579,17 +579,17 @@ export interface TenderInfoSheet {
     paymentTermsSupply: number | null;
     paymentTermsInstallation: number | null;
 
-    pbgForm: string | null;
+    pbgForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
     pbgPercentage: number | null;
     pbgDurationMonths: number | null;
 
-    sdForm: string | null;
+    sdForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
     securityDepositPercentage: number | null;
     sdDurationMonths: number | null;
 
     bidValidityDays: number | null;
-    commercialEvaluation: string | null;
-    mafRequired: string | null;
+    commercialEvaluation: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
+    mafRequired: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
 
     deliveryTimeSupply: number | null;
     deliveryTimeInstallationInclusive: boolean;
@@ -598,7 +598,7 @@ export interface TenderInfoSheet {
     ldPercentagePerWeek: number | null;
     maxLdPercentage: number | null;
 
-    physicalDocsRequired: string | null;
+    physicalDocsRequired: 'YES' | 'NO' | null;
     physicalDocsDeadline: string | null;
 
     techEligibilityAgeYears: number | null;
@@ -606,16 +606,16 @@ export interface TenderInfoSheet {
     orderValue2: number | null;
     orderValue3: number | null;
 
-    avgAnnualTurnoverCriteria: string | null;
+    avgAnnualTurnoverCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
     avgAnnualTurnoverValue: number | null;
 
-    workingCapitalCriteria: string | null;
+    workingCapitalCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
     workingCapitalValue: number | null;
 
-    solvencyCertificateCriteria: string | null;
+    solvencyCertificateCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
     solvencyCertificateValue: number | null;
 
-    netWorthCriteria: string | null;
+    netWorthCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
     netWorthValue: number | null;
 
     clientOrganization: string | null;
@@ -632,7 +632,7 @@ export interface TenderInfoSheet {
 }
 
 export interface SaveTenderInfoSheetDto {
-    teRecommendation: string;
+    teRecommendation: 'YES' | 'NO';
     teRejectionReason: number | null;
     teRejectionRemarks: string | null;
 
@@ -642,10 +642,10 @@ export interface SaveTenderInfoSheetDto {
     tenderFeeAmount: number | null;
     tenderFeeModes: string[] | null;
 
-    emdRequired: string | null;
+    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
     emdModes: string[] | null;
 
-    reverseAuctionApplicable: string | null;
+    reverseAuctionApplicable: 'YES' | 'NO' | null;
     paymentTermsSupply: number | null;
     paymentTermsInstallation: number | null;
 
@@ -668,7 +668,7 @@ export interface SaveTenderInfoSheetDto {
     ldPercentagePerWeek: number | null;
     maxLdPercentage: number | null;
 
-    physicalDocsRequired: string | null;
+    physicalDocsRequired: 'YES' | 'NO' | null;
     physicalDocsDeadline: string | null;
 
     techEligibilityAgeYears: number | null;
