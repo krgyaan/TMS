@@ -101,7 +101,6 @@ const OrganizationPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             cellRenderer: createActionColumnRenderer(organizationActions),
             sortable: false,

@@ -22,9 +22,9 @@ class ItemsService extends BaseApiService {
         return this.patch<Item>(`/${id}`, data)
     }
 
-    async delete(id: number): Promise<void> {
-        await super.delete<void>(`/${id}`)
-    }
+    // async delete(id: number): Promise<void> {
+    //     await super.delete<void>(`/${id}`)
+    // }
 }
 
 export const itemsService = new ItemsService()

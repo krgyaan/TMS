@@ -22,9 +22,9 @@ class UsersService extends BaseApiService {
         return this.patch<User>(`/${id}`, data)
     }
 
-    async delete(id: number): Promise<void> {
-        await super.delete<void>(`/${id}`)
-    }
+    // async delete(id: number): Promise<void> {
+    //     await super.delete<void>(`/${id}`)
+    // }
 }
 
 export const usersService = new UsersService()

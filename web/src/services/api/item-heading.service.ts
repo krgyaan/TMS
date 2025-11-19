@@ -22,9 +22,9 @@ class ItemHeadingsService extends BaseApiService {
         return this.patch<ItemHeading>(`/${id}`, data)
     }
 
-    async delete(id: number): Promise<void> {
-        await super.delete<void>(`/${id}`)
-    }
+    // async delete(id: number): Promise<void> {
+    //     await super.delete<void>(`/${id}`)
+    // }
 }
 
 export const itemHeadingsService = new ItemHeadingsService()

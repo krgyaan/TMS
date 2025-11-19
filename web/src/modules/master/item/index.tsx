@@ -104,7 +104,6 @@ const ItemPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             cellRenderer: createActionColumnRenderer(itemActions),
             sortable: false,
