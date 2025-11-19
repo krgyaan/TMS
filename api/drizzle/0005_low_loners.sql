@@ -17,4 +17,3 @@ ALTER TABLE "vendors" ADD CONSTRAINT "vendors_organization_id_vendor_organizatio
 ALTER TABLE "vendor_accs" ADD CONSTRAINT "vendor_accs_org_vendor_organizations_id_fk" FOREIGN KEY ("org") REFERENCES "public"."vendor_organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_files" ADD CONSTRAINT "vendor_files_vendor_id_vendors_id_fk" FOREIGN KEY ("vendor_id") REFERENCES "public"."vendors"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_gsts" ADD CONSTRAINT "vendor_gsts_org_vendor_organizations_id_fk" FOREIGN KEY ("org") REFERENCES "public"."vendor_organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "vendors" DROP COLUMN "mobile";
