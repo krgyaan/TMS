@@ -63,7 +63,7 @@ export const useDeleteStatus = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => statusesService.delete(id),
+        mutationFn: (id: number) => statusesService.deleteStatus(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: statusKey.lists() })
             toast.success('Status deleted successfully')

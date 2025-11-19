@@ -63,7 +63,7 @@ export const useDeleteLocation = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => locationsService.delete(id),
+        mutationFn: (id: number) => locationsService.deleteLocation(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: locationKey.lists() })
             toast.success('Location deleted successfully')

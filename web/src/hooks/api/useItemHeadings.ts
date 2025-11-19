@@ -63,7 +63,7 @@ export const useDeleteItemHeading = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => itemHeadingsService.delete(id),
+        mutationFn: (id: number) => itemHeadingsService.deleteItemHeading(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: itemHeadingKey.lists() })
             toast.success('Item heading deleted successfully')

@@ -63,7 +63,7 @@ export const useDeleteUser = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => usersService.delete(id),
+        mutationFn: (id: number) => usersService.deleteUser(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
             toast.success('User deleted successfully')
