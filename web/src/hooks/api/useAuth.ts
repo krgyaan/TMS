@@ -27,7 +27,11 @@ export const useLogin = () => {
         mutationFn: ({ email, password }: { email: string; password: string }) =>
             authService.login(email, password),
         onSuccess: (data) => {
-            setStoredUser(data.user)
+            setStoredUser({
+                ...data.user,
+                designation: data.user.designation?.name || undefined,
+                team: data.user.team?.name || undefined,
+            })
             queryClient.setQueryData(authKeys.currentUser, data.user)
 
             toast.success(`Welcome back, ${data.user.name}!`)
@@ -57,7 +61,11 @@ export const useGoogleCallback = () => {
     return useMutation({
         mutationFn: (code: string) => authService.googleCallback(code),
         onSuccess: (data) => {
-            setStoredUser(data.user)
+            setStoredUser({
+                ...data.user,
+                designation: data.user.designation?.name || undefined,
+                team: data.user.team?.name || undefined,
+            })
             queryClient.setQueryData(authKeys.currentUser, data.user)
 
             console.log('✅ Google login success, redirecting to /')

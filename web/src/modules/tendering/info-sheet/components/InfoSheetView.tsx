@@ -150,7 +150,7 @@ export const InfoSheetView = ({
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Tender Fee Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.tenderFeeMode)}</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.tenderFeeModes?.map((mode) => mode).join(", "))}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">EMD Required</p>
@@ -158,7 +158,7 @@ export const InfoSheetView = ({
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">EMD Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.emdMode)}</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.emdModes?.map((mode) => mode).join(", "))}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Reverse Auction</p>
@@ -180,7 +180,7 @@ export const InfoSheetView = ({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <p className="text-xs text-muted-foreground">PBG Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.pbgRequired)}</p>
+                            <p className="text-base font-semibold">{formatYesNo(infoSheet.pbgForm)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">PBG Percentage</p>
@@ -192,7 +192,7 @@ export const InfoSheetView = ({
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Security Deposit Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.securityDepositMode)}</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.sdForm)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Security Deposit %</p>
@@ -208,18 +208,6 @@ export const InfoSheetView = ({
                 <section className="space-y-4">
                     <h3 className="font-semibold text-base border-b pb-2">Eligibility Summary</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground">Technical Eligibility</p>
-                            <Badge variant={infoSheet.technicalEligible ? "default" : "secondary"}>
-                                {infoSheet.technicalEligible ? "Eligible" : "Not Eligible"}
-                            </Badge>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Financial Eligibility</p>
-                            <Badge variant={infoSheet.financialEligible ? "default" : "secondary"}>
-                                {infoSheet.financialEligible ? "Eligible" : "Not Eligible"}
-                            </Badge>
-                        </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Company Age (Years)</p>
                             <p className="text-base font-semibold">{formatValue(infoSheet.techEligibilityAgeYears)}</p>
@@ -252,15 +240,11 @@ export const InfoSheetView = ({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <p className="text-xs text-muted-foreground mb-2">Technical Documents</p>
-                            {formatDocuments(infoSheet.technicalDocuments)}
+                            {formatDocuments(infoSheet.technicalWorkOrders)}
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground mb-2">Financial Documents</p>
-                            {formatDocuments(infoSheet.financialDocuments)}
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground mb-2">PQC Documents</p>
-                            {formatDocuments(infoSheet.pqcDocuments)}
+                            {formatDocuments(infoSheet.commercialDocuments)}
                         </div>
                     </div>
                 </section>

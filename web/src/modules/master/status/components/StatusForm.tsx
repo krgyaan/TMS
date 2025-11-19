@@ -40,7 +40,7 @@ export const StatusForm = ({ mode, status }: StatusFormProps) => {
     const [customCategory, setCustomCategory] = useState(false)
 
     const form = useForm<StatusFormValues>({
-        resolver: zodResolver(StatusFormSchema),
+        resolver: zodResolver(StatusFormSchema) as any,
         defaultValues: {
             name: '',
             tenderCategory: '',
@@ -107,9 +107,9 @@ export const StatusForm = ({ mode, status }: StatusFormProps) => {
         }
 
         if (mode === 'create') {
-            await createStatus.mutateAsync(payload)
+            await createStatus.mutateAsync(payload as any)
         } else if (status) {
-            await updateStatus.mutateAsync({ id: status.id, data: payload })
+            await updateStatus.mutateAsync({ id: status.id, data: payload as any })
         }
 
         navigate(paths.master.statuses)

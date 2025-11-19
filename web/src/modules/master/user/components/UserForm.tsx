@@ -103,7 +103,7 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
     const { data: designations = [] } = useDesignations()
 
     const form = useForm<UserFormValues>({
-        resolver: zodResolver(UserFormSchema),
+        resolver: zodResolver(UserFormSchema) as any,
         defaultValues: {
             name: '',
             email: '',
@@ -278,23 +278,24 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
                             <FieldWrapper control={form.control} name="name" label="Full Name">
-                                {(field) => <Input placeholder="Enter full name" {...field} />}
+                                {(field) => <Input placeholder="Enter full name" {...field as any} value={field.value ?? ''} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="email" label="Email">
-                                {(field) => <Input type="email" placeholder="name@company.com" {...field} />}
+                                {(field) => <Input type="email" placeholder="name@company.com" {...field as any} value={field.value ?? ''} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="username" label="Username (optional)">
-                                {(field) => <Input placeholder="Username" {...field} />}
+                                {(field) => <Input placeholder="Username" {...field as any} value={field.value ?? ''} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="mobile" label="Mobile (optional)">
-                                {(field) => <Input placeholder="Phone number" {...field} />}
+                                {(field) => <Input placeholder="Phone number" {...field as any} value={field.value ?? ''} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="password" label="Password">
                                 {(field) => (
                                     <Input
                                         type="password"
                                         placeholder={mode === 'edit' ? 'Leave blank to keep current password' : 'Minimum 6 characters'}
-                                        {...field}
+                                        {...field as any}
+                                        value={field.value ?? ''}
                                     />
                                 )}
                             </FieldWrapper>
