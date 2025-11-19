@@ -15,6 +15,8 @@ import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { Badge } from '@/components/ui/badge';
 import {
     Accordion,
     AccordionContent,
@@ -44,6 +46,7 @@ import {
     dummyFinancialDocuments,
 } from '@/constants/tenderInfoOptions';
 import { TenderView } from '../../tenders/components/TenderView';
+import { infoSheetFieldOptions } from '@/constants/tenderApprovalOptions';
 
 // Zod Schema
 const TenderInformationFormSchema = z.object({
@@ -351,6 +354,14 @@ const buildDefaultValues = (): FormValues => ({
     teRemark: '',
 });
 
+const IncompleteFieldAlert = ({ comment }: { comment: string }) => (
+    <div className="mt-2 space-y-1">
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+            <strong>TL Said:</strong> {comment}
+        </p>
+    </div>
+);
+
 export function TenderInformationForm({
     tenderId,
     tender,
@@ -360,7 +371,7 @@ export function TenderInformationForm({
     isInfoSheetLoading,
 }: TenderInformationFormProps) {
     const navigate = useNavigate();
-
+    const { data: approvalData } = useTenderApproval(tenderId);
     const initialFormValues = useMemo(() => {
         return mapInitialDataToForm(initialData ?? null);
     }, [initialData]);
@@ -378,6 +389,14 @@ export function TenderInformationForm({
         control: form.control,
         name: 'clients',
     });
+
+    const isIncomplete = approvalData?.tlStatus === '3';
+    const incompleteFields = approvalData?.incompleteFields || [];
+
+    const getIncompleteFieldComment = (fieldName: string): string | null => {
+        const field = incompleteFields.find(f => f.fieldName === fieldName);
+        return field?.comment || null;
+    };
 
     // Watch for conditional fields
     const teRecommendation = form.watch('teRecommendation');
@@ -403,7 +422,7 @@ export function TenderInformationForm({
                 await updateInfoSheet.mutateAsync({ tenderId, data: payload });
             }
 
-            navigate(paths.tendering.tenderView(tenderId));
+            navigate(paths.tendering.tenderApproval);
         } catch (error) {
             console.error('Form submission error:', error);
         }
@@ -483,6 +502,28 @@ export function TenderInformationForm({
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
+                {isIncomplete && incompleteFields.length > 0 && (
+                    <Alert className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <div className="space-y-2">
+                                <p className="font-semibold">
+                                    This info sheet has been marked as incomplete by the TL.
+                                </p>
+                                <p className="text-sm">
+                                    Please review and correct the following {incompleteFields.length} field(s) marked below:
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {incompleteFields.map((field, idx) => (
+                                        <Badge key={idx} variant="outline" className="border-amber-600">
+                                            {infoSheetFieldOptions.find((opt: { value: string }) => opt.value === field.fieldName)?.label || field.fieldName}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
                         <div className="space-y-8 pt-4">
@@ -1005,7 +1046,7 @@ export function TenderInformationForm({
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 space-y-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <MultiSelectField
                                             control={form.control}
                                             name="technicalWorkOrders"
@@ -1020,6 +1061,12 @@ export function TenderInformationForm({
                                             options={dummyFinancialDocuments}
                                             placeholder="Select documents"
                                         />
+                                        {getIncompleteFieldComment('financialDocuments') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('financialDocuments')!} />
+                                        )}
+                                        {getIncompleteFieldComment('commercialDocuments') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialDocuments')!} />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1126,6 +1173,12 @@ export function TenderInformationForm({
                                             />
                                         )}
                                     </FieldWrapper>
+                                    {getIncompleteFieldComment('teRemark') && (
+                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
+                                    )}
+                                    {getIncompleteFieldComment('courierAddress') && (
+                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
+                                    )}
                                 </div>
                             </div>
                         </div>

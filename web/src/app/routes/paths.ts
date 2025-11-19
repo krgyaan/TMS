@@ -24,6 +24,7 @@
         infoSheetCreate: (tenderId: number | string) => `/tendering/info-sheet/create/${tenderId}`,
         infoSheetEdit: (tenderId: number | string) => `/tendering/info-sheet/edit/${tenderId}`,
         tenderApproval: '/tendering/tender-approval',
+        tenderApprovalCreate: (tenderId: number | string) => `/tendering/tender-approval/create/${tenderId}`,
         phydocs: '/tendering/phydocs',
         rfqs: '/tendering/rfqs',
         emdsTenderFees: '/tendering/emds-tenderfees',

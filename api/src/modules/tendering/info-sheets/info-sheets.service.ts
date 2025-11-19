@@ -7,8 +7,8 @@ import {
     tenderClients,
     tenderTechnicalDocuments,
     tenderFinancialDocuments,
-    type TenderInformation as TenderInformationRow,
-    type TenderClient as TenderClientRow,
+    type TenderInformation,
+    type TenderClient,
     type TenderTechnicalDocument,
     type TenderFinancialDocument,
 } from '../../../db/tender-info-sheet.schema';
@@ -104,12 +104,17 @@ export class TenderInfoSheetsService {
         private readonly tenderInfosService: TenderInfosService,
     ) { }
 
-    async findByTenderId(tenderId: number): Promise<TenderInfoSheetDetails> {
-        const [info] = await this.db
+    async findAll(): Promise<TenderInfoSheetDetails[]> {
+        const info = (await this.db.select().from(tenderInformation)) as unknown as TenderInformation[];
+        return info.map((info) => this.hydrateInfoSheet(info, [], [], []));
+    }
+
+    async findByTenderId(tenderId: number): Promise<TenderInfoSheetDetails | null> {
+        const [info] = (await this.db
             .select()
             .from(tenderInformation)
             .where(eq(tenderInformation.tenderId, tenderId))
-            .limit(1);
+            .limit(1)) as unknown as TenderInformation[];
 
         if (!info) {
             throw new NotFoundException('Info sheet not found');
@@ -143,7 +148,11 @@ export class TenderInfoSheetsService {
             await this.replaceDocuments(tx, tenderId, payload);
         });
 
-        return this.findByTenderId(tenderId);
+        const sheet = await this.findByTenderId(tenderId);
+        if (!sheet) {
+            throw new NotFoundException('Info sheet not found for this tender');
+        }
+        return sheet;
     }
 
     async update(tenderId: number, payload: TenderInfoSheetPayload): Promise<TenderInfoSheetDetails> {
@@ -168,7 +177,11 @@ export class TenderInfoSheetsService {
             await this.replaceDocuments(tx, tenderId, payload);
         });
 
-        return this.findByTenderId(tenderId);
+        const sheet = await this.findByTenderId(tenderId);
+        if (!sheet) {
+            throw new NotFoundException('Info sheet not found for this tender');
+        }
+        return sheet;
     }
 
     private async ensureTenderExists(tenderId: number) {
@@ -279,67 +292,58 @@ export class TenderInfoSheetsService {
     }
 
     private hydrateInfoSheet(
-        info: TenderInformationRow,
-        clients: TenderClientRow[],
+        info: TenderInformation,
+        clients: TenderClient[],
         technicalDocs: TenderTechnicalDocument[],
         financialDocs: TenderFinancialDocument[],
     ): TenderInfoSheetDetails {
-        const asNumber = (value: number | string | null | undefined) => {
-            if (value === null || value === undefined) return null;
-            if (typeof value === 'number') return value;
-            const parsed = Number(value);
-            return Number.isNaN(parsed) ? null : parsed;
-        };
-
-        const toIso = (value?: Date | null) => (value ? value.toISOString() : null);
-
         return {
             id: info.id,
             tenderId: info.tenderId,
-            teRecommendation: info.teRecommendation,
+            teRecommendation: info.teRecommendation as 'YES' | 'NO',
             teRejectionReason: info.teRejectionReason ?? null,
             teRejectionRemarks: info.teRejectionRemarks ?? null,
             teRemark: info.teFinalRemark ?? null,
-            processingFeeAmount: asNumber(info.processingFeeAmount),
+            processingFeeAmount: info.processingFeeAmount ? Number(info.processingFeeAmount) : null,
             processingFeeModes: info.processingFeeMode ?? null,
-            tenderFeeAmount: asNumber(info.tenderFeeAmount),
+            tenderFeeAmount: info.tenderFeeAmount ? Number(info.tenderFeeAmount) : null,
             tenderFeeModes: info.tenderFeeMode ?? null,
-            emdRequired: info.emdRequired ?? null,
+            emdRequired: info.emdRequired as 'YES' | 'NO' | 'EXEMPT' | null,
             emdModes: info.emdMode ?? null,
-            reverseAuctionApplicable: info.reverseAuctionApplicable ?? null,
-            paymentTermsSupply: asNumber(info.paymentTermsSupply),
-            paymentTermsInstallation: asNumber(info.paymentTermsInstallation),
+            reverseAuctionApplicable: info.reverseAuctionApplicable as 'YES' | 'NO' | null,
+            paymentTermsSupply: info.paymentTermsSupply ? Number(info.paymentTermsSupply) : null,
+            paymentTermsInstallation: info.paymentTermsInstallation ? Number(info.paymentTermsInstallation) : null,
             pbgForm: info.pbgInFormOf ?? null,
-            pbgPercentage: asNumber(info.pbgPercentage),
-            pbgDurationMonths: asNumber(info.pbgDurationMonths),
+            pbgPercentage: info.pbgPercentage ? Number(info.pbgPercentage) : null,
+            pbgDurationMonths: info.pbgDurationMonths ? Number(info.pbgDurationMonths) : null,
             sdForm: info.sdInFormOf ?? null,
-            securityDepositPercentage: asNumber(info.securityDepositPercentage),
-            sdDurationMonths: asNumber(info.sdDurationMonths),
-            bidValidityDays: asNumber(info.bidValidityDays),
+            securityDepositPercentage: info.securityDepositPercentage ? Number(info.securityDepositPercentage) : null,
+            sdDurationMonths: info.sdDurationMonths ? Number(info.sdDurationMonths) : null,
+            bidValidityDays: info.bidValidityDays ? Number(info.bidValidityDays) : null,
             commercialEvaluation: info.commercialEvaluation ?? null,
             mafRequired: info.mafRequired ?? null,
-            deliveryTimeSupply: asNumber(info.deliveryTimeSupply),
+            deliveryTimeSupply: info.deliveryTimeSupply ? Number(info.deliveryTimeSupply) : null,
             deliveryTimeInstallationInclusive: info.deliveryTimeInstallationInclusive ?? false,
-            deliveryTimeInstallation: asNumber(info.deliveryTimeInstallationDays),
-            ldPercentagePerWeek: asNumber(info.ldPercentagePerWeek),
-            maxLdPercentage: asNumber(info.maxLdPercentage),
-            physicalDocsRequired: info.physicalDocsRequired ?? null,
-            physicalDocsDeadline: toIso(info.physicalDocsDeadline),
-            techEligibilityAgeYears: asNumber(info.techEligibilityAgeYears),
-            orderValue1: asNumber(info.orderValue1),
-            orderValue2: asNumber(info.orderValue2),
-            orderValue3: asNumber(info.orderValue3),
+            deliveryTimeInstallation: info.deliveryTimeInstallationDays ? Number(info.deliveryTimeInstallationDays) : null,
+            ldPercentagePerWeek: info.ldPercentagePerWeek ? Number(info.ldPercentagePerWeek) : null,
+            maxLdPercentage: info.maxLdPercentage ? Number(info.maxLdPercentage) : null,
+            physicalDocsRequired: info.physicalDocsRequired as 'YES' | 'NO' | null,
+            physicalDocsDeadline: info.physicalDocsDeadline ? info.physicalDocsDeadline.toISOString() : null,
+            techEligibilityAgeYears: info.techEligibilityAgeYears ? Number(info.techEligibilityAgeYears) : null,
+            orderValue1: info.orderValue1 ? Number(info.orderValue1) : null,
+            orderValue2: info.orderValue2 ? Number(info.orderValue2) : null,
+            orderValue3: info.orderValue3 ? Number(info.orderValue3) : null,
             avgAnnualTurnoverCriteria: info.avgAnnualTurnoverType ?? null,
-            avgAnnualTurnoverValue: asNumber(info.avgAnnualTurnoverValue),
+            avgAnnualTurnoverValue: info.avgAnnualTurnoverValue ? Number(info.avgAnnualTurnoverValue) : null,
             workingCapitalCriteria: info.workingCapitalType ?? null,
-            workingCapitalValue: asNumber(info.workingCapitalValue),
+            workingCapitalValue: info.workingCapitalValue ? Number(info.workingCapitalValue) : null,
             solvencyCertificateCriteria: info.solvencyCertificateType ?? null,
-            solvencyCertificateValue: asNumber(info.solvencyCertificateValue),
+            solvencyCertificateValue: info.solvencyCertificateValue ? Number(info.solvencyCertificateValue) : null,
             netWorthCriteria: info.netWorthType ?? null,
-            netWorthValue: asNumber(info.netWorthValue),
+            netWorthValue: info.netWorthValue ? Number(info.netWorthValue) : null,
             clientOrganization: info.clientOrganisation ?? null,
             courierAddress: info.courierAddress ?? null,
-            rejectionRemark: info.rejectionRemark ?? null,
+            rejectionRemark: info.teRejectionRemarks ?? null,
             clients: clients.map((client) => ({
                 id: client.id,
                 clientName: client.clientName ?? null,
@@ -349,8 +353,8 @@ export class TenderInfoSheetsService {
             })),
             technicalWorkOrders: technicalDocs.map((doc) => doc.documentName),
             commercialDocuments: financialDocs.map((doc) => doc.documentName),
-            createdAt: toIso(info.createdAt) ?? new Date().toISOString(),
-            updatedAt: toIso(info.updatedAt) ?? new Date().toISOString(),
+            createdAt: info.createdAt.toISOString(),
+            updatedAt: info.updatedAt.toISOString(),
         };
     }
 }

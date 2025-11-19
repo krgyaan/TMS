@@ -171,4 +171,67 @@ export class TenderInfosService {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
     }
+
+    getApprovalData(tender: TenderInfoWithNames) {
+        const rfqToNumbers = tender.rfqTo
+            ? tender.rfqTo.split(',').map(Number)
+            : [];
+
+        return {
+            id: tender.id,
+            tenderId: tender.id,
+            tlStatus: tender.tlStatus as '0' | '1' | '2' | '3' | null,
+            rfqTo: rfqToNumbers,
+            tenderFeeMode: tender.tenderFeeMode ?? null,
+            emdMode: tender.emdMode ?? null,
+            approvePqrSelection: tender.approvePqrSelection ?? null,
+            approveFinanceDocSelection: tender.approveFinanceDocSelection ?? null,
+            tenderApprovalStatus: tender.tenderApprovalStatus ?? null,
+            oemNotAllowed: tender.oemNotAllowed ?? null,
+            tlRejectionRemarks: tender.tlRejectionRemarks ?? null,
+            createdAt: tender.createdAt,
+            updatedAt: tender.updatedAt,
+        };
+    }
+
+    async updateApproval(
+        id: number,
+        data: {
+            tlStatus: '0' | '1' | '2' | '3';
+            rfqTo?: string;
+            tenderFeeMode?: string;
+            emdMode?: string;
+            approvePqrSelection?: string;
+            approveFinanceDocSelection?: string;
+            tenderApprovalStatus?: string;
+            oemNotAllowed?: string;
+            tlRejectionRemarks?: string;
+        }
+    ): Promise<TenderInfo> {
+        const updateData: Partial<NewTenderInfo> = {
+            tlStatus: data.tlStatus ?? null,
+            rfqTo: data.rfqTo ?? null,
+            tenderFeeMode: data.tenderFeeMode ?? null,
+            emdMode: data.emdMode ?? null,
+            approvePqrSelection: data.approvePqrSelection ?? null,
+            approveFinanceDocSelection: data.approveFinanceDocSelection ?? null,
+            tenderApprovalStatus: data.tenderApprovalStatus ?? null,
+            oemNotAllowed: data.oemNotAllowed ?? null,
+            tlRejectionRemarks: data.tlRejectionRemarks ?? null,
+        };
+
+        // Clear YES decision fields if decision is NO
+        if (data.tlStatus === '0') {
+            updateData.rfqTo = null;
+            updateData.tenderFeeMode = null;
+            updateData.emdMode = null;
+            updateData.approvePqrSelection = null;
+            updateData.approveFinanceDocSelection = null;
+            updateData.tenderApprovalStatus = null;
+            updateData.oemNotAllowed = null;
+            updateData.tlRejectionRemarks = null;
+        }
+
+        return this.update(id, updateData);
+    }
 }

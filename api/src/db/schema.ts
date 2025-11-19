@@ -28,3 +28,4 @@ export * from './states.schema';
 export * from './websites.schema';
 export * from './tenders.schema';
 export * from './tender-info-sheet.schema';
+export * from './tender-incomplete-fields.schema';

@@ -1,32 +1,15 @@
 import {
     pgTable, serial, bigint, varchar, numeric, boolean,
-    timestamp, pgEnum, integer, text, index
+    timestamp, integer, text, index
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-
-export const yesNoEnum = pgEnum("yes_no", ["YES", "NO"]);
-export const emdRequiredEnum = pgEnum("emd_required", ["YES", "NO", "EXEMPT"]);
-
-export const commercialEvaluationEnum = pgEnum("commercial_evaluation_type", [
-    "ITEM_WISE_GST_INCLUSIVE",
-    "ITEM_WISE_PRE_GST",
-    "OVERALL_GST_INCLUSIVE",
-    "OVERALL_PRE_GST"
-]);
-
-export const mafRequiredEnum = pgEnum("maf_required_type", ["YES_GENERAL", "YES_PROJECT_SPECIFIC", "NO"]);
-
-export const pbgSdFormEnum = pgEnum("pbg_sd_form", ["DD_DEDUCTION", "FDR", "PBG", "SB", "NA"]);
-
-export const commercialEligibilityTypeEnum = pgEnum("commercial_eligibility_type", ["NOT_APPLICABLE", "AMOUNT"]);
-export const commercialCapitalTypeEnum = pgEnum("commercial_capital_type", ["NOT_APPLICABLE", "POSITIVE", "AMOUNT"]);
 
 
 export const tenderInformation = pgTable("tender_information", {
     id: serial("id").primaryKey(),
     tenderId: bigint("tender_id", { mode: "number" }).notNull().unique(),
 
-    teRecommendation: yesNoEnum("te_recommendation").notNull(),
+    teRecommendation: varchar("te_recommendation", { length: 5 }).notNull(),
     teRejectionReason: integer("te_rejection_reason"),
     teRejectionRemarks: text("te_rejection_remarks"),
 
@@ -35,32 +18,32 @@ export const tenderInformation = pgTable("tender_information", {
     tenderFeeAmount: numeric("tender_fee_amount", { precision: 12, scale: 2 }),
     tenderFeeMode: text("tender_fee_mode").array(),
 
-    emdRequired: emdRequiredEnum("emd_required"),
+    emdRequired: varchar("emd_required", { length: 10 }),
     emdMode: text("emd_mode").array(),
 
-    reverseAuctionApplicable: yesNoEnum("reverse_auction_applicable"),
+    reverseAuctionApplicable: varchar("reverse_auction_applicable", { length: 5 }),
     paymentTermsSupply: integer("payment_terms_supply"),
     paymentTermsInstallation: integer("payment_terms_installation"),
     bidValidityDays: integer("bid_validity_days"),
-    commercialEvaluation: commercialEvaluationEnum("commercial_evaluation"),
-    mafRequired: mafRequiredEnum("maf_required"),
+    commercialEvaluation: varchar("commercial_evaluation", { length: 50 }),
+    mafRequired: varchar("maf_required", { length: 30 }),
 
     deliveryTimeSupply: integer("delivery_time_supply"),
     deliveryTimeInstallationInclusive: boolean("delivery_time_installation_inclusive"),
     deliveryTimeInstallationDays: integer("delivery_time_installation_days"),
 
-    pbgInFormOf: pbgSdFormEnum("pbg_in_form_of"),
+    pbgInFormOf: varchar("pbg_in_form_of", { length: 20 }),
     pbgPercentage: numeric("pbg_percentage", { precision: 5, scale: 2 }),
     pbgDurationMonths: integer("pbg_duration_months"),
 
-    sdInFormOf: pbgSdFormEnum("sd_in_form_of"),
+    sdInFormOf: varchar("sd_in_form_of", { length: 20 }),
     securityDepositPercentage: numeric("security_deposit_percentage", { precision: 5, scale: 2 }),
     sdDurationMonths: integer("sd_duration_months"),
 
     ldPercentagePerWeek: numeric("ld_percentage_per_week", { precision: 5, scale: 2 }),
     maxLdPercentage: numeric("max_ld_percentage", { precision: 5, scale: 2 }),
 
-    physicalDocsRequired: yesNoEnum("physical_docs_required"),
+    physicalDocsRequired: varchar("physical_docs_required", { length: 5 }),
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
 
     techEligibilityAgeYears: integer("technical_eligibility_age_years"),
@@ -68,16 +51,16 @@ export const tenderInformation = pgTable("tender_information", {
     orderValue2: numeric("order_value_2", { precision: 12, scale: 2 }),
     orderValue3: numeric("order_value_3", { precision: 12, scale: 2 }),
 
-    avgAnnualTurnoverType: commercialEligibilityTypeEnum("avg_annual_turnover_type"),
+    avgAnnualTurnoverType: varchar("avg_annual_turnover_type", { length: 20 }),
     avgAnnualTurnoverValue: numeric("avg_annual_turnover_value", { precision: 12, scale: 2 }),
 
-    workingCapitalType: commercialCapitalTypeEnum("working_capital_type"),
+    workingCapitalType: varchar("working_capital_type", { length: 20 }),
     workingCapitalValue: numeric("working_capital_value", { precision: 12, scale: 2 }),
 
-    solvencyCertificateType: commercialEligibilityTypeEnum("solvency_certificate_type"),
+    solvencyCertificateType: varchar("solvency_certificate_type", { length: 20 }),
     solvencyCertificateValue: numeric("solvency_certificate_value", { precision: 12, scale: 2 }),
 
-    netWorthType: commercialCapitalTypeEnum("net_worth_type"),
+    netWorthType: varchar("net_worth_type", { length: 20 }),
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
     clientOrganisation: varchar("client_organisation", { length: 255 }),
@@ -151,3 +134,8 @@ export const tenderFinancialDocumentsRelations = relations(tenderFinancialDocume
         references: [tenderInformation.tenderId],
     }),
 }));
+
+export type TenderInformation = typeof tenderInformation.$inferSelect;
+export type TenderClient = typeof tenderClients.$inferSelect;
+export type TenderTechnicalDocument = typeof tenderTechnicalDocuments.$inferSelect;
+export type TenderFinancialDocument = typeof tenderFinancialDocuments.$inferSelect;

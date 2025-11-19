@@ -1,0 +1,222 @@
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { DRIZZLE } from '../../../db/database.module';
+import type { DbInstance } from '../../../db';
+import type { TenderApprovalPayload } from './dto/tender-approval.dto';
+import { tenderInfos } from 'src/db/tenders.schema';
+import { eq } from 'drizzle-orm';
+import { tenderInformation } from 'src/db/tender-info-sheet.schema';
+import { users } from 'src/db/users.schema';
+import { statuses } from 'src/db/statuses.schema';
+import { items } from 'src/db/items.schema';
+import { tenderIncompleteFields } from 'src/db/tender-incomplete-fields.schema';
+
+const TABS_NAMES = {
+    '0': 'Pending',
+    '1': 'Approved',
+    '2': 'Rejected',
+    '3': 'Incomplete',
+} as const;
+
+type TabCategory = (typeof TABS_NAMES)[keyof typeof TABS_NAMES];
+type TenderRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: Date;
+    status: number;
+    teamMemberName: string;
+    itemName: string;
+    statusName: string;
+    tlStatus: string | number;
+};
+
+@Injectable()
+export class TenderApprovalService {
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+    ) { }
+
+    async getAll(): Promise<Record<TabCategory, TenderRow[]>> {
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                item: tenderInfos.item,
+                gstValues: tenderInfos.gstValues,
+                tenderFees: tenderInfos.tenderFees,
+                emd: tenderInfos.emd,
+                teamMember: tenderInfos.teamMember,
+                dueDate: tenderInfos.dueDate,
+                status: tenderInfos.status,
+                tlStatus: tenderInfos.tlStatus,
+                teamMemberName: users.name,
+                itemName: items.name,
+                statusName: statuses.name,
+            })
+            .from(tenderInfos)
+            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
+            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .innerJoin(items, eq(tenderInfos.item, items.id))
+            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .orderBy(tenderInfos.dueDate) as unknown as TenderRow[];
+
+        const categorized: Record<TabCategory, TenderRow[]> = {
+            Pending: [],
+            Approved: [],
+            Rejected: [],
+            Incomplete: [],
+        };
+
+        for (const row of rows) {
+            const statusKey = row.tlStatus?.toString();
+            const category = TABS_NAMES[statusKey as keyof typeof TABS_NAMES] ?? 'Incomplete';
+            categorized[category].push(row);
+        }
+
+        // DEBUG: Category counts
+        console.log('🔍 Categorized:', Object.fromEntries(
+            Object.entries(categorized).map(([k, v]) => [k, v.length])
+        ));
+
+        return categorized;
+    }
+
+    async getByTenderId(tenderId: number) {
+        const result = await this.db
+            .select({
+                tlStatus: tenderInfos.tlStatus,
+                rfqTo: tenderInfos.rfqTo,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                emdMode: tenderInfos.emdMode,
+                approvePqrSelection: tenderInfos.approvePqrSelection,
+                approveFinanceDocSelection: tenderInfos.approveFinanceDocSelection,
+                tenderStatus: tenderInfos.status,
+                oemNotAllowed: tenderInfos.oemNotAllowed,
+                tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
+            })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        if (!result.length) {
+            return null;
+        }
+
+        const data = result[0];
+
+        const rfqToArray = data.rfqTo
+            ? data.rfqTo.split(',').map(Number).filter(n => !isNaN(n))
+            : [];
+
+        // Fetch incomplete fields
+        const incompleteFieldsResult = await this.db
+            .select({
+                id: tenderIncompleteFields.id,
+                fieldName: tenderIncompleteFields.fieldName,
+                comment: tenderIncompleteFields.comment,
+                status: tenderIncompleteFields.status,
+            })
+            .from(tenderIncompleteFields)
+            .where(eq(tenderIncompleteFields.tenderId, tenderId));
+
+        return {
+            ...data,
+            rfqTo: rfqToArray,
+            incompleteFields: incompleteFieldsResult,
+        };
+    }
+
+    async updateApproval(tenderId: number, payload: TenderApprovalPayload) {
+        const existingTender = await this.db
+            .select({ id: tenderInfos.id })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        if (!existingTender.length) {
+            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+        }
+
+        const updateData: any = {
+            tlStatus: payload.tlStatus,
+            updatedAt: new Date(),
+        };
+
+        // Clear incomplete fields for statuses other than '3'
+        if (payload.tlStatus !== '3') {
+            await this.db
+                .delete(tenderIncompleteFields)
+                .where(eq(tenderIncompleteFields.tenderId, tenderId));
+        }
+
+        if (payload.tlStatus === '1') {
+            const rfqToString = payload.rfqTo?.join(',') || '';
+
+            updateData.rfqTo = rfqToString;
+            updateData.tenderFeeMode = payload.tenderFeeMode;
+            updateData.emdMode = payload.emdMode;
+            updateData.approvePqrSelection = payload.approvePqrSelection;
+            updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection;
+
+            updateData.tlRejectionRemarks = null;
+            updateData.oemNotAllowed = null;
+        }
+        else if (payload.tlStatus === '2') {
+            updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
+            updateData.oemNotAllowed = payload.oemNotAllowed;
+
+            if (payload.tenderStatus) {
+                updateData.status = payload.tenderStatus;
+            }
+
+            updateData.rfqTo = null;
+            updateData.tenderFeeMode = null;
+            updateData.emdMode = null;
+            updateData.approvePqrSelection = null;
+            updateData.approveFinanceDocSelection = null;
+        }
+        else if (payload.tlStatus === '3') {
+            // Incomplete status - clear approval/rejection fields
+            updateData.rfqTo = null;
+            updateData.tenderFeeMode = null;
+            updateData.emdMode = null;
+            updateData.approvePqrSelection = null;
+            updateData.approveFinanceDocSelection = null;
+            updateData.tlRejectionRemarks = null;
+            updateData.oemNotAllowed = null;
+
+            // Delete existing incomplete fields
+            await this.db
+                .delete(tenderIncompleteFields)
+                .where(eq(tenderIncompleteFields.tenderId, tenderId));
+
+            // Insert new incomplete fields
+            if (payload.incompleteFields && payload.incompleteFields.length > 0) {
+                const incompleteFieldsData = payload.incompleteFields.map(field => ({
+                    tenderId,
+                    fieldName: field.fieldName,
+                    comment: field.comment,
+                    status: 'pending' as const,
+                }));
+
+                await this.db
+                    .insert(tenderIncompleteFields)
+                    .values(incompleteFieldsData);
+            }
+        }
+
+        const [updated] = await this.db
+            .update(tenderInfos)
+            .set(updateData)
+            .where(eq(tenderInfos.id, tenderId))
+            .returning();
+
+        return this.getByTenderId(tenderId);
+    }
+}

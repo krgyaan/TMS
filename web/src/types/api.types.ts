@@ -500,6 +500,14 @@ export interface TenderInfo {
     tlRemarks?: string | null;
     rfqTo?: string | null;
     courierAddress?: string | null;
+
+    tenderFeeMode?: string | null;
+    emdMode?: string | null;
+    approvePqrSelection?: "YES" | "NO" | null;
+    approveFinanceDocSelection?: "YES" | "NO" | null;
+    tenderApprovalStatus?: number | null;
+    oemNotAllowed?: number | null;
+    tenderApprovalRemarks?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -695,3 +703,52 @@ export interface SaveTenderInfoSheetDto {
 
     teRemark: string | null;
 }
+
+export interface IncompleteField {
+    id?: number;
+    fieldName: string;
+    comment: string;
+    status?: 'pending' | 'resolved';
+}
+
+export interface SaveTenderApprovalDto {
+    tlStatus: '0' | '1' | '2' | '3';
+    rfqTo?: number[]; // vendor org IDs
+    tenderFeeMode?: string;
+    emdMode?: string;
+    approvePqrSelection?: '1' | '2';
+    approveFinanceDocSelection?: '1' | '2';
+    tenderStatus?: number; // status ID
+    oemNotAllowed?: string; // vendor org ID
+    tlRejectionRemarks?: string;
+    incompleteFields?: IncompleteField[];
+}
+
+export interface TenderApproval {
+    id: number;
+    tenderId: number;
+    tlStatus: '0' | '1' | '2' | '3';
+    rfqTo: number[] | null;
+    tenderFeeMode: string | null;
+    emdMode: string | null;
+    approvePqrSelection: '1' | '2' | null;
+    approveFinanceDocSelection: '1' | '2' | null;
+    tenderStatus: number | null;
+    oemNotAllowed: number | null;
+    tlRejectionRemarks: string | null;
+    incompleteFields?: IncompleteField[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface TenderWithRelations extends TenderInfoWithNames {
+    infoSheet?: TenderInfoSheet | null;
+    approval?: TenderApproval | null;
+}
+
+export type TenderApprovalTabData = {
+    key: '0' | '1' | '2' | '3';
+    name: string;
+    count: number;
+    data: TenderInfoWithNames[];
+};
