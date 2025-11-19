@@ -71,10 +71,6 @@ const data = {
                     url: paths.tendering.tenders,
                 },
                 {
-                    title: "Info Sheet",
-                    url: paths.tendering.infoSheet,
-                },
-                {
                     title: "Tender Approval",
                     url: paths.tendering.tenderApproval,
                 },
