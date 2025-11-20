@@ -37,6 +37,8 @@ import { WebsitesModule } from './modules/master/websites/websites.module';
 import { StatesModule } from './modules/master/states/states.module';
 import { LeadTypesModule } from './modules/master/lead-types/lead-types.module';
 import { TendersModule } from './modules/tendering/tenders/tenders.module';
+import { TenderInfoSheetsModule } from './modules/tendering/info-sheets/info-sheets.module';
+import { TenderApprovalModule } from './modules/tendering/tender-approval/tender-approval.module';
 
 @Module({
     imports: [
@@ -79,7 +81,9 @@ import { TendersModule } from './modules/tendering/tenders/tenders.module';
         WebsitesModule,
         StatesModule,
         LeadTypesModule,
-        TendersModule
+        TendersModule,
+        TenderInfoSheetsModule,
+        TenderApprovalModule
     ],
     controllers: [AppController],
     providers: [

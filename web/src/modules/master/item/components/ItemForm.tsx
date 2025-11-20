@@ -49,7 +49,7 @@ export const ItemForm = ({ mode, item }: ItemFormProps) => {
     )
 
     const form = useForm<ItemFormValues>({
-        resolver: zodResolver(ItemFormSchema),
+        resolver: zodResolver(ItemFormSchema) as any,
         defaultValues: {
             name: '',
             teamId: '',

@@ -22,8 +22,8 @@ class StatusesService extends BaseApiService {
         return this.patch<Status>(`/${id}`, data)
     }
 
-    async delete(id: number): Promise<void> {
-        await super.delete<void>(`/${id}`)
+    async deleteStatus(id: number): Promise<void> {
+        return this.delete<void>(`/${id}`)
     }
 }
 

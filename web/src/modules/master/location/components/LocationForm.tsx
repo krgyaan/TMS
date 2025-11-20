@@ -35,7 +35,7 @@ export const LocationForm = ({ mode, location }: LocationFormProps) => {
     const updateLocation = useUpdateLocation()
 
     const form = useForm<LocationFormValues>({
-        resolver: zodResolver(LocationFormSchema),
+        resolver: zodResolver(LocationFormSchema) as any,
         defaultValues: {
             name: '',
             acronym: '',
@@ -69,9 +69,9 @@ export const LocationForm = ({ mode, location }: LocationFormProps) => {
         }
 
         if (mode === 'create') {
-            await createLocation.mutateAsync(payload)
+            await createLocation.mutateAsync(payload as any)
         } else if (location) {
-            await updateLocation.mutateAsync({ id: location.id, data: payload })
+            await updateLocation.mutateAsync({ id: location.id, data: payload as any })
         }
 
         navigate(paths.master.locations)
@@ -94,16 +94,16 @@ export const LocationForm = ({ mode, location }: LocationFormProps) => {
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
                             <FieldWrapper control={form.control} name="name" label="Location Name">
-                                {(field) => <Input placeholder="Enter location name" {...field} />}
+                                {(field) => <Input placeholder="Enter location name" {...field as any} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="acronym" label="Acronym (optional)">
-                                {(field) => <Input placeholder="Short code" {...field} />}
+                                {(field) => <Input placeholder="Short code" {...field as any} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="state" label="State (optional)">
-                                {(field) => <Input placeholder="State name" {...field} />}
+                                {(field) => <Input placeholder="State name" {...field as any} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="region" label="Region (optional)">
-                                {(field) => <Input placeholder="Region" {...field} />}
+                                {(field) => <Input placeholder="Region" {...field as any} />}
                             </FieldWrapper>
                         </div>
 

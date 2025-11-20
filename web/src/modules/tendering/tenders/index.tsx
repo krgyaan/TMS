@@ -9,10 +9,10 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDeleteTender, useTenders } from '@/hooks/api/useTenders';
 import { useStatuses } from '@/hooks/api/useStatuses';
-import type { TenderInfoWithNames } from '@/types/api.types';
+import type { TenderInfoWithNames, TenderWithRelations } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Pencil, Plus, Trash } from 'lucide-react';
+import { AlertCircle, Eye, FilePlus, Pencil, Plus, Trash } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -70,6 +70,11 @@ const TendersPage = () => {
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
         {
+            label: 'Fill Info Sheet',
+            onClick: (row: TenderWithRelations) => row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id)),
+            icon: <FilePlus className="h-4 w-4" />,
+        },
+        {
             label: 'View',
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
@@ -95,7 +100,7 @@ const TendersPage = () => {
         },
     ];
 
-    const [colDefs] = useState<ColDef<any>[]>([
+    const [colDefs] = useState<ColDef<TenderInfoWithNames>[]>([
         {
             field: 'tenderNo',
             headerName: 'Tender No',
@@ -188,7 +193,7 @@ const TendersPage = () => {
             sortable: false,
             cellRenderer: createActionColumnRenderer(tenderActions),
             pinned: 'right',
-            width: 50,
+            width: 25,
         },
     ]);
 

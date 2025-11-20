@@ -104,7 +104,6 @@ const StatusPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             cellRenderer: createActionColumnRenderer(statusActions),
             sortable: false,

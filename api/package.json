@@ -32,6 +32,8 @@
         "@nestjs/passport": "^11.0.0",
         "@nestjs/platform-express": "^11.0.1",
         "argon2": "^0.40.3",
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.14.2",
         "cookie-parser": "^1.4.7",
         "drizzle-orm": "^0.44.5",
         "googleapis": "^135.0.0",

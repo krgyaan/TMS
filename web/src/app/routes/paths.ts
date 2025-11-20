@@ -1,4 +1,4 @@
-﻿export const paths = {
+export const paths = {
     // ==================== AUTH ====================
     auth: {
         login: "/login",
@@ -21,18 +21,20 @@
         tenderCreate: "/tendering/tenders/create",
         tenderEdit: (id: number | string) => `/tendering/tenders/${id}/edit`,
         tenderView: (id: number | string) => `/tendering/tenders/${id}`,
-        infoSheet: "/tendering/info-sheet",
-        tenderApproval: "/tendering/tender-approval",
-        phydocs: "/tendering/phydocs",
-        rfqs: "/tendering/rfqs",
-        emdsTenderFees: "/tendering/emds-tenderfees",
-        checklists: "/tendering/checklists",
-        costingSheets: "/tendering/costing-sheets",
-        costingApproval: "/tendering/costing-approval",
-        bidSubmissions: "/tendering/bid-submissions",
-        tqs: "/tendering/tqs",
-        ras: "/tendering/ras",
-        results: "/tendering/results",
+        infoSheetCreate: (tenderId: number | string) => `/tendering/info-sheet/create/${tenderId}`,
+        infoSheetEdit: (tenderId: number | string) => `/tendering/info-sheet/edit/${tenderId}`,
+        tenderApproval: '/tendering/tender-approval',
+        tenderApprovalCreate: (tenderId: number | string) => `/tendering/tender-approval/create/${tenderId}`,
+        phydocs: '/tendering/phydocs',
+        rfqs: '/tendering/rfqs',
+        emdsTenderFees: '/tendering/emds-tenderfees',
+        checklists: '/tendering/checklists',
+        costingSheets: '/tendering/costing-sheets',
+        costingApproval: '/tendering/costing-approval',
+        bidSubmissions: '/tendering/bid-submissions',
+        tqs: '/tendering/tqs',
+        ras: '/tendering/ras',
+        results: '/tendering/results',
     },
 
     // ==================== OPERATIONS ====================
