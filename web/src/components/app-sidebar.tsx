@@ -21,13 +21,7 @@ import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { paths } from "@/app/routes/paths";
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarRail,
-} from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 import { getStoredUser, clearAuthSession } from "@/lib/auth";
 
 const data = {
@@ -51,7 +45,7 @@ const data = {
             name: "Team DC",
             logo: AudioWaveform,
             plan: "only DC team",
-        }
+        },
     ],
     navMain: [
         {
@@ -354,7 +348,7 @@ const data = {
                 {
                     title: "Loan Parties",
                     url: paths.master.loanParties,
-                }
+                },
             ],
         },
         {
@@ -372,8 +366,8 @@ const data = {
                 },
                 {
                     title: "Imprests",
-                    url: "#",
-                }
+                    url: paths.shared.imprests,
+                },
             ],
         },
     ],

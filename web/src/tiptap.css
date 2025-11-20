@@ -1,0 +1,31 @@
+@import "prosemirror-view/style/prosemirror.css";
+
+.tiptap {
+    font-family: ui-sans-serif, system-ui;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: inherit;
+}
+
+.tiptap .ProseMirror {
+    min-height: 250px;
+    padding: 0.75rem;
+    outline: none;
+}
+
+.tiptap .ProseMirror > * + * {
+    margin-top: 0.8rem;
+}
+
+.tiptap .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    opacity: 0.45;
+    color: #888;
+    pointer-events: none;
+    float: left;
+    height: 0;
+}
+
+html.dark .tiptap .ProseMirror {
+    color: #e5e7eb;
+}
