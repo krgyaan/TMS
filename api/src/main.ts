@@ -21,8 +21,10 @@ async function bootstrap() {
     app.setGlobalPrefix('api/v1');
 
     const allowedOrigins = [
-        'http://localhost:5173'
+        'http://localhost:5173',
+        'https://tmsv2.volksenergie.in'
     ];
+
     app.enableCors({
         origin: function (origin: string, callback: (arg0: Error | null, arg1: boolean | undefined) => void) {
             if (!origin) return callback(null, true);
@@ -37,6 +39,7 @@ async function bootstrap() {
     });
 
     await app.listen(appCfg?.port ?? 3000);
+    console.log("GOOGLE_REDIRECT_URI:", process.env.GOOGLE_REDIRECT_URI);
     console.log(`App is Running on: http://localhost:${appCfg?.port ?? 3000}`);
 }
 bootstrap();

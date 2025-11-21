@@ -752,3 +752,50 @@ export type TenderApprovalTabData = {
     count: number;
     data: TenderInfoWithNames[];
 };
+
+// Dashboard row for physical docs list
+export interface PhysicalDocsDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    courierAddress: string;
+    physicalDocsRequired: string;
+    physicalDocsDeadline: Date;
+    teamMemberName: string;
+    statusName: string;
+    physicalDocs: number | null;
+    courierNo: number | null;
+}
+
+// Person who submitted physical docs
+export interface PhysicalDocsPerson {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+}
+
+// Physical doc with persons (returned from backend)
+export interface PhysicalDocs {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocsPerson[];
+}
+
+// DTO for creating physical docs (without person IDs)
+export interface CreatePhysicalDocsDto {
+    tenderId: number;
+    courierNo: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
+}
+
+// DTO for updating physical docs
+export interface UpdatePhysicalDocsDto {
+    id: number;
+    courierNo?: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
+}
