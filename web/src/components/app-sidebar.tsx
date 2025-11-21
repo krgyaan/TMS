@@ -76,7 +76,7 @@ const data = {
                 },
                 {
                     title: "Physical Docs",
-                    url: paths.tendering.phydocs,
+                    url: paths.tendering.physicalDocs,
                 },
                 {
                     title: "RFQs",

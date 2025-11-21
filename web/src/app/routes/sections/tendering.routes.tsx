@@ -11,7 +11,10 @@ const Tendering_TenderApproval = lazy(() => import('@/modules/tendering/tender-a
 const Tendering_TenderApproval_Create = lazy(() => import('@/modules/tendering/tender-approval/create'));
 const InfoSheet_Create = lazy(() => import('@/modules/tendering/info-sheet/create'));
 const InfoSheet_Edit = lazy(() => import('@/modules/tendering/info-sheet/edit'));
-const Tendering_PhysDocs = lazy(() => import('@/modules/tendering/phydocs'));
+const Tendering_PhysicalDocs = lazy(() => import('@/modules/tendering/physical-docs'));
+const Tendering_PhysicalDocs_Create = lazy(() => import('@/modules/tendering/physical-docs/create'));
+const Tendering_PhysicalDocs_Edit = lazy(() => import('@/modules/tendering/physical-docs/edit'));
+const Tendering_PhysicalDocs_Show = lazy(() => import('@/modules/tendering/physical-docs/show'));
 const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs'));
 const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees'));
 const Tendering_DocChecklist = lazy(() => import('@/modules/tendering/checklists'));
@@ -33,7 +36,10 @@ export default function TenderingRoutes() {
             <Route path="info-sheet/edit/:tenderId" element={<RouteWrapper><InfoSheet_Edit /></RouteWrapper>} />
             <Route path="tender-approval" element={<RouteWrapper><Tendering_TenderApproval /></RouteWrapper>} />
             <Route path="tender-approval/create/:tenderId" element={<RouteWrapper><Tendering_TenderApproval_Create /></RouteWrapper>} />
-            <Route path="phydocs" element={<RouteWrapper><Tendering_PhysDocs /></RouteWrapper>} />
+            <Route path="physical-docs" element={<RouteWrapper><Tendering_PhysicalDocs /></RouteWrapper>} />
+            <Route path="physical-docs/create/:id" element={<RouteWrapper><Tendering_PhysicalDocs_Create /></RouteWrapper>} />
+            <Route path="physical-docs/:id/edit" element={<RouteWrapper><Tendering_PhysicalDocs_Edit /></RouteWrapper>} />
+            <Route path="physical-docs/:id" element={<RouteWrapper><Tendering_PhysicalDocs_Show /></RouteWrapper>} />
             <Route path="rfqs" element={<RouteWrapper><Tendering_RFQs /></RouteWrapper>} />
             <Route path="emds-tenderfees" element={<RouteWrapper><Tendering_EMD /></RouteWrapper>} />
             <Route path="checklists" element={<RouteWrapper><Tendering_DocChecklist /></RouteWrapper>} />

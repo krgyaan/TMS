@@ -47,8 +47,8 @@ const CreateTenderInfoSchema = z.object({
     location: z.coerce.number().int().positive().optional(),
     website: z.coerce.number().int().positive().optional(),
 
-    deleteStatus: z.enum(["0", "1"]).optional(),
-    tlStatus: z.enum(["0", "1", "2", "3"]).optional(),
+    deleteStatus: z.coerce.number().int().min(0, "Invalid delete status").default(0).optional(),
+    tlStatus: z.coerce.number().int().min(0, "Invalid TL status").default(0).optional(),
     tlRemarks: z.string().max(200).optional(),
     rfqTo: z.string().max(15).optional(),
     courierAddress: z.string().optional(),
@@ -74,8 +74,8 @@ const UpdateTenderInfoSchema = z.object({
     location: z.coerce.number().int().positive().optional(),
     website: z.coerce.number().int().positive().optional(),
 
-    deleteStatus: z.enum(["0", "1"]).optional(),
-    tlStatus: z.enum(["0", "1", "2", "3"]).optional(),
+    deleteStatus: z.coerce.number().int().min(0, "Invalid delete status").default(0).optional(),
+    tlStatus: z.coerce.number().int().min(0, "Invalid TL status").default(0).optional(),
     tlRemarks: z.string().max(200).optional(),
     rfqTo: z.string().max(15).optional(),
     courierAddress: z.string().optional(),
@@ -91,7 +91,7 @@ const UpdateTenderInfoSchema = z.object({
 });
 
 const SaveTenderApprovalSchema = z.object({
-    tlStatus: z.enum(["0", "1", "2", "3"]),
+    tlStatus: z.coerce.number().int().min(0, "Invalid TL status").default(0),
     rfqTo: z.string().max(15).optional(),
     tenderFeeMode: z.string().max(50).optional(),
     emdMode: z.string().max(50).optional(),

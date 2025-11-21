@@ -127,6 +127,34 @@
       "when": 1763546076563,
       "tag": "0017_nifty_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1763616567573,
+      "tag": "0018_perfect_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1763637901273,
+      "tag": "0019_loose_eternity",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1763640920663,
+      "tag": "0020_fearless_midnight",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1763701125074,
+      "tag": "0021_silky_inertia",
+      "breakpoints": true
     }
   ]
 }

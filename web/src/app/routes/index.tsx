@@ -29,7 +29,11 @@ export default function AppRoutes() {
             {/* ==================== PUBLIC ROUTES ==================== */}
             <Route
                 path={paths.auth.googleCallback}
-                element={<RouteWrapper><Auth_GoogleCallback /></RouteWrapper>}
+                element={
+                    <RouteWrapper>
+                        <Auth_GoogleCallback />
+                    </RouteWrapper>
+                }
             />
 
             <Route element={<PublicOnlyRoute />}>
@@ -44,34 +48,104 @@ export default function AppRoutes() {
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
                     {/* Integrations */}
-                    <Route path="integrations/*" element={<RouteWrapper><IntegrationsRoutes /></RouteWrapper>} />
+                    <Route
+                        path="integrations/*"
+                        element={
+                            <RouteWrapper>
+                                <IntegrationsRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Tendering */}
-                    <Route path="tendering/*" element={<RouteWrapper><TenderingRoutes /></RouteWrapper>} />
+                    <Route
+                        path="tendering/*"
+                        element={
+                            <RouteWrapper>
+                                <TenderingRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Operations */}
-                    <Route path="operations/*" element={<RouteWrapper><OperationsRoutes /></RouteWrapper>} />
+                    <Route
+                        path="operations/*"
+                        element={
+                            <RouteWrapper>
+                                <OperationsRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Services */}
-                    <Route path="services/*" element={<RouteWrapper><ServicesRoutes /></RouteWrapper>} />
+                    <Route
+                        path="services/*"
+                        element={
+                            <RouteWrapper>
+                                <ServicesRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* BI Dashboard */}
-                    <Route path="bi-dashboard/*" element={<RouteWrapper><BIDashboardRoutes /></RouteWrapper>} />
+                    <Route
+                        path="bi-dashboard/*"
+                        element={
+                            <RouteWrapper>
+                                <BIDashboardRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Accounts */}
-                    <Route path="accounts/*" element={<RouteWrapper><AccountsRoutes /></RouteWrapper>} />
+                    <Route
+                        path="accounts/*"
+                        element={
+                            <RouteWrapper>
+                                <AccountsRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* CRM */}
-                    <Route path="crm/*" element={<RouteWrapper><CRMRoutes /></RouteWrapper>} />
+                    <Route
+                        path="crm/*"
+                        element={
+                            <RouteWrapper>
+                                <CRMRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Performance */}
-                    <Route path="performance/*" element={<RouteWrapper><PerformanceRoutes /></RouteWrapper>} />
+                    <Route
+                        path="performance/*"
+                        element={
+                            <RouteWrapper>
+                                <PerformanceRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Master Data */}
-                    <Route path="master/*" element={<RouteWrapper><MasterRoutes /></RouteWrapper>} />
+                    <Route
+                        path="master/*"
+                        element={
+                            <RouteWrapper>
+                                <MasterRoutes />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Shared */}
-                    <Route path="shared/*" element={<RouteWrapper><SharedRoutes /></RouteWrapper>} />
+                    <Route
+                        path="shared/*"
+                        element={
+                            <RouteWrapper>
+                                <SharedRoutes />
+                            </RouteWrapper>
+                        }
+                    />
                 </Route>
             </Route>
 

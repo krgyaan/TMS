@@ -16,6 +16,7 @@ type Props<T> = {
 }
 
 export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => {
+    // console.log(rowData);
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>

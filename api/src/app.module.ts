@@ -39,6 +39,7 @@ import { LeadTypesModule } from './modules/master/lead-types/lead-types.module';
 import { TendersModule } from './modules/tendering/tenders/tenders.module';
 import { TenderInfoSheetsModule } from './modules/tendering/info-sheets/info-sheets.module';
 import { TenderApprovalModule } from './modules/tendering/tender-approval/tender-approval.module';
+import { PhysicalDocsModule } from './modules/tendering/physical-docs/physical-docs.module';
 
 @Module({
     imports: [
@@ -83,7 +84,8 @@ import { TenderApprovalModule } from './modules/tendering/tender-approval/tender
         LeadTypesModule,
         TendersModule,
         TenderInfoSheetsModule,
-        TenderApprovalModule
+        TenderApprovalModule,
+        PhysicalDocsModule
     ],
     controllers: [AppController],
     providers: [
