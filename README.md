@@ -1,8 +1,36 @@
-| Component               | Current Status                                      | Your Focus Area                              | Priority Level                     |
-|------------------------|-----------------------------------------------------|----------------------------------------------|------------------------------------|
-| React Frontend (web/)  | Fully implemented with UI components               | Integration points for ML results display    | Medium - Integration layer         |
-| Nest.js Backend (api/) | Complete CRUD operations with modules              | Add ML service endpoints and calls           | High - API endpoints for ML        |
-| ML OCR Service (ml-ocr/)| Skeleton structure - needs implementation          | IMPLEMENT THIS - OCR functionality           | CRITICAL - Core OCR implementation |
-| ML Extract Service (ml-extract/)| Skeleton structure - needs implementation   | IMPLEMENT THIS - Information extraction      | CRITICAL - Data extraction logic   |
-| Database Layer (Drizzle ORM)| Schema defined for users, roles, teams         | Extend schema for tender data storage        | Medium - Data persistence          |
-| Tendering Module       | Frontend components exist for tender workflows     | Enhance with ML automation features          | High - User experience enhancement |
+# Project Structure
+
+## Backend (`api/`) - NestJS
+
+- **Drizzle ORM**: Over 52 migrations
+- **Modular Architecture**, with major domains:
+    - **auth**: Authentication, roles, permissions
+    - **tendering**: Tenders, EMDs, RFQs, bids, costing
+    - **master**: Companies, locations, vendors, items
+    - **accounts**: Imprests, loan parties
+    - **crm**: Leads, follow-ups
+    - **shared**: Couriers, follow-ups, enums
+
+## Frontend (`web/`) - React + Vite
+
+- **UI**: [shadcn/ui](https://ui.shadcn.com/) components
+- **Feature Modules**: Mirror backend domains
+- **Custom Hooks**: `/hooks/api/` for each entity
+- **Services Layer**: `/services/api/`
+- **Routes**: Organized by domain
+
+## Machine Learning & OCR (`ml-ocr/`) - Python
+
+- **OCR Text Extraction**
+- **LLM Post-processing**
+- **Self-hosted LLM Integration**
+
+---
+
+## Key Patterns
+
+- **Zod Schemas** for validation (API)
+- **React Query** for data fetching (Web)
+- **Permission-based Access Control**
+- **Team-based Multi-tenancy**
+- **Status Workflow Management** for tenders
