@@ -1,33 +1,33 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useState, useMemo, useEffect } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { useDeleteTender, useTenders } from '@/hooks/api/useTenders';
-import { useStatuses } from '@/hooks/api/useStatuses';
-import type { TenderInfoWithNames } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Pencil, Plus, Trash } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef } from "ag-grid-community";
+import { useState, useMemo, useEffect } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { NavLink, useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { useDeleteTender, useTenders } from "@/hooks/api/useTenders";
+import { useStatuses } from "@/hooks/api/useStatuses";
+import type { TenderInfoWithNames } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Eye, Pencil, Plus, Trash } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatINR } from "@/hooks/useINRFormatter";
+import { formatDateTime } from "@/hooks/useFormatedDate";
 
 const TendersPage = () => {
     const { data: statuses, isLoading: statusesLoading, error: statusesError } = useStatuses();
-    const [activeTab, setActiveTab] = useState<string>('');
+    const [activeTab, setActiveTab] = useState<string>("");
 
     const TC = {
-        'prep': 'Under Preperation',
-        'dnb': 'Did Not BId',
-        'bid': 'Bid Submitted',
-        'won': 'Won',
-        'lost': 'Lost',
-        'unallocated': 'Unallocated'
+        prep: "Under Preperation",
+        dnb: "Did Not BId",
+        bid: "Bid Submitted",
+        won: "Won",
+        lost: "Lost",
+        unallocated: "Unallocated",
     } as const;
     type TenderCategoryKey = keyof typeof TC;
 
@@ -47,7 +47,7 @@ const TendersPage = () => {
             statusIds,
         }));
 
-        categoriesArray.push({ name: 'unallocated', label: 'Unallocated', statusIds: [] });
+        categoriesArray.push({ name: "unallocated", label: "Unallocated", statusIds: [] });
         return categoriesArray;
     }, [statuses]);
 
@@ -62,132 +62,138 @@ const TendersPage = () => {
         [categories, activeTab]
     );
 
-    const { data: tenders, isLoading: tendersLoading, error: tendersError, refetch } =
-        useTenders(activeTab, selectedStatusIds);
+    const {
+        data: tenders,
+        isLoading: tendersLoading,
+        error: tendersError,
+        refetch,
+    } = useTenders(activeTab, selectedStatusIds);
 
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
         {
-            label: 'View',
+            label: "View",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
-            label: 'Edit',
+            label: "Edit",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete tender "${row.tenderName}"?`)) {
                     try {
                         await deleteTender.mutateAsync(row.id);
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
-            icon: <Trash className='h-4 w-4' />
+            icon: <Trash className="h-4 w-4" />,
         },
     ];
 
     const [colDefs] = useState<ColDef<any>[]>([
         {
-            field: 'tenderNo',
-            headerName: 'Tender No',
+            field: "tenderNo",
+            headerName: "Tender No",
             width: 200,
         },
         {
-            field: 'tenderName',
-            headerName: 'Tender Name',
+            field: "tenderName",
+            headerName: "Tender Name",
             flex: 2,
         },
         {
-            field: 'organizationAcronym',
-            headerName: 'Org.',
+            field: "organizationAcronym",
+            headerName: "Org.",
             width: 100,
             cellRenderer: (params: any) => {
-                return <span title={params.data.organizationName}>{params.value || '-'}</span>;
+                return <span title={params.data.organizationName}>{params.value || "-"}</span>;
             },
         },
         {
-            field: 'itemName',
-            headerName: 'Item',
+            field: "itemName",
+            headerName: "Item",
             width: 150,
             cellRenderer: (params: any) => {
                 return params.value || <span className="text-gray-400">-</span>;
             },
         },
         {
-            field: 'teamMemberName',
-            headerName: 'Member',
+            field: "teamMemberName",
+            headerName: "Member",
             width: 150,
             cellRenderer: (params: any) => {
                 const { value, data } = params;
                 return (
                     <span title={data?.teamMemberUsername}>
-                        {value ? value : <b className='text-gray-400'>Unassigned</b>}
+                        {value ? value : <b className="text-gray-400">Unassigned</b>}
                     </span>
                 );
             },
         },
         {
-            field: 'gstValues',
-            headerName: 'Tender Value',
+            field: "gstValues",
+            headerName: "Tender Value",
             width: 130,
             cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined
-                    ? formatINR(p.value)
-                    : <span className="text-gray-400">—</span>,
-        },
-        {
-            field: 'tenderFees',
-            headerName: 'Tender Fee',
-            width: 130,
-            cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined
-                    ? formatINR(p.value)
-                    : <span className="text-gray-400">—</span>,
-        },
-        {
-            field: 'emd',
-            headerName: 'EMD',
-            width: 130,
-            cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined
-                    ? formatINR(p.value)
-                    : <span className="text-gray-400">—</span>,
-        },
-        {
-            field: 'dueDate',
-            headerName: 'Due Date',
-            width: 150,
-            cellRenderer: (params: { value: string | Date }) => {
-                return params.value ? formatDateTime(params.value) : '-';
-            },
-        },
-        {
-            field: 'statusName',
-            headerName: 'Status',
-            width: 150,
-            cellRenderer: (params: any) => {
-                return params.value ? (
-                    <b>{params.value}</b>
+                p.value !== null && p.value !== undefined ? (
+                    formatINR(p.value)
                 ) : (
                     <span className="text-gray-400">—</span>
-                );
+                ),
+        },
+        {
+            field: "tenderFees",
+            headerName: "Tender Fee",
+            width: 130,
+            cellRenderer: (p: { value: number | string | null | undefined }) =>
+                p.value !== null && p.value !== undefined ? (
+                    formatINR(p.value)
+                ) : (
+                    <span className="text-gray-400">—</span>
+                ),
+        },
+        {
+            field: "emd",
+            headerName: "EMD",
+            width: 130,
+            cellRenderer: (p: { value: number | string | null | undefined }) =>
+                p.value !== null && p.value !== undefined ? (
+                    formatINR(p.value)
+                ) : (
+                    <span className="text-gray-400">—</span>
+                ),
+        },
+        {
+            field: "dueDate",
+            headerName: "Due Date",
+            width: 150,
+            cellRenderer: (params: { value: string | Date }) => {
+                return params.value ? formatDateTime(params.value) : "-";
             },
         },
         {
-            headerName: 'Actions',
+            field: "statusName",
+            headerName: "Status",
+            width: 150,
+            cellRenderer: (params: any) => {
+                return params.value ? <b>{params.value}</b> : <span className="text-gray-400">—</span>;
+            },
+        },
+        {
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(tenderActions),
-            pinned: 'right',
+            pinned: "right",
             width: 50,
         },
     ]);
@@ -219,7 +225,12 @@ const TendersPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading categories: {statusesError.message}
-                            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="ml-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.reload()}
+                                className="ml-4"
+                            >
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -285,15 +296,15 @@ const TendersPage = () => {
                 </CardAction>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)}>
+                <Tabs value={activeTab} onValueChange={value => setActiveTab(value)}>
                     <TabsList className="m-auto">
-                        {categories.map((category) => (
+                        {categories.map(category => (
                             <TabsTrigger key={category.name} value={category.name}>
                                 {category.label}
                             </TabsTrigger>
                         ))}
                     </TabsList>
-                    {categories.map((category) => (
+                    {categories.map(category => (
                         <TabsContent key={category.name} value={category.name} className="h-screen mt-0">
                             {activeTab === category.name ? (
                                 <DataTable
@@ -302,7 +313,12 @@ const TendersPage = () => {
                                     columnDefs={colDefs}
                                     loading={tendersLoading}
                                     gridOptions={{
-                                        defaultColDef: { editable: true, filter: true, sortable: true, resizable: true },
+                                        defaultColDef: {
+                                            editable: true,
+                                            filter: true,
+                                            sortable: true,
+                                            resizable: true,
+                                        },
                                         pagination: true,
                                         overlayNoRowsTemplate: '<span style="padding: 10px;">No data found</span>',
                                     }}

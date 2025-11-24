@@ -208,6 +208,8 @@
         followUpsEdit: "/shared/follow-up/edit",
         followUpsShow: "/shared/follow-up/show",
         couriers: "/shared/couriers",
+        courierDispatch: "/shared/couriers/dispatch",
+        courierCreate: "/shared/couriers/create",
         imprests: "/shared/imprests",
     },
 };
