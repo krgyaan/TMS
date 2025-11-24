@@ -40,6 +40,7 @@ import { TendersModule } from './modules/tendering/tenders/tenders.module';
 import { TenderInfoSheetsModule } from './modules/tendering/info-sheets/info-sheets.module';
 import { TenderApprovalModule } from './modules/tendering/tender-approval/tender-approval.module';
 import { PhysicalDocsModule } from './modules/tendering/physical-docs/physical-docs.module';
+import { RfqsModule } from './modules/tendering/rfqs/rfq.module';
 
 @Module({
     imports: [
@@ -85,7 +86,8 @@ import { PhysicalDocsModule } from './modules/tendering/physical-docs/physical-d
         TendersModule,
         TenderInfoSheetsModule,
         TenderApprovalModule,
-        PhysicalDocsModule
+        PhysicalDocsModule,
+        RfqsModule,
     ],
     controllers: [AppController],
     providers: [

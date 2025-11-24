@@ -155,6 +155,34 @@
       "when": 1763701125074,
       "tag": "0021_silky_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1763838870374,
+      "tag": "0022_tricky_leo",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1763839585479,
+      "tag": "0023_bright_chameleon",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1763849396134,
+      "tag": "0024_empty_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1763871992585,
+      "tag": "0025_loud_phantom_reporter",
+      "breakpoints": true
     }
   ]
 }

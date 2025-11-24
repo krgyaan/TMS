@@ -31,3 +31,4 @@ export * from './tender-info-sheet.schema';
 export * from './tender-incomplete-fields.schema';
 export * from './tender-status-history.schema';
 export * from './physical-docs.schema'
+export * from './rfqs.schema'

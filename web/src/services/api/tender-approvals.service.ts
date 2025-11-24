@@ -1,9 +1,9 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderApproval, SaveTenderApprovalDto, TenderApprovalTabData } from '@/types/api.types';
+import type { TenderApproval, SaveTenderApprovalDto, TenderApprovalRow } from '@/types/api.types';
 
 export const tenderApprovalsService = {
-    getAll: async (): Promise<TenderApprovalTabData[]> => {
-        const response = await axiosInstance.get<TenderApprovalTabData[]>('/tender-approvals');
+    getAll: async (): Promise<Record<string, TenderApprovalRow[]>> => {
+        const response = await axiosInstance.get<Record<string, TenderApprovalRow[]>>('/tender-approvals');
         return response.data;
     },
 
