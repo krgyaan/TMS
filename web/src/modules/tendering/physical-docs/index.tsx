@@ -32,7 +32,7 @@ const PhysicalDocs = () => {
         {
             label: 'View',
             onClick: (row: PhysicalDocsDashboardRow) => {
-                navigate(paths.tendering.physicalDocsView(row.physicalDocs || row.tenderId));
+                navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
