@@ -12,7 +12,7 @@ type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<
     control: Control<TFieldValues>
     name: TName
     label: React.ReactNode
-    options: SelectOption[]
+    options: Array<SelectOption | { value: string; label: string }>
     placeholder: string
 }
 
@@ -23,9 +23,28 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
     options,
     placeholder,
 }: SelectFieldProps<TFieldValues, TName>) {
+    const normalizedOptions = React.useMemo<SelectOption[]>(() =>
+        options.map((option) =>
+            'id' in option
+                ? option
+                : {
+                    id: option.value,
+                    name: option.label,
+                },
+        ),
+        [options],
+    )
+
     return (
         <FieldWrapper control={control} name={name} label={label}>
-            {(field) => <Combobox value={String(field.value ?? "")} onChange={field.onChange} options={options} placeholder={placeholder} />}
+            {(field) => (
+                <Combobox
+                    value={String(field.value ?? "")}
+                    onChange={field.onChange}
+                    options={normalizedOptions}
+                    placeholder={placeholder}
+                />
+            )}
         </FieldWrapper>
     )
 }

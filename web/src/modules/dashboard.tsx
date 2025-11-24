@@ -9,13 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CheckCircle, Clock, Users, FileText, GanttChart } from "lucide-react";
 
 // Types
-interface User {
-    id: string;
-    name: string;
-    team: string;
-    role: "Admin" | "User";
-}
-
 interface TenderInfo {
     id: string;
     tender_name: string;
@@ -105,7 +98,7 @@ const Dashboard = () => {
             });
             setCurrentTime(timeString);
         };
-
+        setDashboardData(mockDashboardData);
         updateTime();
         const interval = setInterval(updateTime, 1000);
         return () => clearInterval(interval);
@@ -197,7 +190,7 @@ const Dashboard = () => {
         <div className="space-y-6 p-8">
             {/* Google OAuth Alert */}
             {!dashboardData.google_oauth_connected ? (
-                <Alert variant="warning">
+                <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="flex items-center justify-between">
                         <span>Google OAuth Not Connected! Please connect your Google account now</span>
@@ -207,7 +200,7 @@ const Dashboard = () => {
                     </AlertDescription>
                 </Alert>
             ) : (
-                <Alert variant="success">
+                <Alert variant="default">
                     <CheckCircle className="h-4 w-4" />
                     <AlertDescription className="flex items-center justify-between">
                         <span>Google OAuth Connected! You are connected. You may reconnect if needed.</span>
@@ -305,7 +298,7 @@ const Dashboard = () => {
                                 <span className="text-sm text-muted-foreground">Legendary:</span>
                                 {Object.entries(teamColors).map(([name, color]) => (
                                     <div key={name} className="flex items-center space-x-1">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color as string }} />
                                         <span className="text-xs">{name}</span>
                                     </div>
                                 ))}
@@ -332,7 +325,7 @@ const Dashboard = () => {
                                         onSelect={setSelectedDate}
                                         className="rounded-md border w-full"
                                         modifiers={{
-                                            hasEvents: calendarEvents.map(event => new Date(event.date)),
+                                            hasEvents: calendarEvents.map((event: { date: string }) => new Date(event.date)),
                                         }}
                                         modifiersStyles={{
                                             hasEvents: {
@@ -350,15 +343,15 @@ const Dashboard = () => {
                                             Events for {selectedDate.toLocaleDateString()}
                                         </h4>
                                         {calendarEvents
-                                            .filter(event => event.date === selectedDate.toISOString().split("T")[0])
-                                            .map((event, index) => (
+                                            .filter((event: { date: string }) => event.date === selectedDate.toISOString().split("T")[0])
+                                            .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
                                                 <div
                                                     key={index}
                                                     className="flex items-center space-x-3 p-3 border rounded-lg"
                                                 >
                                                     <div
                                                         className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color }}
+                                                        style={{ backgroundColor: event.color as string }}
                                                     />
                                                     <div className="flex-1">
                                                         <div className="font-medium">{event.title}</div>
@@ -379,8 +372,8 @@ const Dashboard = () => {
                             <TabsContent value="list">
                                 <div className="space-y-3">
                                     {calendarEvents
-                                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                        .map((event, index) => (
+                                        .sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                        .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
                                             <div
                                                 key={index}
                                                 className="flex items-center justify-between p-3 border rounded-lg"
@@ -388,7 +381,7 @@ const Dashboard = () => {
                                                 <div className="flex items-center space-x-3">
                                                     <div
                                                         className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color }}
+                                                        style={{ backgroundColor: event.color as string }}
                                                     />
                                                     <div>
                                                         <div className="font-medium">{event.title}</div>

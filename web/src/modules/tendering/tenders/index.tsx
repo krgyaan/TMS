@@ -9,10 +9,10 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders } from "@/hooks/api/useTenders";
 import { useStatuses } from "@/hooks/api/useStatuses";
-import type { TenderInfoWithNames } from "@/types/api.types";
+import type { TenderInfoWithNames, TenderWithRelations } from "@/types/api.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Pencil, Plus, Trash } from "lucide-react";
+import { AlertCircle, Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -57,22 +57,24 @@ const TendersPage = () => {
         }
     }, [categories, activeTab]);
 
-    const selectedStatusIds = useMemo(
-        () => categories.find(c => c.name === activeTab)?.statusIds || [],
-        [categories, activeTab]
-    );
+    const selectedStatusIds = useMemo(() => categories.find(c => c.name === activeTab)?.statusIds || [], [categories, activeTab]);
 
-    const {
-        data: tenders,
-        isLoading: tendersLoading,
-        error: tendersError,
-        refetch,
-    } = useTenders(activeTab, selectedStatusIds);
+    const { data: tenders, isLoading: tendersLoading, error: tendersError, refetch } = useTenders(activeTab, selectedStatusIds);
 
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
+        {
+            label: "Fill Info Sheet",
+            onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
+            icon: <FilePlus className="h-4 w-4" />,
+        },
+        {
+            label: "Fill Info Sheet",
+            onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
+            icon: <FilePlus className="h-4 w-4" />,
+        },
         {
             label: "View",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
@@ -99,7 +101,7 @@ const TendersPage = () => {
         },
     ];
 
-    const [colDefs] = useState<ColDef<any>[]>([
+    const [colDefs] = useState<ColDef<TenderInfoWithNames>[]>([
         {
             field: "tenderNo",
             headerName: "Tender No",
@@ -132,11 +134,7 @@ const TendersPage = () => {
             width: 150,
             cellRenderer: (params: any) => {
                 const { value, data } = params;
-                return (
-                    <span title={data?.teamMemberUsername}>
-                        {value ? value : <b className="text-gray-400">Unassigned</b>}
-                    </span>
-                );
+                return <span title={data?.teamMemberUsername}>{value ? value : <b className="text-gray-400">Unassigned</b>}</span>;
             },
         },
         {
@@ -144,33 +142,21 @@ const TendersPage = () => {
             headerName: "Tender Value",
             width: 130,
             cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? (
-                    formatINR(p.value)
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
+                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
         },
         {
             field: "tenderFees",
             headerName: "Tender Fee",
             width: 130,
             cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? (
-                    formatINR(p.value)
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
+                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
         },
         {
             field: "emd",
             headerName: "EMD",
             width: 130,
             cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? (
-                    formatINR(p.value)
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
+                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
         },
         {
             field: "dueDate",
@@ -194,7 +180,7 @@ const TendersPage = () => {
             sortable: false,
             cellRenderer: createActionColumnRenderer(tenderActions),
             pinned: "right",
-            width: 50,
+            width: 25,
         },
     ]);
 
@@ -225,12 +211,7 @@ const TendersPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading categories: {statusesError.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.location.reload()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -272,9 +253,7 @@ const TendersPage = () => {
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            No tender categories have been configured. Please add statuses with tender categories first.
-                        </AlertDescription>
+                        <AlertDescription>No tender categories have been configured. Please add statuses with tender categories first.</AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>

@@ -7,6 +7,7 @@ import {
     ParseIntPipe,
     Patch,
     Post,
+    Put,
     Query,
     HttpCode,
     HttpStatus,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { TenderInfosService } from './tenders.service';
+import { NewTenderInfo } from 'src/db/tenders.schema';
 
 // Reusable decimal field transformer
 const decimalField = (message: string, required = true) => {
@@ -77,6 +79,27 @@ const UpdateTenderInfoSchema = z.object({
     tlRemarks: z.string().max(200).optional(),
     rfqTo: z.string().max(15).optional(),
     courierAddress: z.string().optional(),
+
+    // Approval fields
+    tenderFeeMode: z.string().max(50).optional(),
+    emdMode: z.string().max(50).optional(),
+    approvePqrSelection: z.string().max(50).optional(),
+    approveFinanceDocSelection: z.string().max(50).optional(),
+    tenderApprovalStatus: z.string().max(50).optional(),
+    oemNotAllowed: z.string().optional(),
+    tlRejectionRemarks: z.string().optional(),
+});
+
+const SaveTenderApprovalSchema = z.object({
+    tlStatus: z.enum(["0", "1", "2", "3"]),
+    rfqTo: z.string().max(15).optional(),
+    tenderFeeMode: z.string().max(50).optional(),
+    emdMode: z.string().max(50).optional(),
+    approvePqrSelection: z.string().max(50).optional(),
+    approveFinanceDocSelection: z.string().max(50).optional(),
+    tenderApprovalStatus: z.string().max(50).optional(),
+    oemNotAllowed: z.string().optional(),
+    tlRejectionRemarks: z.string().optional(),
 });
 
 type CreateTenderDto = z.infer<typeof CreateTenderInfoSchema>;
@@ -122,12 +145,30 @@ export class TenderInfoController {
     @Patch(':id')
     async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateTenderInfoSchema.parse(body);
-        return this.tenderInfosService.update(id, parsed);
+        return this.tenderInfosService.update(id, parsed as unknown as Partial<NewTenderInfo>);
     }
 
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.tenderInfosService.delete(id);
+    }
+
+    @Get(':id/approval')
+    async getApproval(@Param('id', ParseIntPipe) id: number) {
+        const tender = await this.tenderInfosService.findById(id);
+        if (!tender) {
+            throw new NotFoundException(`Tender with ID ${id} not found`);
+        }
+        return this.tenderInfosService.getApprovalData(tender);
+    }
+
+    @Put(':id/approval')
+    async updateApproval(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown
+    ) {
+        const parsed = SaveTenderApprovalSchema.parse(body);
+        return this.tenderInfosService.updateApproval(id, parsed);
     }
 }

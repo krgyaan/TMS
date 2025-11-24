@@ -99,7 +99,6 @@ const LocationPage = () => {
         },
         {
             headerName: 'Actions',
-            field: 'actions',
             filter: false,
             cellRenderer: createActionColumnRenderer(locationActions),
             sortable: false,

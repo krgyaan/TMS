@@ -43,7 +43,7 @@ export const OrganizationForm = ({ mode, organization }: OrganizationFormProps) 
     )
 
     const form = useForm<OrganizationFormValues>({
-        resolver: zodResolver(OrganizationFormSchema),
+        resolver: zodResolver(OrganizationFormSchema) as any,
         defaultValues: {
             name: '',
             acronym: '',
@@ -74,9 +74,9 @@ export const OrganizationForm = ({ mode, organization }: OrganizationFormProps) 
         }
 
         if (mode === 'create') {
-            await createOrganization.mutateAsync(payload)
+            await createOrganization.mutateAsync(payload as any)
         } else if (organization) {
-            await updateOrganization.mutateAsync({ id: organization.id, data: payload })
+            await updateOrganization.mutateAsync({ id: organization.id, data: payload as any })
         }
 
         navigate(paths.master.organizations)
@@ -99,10 +99,10 @@ export const OrganizationForm = ({ mode, organization }: OrganizationFormProps) 
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
                             <FieldWrapper control={form.control} name="name" label="Organization Name">
-                                {(field) => <Input placeholder="Enter organization name" {...field} />}
+                                {(field) => <Input placeholder="Enter organization name" {...field as any} />}
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="acronym" label="Acronym (optional)">
-                                {(field) => <Input placeholder="Short code" {...field} />}
+                                {(field) => <Input placeholder="Short code" {...field as any} value={field.value ?? ''} />}
                             </FieldWrapper>
                             <SelectField
                                 control={form.control}

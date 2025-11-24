@@ -78,7 +78,7 @@ export const useDeleteOrganization = () => {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (id: number) => organizationsService.delete(id),
+        mutationFn: (id: number) => organizationsService.deleteOrganization(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: organizationsKey.lists() })
             toast.success('Organization deleted successfully')
