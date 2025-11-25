@@ -96,10 +96,7 @@ const ImprestDetailsPage: React.FC = () => {
     // summary calculations (derived from rows)
     const amtReceived = useMemo(() => rows.reduce((s, r) => s + (r.amount ?? 0), 0) + 50000, [rows]); // dummy tweak
     const amtSpent = useMemo(() => rows.reduce((s, r) => s + (r.amount ?? 0), 0), [rows]);
-    const amtApproved = useMemo(
-        () => rows.filter(r => r.buttonstatus === 1).reduce((s, r) => s + (r.amount ?? 0), 0),
-        [rows]
-    );
+    const amtApproved = useMemo(() => rows.filter(r => r.buttonstatus === 1).reduce((s, r) => s + (r.amount ?? 0), 0), [rows]);
     const amtLeft = useMemo(() => amtReceived - amtSpent, [amtReceived, amtSpent]);
 
     // Lightbox state
@@ -151,11 +148,7 @@ const ImprestDetailsPage: React.FC = () => {
             type: f.type.startsWith("image") ? "image" : "file",
         }));
 
-        setRows(prev =>
-            prev.map(r =>
-                r.id === currentProofRowId ? { ...r, invoice_proof: [...(r.invoice_proof ?? []), ...newProofs] } : r
-            )
-        );
+        setRows(prev => prev.map(r => (r.id === currentProofRowId ? { ...r, invoice_proof: [...(r.invoice_proof ?? []), ...newProofs] } : r)));
 
         setFilesToUpload([]);
         setAddProofOpen(false);
@@ -251,9 +244,7 @@ const ImprestDetailsPage: React.FC = () => {
                     return (
                         <div>
                             <div>{row.category?.category}</div>
-                            {row.category_id === 22 && row.team ? (
-                                <div className="text-xs text-muted">{row.team.name}</div>
-                            ) : null}
+                            {row.category_id === 22 && row.team ? <div className="text-xs text-muted">{row.team.name}</div> : null}
                         </div>
                     );
                 },
@@ -271,19 +262,11 @@ const ImprestDetailsPage: React.FC = () => {
                             {row.invoice_proof.map((f, idx) => (
                                 <div key={idx}>
                                     {f.type === "image" ? (
-                                        <button
-                                            className="text-blue-600 underline"
-                                            onClick={() => openLightboxForRow(row)}
-                                        >
+                                        <button className="text-blue-600 underline" onClick={() => openLightboxForRow(row)}>
                                             IMG-{idx + 1}
                                         </button>
                                     ) : (
-                                        <a
-                                            href={f.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-blue-600 underline"
-                                        >
+                                        <a href={f.url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
                                             {f.name}
                                         </a>
                                     )}
@@ -331,6 +314,7 @@ const ImprestDetailsPage: React.FC = () => {
                             Back
                         </Button>
                         <Button onClick={() => setPayImprestOpen(true)}>Pay Imprest</Button>
+                        <Button onClick={() => setPayImprestOpen(true)}> Imprest</Button>
                         <Button onClick={() => console.log("Download Excel (placeholder)")}>Imprest Voucher</Button>
                         <Button variant="ghost" onClick={() => console.log("Download Excel placeholder")}>
                             Download Excel
@@ -376,12 +360,7 @@ const ImprestDetailsPage: React.FC = () => {
                     <div className="card">
                         <div className="card-body">
                             <div className="table-responsive mt-3">
-                                <DataTable
-                                    data={rows}
-                                    loading={false}
-                                    columnDefs={columns}
-                                    gridOptions={{ pagination: true }}
-                                />
+                                <DataTable data={rows} loading={false} columnDefs={columns} gridOptions={{ pagination: true }} />
                             </div>
                         </div>
                     </div>
@@ -474,9 +453,7 @@ const ImprestDetailsPage: React.FC = () => {
             </Dialog>
 
             {/* Lightbox */}
-            {lightboxOpen && (
-                <Lightbox open={lightboxOpen} close={() => setLightboxOpen(false)} slides={lightboxSlides} />
-            )}
+            {lightboxOpen && <Lightbox open={lightboxOpen} close={() => setLightboxOpen(false)} slides={lightboxSlides} />}
         </div>
     );
 };

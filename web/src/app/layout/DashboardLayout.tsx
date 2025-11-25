@@ -11,7 +11,7 @@ export default function DashboardLayout() {
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset className="flex flex-col min-h-screen">
-                <DocumentTitle title={documentTitle} />
+                <DocumentTitle />
                 <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-accent">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1 cursor-pointer" />
