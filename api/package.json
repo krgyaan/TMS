@@ -37,6 +37,7 @@
         "cookie-parser": "^1.4.7",
         "drizzle-orm": "^0.44.5",
         "googleapis": "^135.0.0",
+        "mysql2": "^3.15.3",
         "passport": "^0.7.0",
         "passport-jwt": "^4.0.1",
         "pg-boss": "^10.3.2",
