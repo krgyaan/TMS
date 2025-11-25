@@ -1,49 +1,44 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Param,
-  Body,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe } from "@nestjs/common";
 
-import { EmployeeImprestService } from './employee-imprest.service';
+import { EmployeeImprestService } from "./employee-imprest.service";
 
-import type { CreateEmployeeImprestDto } from './zod/create-employee-imprest.schema';
+import type { CreateEmployeeImprestDto } from "./zod/create-employee-imprest.schema";
 
-import type { UpdateEmployeeImprestDto } from './zod/update-employee-imprest.schema';
+import type { UpdateEmployeeImprestDto } from "./zod/update-employee-imprest.schema";
+import { Public } from "../auth/decorators/public.decorator";
 
-@Controller('employee-imprest')
+@Controller("employee-imprest")
 export class EmployeeImprestController {
-  constructor(private readonly service: EmployeeImprestService) {}
+    constructor(private readonly service: EmployeeImprestService) {}
 
-  @Post()
-  create(@Body() body: CreateEmployeeImprestDto) {
-    return this.service.create(body);
-  }
+    @Get()
+    test(): string {
+        return "hello";
+    }
 
-  @Get('user/:id')
-  getByUser(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findAllByUser(id);
-  }
+    @Post()
+    create(@Body() body: CreateEmployeeImprestDto) {
+        console.log(body);
+        return this.service.create(body);
+    }
 
-  @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
-  }
+    @Get("user/:id")
+    getByUser(@Param("id", ParseIntPipe) id: number) {
+        return this.service.findAllByUser(id);
+    }
 
-  @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateEmployeeImprestDto,
-  ) {
-    return this.service.update(id, body);
-  }
+    @Get(":id")
+    getOne(@Param("id", ParseIntPipe) id: number) {
+        return this.service.findOne(id);
+    }
 
-  @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.service.delete(id);
-  }
+    @Put(":id")
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: UpdateEmployeeImprestDto) {
+        return this.service.update(id, body);
+    }
+
+    @Delete(":id")
+    delete(@Param("id", ParseIntPipe) id: number) {
+        return this.service.delete(id);
+    }
 }
