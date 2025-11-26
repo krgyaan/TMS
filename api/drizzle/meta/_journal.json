@@ -211,6 +211,20 @@
       "when": 1764054998672,
       "tag": "0029_first_madame_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1764145528661,
+      "tag": "0030_brave_kree",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1764149731584,
+      "tag": "0031_smiling_deathbird",
+      "breakpoints": true
     }
   ]
 }

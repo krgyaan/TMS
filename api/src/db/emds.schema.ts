@@ -14,43 +14,39 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
 ]);
 
 export const instrumentTypeEnum = pgEnum('instrument_type', [
-    'DD',           // Demand Draft
-    'FDR',          // Fixed Deposit Receipt
-    'BG',           // Bank Guarantee
+    'DD',
+    'FDR',
+    'BG',
     'Cheque',
     'Bank Transfer',
     'Portal Payment',
     'Surety Bond',
 ]);
 
-export const instrumentStatusEnum = pgEnum('instrument_status', [
-    'Pending', 'Requested', 'Approved', 'Issued', 'Dispatched', 'Received', 'Returned', 'Cancelled',
-    'Refunded', 'Encashed', 'Extended'
-]);
-
 export const paymentRequestTypeEnum = pgEnum('payment_request_type', [
     'TMS', 'Other Than TMS', 'Old Entries', 'Other Than Tender'
 ]);
 
+// ============================================
+// PAYMENT REQUESTS TABLE
+// ============================================
 export const paymentRequests = pgTable('payment_requests', {
     id: serial('id').primaryKey(),
     tenderId: integer('tender_id').notNull(),
 
-    // From old `emds` table
-    type: paymentRequestTypeEnum('type').default('TMS'), // old: emds.type
-    tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // old: emds.tender_no
-    projectName: varchar('project_name', { length: 500 }), // old: emds.project_name
+    type: paymentRequestTypeEnum('type').default('TMS'),
+    tenderNo: varchar('tender_no', { length: 500 }).default('NA'),
+    projectName: varchar('project_name', { length: 500 }),
 
     purpose: paymentPurposeEnum('purpose').notNull(),
     amountRequired: decimal('amount_required', { precision: 18, scale: 2 }).notNull(),
-    dueDate: timestamp('due_date'), // old: emds.due_date
-    requestedBy: varchar('requested_by', { length: 200 }), // old: emds.requested_by
+    dueDate: timestamp('due_date'),
+    requestedBy: varchar('requested_by', { length: 200 }),
 
     status: varchar('status', { length: 50 }).default('Pending'),
     remarks: text('remarks'),
 
-    // Migration helpers
-    legacyEmdId: integer('legacy_emd_id'), // maps to old emds.id
+    legacyEmdId: integer('legacy_emd_id'),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -68,6 +64,9 @@ export const paymentRequests = pgTable('payment_requests', {
     ];
 });
 
+// ============================================
+// PAYMENT INSTRUMENTS TABLE
+// ============================================
 export const paymentInstruments = pgTable('payment_instruments', {
     id: serial('id').primaryKey(),
     requestId: integer('request_id').notNull(),
@@ -76,39 +75,47 @@ export const paymentInstruments = pgTable('payment_instruments', {
 
     // Common fields
     amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
-    favouring: varchar('favouring', { length: 500 }), // old: dd_favour, cheque_favour, etc.
-    payableAt: varchar('payable_at', { length: 500 }), // old: dd_payable, fdr_payable
+    favouring: varchar('favouring', { length: 500 }),
+    payableAt: varchar('payable_at', { length: 500 }),
 
-    issueDate: date('issue_date'),     // old: dd_date, fdr_date, bg_date, cheque_date
-    expiryDate: date('expiry_date'),   // old: fdr_expiry, bg_expiry
-    validityDate: date('validity_date'), // BG validity
-    claimExpiryDate: date('claim_expiry_date'), // BG claim expiry
+    issueDate: date('issue_date'),
+    expiryDate: date('expiry_date'),
+    validityDate: date('validity_date'),
+    claimExpiryDate: date('claim_expiry_date'),
 
-    status: instrumentStatusEnum('instrument_status').default('Pending'),
+    status: varchar('status', { length: 100 }).default('Pending'),
     utr: varchar('utr', { length: 255 }),
-    docketNo: varchar('docket_no', { length: 255 }).unique(),
-    courierAddress: text('courier_address'), // old: courier_add, bg_courier_addr
+    docketNo: varchar('docket_no', { length: 255 }),
+    courierAddress: text('courier_address'),
 
-    action: integer('action'), // old: action (int flag in all detail tables)
+    action: integer('action'),
+    courierDeadline: integer('courier_deadline'),
 
-    // Courier deadline (in days or date)
-    courierDeadline: integer('courier_deadline'), // old: courier_deadline (int)
-
-    // Rejection / cancellation reasons
-    rejectionReason: text('rejection_reason'), // old: reason, reason_req, stop_reason_text
+    rejectionReason: text('rejection_reason'),
 
     // File paths
-    generatedPdf: varchar('generated_pdf', { length: 500 }), // main generated PDF
-    cancelPdf: varchar('cancel_pdf', { length: 500 }), // cancellation PDF
+    generatedPdf: varchar('generated_pdf', { length: 500 }),
+    cancelPdf: varchar('cancel_pdf', { length: 500 }),
     docketSlip: varchar('docket_slip', { length: 500 }),
     coveringLetter: varchar('covering_letter', { length: 500 }),
-    extraPdfPaths: text('generated_pdfs'), // old: generated_pdfs (text array)
+    extraPdfPaths: text('extra_pdf_paths'),
 
-    // Extension & Cancellation workflow files
-    extensionRequestPdf: varchar('extension_request_pdf', { length: 500 }), // old: request_extension_pdf
-    cancellationRequestPdf: varchar('cancellation_request_pdf', { length: 500 }), // old: request_cancellation_pdf
+    extensionRequestPdf: varchar('extension_request_pdf', { length: 500 }),
+    cancellationRequestPdf: varchar('cancellation_request_pdf', { length: 500 }),
+
+    // NEW FIELDS - Added from MySQL
+    reqNo: varchar('req_no', { length: 200 }),
+    reqReceive: varchar('req_receive', { length: 500 }),
+    referenceNo: varchar('reference_no', { length: 200 }),
+    transferDate: date('transfer_date'),
+    creditDate: date('credit_date'),
+
+    creditAmount: decimal('credit_amount', { precision: 18, scale: 2 }),
 
     remarks: text('remarks'),
+
+    // Legacy data storage for unmapped fields
+    legacyData: jsonb('legacy_data'),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -127,91 +134,244 @@ export const paymentInstruments = pgTable('payment_instruments', {
     ];
 });
 
-// DD - Demand Draft
+// ============================================
+// DD - DEMAND DRAFT DETAILS
+// ============================================
 export const instrumentDdDetails = pgTable('instrument_dd_details', {
     id: serial('id').primaryKey(),
     instrumentId: integer('instrument_id').notNull(),
-    ddNo: varchar('dd_no', { length: 100 }), // old: dd_no
-    ddDate: date('dd_date'), // old: dd_date
-    bankName: varchar('bank_name', { length: 300 }),
-    reqNo: varchar('req_no', { length: 100 }), // old: req_no
-}, (t) => [{ fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }]);
 
-// FDR - Fixed Deposit Receipt
+    ddNo: varchar('dd_no', { length: 100 }),
+    ddDate: date('dd_date'),
+    bankName: varchar('bank_name', { length: 300 }),
+    reqNo: varchar('req_no', { length: 100 }),
+
+    // NEW FIELDS - Added from MySQL emd_demand_drafts
+    ddNeeds: varchar('dd_needs', { length: 255 }),
+    ddPurpose: varchar('dd_purpose', { length: 255 }),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
+// FDR - FIXED DEPOSIT RECEIPT DETAILS
+// ============================================
 export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     id: serial('id').primaryKey(),
     instrumentId: integer('instrument_id').notNull(),
-    fdrNo: varchar('fdr_no', { length: 100 }), // old: fdr_no
-    fdrDate: date('fdr_date'), // old: fdr_date
-    fdrSource: varchar('fdr_source', { length: 200 }), // old: fdr_source
-    roi: decimal('roi', { precision: 6, scale: 2 }), // old: fdr_roi
-    marginPercent: decimal('margin_percent', { precision: 6, scale: 2 }),
-    fdrPurpose: varchar('fdr_purpose', { length: 500 }), // old: fdr_purpose
-}, (t) => [{ fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }]);
 
-// BG - Bank Guarantee
+    fdrNo: varchar('fdr_no', { length: 100 }),
+    fdrDate: date('fdr_date'),
+    fdrSource: varchar('fdr_source', { length: 200 }),
+    roi: decimal('roi', { precision: 6, scale: 2 }),
+    marginPercent: decimal('margin_percent', { precision: 6, scale: 2 }),
+    fdrPurpose: varchar('fdr_purpose', { length: 500 }),
+    fdrExpiryDate: date('fdr_expiry_date'),
+
+    // NEW FIELDS - Added from MySQL emd_fdrs
+    fdrNeeds: varchar('fdr_needs', { length: 255 }),
+    fdrRemark: text('fdr_remark'),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
+// BG - BANK GUARANTEE DETAILS
+// ============================================
 export const instrumentBgDetails = pgTable('instrument_bg_details', {
     id: serial('id').primaryKey(),
     instrumentId: integer('instrument_id').notNull(),
-    bgNo: varchar('bg_no', { length: 100 }), // old: bg_no
-    bgDate: date('bg_date'), // old: bg_date
-    validityDate: date('validity_date'), // old: bg_validity
-    claimExpiryDate: date('claim_expiry_date'), // old: claim_expiry
-    beneficiaryName: varchar('beneficiary_name', { length: 500 }), // old: bg_favour
-    beneficiaryAddress: text('beneficiary_address'), // old: bg_address
-    bankName: varchar('bank_name', { length: 300 }), // old: bg_bank_name, new_bg_bank_name
+
+    bgNo: varchar('bg_no', { length: 100 }),
+    bgDate: date('bg_date'),
+    validityDate: date('validity_date'),
+    claimExpiryDate: date('claim_expiry_date'),
+    beneficiaryName: varchar('beneficiary_name', { length: 500 }),
+    beneficiaryAddress: text('beneficiary_address'),
+    bankName: varchar('bank_name', { length: 300 }),
 
     // Margin percentages
-    cashMarginPercent: decimal('cash_margin_percent', { precision: 6, scale: 2 }), // old: bg_cont_percent
-    fdrMarginPercent: decimal('fdr_margin_percent', { precision: 6, scale: 2 }), // old: bg_fdr_percent
+    cashMarginPercent: decimal('cash_margin_percent', { precision: 6, scale: 2 }),
+    fdrMarginPercent: decimal('fdr_margin_percent', { precision: 6, scale: 2 }),
 
     // Charges
-    stampCharges: decimal('stamp_charges', { precision: 12, scale: 2 }), // old: bg_stamp
+    stampCharges: decimal('stamp_charges', { precision: 12, scale: 2 }),
     sfmsCharges: decimal('sfms_charges', { precision: 12, scale: 2 }),
 
-    // Deducted charges (actual debited)
-    stampChargesDeducted: decimal('stamp_charges_deducted', { precision: 12, scale: 2 }), // old: stamp_charge_deducted, new_stamp_charge_deducted
-    sfmsChargesDeducted: decimal('sfms_charges_deducted', { precision: 12, scale: 2 }), // old: sfms_charge_deducted
-    otherChargesDeducted: decimal('other_charges_deducted', { precision: 12, scale: 2 }), // old: other_charge_deducted
+    // Deducted charges
+    stampChargesDeducted: decimal('stamp_charges_deducted', { precision: 12, scale: 2 }),
+    sfmsChargesDeducted: decimal('sfms_charges_deducted', { precision: 12, scale: 2 }),
+    otherChargesDeducted: decimal('other_charges_deducted', { precision: 12, scale: 2 }),
 
-    // Extension fields (for extended BG)
-    extendedAmount: decimal('extended_amount', { precision: 18, scale: 2 }), // old: new_bg_amt
-    extendedValidityDate: date('extended_validity_date'), // old: new_bg_expiry
-    extendedClaimExpiryDate: date('extended_claim_expiry_date'), // old: new_bg_claim
-    extendedBankName: varchar('extended_bank_name', { length: 300 }), // old: new_bg_bank_name
+    // Extension fields
+    extendedAmount: decimal('extended_amount', { precision: 18, scale: 2 }),
+    extendedValidityDate: date('extended_validity_date'),
+    extendedClaimExpiryDate: date('extended_claim_expiry_date'),
+    extendedBankName: varchar('extended_bank_name', { length: 300 }),
 
     // File paths
-    extensionLetterPath: varchar('extension_letter_path', { length: 500 }), // old: ext_letter
+    extensionLetterPath: varchar('extension_letter_path', { length: 500 }),
     cancellationLetterPath: varchar('cancellation_letter_path', { length: 500 }),
-    prefilledSignedBg: varchar('prefilled_signed_bg', { length: 500 }), // old: prefilled_signed_bg
-}, (t) => [{ fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }]);
+    prefilledSignedBg: text('prefilled_signed_bg'),
 
-// Cheque
+    // ============================================
+    // NEW FIELDS - Added from MySQL emd_bgs
+    // ============================================
+
+    // BG Basic Info
+    bgNeeds: varchar('bg_needs', { length: 255 }),
+    bgPurpose: varchar('bg_purpose', { length: 255 }),
+    bgSoftCopy: varchar('bg_soft_copy', { length: 255 }),
+    bgPo: varchar('bg_po', { length: 255 }),
+
+    // Client Info
+    bgClientUser: varchar('bg_client_user', { length: 255 }),
+    bgClientCp: varchar('bg_client_cp', { length: 255 }),
+    bgClientFin: varchar('bg_client_fin', { length: 255 }),
+
+    // Bank Account Details
+    bgBankAcc: varchar('bg_bank_acc', { length: 255 }),
+    bgBankIfsc: varchar('bg_bank_ifsc', { length: 255 }),
+
+    // Courier
+    courierNo: varchar('courier_no', { length: 255 }),
+
+    // BG Formats
+    approveBg: varchar('approve_bg', { length: 255 }),
+    bgFormatTe: varchar('bg_format_te', { length: 255 }),
+    bgFormatTl: varchar('bg_format_tl', { length: 255 }),
+
+    // SFMS
+    sfmsConf: varchar('sfms_conf', { length: 255 }),
+
+    // FDR Details (for BG)
+    fdrAmt: decimal('fdr_amt', { precision: 18, scale: 2 }),
+    fdrPer: decimal('fdr_per', { precision: 6, scale: 2 }),
+    fdrCopy: varchar('fdr_copy', { length: 255 }),
+    fdrNo: varchar('fdr_no', { length: 255 }),
+    fdrValidity: date('fdr_validity'),
+    fdrRoi: decimal('fdr_roi', { precision: 6, scale: 2 }),
+
+    // BG Charges
+    bgChargeDeducted: decimal('bg_charge_deducted', { precision: 12, scale: 2 }),
+    newStampChargeDeducted: decimal('new_stamp_charge_deducted', { precision: 12, scale: 2 }),
+
+    // Cancellation Details
+    stampCoveringLetter: varchar('stamp_covering_letter', { length: 255 }),
+    cancelRemark: text('cancel_remark'),
+    cancellConfirm: text('cancell_confirm'),
+
+    // FDR Cancellation Details
+    bgFdrCancelDate: varchar('bg_fdr_cancel_date', { length: 255 }),
+    bgFdrCancelAmount: decimal('bg_fdr_cancel_amount', { precision: 18, scale: 2 }),
+    bgFdrCancelRefNo: varchar('bg_fdr_cancel_ref_no', { length: 255 }),
+
+    // Remarks
+    bg2Remark: text('bg2_remark'),
+    reasonReq: text('reason_req'),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
+// CHEQUE DETAILS
+// ============================================
 export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
     id: serial('id').primaryKey(),
     instrumentId: integer('instrument_id').notNull(),
-    chequeNo: varchar('cheque_no', { length: 50 }), // old: cheq_no
-    chequeDate: date('cheque_date'), // old: cheque_date
-    bankName: varchar('bank_name', { length: 300 }), // old: cheque_bank
-    chequeImagePath: varchar('cheque_image_path', { length: 500 }), // old: cheq_img
-    cancelledImagePath: varchar('cancelled_image_path', { length: 500 }), // old: cancelled_img
-}, (t) => [{ fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }]);
 
-// Bank Transfer / Portal Payment / UPI
+    chequeNo: varchar('cheque_no', { length: 50 }),
+    chequeDate: date('cheque_date'),
+    bankName: varchar('bank_name', { length: 300 }),
+    chequeImagePath: varchar('cheque_image_path', { length: 500 }),
+    cancelledImagePath: varchar('cancelled_image_path', { length: 500 }),
+
+    // ============================================
+    // NEW FIELDS - Added from MySQL emd_cheques
+    // ============================================
+
+    // Linked references
+    linkedDdId: integer('linked_dd_id'),
+    linkedFdrId: integer('linked_fdr_id'),
+
+    // Request details
+    reqType: varchar('req_type', { length: 255 }),
+    chequeNeeds: varchar('cheque_needs', { length: 255 }),
+    chequeReason: varchar('cheque_reason', { length: 255 }),
+
+    // Dates
+    dueDate: date('due_date'),
+    transferDate: date('transfer_date'),
+    btTransferDate: date('bt_transfer_date'),
+
+    // Other details
+    handover: varchar('handover', { length: 200 }),
+    confirmation: varchar('confirmation', { length: 200 }),
+    reference: varchar('reference', { length: 200 }),
+    stopReasonText: text('stop_reason_text'),
+
+    // Amount (for action 3)
+    amount: decimal('amount', { precision: 18, scale: 2 }),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
+// BANK TRANSFER / PORTAL PAYMENT DETAILS
+// ============================================
 export const instrumentTransferDetails = pgTable('instrument_transfer_details', {
     id: serial('id').primaryKey(),
     instrumentId: integer('instrument_id').notNull(),
-    portalName: varchar('portal_name', { length: 200 }), // old: portal (pay_on_portals.portal)
-    accountName: varchar('account_name', { length: 500 }), // old: bt_acc_name
-    accountNumber: varchar('account_number', { length: 50 }), // old: bt_acc
-    ifsc: varchar('ifsc', { length: 20 }), // old: bt_ifsc
-    transactionId: varchar('transaction_id', { length: 500 }), // old: utr, utr_num
-    transactionDate: timestamp('transaction_date'), // old: date_time
 
-    // Extra from portal payments
-    paymentMethod: varchar('payment_method', { length: 50 }), // old: is_netbanking, is_debit → derive: Netbanking, Debit Card, etc.
-}, (t) => [{ fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }]);
+    portalName: varchar('portal_name', { length: 200 }),
+    accountName: varchar('account_name', { length: 500 }),
+    accountNumber: varchar('account_number', { length: 50 }),
+    ifsc: varchar('ifsc', { length: 20 }),
+    transactionId: varchar('transaction_id', { length: 500 }),
+    transactionDate: timestamp('transaction_date'),
+    paymentMethod: varchar('payment_method', { length: 50 }),
 
+    // ============================================
+    // NEW FIELDS - Added from MySQL
+    // ============================================
+
+    // Bank Transfer specific
+    utrMsg: text('utr_msg'),
+    utrNum: varchar('utr_num', { length: 200 }),
+
+    // Portal Payment specific
+    isNetbanking: varchar('is_netbanking', { length: 255 }),
+    isDebit: varchar('is_debit', { length: 255 }),
+
+    // Return details
+    returnTransferDate: date('return_transfer_date'),
+    returnUtr: varchar('return_utr', { length: 200 }),
+
+    // Rejection/Remarks
+    reason: text('reason'),
+    remarks: text('remarks'),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
+// RELATIONS
+// ============================================
 export const paymentRequestRelations = relations(paymentRequests, ({ one, many }) => ({
     tender: one(tenderInfos, {
         fields: [paymentRequests.tenderId],
@@ -231,3 +391,57 @@ export const paymentInstrumentRelations = relations(paymentInstruments, ({ one }
     chequeDetails: one(instrumentChequeDetails),
     transferDetails: one(instrumentTransferDetails),
 }));
+
+export const instrumentDdDetailsRelations = relations(instrumentDdDetails, ({ one }) => ({
+    instrument: one(paymentInstruments, {
+        fields: [instrumentDdDetails.instrumentId],
+        references: [paymentInstruments.id],
+    }),
+}));
+
+export const instrumentFdrDetailsRelations = relations(instrumentFdrDetails, ({ one }) => ({
+    instrument: one(paymentInstruments, {
+        fields: [instrumentFdrDetails.instrumentId],
+        references: [paymentInstruments.id],
+    }),
+}));
+
+export const instrumentBgDetailsRelations = relations(instrumentBgDetails, ({ one }) => ({
+    instrument: one(paymentInstruments, {
+        fields: [instrumentBgDetails.instrumentId],
+        references: [paymentInstruments.id],
+    }),
+}));
+
+export const instrumentChequeDetailsRelations = relations(instrumentChequeDetails, ({ one }) => ({
+    instrument: one(paymentInstruments, {
+        fields: [instrumentChequeDetails.instrumentId],
+        references: [paymentInstruments.id],
+    }),
+}));
+
+export const instrumentTransferDetailsRelations = relations(instrumentTransferDetails, ({ one }) => ({
+    instrument: one(paymentInstruments, {
+        fields: [instrumentTransferDetails.instrumentId],
+        references: [paymentInstruments.id],
+    }),
+}));
+
+// ============================================
+// TYPES
+// ============================================
+export type PaymentRequest = typeof paymentRequests.$inferSelect;
+export type PaymentInstrument = typeof paymentInstruments.$inferSelect;
+export type InstrumentDdDetails = typeof instrumentDdDetails.$inferSelect;
+export type InstrumentFdrDetails = typeof instrumentFdrDetails.$inferSelect;
+export type InstrumentBgDetails = typeof instrumentBgDetails.$inferSelect;
+export type InstrumentChequeDetails = typeof instrumentChequeDetails.$inferSelect;
+export type InstrumentTransferDetails = typeof instrumentTransferDetails.$inferSelect;
+
+export type NewPaymentRequest = typeof paymentRequests.$inferInsert;
+export type NewPaymentInstrument = typeof paymentInstruments.$inferInsert;
+export type NewInstrumentDdDetails = typeof instrumentDdDetails.$inferInsert;
+export type NewInstrumentFdrDetails = typeof instrumentFdrDetails.$inferInsert;
+export type NewInstrumentBgDetails = typeof instrumentBgDetails.$inferInsert;
+export type NewInstrumentChequeDetails = typeof instrumentChequeDetails.$inferInsert;
+export type NewInstrumentTransferDetails = typeof instrumentTransferDetails.$inferInsert;

@@ -13,6 +13,7 @@ import {
     instrumentChequeDetails,
     instrumentTransferDetails,
 } from './src/db/emds.schema';
+import { int } from 'drizzle-orm/mysql-core';
 
 const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
 const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';
@@ -40,27 +41,32 @@ const emds = mysqlTable('emds', {
 const emd_fdrs = mysqlTable('emd_fdrs', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
-    fdr_amt: varchar('fdr_amt', { length: 255 }),
-    amount: varchar('amount', { length: 200 }),
     fdr_favour: varchar('fdr_favour', { length: 255 }),
-    fdr_payable: varchar('fdr_payable', { length: 255 }),
+    fdr_amt: varchar('fdr_amt', { length: 255 }),
     fdr_expiry: varchar('fdr_expiry', { length: 255 }),
-    fdr_date: date('fdr_date'),
-    status: varchar('status', { length: 100 }),
-    utr: varchar('utr', { length: 200 }),
-    docket_no: varchar('docket_no', { length: 200 }),
+    fdr_needs: varchar('fdr_needs', { length: 255 }),
+    courier_deadline: int('courier_deadline'),
     courier_add: varchar('courier_add', { length: 255 }),
-    courier_deadline: varchar('courier_deadline', { length: 20 }),
+    fdr_no: varchar('fdr_no', { length: 200 }),
+    fdr_date: date('fdr_date'),
+    action: int('action'),
+    fdr_source: varchar('fdr_source', { length: 200 }),
+    fdr_remark: text('fdr_remark'),
+    fdr_payable: varchar('fdr_payable', { length: 255 }),
+    remarks: text('remarks'),
+    status: varchar('status', { length: 100 }),
     generated_fdr: varchar('generated_fdr', { length: 500 }),
     fdrcancel_pdf: varchar('fdrcancel_pdf', { length: 500 }),
-    docket_slip: varchar('docket_slip', { length: 255 }),
+    req_receive: varchar('req_receive', { length: 500 }),
     covering_letter: varchar('covering_letter', { length: 500 }),
-    remarks: text('remarks'),
-    fdr_remark: text('fdr_remark'),
-    action: varchar('action', { length: 50 }),
-    fdr_no: varchar('fdr_no', { length: 200 }),
-    fdr_source: varchar('fdr_source', { length: 200 }),
-    fdr_purpose: varchar('fdr_purpose', { length: 500 }),
+    req_no: varchar('req_no', { length: 200 }),
+    docket_no: varchar('docket_no', { length: 200 }),
+    docket_slip: varchar('docket_slip', { length: 255 }),
+    transfer_date: date('transfer_date'),
+    utr: varchar('utr', { length: 200 }),
+    reference_no: varchar('reference_no', { length: 200 }),
+    date: date('date'),
+    amount: varchar('amount', { length: 200 }),
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -68,22 +74,33 @@ const emd_fdrs = mysqlTable('emd_fdrs', {
 const emd_demand_drafts = mysqlTable('emd_demand_drafts', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
-    dd_amt: varchar('dd_amt', { length: 255 }),
-    amount: varchar('amount', { length: 200 }),
     dd_favour: varchar('dd_favour', { length: 255 }),
+    dd_amt: varchar('dd_amt', { length: 255 }),
     dd_payable: varchar('dd_payable', { length: 255 }),
-    dd_date: date('dd_date'),
-    status: varchar('status', { length: 100 }),
-    utr: varchar('utr', { length: 200 }),
-    docket_no: varchar('docket_no', { length: 200 }),
+    dd_needs: varchar('dd_needs', { length: 255 }),
+    dd_purpose: varchar('dd_purpose', { length: 255 }),
     courier_add: varchar('courier_add', { length: 255 }),
+    courier_deadline: varchar('courier_deadline', { length: 20 }),
+    action: int('action'), // Action taken on DD
+    // action == 1 (Accountant Form DD)
+    status: varchar('status', { length: 100 }), // Status of DD Request
+    dd_date: date('dd_date'), // DD Date
+    dd_no: varchar('dd_no', { length: 200 }), // DD No
+    req_no: varchar('req_no', { length: 200 }), // Request No
+    remarks: varchar('remarks', { length: 200 }), // Remarks
     generated_dd: varchar('generated_dd', { length: 500 }),
-    ddcancel_pdf: varchar('ddcancel_pdf', { length: 500 }),
+    // action == 3 (Return DD via courier)
+    docket_no: varchar('docket_no', { length: 200 }),
     docket_slip: varchar('docket_slip', { length: 255 }),
-    remarks: varchar('remarks', { length: 200 }),
-    action: varchar('action', { length: 50 }),
-    dd_no: varchar('dd_no', { length: 200 }),
-    req_no: varchar('req_no', { length: 200 }),
+    // action == 4 (Return DD via Bank Transfer)
+    transfer_date: date('transfer_date'), // Transfer Date
+    utr: varchar('utr', { length: 200 }),
+    // action == 6 (Request Cancellation)
+    ddcancel_pdf: varchar('ddcancel_pdf', { length: 500 }),
+    // action == 7 (Cancelled at Branch)
+    date: date('date'), // date of credit
+    amount: varchar('amount', { length: 200 }), // amount credited
+    reference_no: varchar('reference_no', { length: 200 }), // bank reference no
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -91,37 +108,76 @@ const emd_demand_drafts = mysqlTable('emd_demand_drafts', {
 const emd_bgs = mysqlTable('emd_bgs', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
-    bg_amt: varchar('bg_amt', { length: 255 }),
-    new_bg_amt: decimal('new_bg_amt', { precision: 20, scale: 2 }),
     bg_favour: varchar('bg_favour', { length: 255 }),
-    bg_expiry: date('bg_expiry'),
-    new_bg_expiry: date('new_bg_expiry'),
-    bg_date: date('bg_date'),
-    bg_validity: date('bg_validity'),
-    claim_expiry: date('claim_expiry'),
-    new_bg_claim: date('new_bg_claim'),
-    docket_no: varchar('docket_no', { length: 255 }),
-    docket_slip: varchar('docket_slip', { length: 255 }),
-    reason_req: text('reason_req'),
-    cancel_remark: text('cancel_remark'),
-    generated_pdfs: text('generated_pdfs'),
-    request_extension_pdf: varchar('request_extension_pdf', { length: 255 }),
-    request_cancellation_pdf: varchar('request_cancellation_pdf', { length: 255 }),
-    action: varchar('action', { length: 50 }),
-    status: varchar('bg_req', { length: 255 }),
-    bg_no: varchar('bg_no', { length: 255 }),
     bg_address: varchar('bg_address', { length: 255 }),
-    bg_bank_name: varchar('bg_bank_name', { length: 255 }),
-    new_bg_bank_name: varchar('new_bg_bank_name', { length: 255 }),
+    bg_expiry: date('bg_expiry'),
+    bg_claim: date('bg_claim'),
+    bg_amt: varchar('bg_amt', { length: 255 }),
+    bg_bank: varchar('bg_bank', { length: 255 }),
     bg_cont_percent: varchar('bg_cont_percent', { length: 255 }),
     bg_fdr_percent: varchar('bg_fdr_percent', { length: 255 }),
+    bg_needs: varchar('bg_needs', { length: 255 }),
+    bg_purpose: varchar('bg_purpose', { length: 255 }),
     bg_stamp: varchar('bg_stamp', { length: 255 }),
+    bg_courier_addr: varchar('bg_courier_addr', { length: 255 }),
+    bg_courier_deadline: varchar('bg_courier_deadline', { length: 20 }),
+    bg_soft_copy: varchar('bg_soft_copy', { length: 255 }),
+    bg_po: varchar('bg_po', { length: 255 }),
+    bg_client_user: varchar('bg_client_user', { length: 255 }),
+    bg_client_cp: varchar('bg_client_cp', { length: 255 }),
+    bg_client_fin: varchar('bg_client_fin', { length: 255 }),
+    bg_bank_name: varchar('bg_bank_name', { length: 255 }),
+    bg_bank_acc: varchar('bg_bank_acc', { length: 255 }),
+    bg_bank_ifsc: varchar('bg_bank_ifsc', { length: 255 }),
+    action: varchar('action', { length: 50 }), // Action taken on BG
+    // action == 1 (Request Bank for BG)
+    status: varchar('bg_req', { length: 255 }), // Status of BG Request
+    reason_req: text('reason_req'), // Reason for Rejection
+    approve_bg: varchar('approve_bg', { length: 255 }), // Approved BG Format
+    bg_format_te: varchar('bg_format_te', { length: 255 }), // BG Format by TE
+    bg_format_tl: varchar('bg_format_imran', { length: 255 }), // BG Format by TL
+    prefilled_signed_bg: text('prefilled_signed_bg'), // Prefilled Signed BG
+    // action == 2 (Capture BG after creation)
+    bg_no: varchar('bg_no', { length: 255 }), // BG Number
+    bg_date: date('bg_date'), // BG Creation Date
+    bg_validity: date('bg_validity'), // BG Validity Date
+    claim_expiry: date('claim_expiry'), // BG Claim Period Expiry
+    courier_no: varchar('courier_no', { length: 255 }), // Courier Request No
+    bg2_remark: text('bg2_remark'), // Remarks
+    // action == 3 (Capture FDR)
+    sfms_conf: varchar('sfms_conf', { length: 255 }), // SFMS Confirmation Copy
+    fdr_amt: varchar('fdr_amt', { length: 255 }), // FDR Amount
+    fdr_per: varchar('fdr_per', { length: 255 }), // FDR Percentage
+    fdr_copy: varchar('fdr_copy', { length: 255 }), // FDR copy
+    fdr_no: varchar('fdr_no', { length: 255 }), // FDR No
+    fdr_validity: date('fdr_validity'), // FDR Validity
+    fdr_roi: varchar('fdr_roi', { length: 255 }), // FDR ROI%
+    bg_charge_deducted: varchar('bg_charge_deducted', { length: 255 }), // BG Charges deducted
+    sfms_charge_deducted: varchar('sfms_charge_deducted', { length: 255 }), // SFMS Charges deducted
+    stamp_charge_deducted: varchar('stamp_charge_deducted', { length: 255 }), // Stamp Charges deducted
+    other_charge_deducted: varchar('other_charge_deducted', { length: 255 }), // Other Charges deducted
+    // action == 5 (Request Extension)
     new_stamp_charge_deducted: decimal('new_stamp_charge_deducted', { precision: 10, scale: 2 }),
-    stamp_charge_deducted: varchar('stamp_charge_deducted', { length: 200 }),
-    sfms_charge_deducted: varchar('sfms_charge_deducted', { length: 200 }),
-    other_charge_deducted: varchar('other_charge_deducted', { length: 255 }),
-    ext_letter: varchar('ext_letter', { length: 255 }),
-    prefilled_signed_bg: text('prefilled_signed_bg'),
+    new_bg_bank_name: varchar('new_bg_bank_name', { length: 255 }), // New BG Bank Name
+    new_bg_amt: decimal('new_bg_amt', { precision: 20, scale: 2 }), // New BG Amount
+    new_bg_expiry: date('new_bg_expiry'), // New BG Expiry Date
+    new_bg_claim: decimal('new_bg_claim', { precision: 10, scale: 2 }), // New BG Claim Date
+    ext_letter: varchar('ext_letter', { length: 255 }), // Extension Letter
+    request_extension_pdf: varchar('request_extension_pdf', { length: 255 }), // Request Extension PDF
+    // action == 6 (Returned via courier)
+    docket_no: varchar('docket_no', { length: 255 }), // Docket No
+    docket_slip: varchar('docket_slip', { length: 255 }), // Docket Slip
+    // action == 7 (Request Cancellation)
+    stamp_covering_letter: varchar('stamp_covering_letter', { length: 255 }), // Stamp Covering Letter
+    request_cancellation_pdf: varchar('request_cancellation_pdf', { length: 255 }), // Request Cancellation PDF
+    cancel_remark: text('cancel_remark'), // Cancellation Remark
+    // action == 8 (BG Cancellation Confirmation)
+    cancell_confirm: text('cancell_confirm'), // Cancellation Confirm
+    // action == 9 (FDR Cancellation Confirmation)
+    bg_fdr_cancel_date: varchar('bg_fdr_cancel_date', { length: 255 }), // BG FDR Cancel Date
+    bg_fdr_cancel_amount: varchar('bg_fdr_cancel_amount', { length: 255 }), // BG FDR Cancel Amount
+    bg_fdr_cancel_ref_no: varchar('bg_fdr_cancel_ref_no', { length: 255 }), // BG FDR Cancel Reference No
+
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -129,20 +185,38 @@ const emd_bgs = mysqlTable('emd_bgs', {
 const emd_cheques = mysqlTable('emd_cheques', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
-    cheque_amt: varchar('cheque_amt', { length: 255 }),
-    amount: varchar('amount', { length: 200 }),
+    dd_id: bigint('dd_id', { mode: 'number' }),
+    fdr_id: bigint('fdr_id', { mode: 'number' }),
+    req_type: varchar('req_type', { length: 255 }), // Request Type
     cheque_favour: varchar('cheque_favour', { length: 255 }),
+    cheque_amt: varchar('cheque_amt', { length: 255 }),
     cheque_date: varchar('cheque_date', { length: 255 }),
-    status: varchar('status', { length: 200 }),
-    utr: varchar('utr', { length: 200 }),
-    reason: varchar('reason', { length: 200 }),
-    stop_reason_text: text('stop_reason_text'),
-    generated_pdfs: text('generated_pdfs'),
-    action: varchar('action', { length: 50 }),
-    cheq_no: varchar('cheq_no', { length: 200 }),
+    cheque_needs: varchar('cheque_needs', { length: 255 }),
+    cheque_reason: varchar('cheque_reason', { length: 255 }),
     cheque_bank: varchar('cheque_bank', { length: 255 }),
-    cheq_img: varchar('cheq_img', { length: 200 }),
-    cancelled_img: varchar('cancelled_img', { length: 200 }),
+    action: int('action'), // Action taken on Cheque
+    // action == 1 (Accountant Form Cheque)
+    status: varchar('status', { length: 200 }), // Status of Cheque Request
+    reason: varchar('reason', { length: 200 }), // Reason for Rejection
+    cheque_no: varchar('cheq_no', { length: 200 }), // Cheque No
+    duedate: date('duedate'), // Due Date
+    handover: varchar('handover', { length: 200 }), // Handover
+    cheque_img: varchar('cheq_img', { length: 200 }), // Cheque Image
+    confirmation: varchar('confirmation', { length: 200 }), // Confirmation
+    remarks: varchar('remarks', { length: 200 }), // Remarks
+    // action == 2 (Stop the cheque from bank)
+    stop_reason_text: text('stop_reason_text'), // Stop Reason Text
+    // action == 3 (Paid via Bank Transfer)
+    transfer_date: date('transfer_date'), // Transfer Date
+    amount: varchar('amount', { length: 200 }), // Amount
+    utr: varchar('utr', { length: 200 }), // UTR
+    // action == 4 (Deposited in Bank)
+    bt_transfer_date: date('bt_transfer_date'), // BT Transfer Date
+    reference: varchar('reference', { length: 200 }), // Reference
+    // action == 5 (Cancelled or Torn)
+    cancelled_img: varchar('cancelled_img', { length: 200 }), // Cancelled Image
+
+    generated_pdfs: text('generated_pdfs'), // Generated PDFs
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -151,14 +225,21 @@ const bank_transfers = mysqlTable('bank_transfers', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     bt_amount: varchar('bt_amount', { length: 200 }),
-    status: varchar('status', { length: 200 }),
-    utr: varchar('utr', { length: 200 }),
-    utr_num: varchar('utr_num', { length: 200 }),
     bt_acc_name: varchar('bt_acc_name', { length: 255 }),
     bt_acc: varchar('bt_acc', { length: 255 }),
     bt_ifsc: varchar('bt_ifsc', { length: 255 }),
-    date_time: timestamp('date_time'),
-    transfer_date: date('transfer_date'),
+    action: int('action'), // Action taken on BT
+    // action == 1 (Accountant Form BT)
+    status: varchar('status', { length: 200 }), // Status of BT Request
+    reason: text('reason'), // Reason for Rejection
+    date_time: timestamp('date_time'), // Date and Time of payment
+    utr: varchar('utr', { length: 200 }), // UTR of payment
+    utr_msg: text('utr_mgs'), // Message from UTR
+    remarks: varchar('remarks', { length: 200 }), // Remarks
+    // action == 3 (Return via Bank Transfer)
+    transfer_date: date('transfer_date'), // Transfer Date
+    utr_num: varchar('utr_num', { length: 200 }), // UTR Number
+
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -166,14 +247,22 @@ const bank_transfers = mysqlTable('bank_transfers', {
 const pay_on_portals = mysqlTable('pay_on_portals', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
-    amount: varchar('amount', { length: 255 }),
-    status: varchar('status', { length: 255 }),
-    utr: varchar('utr', { length: 200 }),
-    utr_num: varchar('utr_num', { length: 200 }),
     portal: varchar('portal', { length: 255 }),
     is_netbanking: varchar('is_netbanking', { length: 255 }),
     is_debit: varchar('is_debit', { length: 255 }),
-    date_time: timestamp('date_time'),
+    amount: varchar('amount', { length: 255 }),
+    action: int('action'), // Action taken on Portal
+    // action == 1 (Accountant Form Portal)
+    status: varchar('status', { length: 255 }), // Status of Portal Request
+    date_time: timestamp('date_time'), // Date and Time of payment from portal
+    utr_num: varchar('utr_num', { length: 200 }), // UTR Number from portal
+    utr_msg: text('utr_mgs'), // Message from UTR from portal
+    remarks: varchar('remarks', { length: 200 }), // Remarks from portal
+    reason: text('reason'), // Rejection Reason from portal
+    // action == 3 (Return via Bank Transfer)
+    transfer_date: date('transfer_date'), // Transfer Date from portal
+    utr: varchar('utr', { length: 200 }), // UTR of payment from portal
+
     created_at: timestamp('created_at'),
     updated_at: timestamp('updated_at'),
 });
@@ -215,22 +304,23 @@ async function migratePaymentRequests() {
     const rows = await mysqlDb.select().from(emds);
 
     for (const r of rows) {
-        const newId = await db.insert(paymentRequests).values({
-            tenderId: Number(r.tender_id || 0),
-            type: (r.type as 'TMS' | 'Other Than TMS' | 'Old Entries' | 'Other Than Tender') || 'TMS',
-            tenderNo: r.tender_no || 'NA',
-            projectName: r.project_name || null,
-            purpose: 'EMD',
-            amountRequired: parseAmount(r.amount),
+        const [newRecord] = await db.insert(paymentRequests).values({
+            tenderId: Number(r.tender_id ?? 0),
+            type: (r.type as 'TMS' | 'Other Than TMS' | 'Old Entries' | 'Other Than Tender') ?? 'TMS',
+            tenderNo: r.tender_no ?? 'NA',
+            projectName: r.project_name ?? null,
+            purpose: 'EMD', // Old system was EMD-focused
+            amountRequired: '0.00', // Will be updated after instruments migration
             dueDate: parseDate(r.due_date),
-            requestedBy: r.requested_by || null,
+            requestedBy: r.requested_by ?? null,
+            status: 'Pending', // Default, can be updated based on instrument statuses
+            remarks: null, // No equivalent in old schema
             legacyEmdId: Number(r.id),
-            status: 'Pending',
-            createdAt: parseDate(r.created_at) || new Date(),
-            updatedAt: parseDate(r.updated_at) || new Date(),
+            createdAt: parseDate(r.created_at) ?? new Date(),
+            updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentRequests.id });
 
-        emdToRequestMap.set(Number(r.id), newId[0].id);
+        emdToRequestMap.set(Number(r.id ?? 0), newRecord.id);
     }
     console.log(`Migrated ${emdToRequestMap.size} payment requests`);
 }
@@ -239,31 +329,31 @@ async function migrateFDRs() {
     console.log('Migrating FDRs...');
     const rows = await mysqlDb.select().from(emd_fdrs);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
             requestId,
             instrumentType: 'FDR',
-            amount: parseAmount(r.fdr_amt || r.amount),
-            favouring: r.fdr_favour || r.fdr_payable,
+            amount: parseAmount(r.fdr_amt ?? r.amount),
+            favouring: r.fdr_favour ?? r.fdr_payable,
             payableAt: r.fdr_payable,
             issueDate: parseDateToString(r.fdr_date),
             expiryDate: parseDateToString(r.fdr_expiry),
             status: mapStatus(r.status),
-            utr: r.utr || r.utr_num,
+            utr: r.utr,
             docketNo: r.docket_no,
-            courierAddress: r.courier_add || r.courier_address,
+            courierAddress: r.courier_add,
             courierDeadline: r.courier_deadline ? Number(r.courier_deadline) : null,
             generatedPdf: r.generated_fdr,
             cancelPdf: r.fdrcancel_pdf,
             docketSlip: r.docket_slip,
             coveringLetter: r.covering_letter,
-            rejectionReason: r.remarks || r.fdr_remark,
+            rejectionReason: r.remarks ?? r.fdr_remark,
             action: r.action ? Number(r.action) : null,
-            extraPdfPaths: r.generated_pdfs ? r.generated_pdfs : null,
-            createdAt: parseDate(r.created_at) || new Date(),
-            updatedAt: parseDate(r.updated_at) || new Date(),
+            extraPdfPaths: r.generated_fdr ? r.generated_fdr : null,
+            createdAt: parseDate(r.created_at) ?? new Date(),
+            updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
 
         await db.insert(instrumentFdrDetails).values({
@@ -271,7 +361,7 @@ async function migrateFDRs() {
             fdrNo: r.fdr_no,
             fdrDate: parseDateToString(r.fdr_date),
             fdrSource: r.fdr_source,
-            fdrPurpose: r.fdr_purpose,
+            fdrPurpose: r.fdr_needs,
         });
     }
 }
@@ -280,18 +370,18 @@ async function migrateDDs() {
     console.log('Migrating Demand Drafts...');
     const rows = await mysqlDb.select().from(emd_demand_drafts);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
             requestId,
             instrumentType: 'DD',
-            amount: parseAmount(r.dd_amt || r.amount),
+            amount: parseAmount(r.dd_amt ?? r.amount),
             favouring: r.dd_favour,
             payableAt: r.dd_payable,
             issueDate: parseDateToString(r.dd_date),
             status: mapStatus(r.status),
-            utr: r.utr || r.utr_num,
+            // utr: r.utr ?? r.utr_num,
             docketNo: r.docket_no,
             courierAddress: r.courier_add,
             generatedPdf: r.generated_dd,
@@ -299,15 +389,15 @@ async function migrateDDs() {
             docketSlip: r.docket_slip,
             rejectionReason: r.remarks,
             action: r.action ? Number(r.action) : null,
-            createdAt: parseDate(r.created_at) || new Date(),
-            updatedAt: parseDate(r.updated_at) || new Date(),
+            createdAt: parseDate(r.created_at) ?? new Date(),
+            updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
 
         await db.insert(instrumentDdDetails).values({
             instrumentId: instId[0].id,
             ddNo: r.dd_no,
             ddDate: parseDateToString(r.dd_date),
-            bankName: r.bank_name || null,
+            // bankName: r.bank_name ?? null,
             reqNo: r.req_no,
         });
     }
@@ -317,44 +407,43 @@ async function migrateBGs() {
     console.log('Migrating BGs...');
     const rows = await mysqlDb.select().from(emd_bgs);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
             requestId,
             instrumentType: 'BG',
-            amount: parseAmount(r.new_bg_amt || r.bg_amt),
+            amount: parseAmount(r.bg_amt),
             favouring: r.bg_favour,
             issueDate: parseDateToString(r.bg_date),
-            expiryDate: parseDateToString(r.new_bg_expiry || r.bg_expiry),
-            validityDate: parseDateToString(r.bg_validity || r.new_bg_expiry),
-            claimExpiryDate: parseDateToString(r.claim_expiry || r.new_bg_claim),
-            status: mapStatus(r.status || (r.new_bg_amt ? 'Extended' : 'Issued')),
+            expiryDate: parseDateToString(r.bg_expiry),
+            validityDate: parseDateToString(r.bg_expiry),
+            claimExpiryDate: parseDateToString(r.claim_expiry),
+            status: mapStatus(r.status),
             docketNo: r.docket_no,
             docketSlip: r.docket_slip,
-            rejectionReason: r.reason_req || r.cancel_remark,
-            extraPdfPaths: r.generated_pdfs ? r.generated_pdfs : null,
+            rejectionReason: r.reason_req,
             extensionRequestPdf: r.request_extension_pdf,
             cancellationRequestPdf: r.request_cancellation_pdf,
             action: r.action ? Number(r.action) : null,
-            createdAt: parseDate(r.created_at) || new Date(),
-            updatedAt: parseDate(r.updated_at) || new Date(),
+            createdAt: parseDate(r.created_at) ?? new Date(),
+            updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
 
         await db.insert(instrumentBgDetails).values({
             instrumentId: instId[0].id,
             bgNo: r.bg_no,
             bgDate: parseDateToString(r.bg_date),
-            validityDate: parseDateToString(r.bg_validity || r.new_bg_expiry),
-            claimExpiryDate: parseDateToString(r.claim_expiry || r.new_bg_claim),
+            validityDate: parseDateToString(r.bg_expiry),
+            claimExpiryDate: parseDateToString(r.claim_expiry),
             beneficiaryName: r.bg_favour,
             beneficiaryAddress: r.bg_address,
-            bankName: r.new_bg_bank_name || r.bg_bank_name,
+            bankName: r.bg_bank,
             cashMarginPercent: parseAmount(r.bg_cont_percent),
             fdrMarginPercent: parseAmount(r.bg_fdr_percent),
-            stampCharges: parseAmount(r.bg_stamp || r.new_stamp_charge_deducted),
+            stampCharges: parseAmount(r.bg_stamp ?? r.new_stamp_charge_deducted),
             sfmsCharges: null,
-            stampChargesDeducted: parseAmount(r.new_stamp_charge_deducted || r.stamp_charge_deducted),
+            stampChargesDeducted: parseAmount(r.stamp_charge_deducted),
             sfmsChargesDeducted: parseAmount(r.sfms_charge_deducted),
             otherChargesDeducted: parseAmount(r.other_charge_deducted),
             extendedAmount: parseAmount(r.new_bg_amt),
@@ -362,7 +451,7 @@ async function migrateBGs() {
             extendedClaimExpiryDate: parseDateToString(r.new_bg_claim),
             extendedBankName: r.new_bg_bank_name,
             extensionLetterPath: r.ext_letter,
-            cancellationLetterPath: r.cancellation_letter_path || null,
+            // cancellationLetterPath: r.cancellation_letter_path ?? null,
             prefilledSignedBg: r.prefilled_signed_bg,
         });
     }
@@ -372,30 +461,30 @@ async function migrateCheques() {
     console.log('Migrating Cheques...');
     const rows = await mysqlDb.select().from(emd_cheques);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
             requestId,
             instrumentType: 'Cheque',
-            amount: parseAmount(r.cheque_amt || r.amount),
+            amount: parseAmount(r.cheque_amt ?? r.amount),
             favouring: r.cheque_favour,
             issueDate: parseDateToString(r.cheque_date),
             status: mapStatus(r.status),
-            utr: r.utr || r.utr_num,
-            rejectionReason: r.reason || r.stop_reason_text,
+            // utr: r.utr ?? r.utr_num,
+            rejectionReason: r.reason ?? r.stop_reason_text,
             generatedPdf: r.generated_pdfs,
             action: r.action ? Number(r.action) : null,
-            createdAt: parseDate(r.created_at) || new Date(),
-            updatedAt: parseDate(r.updated_at) || new Date(),
+            createdAt: parseDate(r.created_at) ?? new Date(),
+            updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
 
         await db.insert(instrumentChequeDetails).values({
             instrumentId: instId[0].id,
-            chequeNo: r.cheq_no,
+            chequeNo: r.cheque_no,
             chequeDate: parseDateToString(r.cheque_date),
             bankName: r.cheque_bank,
-            chequeImagePath: r.cheq_img,
+            chequeImagePath: r.cheque_img,
             cancelledImagePath: r.cancelled_img,
         });
     }
@@ -405,7 +494,7 @@ async function migrateBankTransfers() {
     console.log('Migrating Bank Transfers...');
     const rows = await mysqlDb.select().from(bank_transfers);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
@@ -413,7 +502,7 @@ async function migrateBankTransfers() {
             instrumentType: 'Bank Transfer',
             amount: parseAmount(r.bt_amount),
             status: mapStatus(r.status),
-            utr: r.utr || r.utr_num,
+            // utr: r.utr ?? r.utr_num,
             createdAt: parseDate(r.created_at) || new Date(),
             updatedAt: parseDate(r.updated_at) || new Date(),
         }).returning({ id: paymentInstruments.id });
@@ -433,7 +522,7 @@ async function migratePortalPayments() {
     console.log('Migrating Portal Payments...');
     const rows = await mysqlDb.select().from(pay_on_portals);
     for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id);
+        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
         if (!requestId) continue;
 
         const instId = await db.insert(paymentInstruments).values({
@@ -441,7 +530,7 @@ async function migratePortalPayments() {
             instrumentType: 'Portal Payment',
             amount: parseAmount(r.amount),
             status: mapStatus(r.status),
-            utr: r.utr || r.utr_num,
+            // utr: r.utr ?? r.utr_num,
             createdAt: parseDate(r.created_at) || new Date(),
             updatedAt: parseDate(r.updated_at) || new Date(),
         }).returning({ id: paymentInstruments.id });

@@ -171,4 +171,10 @@ export class TenderInfoController {
         const parsed = SaveTenderApprovalSchema.parse(body);
         return this.tenderInfosService.updateApproval(id, parsed);
     }
+
+    @Get('emd-data')
+    async getEmdData(@Query('type') type?: string) {
+        const validType = type === 'pending' || type === 'sent' ? type : undefined;
+        return this.tenderInfosService.findEmdData(validType);
+    }
 }

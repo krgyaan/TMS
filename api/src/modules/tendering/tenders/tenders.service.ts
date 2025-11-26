@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull, notInArray, or, gt, desc, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '../../../db/tenders.schema';
@@ -9,6 +9,8 @@ import { items } from 'src/db/items.schema';
 import { organizations } from 'src/db/organizations.schema';
 import { locations } from 'src/db/locations.schema';
 import { websites } from 'src/db/websites.schema';
+import { tenderInformation } from 'src/db/tender-info-sheet.schema';
+import { paymentRequests } from 'src/db/emds.schema';
 
 export type TenderListFilters = {
     statusIds?: number[];

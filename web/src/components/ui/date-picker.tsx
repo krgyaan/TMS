@@ -44,7 +44,7 @@ export function DatePicker({
                         mode="single"
                         selected={date}
                         onSelect={onChange}
-                        initialFocus
+                        autoFocus
                         className={cn("min-h-[320px]", calendarClassName)}
                     />
                 </PopoverContent>

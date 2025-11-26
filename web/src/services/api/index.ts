@@ -23,3 +23,4 @@ export { leadTypesService } from './lead-type.service';
 export { loanPartiesService } from './loan-party.service';
 export { tenderInfosService } from './tenders.service';
 export { infoSheetsService } from './info-sheet.service';
+export { emdsService } from './emds.service';
