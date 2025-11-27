@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, inArray, isNull, notInArray, or, gt, desc, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNull, not, or, ne, notInArray, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '../../../db/tenders.schema';
@@ -9,12 +9,11 @@ import { items } from 'src/db/items.schema';
 import { organizations } from 'src/db/organizations.schema';
 import { locations } from 'src/db/locations.schema';
 import { websites } from 'src/db/websites.schema';
-import { tenderInformation } from 'src/db/tender-info-sheet.schema';
-import { paymentRequests } from 'src/db/emds.schema';
+import { StatusCache } from 'src/utils/status-cache';
 
 export type TenderListFilters = {
     statusIds?: number[];
-    unallocated?: boolean; // team_member IS NULL
+    unallocated?: boolean;
 };
 
 export type TenderInfoWithNames = TenderInfo & {
@@ -33,6 +32,16 @@ export type TenderInfoWithNames = TenderInfo & {
 @Injectable()
 export class TenderInfosService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+
+    static getExcludeDnbTlStatusCondition() {
+        const statusIds = ['dnb', 'lost']
+            .flatMap(cat => StatusCache.getIds(cat))
+            .filter(Boolean);
+
+        return notInArray(tenderInfos.status, statusIds);
+    }
+
+
     private mapJoinedRow = (row: {
         tenderInfos: typeof tenderInfos.$inferSelect;
         users: { name: string | null; username: string | null } | null;

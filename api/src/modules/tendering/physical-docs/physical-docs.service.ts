@@ -1,13 +1,14 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos } from '../../../db/tenders.schema';
 import { statuses } from '../../../db/statuses.schema';
 import { users } from '../../../db/users.schema';
-import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs, type NewPhysicalDocsPersons } from 'src/db/physical-docs.schema';
+import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs } from 'src/db/physical-docs.schema';
 import { tenderInformation } from 'src/db/tender-info-sheet.schema';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from './dto/physical-docs.dto';
+import { TenderInfosService } from '../tenders/tenders.service';
 
 type PhysicalDocDashboardRow = {
     tenderId: number;
@@ -61,7 +62,11 @@ export class PhysicalDocsService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(and(eq(tenderInfos.tlStatus, 1), eq(tenderInformation.physicalDocsRequired, 'Yes')));
+            .where(and(
+                eq(tenderInfos.tlStatus, 1),
+                eq(tenderInformation.physicalDocsRequired, 'Yes'),
+                TenderInfosService.getExcludeDnbTlStatusCondition()
+            ));
 
         const pendingRows = rows.filter((row) => row.physicalDocs === null);
         const sentRows = rows.filter((row) => row.physicalDocs !== null);

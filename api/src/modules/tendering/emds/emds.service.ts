@@ -15,6 +15,7 @@ import {
 } from '../../../db/emds.schema';
 import { tenderInfos } from '../../../db/tenders.schema';
 import { tenderInformation } from '../../../db/tender-info-sheet.schema';
+import { statuses } from '../../../db/statuses.schema';
 import { users } from '../../../db/users.schema';
 import { TenderInfosService } from '../tenders/tenders.service';
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto } from './dto/emds.dto';
@@ -230,16 +231,10 @@ export class EmdsService {
 
     async findAllByFilters(statusFilter?: string) {
         const baseConditions = [
-            or(
-                and(
-                    or(
-                        gt(tenderInfos.emd, sql`0`),
-                        gt(tenderInfos.tenderFees, sql`0`)
-                    ),
-                    eq(tenderInfos.tlStatus, 1)
-                ),
-                gt(tenderInformation.processingFeeAmount, sql`0`)
-            )
+            gt(tenderInfos.emd, sql`0`),
+            gt(tenderInfos.tenderFees, sql`0`),
+            gt(tenderInformation.processingFeeAmount, sql`0`),
+            TenderInfosService.getExcludeDnbTlStatusCondition()
         ];
         const statusMap: Record<string, string> = {
             'requested': 'Pending',      // Frontend 'REQUESTED' -> DB 'Pending' (sent but not acted upon - initial status)
@@ -304,6 +299,7 @@ export class EmdsService {
             })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
             .leftJoin(
                 paymentRequests,

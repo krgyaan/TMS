@@ -2,7 +2,6 @@ import {
     pgTable, serial, bigint, varchar, numeric, boolean,
     timestamp, integer, text, index
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
 
 
 export const tenderInformation = pgTable("tender_information", {
@@ -106,34 +105,6 @@ export const tenderFinancialDocuments = pgTable("tender_financial_documents", {
 }, (table) => [
     index("tender_fin_docs_tender_id_idx").on(table.tenderId)
 ]);
-
-
-export const tenderInformationRelations = relations(tenderInformation, ({ many }) => ({
-    clients: many(tenderClients),
-    workOrders: many(tenderTechnicalDocuments),
-    financialDocuments: many(tenderFinancialDocuments),
-}));
-
-export const tenderClientsRelations = relations(tenderClients, ({ one }) => ({
-    tender: one(tenderInformation, {
-        fields: [tenderClients.tenderId],
-        references: [tenderInformation.tenderId],
-    }),
-}));
-
-export const tenderTechnicalDocumentsRelations = relations(tenderTechnicalDocuments, ({ one }) => ({
-    tender: one(tenderInformation, {
-        fields: [tenderTechnicalDocuments.tenderId],
-        references: [tenderInformation.tenderId],
-    }),
-}));
-
-export const tenderFinancialDocumentsRelations = relations(tenderFinancialDocuments, ({ one }) => ({
-    tender: one(tenderInformation, {
-        fields: [tenderFinancialDocuments.tenderId],
-        references: [tenderInformation.tenderId],
-    }),
-}));
 
 export type TenderInformation = typeof tenderInformation.$inferSelect;
 export type TenderClient = typeof tenderClients.$inferSelect;

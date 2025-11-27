@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
+import { DRIZZLE } from './db/database.module';
+import { StatusCache } from './utils/status-cache';
+import type { DbInstance } from './db';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -17,6 +20,7 @@ async function bootstrap() {
 
     // Enable cookie parser
     app.use(cookieParser());
+    await StatusCache.load(app.get(DRIZZLE) as DbInstance);
 
     app.setGlobalPrefix('api/v1');
 

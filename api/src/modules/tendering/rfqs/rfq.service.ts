@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql, isNotNull, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos } from '../../../db/tenders.schema';
@@ -9,6 +9,7 @@ import { NewRfq, rfqs, rfqItems, rfqDocuments, NewRfqItem, NewRfqDocument } from
 import { items } from 'src/db/items.schema';
 import { vendorOrganizations } from 'src/db/vendor-organizations.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
+import { TenderInfosService } from '../tenders/tenders.service';
 
 type RfqRow = {
     id: number;
@@ -53,7 +54,14 @@ export class RfqsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
     async findAll(): Promise<RfqRow[]> {
-        const conditions = [eq(tenderInfos.deleteStatus, 0), eq(tenderInfos.tlStatus, 1), notInArray(tenderInfos.rfqTo, ['0', 'NaN'])];
+        const conditions = [
+            eq(tenderInfos.deleteStatus, 0),
+            eq(tenderInfos.tlStatus, 1),
+            isNotNull(tenderInfos.rfqTo),
+            ne(tenderInfos.rfqTo, '0'),
+            ne(tenderInfos.rfqTo, ''),
+            TenderInfosService.getExcludeDnbTlStatusCondition()
+        ];
         const rows = await this.db.select({
             tenderId: tenderInfos.id,
             tenderNo: tenderInfos.tenderNo,
