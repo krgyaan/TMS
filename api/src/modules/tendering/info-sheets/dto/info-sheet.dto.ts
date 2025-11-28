@@ -1,118 +1,140 @@
 import { z } from 'zod';
 
-const yesNoEnum = z.enum(['YES', 'NO']);
-const feeModeEnum = z.enum(['DD', 'POP', 'BT']);
-const emdRequiredEnum = z.enum(['YES', 'NO', 'EXEMPT']);
-const emdModeEnum = z.enum(['BT', 'POP', 'DD', 'FDR', 'PBG', 'SB']);
-const paymentTermsEnum = z.enum(['ADVANCE', 'AGAINST_DELIVERY', 'CREDIT']);
-const sdModeEnum = z.enum(['NA', 'DD', 'DEDUCTION', 'FDR', 'PBG', 'SB']);
-
+// Helper to transform empty strings to null
 const optionalString = z
-    .union([z.string(), z.undefined()])
-    .transform((value) => {
-        if (typeof value !== 'string') return undefined;
-        const trimmed = value.trim();
-        return trimmed.length ? trimmed : undefined;
+    .union([z.string(), z.undefined(), z.null()])
+    .transform((v) => {
+        if (v === null || v === undefined) return null;
+        const trimmed = String(v).trim();
+        return trimmed.length > 0 ? trimmed : null;
     });
 
+// Helper for optional numbers
 const optionalNumber = (schema: z.ZodNumber = z.coerce.number()) =>
     z
-        .union([schema, z.undefined(), z.literal('')])
-        .transform((value) => {
-            if (value === '' || typeof value === 'undefined') return undefined;
-            const num = typeof value === 'number' ? value : Number(value);
-            return Number.isNaN(num) ? undefined : num;
+        .union([schema, z.undefined(), z.null(), z.literal('')])
+        .transform((v) => {
+            if (v === null || v === undefined || v === '') return null;
+            const num = typeof v === 'number' ? v : Number(v);
+            return Number.isNaN(num) ? null : num;
         });
 
-const clientSchema = z.object({
-    clientName: z.string().min(1, 'Client name is required').max(255),
+// Helper for optional arrays
+const optionalStringArray = z
+    .union([z.array(z.string()), z.undefined(), z.null()])
+    .transform((v) => {
+        if (!v || !Array.isArray(v) || v.length === 0) return null;
+        return v.filter((item) => item && String(item).trim().length > 0);
+    });
+
+// Client schema
+const ClientSchema = z.object({
+    clientName: z.string().min(1, 'Client name is required'),
     clientDesignation: optionalString,
     clientMobile: optionalString,
-    clientEmail: optionalString,
+    clientEmail: z.string().email('Invalid email').optional().or(z.literal('')).transform((v) => (v === '' ? null : v)),
 });
 
-const documentsSchema = z
-    .array(z.string().min(1).max(255))
-    .optional()
-    .transform((value) => value ?? []);
-
-const commercialEvaluationTypeEnum = z.enum([
-    'ITEM_WISE_GST_INCLUSIVE',
-    'ITEM_WISE_PRE_GST',
-    'OVERALL_GST_INCLUSIVE',
-    'OVERALL_PRE_GST'
-]);
-
-const mafRequiredTypeEnum = z.enum(['YES_GENERAL', 'YES_PROJECT_SPECIFIC', 'NO']);
-const pbgSdFormEnum = z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']);
-const financialCriteriaEnum = z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']);
-
 export const TenderInfoSheetPayloadSchema = z.object({
-    teRecommendation: yesNoEnum,
-    teRejectionReason: optionalNumber(z.coerce.number().int().positive()),
+    // TE Recommendation
+    teRecommendation: z.enum(['YES', 'NO']),
+    teRejectionReason: optionalNumber(z.coerce.number().int().min(1)),
     teRejectionRemarks: optionalString,
-    teRemark: optionalString,
 
+    // Processing Fee
+    processingFeeRequired: z.enum(['YES', 'NO']).optional().nullable(),
     processingFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
-    processingFeeModes: z.array(z.string()).optional().nullable(),
+    processingFeeModes: optionalStringArray,
 
+    // Tender Fee
+    tenderFeeRequired: z.enum(['YES', 'NO']).optional().nullable(),
     tenderFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
-    tenderFeeModes: z.array(z.string()).optional().nullable(),
+    tenderFeeModes: optionalStringArray,
 
-    emdRequired: emdRequiredEnum.optional(),
-    emdModes: z.array(z.string()).optional().nullable(),
+    // EMD
+    emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional().nullable(),
+    emdAmount: optionalNumber(z.coerce.number().nonnegative()),
+    emdModes: optionalStringArray,
 
-    reverseAuctionApplicable: yesNoEnum.optional(),
-    paymentTermsSupply: optionalNumber(z.coerce.number().min(0).max(100)),
-    paymentTermsInstallation: optionalNumber(z.coerce.number().min(0).max(100)),
-
+    // Auction & Terms
+    reverseAuctionApplicable: z.enum(['YES', 'NO']).optional().nullable(),
+    paymentTermsSupply: optionalNumber(z.coerce.number().int().min(0).max(100)),
+    paymentTermsInstallation: optionalNumber(z.coerce.number().int().min(0).max(100)),
     bidValidityDays: optionalNumber(z.coerce.number().int().min(0).max(366)),
-    commercialEvaluation: commercialEvaluationTypeEnum.optional(),
-    mafRequired: mafRequiredTypeEnum.optional(),
+    commercialEvaluation: z
+        .enum(['ITEM_WISE_GST_INCLUSIVE', 'ITEM_WISE_PRE_GST', 'OVERALL_GST_INCLUSIVE', 'OVERALL_PRE_GST'])
+        .optional()
+        .nullable(),
+    mafRequired: z.enum(['YES_GENERAL', 'YES_PROJECT_SPECIFIC', 'NO']).optional().nullable(),
 
+    // Delivery Time
     deliveryTimeSupply: optionalNumber(z.coerce.number().int().positive()),
     deliveryTimeInstallationInclusive: z.boolean().optional().default(false),
-    deliveryTimeInstallation: optionalNumber(z.coerce.number().int().positive()),
+    deliveryTimeInstallationDays: optionalNumber(z.coerce.number().int().positive()),
 
-    pbgForm: pbgSdFormEnum.optional(),
+    // PBG
+    pbgRequired: z.enum(['YES', 'NO']).optional().nullable(),
+    pbgMode: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional().nullable(),
     pbgPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     pbgDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120)),
 
-    sdForm: pbgSdFormEnum.optional(),
-    securityDepositPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
+    // Security Deposit
+    sdRequired: z.enum(['YES', 'NO']).optional().nullable(),
+    sdMode: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional().nullable(),
+    sdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     sdDurationMonths: optionalNumber(z.coerce.number().int().positive()),
 
+    // LD
+    ldRequired: z.enum(['YES', 'NO']).optional().nullable(),
     ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(5)),
     maxLdPercentage: optionalNumber(z.coerce.number().int().min(0).max(20)),
 
-    physicalDocsRequired: yesNoEnum.optional(),
-    physicalDocsDeadline: optionalString,
+    // Physical Docs
+    physicalDocsRequired: z.enum(['YES', 'NO']).optional().nullable(),
+    physicalDocsDeadline: z
+        .union([z.string(), z.date(), z.undefined(), z.null()])
+        .transform((v) => {
+            if (!v) return null;
+            if (v instanceof Date) return v;
+            const date = new Date(v);
+            return isNaN(date.getTime()) ? null : date;
+        })
+        .optional()
+        .nullable(),
 
-    techEligibilityAgeYears: optionalNumber(z.coerce.number().int().nonnegative()),
+    // Technical Eligibility
+    techEligibilityAge: optionalNumber(z.coerce.number().int().nonnegative()),
+    workOrderValue1Required: z.enum(['YES', 'NO']).optional().nullable(),
     orderValue1: optionalNumber(z.coerce.number().nonnegative()),
+    wo1Custom: optionalString,
+    workOrderValue2Required: z.enum(['YES', 'NO']).optional().nullable(),
     orderValue2: optionalNumber(z.coerce.number().nonnegative()),
+    wo2Custom: optionalString,
+    workOrderValue3Required: z.enum(['YES', 'NO']).optional().nullable(),
     orderValue3: optionalNumber(z.coerce.number().nonnegative()),
+    wo3Custom: optionalString,
 
-    avgAnnualTurnoverCriteria: financialCriteriaEnum.optional(),
+    // Financial Requirements
+    avgAnnualTurnoverType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),
     avgAnnualTurnoverValue: optionalNumber(z.coerce.number().nonnegative()),
-
-    workingCapitalCriteria: financialCriteriaEnum.optional(),
+    workingCapitalType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),
     workingCapitalValue: optionalNumber(z.coerce.number().nonnegative()),
-
-    solvencyCertificateCriteria: financialCriteriaEnum.optional(),
+    solvencyCertificateType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),
     solvencyCertificateValue: optionalNumber(z.coerce.number().nonnegative()),
-
-    netWorthCriteria: financialCriteriaEnum.optional(),
+    netWorthType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),
     netWorthValue: optionalNumber(z.coerce.number().nonnegative()),
 
+    // Documents
+    technicalWorkOrders: optionalStringArray,
+    commercialDocuments: optionalStringArray,
+
+    // Client & Address
     clientOrganization: optionalString,
+    clients: z.array(ClientSchema).min(1, 'At least one client is required'),
     courierAddress: optionalString,
 
-    clients: z.array(clientSchema).min(1, 'At least one client is required'),
-    technicalWorkOrders: documentsSchema,
-    commercialDocuments: documentsSchema,
-
-    rejectionRemark: optionalString,
+    // Final Remark
+    teFinalRemark: optionalString,
 });
 
 export type TenderInfoSheetPayload = z.infer<typeof TenderInfoSheetPayloadSchema>;

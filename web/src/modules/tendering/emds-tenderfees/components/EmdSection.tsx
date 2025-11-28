@@ -7,7 +7,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { FileUploadField } from "@/components/form/FileUploadField";
 import { Textarea } from "@/components/ui/textarea";
 import { useFormContext } from "react-hook-form";
-import { MODE_LABELS, DELIVERY_OPTIONS, PURPOSE_OPTIONS, BG_PURPOSE_OPTIONS, BANKS } from "../constants";
+import { DELIVERY_OPTIONS, PURPOSE_OPTIONS, BG_PURPOSE_OPTIONS, BANKS, EMD_MODES } from "../constants";
 import { Input } from "@/components/ui/input";
 
 export function EmdSection({ allowedModes }: { allowedModes: string[] }) {
@@ -26,7 +26,7 @@ export function EmdSection({ allowedModes }: { allowedModes: string[] }) {
                                 <div key={mode} className="flex items-center space-x-3">
                                     <RadioGroupItem value={mode} id={`emd-${mode}`} />
                                     <Label htmlFor={`emd-${mode}`} className="cursor-pointer">
-                                        {MODE_LABELS[mode as keyof typeof MODE_LABELS] || mode}
+                                        {EMD_MODES.find(m => m.value === mode)?.label || mode}
                                     </Label>
                                 </div>
                             ))

@@ -26,6 +26,29 @@ export const INSTRUMENT_TYPE = [
     { value: "6", label: "Payment on Portal" },
 ];
 
+export const TENDER_FEES_MODES = [
+    { value: "1", label: "Pay on Portal" },
+    { value: "2", label: "Bank Transfer" },
+    { value: "3", label: "Demand Draft" },
+    { value: "4", label: "Not Applicable" },
+];
+
+export const EMD_MODES = [
+    { value: "1", label: "Pay on Portal" },
+    { value: "2", label: "Bank Transfer" },
+    { value: "3", label: "Demand Draft" },
+    { value: "4", label: "Bank Guarantee" },
+    { value: "5", label: "Fixed Deposit Receipt" },
+    { value: "6", label: "Not Applicable" },
+];
+
+export const COMMERCIAL_OPTIONS = [
+    { value: "1", label: "Item Wise GST Inclusive" },
+    { value: "2", label: "Item Wise Pre GST" },
+    { value: "3", label: "Overall GST Inclusive" },
+    { value: "4", label: "Overall Pre GST" },
+];
+
 export const PURPOSE_OPTIONS = [
     { value: "EMD", label: "EMD" },
     { value: "TENDER_FEES", label: "Tender Fees" },

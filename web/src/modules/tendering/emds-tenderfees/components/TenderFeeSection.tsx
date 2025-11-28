@@ -4,7 +4,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Textarea } from "@/components/ui/textarea";
 import { useFormContext } from "react-hook-form";
-import { MODE_LABELS, DELIVERY_OPTIONS, PURPOSE_OPTIONS } from "../constants";
+import { DELIVERY_OPTIONS, PURPOSE_OPTIONS, TENDER_FEES_MODES } from "../constants";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/form/NumberInput";
 
@@ -30,7 +30,7 @@ export function TenderFeeSection({ prefix, title, allowedModes }: TenderFeeSecti
                                 <div key={mode} className="flex items-center space-x-3">
                                     <RadioGroupItem value={mode} id={`${prefix}-${mode}`} />
                                     <Label htmlFor={`${prefix}-${mode}`} className="cursor-pointer">
-                                        {MODE_LABELS[mode as keyof typeof MODE_LABELS]}
+                                        {TENDER_FEES_MODES.find(m => m.value === mode)?.label || mode}
                                     </Label>
                                 </div>
                             ))

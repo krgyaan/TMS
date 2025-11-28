@@ -1,11 +1,8 @@
-// migrate-tender-info.ts
-
 import { drizzle as pgDrizzle } from 'drizzle-orm/node-postgres';
 import { drizzle as mysqlDrizzle } from 'drizzle-orm/mysql2';
 import mysql2 from 'mysql2/promise';
 import { mysqlTable, varchar, bigint, text, date, time, timestamp, decimal, int } from 'drizzle-orm/mysql-core';
 import { Client } from 'pg';
-import { eq } from 'drizzle-orm';
 import {
     tenderInfos,
     tenderInformation,
@@ -13,10 +10,6 @@ import {
     tenderTechnicalDocuments,
     tenderFinancialDocuments,
 } from './src/db/schema';
-
-// ============================================
-// Database Configuration
-// ============================================
 
 const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
 const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';
@@ -26,10 +19,6 @@ const mysqlPool = mysql2.createPool(MYSQL_URL);
 
 let db: ReturnType<typeof pgDrizzle>;
 let mysqlDb: ReturnType<typeof mysqlDrizzle>;
-
-// ============================================
-// MySQL Table Definitions
-// ============================================
 
 // Old tender_infos table (MySQL)
 const mysql_tender_infos = mysqlTable('tender_infos', {
@@ -111,10 +100,6 @@ const mysql_tender_information = mysqlTable('tender_information', {
     updated_at: timestamp('updated_at'),
 });
 
-// ============================================
-// Mapping Storage
-// ============================================
-
 // Map old tender_infos.id -> new tenderInfos.id
 const tenderInfoIdMap = new Map<number, number>();
 
@@ -129,10 +114,6 @@ interface TenderInformationData {
     courierAddress: string | null;
 }
 const tenderInformationDataMap = new Map<number, TenderInformationData>();
-
-// ============================================
-// Helper Functions
-// ============================================
 
 const parseDecimal = (val: string | number | null | undefined): string | null => {
     if (val === null || val === undefined || val === '') return null;
@@ -181,10 +162,6 @@ const safeString = (val: string | null | undefined, maxLength?: number): string 
     return maxLength ? str.substring(0, maxLength) : str;
 };
 
-// ============================================
-// Step 0: Pre-load tender_information data
-// ============================================
-
 async function preloadTenderInformationData() {
     console.log('Pre-loading tender_information data...');
     const rows = await mysqlDb.select().from(mysql_tender_information);
@@ -205,10 +182,6 @@ async function preloadTenderInformationData() {
     console.log(`Pre-loaded ${tenderInformationDataMap.size} tender_information records`);
 }
 
-// ============================================
-// Migration: tender_infos (MySQL) -> tenderInfos (PostgreSQL)
-// ============================================
-
 async function migrateTenderInfos() {
     console.log('Migrating tender_infos...');
     const rows = await mysqlDb.select().from(mysql_tender_infos);
@@ -219,24 +192,13 @@ async function migrateTenderInfos() {
         try {
             // Parse team - might be a string ID or name
             const teamId = parseInteger(r.team) ?? 1;
-
-            // Parse item - might be a string ID or name
             const itemId = parseInteger(r.item) ?? 1;
-
-            // Parse organization
             const orgId = r.organisation ? (parseInteger(r.organisation) ?? null) : null;
-
-            // Combine date and time for due_date
             const dueDateTime = parseDateTimeFromDateAndTime(r.due_date, r.due_time);
-
-            // Get tender_information data for this tender
             const infoData = tenderInformationDataMap.get(r.id);
-
-            // Parse emdMode and tenderFeeMode from tender_information
             const emdModeArray = infoData ? parseArrayFromString(infoData.emdMode) : null;
             const tenderFeeModeArray = infoData ? parseArrayFromString(infoData.tenderFeeMode) : null;
 
-            // Determine approvePqrSelection and approveFinanceDocSelection
             let approvePqrSelection: string | null = null;
             let approveFinanceDocSelection: string | null = null;
 
@@ -248,7 +210,6 @@ async function migrateTenderInfos() {
                 else if (infoData.finEligible === 0) approveFinanceDocSelection = 'No';
             }
 
-            // Store client_organisation and courier_address for tender_information
             if (infoData) {
                 infoData.clientOrganisation = r.client_organisation ?? null;
                 infoData.courierAddress = r.courier_address ?? null;
@@ -271,8 +232,6 @@ async function migrateTenderInfos() {
                 website: r.website ?? null,
                 courierAddress: r.courier_address ?? null,
                 deleteStatus: r.deleteStatus === '1' ? 1 : 0,
-
-                // Tender approval fields - populated from tender_information
                 tlRemarks: safeString(r.tlRemarks, 200),
                 rfqTo: safeString(r.rfq_to, 15),
                 tlStatus: parseInteger(r.tlStatus) ?? 0,
@@ -313,10 +272,6 @@ async function migrateTenderInfos() {
     console.log(`Migrated ${count} tender_infos (${errorCount} errors)`);
 }
 
-// ============================================
-// Migration: tender_information (MySQL) -> tenderInformation (PostgreSQL)
-// ============================================
-
 async function migrateTenderInformation() {
     console.log('Migrating tender_information...');
     const rows = await mysqlDb.select().from(mysql_tender_information);
@@ -356,14 +311,16 @@ async function migrateTenderInformation() {
                 tenderId: newTenderId,
 
                 // TE Recommendation
-                teRecommendation: r.is_rejectable ?? 'No',
+                teRecommendation: r.is_rejectable ?? 'Yes',
                 teRejectionReason: parseInteger(r.reject_reason),
                 teRejectionRemarks: r.reject_remarks ?? r.rej_remark ?? null,
 
                 // Fees - Note: tender_fees in old table is mode, not amount
+                processingFeeRequired: null, // Not in old schema separately
                 processingFeeAmount: null, // Not in old schema separately
-                processingFeeMode: tenderFeeMode,
-                tenderFeeAmount: null, // Amount is in tender_infos.tender_fees
+                processingFeeMode: null, // Not in old schema separately
+                tenderFeeRequired: 'Yes', // Not in old schema separately
+                tenderFeeAmount: null, // Not in old schema separately
                 tenderFeeMode: tenderFeeMode,
 
                 // EMD
@@ -384,16 +341,19 @@ async function migrateTenderInformation() {
                 deliveryTimeInstallationDays: installationDays,
 
                 // PBG
-                pbgInFormOf: r.pbg ?? null,
+                pbgRequired: 'Yes', // Not in old schema separately
+                pbgMode: r.pbg ?? null,
                 pbgPercentage: parseDecimal(r.pbg),
                 pbgDurationMonths: parseInteger(r.pbg_duration),
 
                 // Security Deposit - not in old schema
-                sdInFormOf: null,
-                securityDepositPercentage: null,
+                sdRequired: 'No', // Not in old schema separately
+                sdMode: null,
+                sdPercentage: null,
                 sdDurationMonths: null,
 
                 // LD
+                ldRequired: 'Yes', // Not in old schema separately
                 ldPercentagePerWeek: parseDecimal(r.ldperweek),
                 maxLdPercentage: parseDecimal(r.maxld),
 
@@ -402,10 +362,16 @@ async function migrateTenderInformation() {
                 physicalDocsDeadline: physicalDocsDeadline,
 
                 // Technical Eligibility
-                techEligibilityAgeYears: parseInteger(r.tech_eligible),
+                techEligibilityAge: parseInteger(r.tech_eligible),
+                workOrderValue1Required: 'Yes', // Not in old schema separately
                 orderValue1: parseDecimal(r.order1),
+                wo1Custom: null, // Not in old schema separately
+                workOrderValue2Required: 'Yes', // Not in old schema separately
                 orderValue2: parseDecimal(r.order2),
+                wo2Custom: null, // Not in old schema separately
+                workOrderValue3Required: 'Yes', // Not in old schema separately
                 orderValue3: parseDecimal(r.order3),
+                wo3Custom: null, // Not in old schema separately
 
                 // Financial Requirements
                 avgAnnualTurnoverType: r.aat ?? null,
@@ -421,7 +387,7 @@ async function migrateTenderInformation() {
                 netWorthValue: parseDecimal(r.nw_amt),
 
                 // Client & Address - from tender_infos via preloaded data
-                clientOrganisation: infoData?.clientOrganisation ?? null,
+                // Note: clientOrganisation is stored in tenderClients table, not here
                 courierAddress: infoData?.courierAddress ?? null,
 
                 // Final Remark
@@ -440,10 +406,6 @@ async function migrateTenderInformation() {
 
     console.log(`Migrated ${count} tender_information (${errorCount} errors)`);
 }
-
-// ============================================
-// Migration: Create Technical Documents
-// ============================================
 
 async function migrateTechnicalDocuments() {
     console.log('Migrating technical documents...');
@@ -473,10 +435,6 @@ async function migrateTechnicalDocuments() {
     console.log(`Created ${count} technical document entries`);
 }
 
-// ============================================
-// Migration: Create Financial Documents
-// ============================================
-
 async function migrateFinancialDocuments() {
     console.log('Migrating financial documents...');
 
@@ -504,10 +462,6 @@ async function migrateFinancialDocuments() {
 
     console.log(`Created ${count} financial document entries`);
 }
-
-// ============================================
-// Main Migration Function
-// ============================================
 
 async function runMigration() {
     try {

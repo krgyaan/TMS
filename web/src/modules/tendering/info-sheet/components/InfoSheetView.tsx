@@ -131,12 +131,12 @@ export const InfoSheetView = ({
                             </p>
                         </div>
                         <div className="md:col-span-2">
-                            <p className="text-xs text-muted-foreground">TE Remarks</p>
-                            <p className="text-sm">{formatValue(infoSheet.teRemark)}</p>
+                            <p className="text-xs text-muted-foreground">TE Final Remark</p>
+                            <p className="text-sm">{formatValue(infoSheet.teFinalRemark ?? infoSheet.teRemark)}</p>
                         </div>
                         <div className="md:col-span-2">
                             <p className="text-xs text-muted-foreground">Rejection Remarks</p>
-                            <p className="text-sm">{formatValue(infoSheet.rejectionRemark)}</p>
+                            <p className="text-sm">{formatValue(infoSheet.teRejectionRemarks ?? infoSheet.rejectionRemark)}</p>
                         </div>
                     </div>
                 </section>
@@ -180,7 +180,11 @@ export const InfoSheetView = ({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <p className="text-xs text-muted-foreground">PBG Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.pbgForm)}</p>
+                            <p className="text-base font-semibold">{formatYesNo(infoSheet.pbgRequired)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground">PBG Mode</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.pbgMode ?? infoSheet.pbgForm)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">PBG Percentage</p>
@@ -191,12 +195,16 @@ export const InfoSheetView = ({
                             <p className="text-base font-semibold">{formatValue(infoSheet.pbgDurationMonths)}</p>
                         </div>
                         <div>
+                            <p className="text-xs text-muted-foreground">SD Required</p>
+                            <p className="text-base font-semibold">{formatYesNo(infoSheet.sdRequired)}</p>
+                        </div>
+                        <div>
                             <p className="text-xs text-muted-foreground">Security Deposit Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.sdForm)}</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.sdMode ?? infoSheet.sdForm)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Security Deposit %</p>
-                            <p className="text-base font-semibold">{formatPercentage(infoSheet.securityDepositPercentage)}</p>
+                            <p className="text-base font-semibold">{formatPercentage(infoSheet.sdPercentage ?? infoSheet.securityDepositPercentage)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">SD Duration (Months)</p>
@@ -210,7 +218,7 @@ export const InfoSheetView = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <p className="text-xs text-muted-foreground">Company Age (Years)</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.techEligibilityAgeYears)}</p>
+                            <p className="text-base font-semibold">{formatValue(infoSheet.techEligibilityAge ?? infoSheet.techEligibilityAgeYears)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Bid Validity (Days)</p>

@@ -1,572 +1,5 @@
-export interface PaginatedResponse<T> {
-    data: T[]
-    total: number
-    page: number
-    limit: number
-}
-
-export interface ApiError {
-    message: string
-    statusCode: number
-    error?: string
-}
-
-export interface Company {
-
-}
-
-export interface NamedEntity {
-    id: number | null
-    name: string | null
-}
-
-export interface UserProfile {
-    id?: number
-    userId: number
-    firstName?: string | null
-    lastName?: string | null
-    dateOfBirth?: string | null
-    gender?: string | null
-    employeeCode?: string | null
-    designationId?: number | null
-    primaryTeamId?: number | null
-    altEmail?: string | null
-    emergencyContactName?: string | null
-    emergencyContactPhone?: string | null
-    image?: string | null
-    signature?: string | null
-    dateOfJoining?: string | null
-    dateOfExit?: string | null
-    timezone?: string | null
-    locale?: string | null
-    createdAt?: string
-    updatedAt?: string
-}
-
-export interface User {
-    id: number
-    name: string
-    email: string
-    username: string | null
-    mobile: string | null
-    role?: string
-    isActive?: boolean
-    createdAt?: string
-    updatedAt?: string
-    team?: NamedEntity | null
-    designation?: NamedEntity | null
-    profile?: UserProfile | null
-}
-
-export interface CreateUserDto {
-    name: string
-    email: string
-    username?: string | null
-    mobile?: string | null
-    password: string
-    isActive?: boolean
-}
-
-export interface UpdateUserDto extends Partial<CreateUserDto> { }
-
-export interface Location {
-    id: number
-    name: string
-    acronym: string
-    state: string | null
-    region: string | null
-    status?: boolean
-    createdAt?: string
-    updatedAt?: string
-}
-
-export interface Team {
-    id: number;
-    name: string;
-    description?: string;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface ItemHeading {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface Item {
-    id: number;
-    name: string;
-    teamId?: number | null;
-    headingId?: number | null;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-
-    team?: {
-        id: number;
-        name: string;
-    } | null;
-    heading?: {
-        id: number;
-        name: string;
-    } | null;
-}
-
-export interface Status {
-    id: number
-    name: string
-    tenderCategory: string | null
-    status?: boolean
-    createdAt?: string
-    updatedAt?: string
-}
-
-export interface Industry {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface Organization {
-    id: number;
-    name: string;
-    acronym: string;
-    industryId?: number | null;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-
-    industry?: {
-        id: number;
-        name: string;
-    } | null;
-}
-
-export interface ApiResponse<T = any> {
-    data?: T
-    user?: T
-    message?: string
-    status?: number
-}
-
-export interface ApiError {
-    message: string
-    statusCode: number
-    error?: string
-}
-
-export interface Company {
-    id: string
-    name: string
-    industryId: string
-    locationId: string
-    isActive: boolean
-    logo?: string
-    createdAt: string
-    updatedAt: string
-}
-
-export interface VendorOrganization {
-    id: number;
-    name: string;
-    address?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface VendorFile {
-    id: number;
-    vendorId: number;
-    name: string;
-    filePath: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface VendorGst {
-    id: number;
-    org: number;
-    gstState: string;
-    gstNum: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface VendorAcc {
-    id: number;
-    org: number;
-    accountName: string;
-    accountNum: string;
-    accountIfsc: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface Vendor {
-    id: number;
-    organizationId?: number | null;
-    name: string;
-    email?: string;
-    address?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-
-    organization?: {
-        id: number;
-        name: string;
-        address?: string;
-    } | null;
-}
-
-export interface VendorWithRelations extends Vendor {
-    files?: VendorFile[];
-}
-
-export interface VendorOrganizationWithRelations extends VendorOrganization {
-    persons: Vendor[];
-    gsts: VendorGst[];
-    accounts: VendorAcc[];
-    _counts?: {
-        persons: number;
-        gsts: number;
-        accounts: number;
-    };
-}
-
-export interface VendorPerson {
-    id: number;
-    organizationId: number;
-    name: string;
-    email?: string;
-    address?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface VendorOrganizationWithPersons {
-    id: number;
-    name: string;
-    persons: VendorPerson[];
-}
-
-export interface Website {
-    id: number;
-    name: string;
-    url?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface ImprestCategory {
-    id: number;
-    name: string;
-    heading?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface FollowupCategory {
-    id: number;
-    name: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateFollowupCategoryDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }
-
-export interface Designation {
-    id: number;
-    name: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateDesignationDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateDesignationDto extends Partial<CreateDesignationDto> { }
-
-export interface DocumentSubmitted {
-    id: number;
-    name: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateDocumentSubmittedDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateDocumentSubmittedDto
-    extends Partial<CreateDocumentSubmittedDto> { }
-
-
-export interface CreateVendorDto {
-    organizationId?: number;
-    name: string;
-    email?: string;
-    address?: string;
-    status?: boolean;
-}
-
-export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
-
-export interface CreateVendorOrganizationDto {
-    organizationId?: number;
-    name: string;
-    address?: string;
-    status?: boolean;
-}
-
-export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
-
-export interface CreateOrganizationDto {
-    name: string;
-    acronym?: string;
-    industryId?: number;
-    status?: boolean;
-}
-
-export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }
-
-export interface CreateWebsiteDto {
-    name: string;
-    url?: string;
-    status?: boolean;
-}
-
-export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }
-
-export interface CreateImprestCategoryDto {
-    name: string;
-    heading?: string;
-    status?: boolean;
-}
-
-export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
-
-
-// ========== INDUSTRIES ==========
-export interface Industry {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateIndustryDto {
-    name: string;
-    description?: string;
-    status?: boolean;
-}
-
-export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
-
-// ========== TEAMS ==========
-export interface Team {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateTeamDto {
-    name: string;
-    description?: string;
-    status?: boolean;
-}
-
-export interface UpdateTeamDto extends Partial<CreateTeamDto> { }
-
-// ========== ROLES ==========
-export interface Role {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateRoleDto {
-    name: string;
-    description?: string;
-    status?: boolean;
-}
-
-export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
-
-// ========== STATES ==========
-export interface State {
-    id: number;
-    name: string;
-    code?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateStateDto {
-    name: string;
-    code?: string;
-    status?: boolean;
-}
-
-export interface UpdateStateDto extends Partial<CreateStateDto> { }
-
-// ========== TQ TYPES ==========
-export interface TqType {
-    id: number;
-    name: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateTqTypeDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
-
-// ========== LEAD TYPES ==========
-export interface LeadType {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateLeadTypeDto {
-    name: string;
-    description?: string;
-    status?: boolean;
-}
-
-export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> { }
-
-// ========== LOAN PARTY ==========
-export interface LoanParty {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateLoanPartyDto {
-    name: string;
-    description?: string;
-    status?: boolean;
-}
-
-export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
-
-export interface TenderInfo {
-    id: number;
-    team: number;
-    tenderNo: string;
-    organization?: number | null;
-    tenderName: string;
-    item: number;
-    gstValues: number;
-    tenderFees: number;
-    emd: number;
-    teamMember: number;
-    dueDate: string;
-    remarks?: string | null;
-    status: number;
-    location?: number | null;
-    website?: number | null;
-    deleteStatus: "0" | "1";
-    tlStatus: number;
-    tlRemarks?: string | null;
-    rfqTo?: string | null;
-    courierAddress?: string | null;
-
-    tenderFeeMode?: string | null;
-    emdMode?: string | null;
-    approvePqrSelection?: "YES" | "NO" | null;
-    approveFinanceDocSelection?: "YES" | "NO" | null;
-    tenderApprovalStatus?: number | null;
-    oemNotAllowed?: number | null;
-    tenderApprovalRemarks?: string | null;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateTenderInfoDto {
-    team: number;
-    tenderNo: string;
-    tenderName: string;
-    item: number;
-    teamMember: number;
-    dueDate: string;
-    gstValues?: number;
-    tenderFees?: number;
-    emd?: number;
-    organization?: number;
-    status?: number;
-    location?: number;
-    website?: number;
-    remarks?: string;
-    deleteStatus?: "0" | "1";
-    tlStatus?: "0" | "1" | "2" | "3" | number;
-    tlRemarks?: string | null;
-    rfqTo?: string;
-    courierAddress?: string;
-}
-
-export interface UpdateTenderInfoDto extends Partial<CreateTenderInfoDto> { }
-
-export interface TenderInfoWithNames extends TenderInfo {
-    organizationName: string | null;
-    teamMemberName: string | null;
-    teamMemberUsername: string | null;
-    statusName: string | null;
-    itemName: string | null;
-    organizationAcronym: string | null;
-    locationName: string | null;
-    locationState: string | null;
-    websiteName: string | null;
-    websiteLink: string | null;
-};
-
-export interface TenderInfoSheetClient {
+// Tender Info Sheet Types
+export interface TenderClient {
     id?: number;
     clientName: string;
     clientDesignation?: string | null;
@@ -575,329 +8,232 @@ export interface TenderInfoSheetClient {
 }
 
 export interface TenderInfoSheet {
-    id: number;
+    id?: number;
     tenderId: number;
 
+    // TE Recommendation
     teRecommendation: 'YES' | 'NO';
-    teRejectionReason: number | null;
-    teRejectionRemarks: string | null;
-    teRemark: string | null;
+    teRejectionReason?: number | null;
+    teRejectionRemarks?: string | null;
 
-    processingFeeAmount: number | null;
-    processingFeeModes: string[] | null;
+    // Processing Fee
+    processingFeeRequired?: 'YES' | 'NO' | null;
+    processingFeeAmount?: number | string | null;
+    processingFeeModes?: string[] | null;
 
-    tenderFeeAmount: number | null;
-    tenderFeeModes: string[] | null;
+    // Tender Fee
+    tenderFeeRequired?: 'YES' | 'NO' | null;
+    tenderFeeAmount?: number | string | null;
+    tenderFeeModes?: string[] | null;
 
-    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdModes: string[] | null;
+    // EMD
+    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdAmount?: number | string | null;
+    emdModes?: string[] | null;
 
-    reverseAuctionApplicable: 'YES' | 'NO' | null;
-    paymentTermsSupply: number | null;
-    paymentTermsInstallation: number | null;
+    // Auction & Terms
+    reverseAuctionApplicable?: 'YES' | 'NO' | null;
+    paymentTermsSupply?: number | null;
+    paymentTermsInstallation?: number | null;
+    bidValidityDays?: number | null;
+    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
+    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
 
-    pbgForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    pbgPercentage: number | null;
-    pbgDurationMonths: number | null;
+    // Delivery Time
+    deliveryTimeSupply?: number | null;
+    deliveryTimeInstallationInclusive?: boolean;
+    deliveryTimeInstallationDays?: number | null;
+    // Frontend alias for deliveryTimeInstallationDays
+    deliveryTimeInstallation?: number | null;
 
-    sdForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    securityDepositPercentage: number | null;
-    sdDurationMonths: number | null;
+    // PBG
+    pbgRequired?: 'YES' | 'NO' | null;
+    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    // Frontend alias for pbgMode
+    pbgForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    pbgPercentage?: number | string | null;
+    pbgDurationMonths?: number | null;
 
-    bidValidityDays: number | null;
-    commercialEvaluation: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
-    mafRequired: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
+    // Security Deposit
+    sdRequired?: 'YES' | 'NO' | null;
+    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    // Frontend alias for sdMode
+    sdForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    sdPercentage?: number | string | null;
+    // Frontend alias for sdPercentage
+    securityDepositPercentage?: number | string | null;
+    sdDurationMonths?: number | null;
 
-    deliveryTimeSupply: number | null;
-    deliveryTimeInstallationInclusive: boolean;
-    deliveryTimeInstallation: number | null;
+    // LD
+    ldRequired?: 'YES' | 'NO' | null;
+    ldPercentagePerWeek?: number | string | null;
+    maxLdPercentage?: number | string | null;
 
-    ldPercentagePerWeek: number | null;
-    maxLdPercentage: number | null;
+    // Physical Docs
+    physicalDocsRequired?: 'YES' | 'NO' | null;
+    physicalDocsDeadline?: string | Date | null;
 
-    physicalDocsRequired: 'YES' | 'NO' | null;
-    physicalDocsDeadline: string | null;
+    // Technical Eligibility
+    techEligibilityAge?: number | null;
+    // Frontend alias for techEligibilityAge
+    techEligibilityAgeYears?: number | null;
+    workOrderValue1Required?: 'YES' | 'NO' | null;
+    orderValue1?: number | string | null;
+    wo1Custom?: string | null;
+    workOrderValue2Required?: 'YES' | 'NO' | null;
+    orderValue2?: number | string | null;
+    wo2Custom?: string | null;
+    workOrderValue3Required?: 'YES' | 'NO' | null;
+    orderValue3?: number | string | null;
+    wo3Custom?: string | null;
 
-    techEligibilityAgeYears: number | null;
-    orderValue1: number | null;
-    orderValue2: number | null;
-    orderValue3: number | null;
+    // Financial Requirements
+    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    // Frontend alias for avgAnnualTurnoverType
+    avgAnnualTurnoverCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    avgAnnualTurnoverValue?: number | string | null;
+    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    // Frontend alias for workingCapitalType
+    workingCapitalCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    workingCapitalValue?: number | string | null;
+    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    // Frontend alias for solvencyCertificateType
+    solvencyCertificateCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    solvencyCertificateValue?: number | string | null;
+    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    // Frontend alias for netWorthType
+    netWorthCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    netWorthValue?: number | string | null;
 
-    avgAnnualTurnoverCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    avgAnnualTurnoverValue: number | null;
+    // Documents
+    technicalWorkOrders?: string[] | null;
+    commercialDocuments?: string[] | null;
 
-    workingCapitalCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    workingCapitalValue: number | null;
+    // Client & Address
+    clientOrganization?: string | null;
+    clients?: TenderClient[];
+    courierAddress?: string | null;
 
-    solvencyCertificateCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    solvencyCertificateValue: number | null;
-
-    netWorthCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    netWorthValue: number | null;
-
-    clientOrganization: string | null;
-    courierAddress: string | null;
-
-    rejectionRemark: string | null;
-
-    clients: TenderInfoSheetClient[];
-    technicalWorkOrders: string[];
-    commercialDocuments: string[];
-
-    createdAt: string;
-    updatedAt: string;
+    // Final Remark
+    teFinalRemark?: string | null;
+    // Frontend alias for teFinalRemark
+    teRemark?: string | null;
+    // Frontend alias for teRejectionRemarks
+    rejectionRemark?: string | null;
 }
 
 export interface SaveTenderInfoSheetDto {
+    // TE Recommendation
     teRecommendation: 'YES' | 'NO';
-    teRejectionReason: number | null;
-    teRejectionRemarks: string | null;
+    teRejectionReason?: number | null;
+    teRejectionRemarks?: string | null;
 
-    processingFeeAmount: number | null;
-    processingFeeModes: string[] | null;
+    // Processing Fee
+    processingFeeRequired?: 'YES' | 'NO' | null;
+    processingFeeAmount?: number | null;
+    processingFeeModes?: string[] | null;
 
-    tenderFeeAmount: number | null;
-    tenderFeeModes: string[] | null;
+    // Tender Fee
+    tenderFeeRequired?: 'YES' | 'NO' | null;
+    tenderFeeAmount?: number | null;
+    tenderFeeModes?: string[] | null;
 
-    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdModes: string[] | null;
+    // EMD
+    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdAmount?: number | null;
+    emdModes?: string[] | null;
 
-    reverseAuctionApplicable: 'YES' | 'NO' | null;
-    paymentTermsSupply: number | null;
-    paymentTermsInstallation: number | null;
+    // Auction & Terms
+    reverseAuctionApplicable?: 'YES' | 'NO' | null;
+    paymentTermsSupply?: number | null;
+    paymentTermsInstallation?: number | null;
+    bidValidityDays?: number | null;
+    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
+    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
 
-    bidValidityDays: number | null;
-    commercialEvaluation: string | null;
-    mafRequired: string | null;
+    // Delivery Time
+    deliveryTimeSupply?: number | null;
+    deliveryTimeInstallationInclusive?: boolean;
+    deliveryTimeInstallationDays?: number | null;
 
-    deliveryTimeSupply: number | null;
-    deliveryTimeInstallationInclusive: boolean;
-    deliveryTimeInstallation: number | null;
+    // PBG
+    pbgRequired?: 'YES' | 'NO' | null;
+    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    pbgPercentage?: number | null;
+    pbgDurationMonths?: number | null;
 
-    pbgForm: string | null;
-    pbgPercentage: number | null;
-    pbgDurationMonths: number | null;
+    // Security Deposit
+    sdRequired?: 'YES' | 'NO' | null;
+    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    sdPercentage?: number | null;
+    sdDurationMonths?: number | null;
 
-    sdForm: string | null;
-    securityDepositPercentage: number | null;
-    sdDurationMonths: number | null;
+    // LD
+    ldRequired?: 'YES' | 'NO' | null;
+    ldPercentagePerWeek?: number | null;
+    maxLdPercentage?: number | null;
 
-    ldPercentagePerWeek: number | null;
-    maxLdPercentage: number | null;
+    // Physical Docs
+    physicalDocsRequired?: 'YES' | 'NO' | null;
+    physicalDocsDeadline?: string | Date | null;
 
-    physicalDocsRequired: 'YES' | 'NO' | null;
-    physicalDocsDeadline: string | null;
+    // Technical Eligibility
+    techEligibilityAge?: number | null;
+    workOrderValue1Required?: 'YES' | 'NO' | null;
+    orderValue1?: number | null;
+    wo1Custom?: string | null;
+    workOrderValue2Required?: 'YES' | 'NO' | null;
+    orderValue2?: number | null;
+    wo2Custom?: string | null;
+    workOrderValue3Required?: 'YES' | 'NO' | null;
+    orderValue3?: number | null;
+    wo3Custom?: string | null;
 
-    techEligibilityAgeYears: number | null;
-    orderValue1: number | null;
-    orderValue2: number | null;
-    orderValue3: number | null;
+    // Financial Requirements
+    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    avgAnnualTurnoverValue?: number | null;
+    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    workingCapitalValue?: number | null;
+    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    solvencyCertificateValue?: number | null;
+    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    netWorthValue?: number | null;
 
-    technicalWorkOrders: string[] | null;
-    commercialDocuments: string[] | null;
+    // Documents
+    technicalWorkOrders?: string[] | null;
+    commercialDocuments?: string[] | null;
 
-    avgAnnualTurnoverCriteria: string | null;
-    avgAnnualTurnoverValue: number | null;
-
-    workingCapitalCriteria: string | null;
-    workingCapitalValue: number | null;
-
-    solvencyCertificateCriteria: string | null;
-    solvencyCertificateValue: number | null;
-
-    netWorthCriteria: string | null;
-    netWorthValue: number | null;
-
-    clientOrganization: string | null;
-    courierAddress: string | null;
-
+    // Client & Address
+    clientOrganization?: string | null;
     clients: Array<{
         clientName: string;
-        clientDesignation: string | null;
-        clientMobile: string | null;
-        clientEmail: string | null;
+        clientDesignation?: string | null;
+        clientMobile?: string | null;
+        clientEmail?: string | null;
     }>;
+    courierAddress?: string | null;
 
-    teRemark: string | null;
+    // Final Remark
+    teFinalRemark?: string | null;
 }
 
-export interface IncompleteField {
-    id?: number;
-    fieldName: string;
-    comment: string;
-    status?: 'pending' | 'resolved';
-}
-
-export interface SaveTenderApprovalDto {
-    tlStatus: '0' | '1' | '2' | '3' | number;
-    rfqTo?: number[]; // vendor org IDs
-    tenderFeeMode?: string;
-    emdMode?: string;
-    approvePqrSelection?: '1' | '2';
-    approveFinanceDocSelection?: '1' | '2';
-    tenderStatus?: number; // status ID
-    oemNotAllowed?: string; // vendor org ID
-    tlRejectionRemarks?: string;
-    incompleteFields?: IncompleteField[];
-}
-
-export interface TenderApproval {
+// Other types that might be needed
+export interface TenderInfo {
     id: number;
-    tenderId: number;
-    tlStatus: '0' | '1' | '2' | '3' | number;
-    rfqTo: number[] | null;
-    tenderFeeMode: string | null;
-    emdMode: string | null;
-    approvePqrSelection: '1' | '2' | null;
-    approveFinanceDocSelection: '1' | '2' | null;
-    tenderStatus: number | null;
-    oemNotAllowed: number | null;
-    tlRejectionRemarks: string | null;
-    incompleteFields?: IncompleteField[];
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface TenderWithRelations extends TenderInfoWithNames {
-    infoSheet?: TenderInfoSheet | null;
-    approval?: TenderApproval | null;
-}
-
-export interface TenderApprovalRow {
-    tenderId: number;
     tenderNo: string;
     tenderName: string;
-    item: number;
-    gstValues: number;
-    tenderFees: number;
-    emd: number;
-    teamMember: number;
-    dueDate: string;
-    status: number;
-    teamMemberName: string;
-    itemName: string;
-    statusName: string;
-    tlStatus: string | number;
+    // ... other fields
 }
 
-export type TenderApprovalTabData = {
-    key: '0' | '1' | '2' | '3';
-    name: string;
-    count: number;
-    data: TenderApprovalRow[];
-};
-
-export interface PhysicalDocsDashboardRow {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    courierAddress: string;
-    physicalDocsRequired: string;
-    physicalDocsDeadline: Date;
-    teamMemberName: string;
-    statusName: string;
-    physicalDocs: number | null;
-    courierNo: number | null;
+export interface TenderInfoWithNames extends TenderInfo {
+    organizationName?: string | null;
+    teamMemberName?: string | null;
+    teamMemberUsername?: string | null;
+    statusName?: string | null;
+    itemName?: string | null;
+    organizationAcronym?: string | null;
+    locationName?: string | null;
+    locationState?: string | null;
+    websiteName?: string | null;
+    websiteLink?: string | null;
 }
-
-export interface PhysicalDocsPerson {
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
-}
-
-export interface PhysicalDocs {
-    id: number;
-    tenderId: number;
-    courierNo: number;
-    submittedDocs: string | null;
-    persons: PhysicalDocsPerson[];
-}
-
-export interface CreatePhysicalDocsDto {
-    tenderId: number;
-    courierNo: number;
-    submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
-}
-
-export interface UpdatePhysicalDocsDto {
-    id: number;
-    courierNo?: number;
-    submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
-}
-
-export interface RfqDashboardRow {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    itemName: string;
-    rfqTo: string;
-    teamMemberName: string;
-    statusName: string;
-    dueDate: Date;
-    rfqId: number | null;
-    vendorOrganizationNames: string | null;
-}
-
-export interface Rfq {
-    id: number;
-    tenderId: number;
-    dueDate: Date;
-    docList: string | null;
-    requestedVendor: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    items: RfqItem[];
-    documents: RfqDocument[];
-}
-
-export interface RfqItem {
-    id: number;
-    rfqId: number;
-    requirement: string;
-    unit: string | null;
-    qty: string | null;
-}
-
-export interface RfqDocument {
-    id: number;
-    rfqId: number;
-    docType: string;
-    path: string;
-    metadata: any;
-}
-
-export interface CreateRfqDto {
-    tenderId: number;
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
-    documents?: Array<{
-        docType: string;
-        path: string;
-        metadata?: any;
-    }>;
-}
-
-export interface UpdateRfqDto {
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items?: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
-}
-
-// Type aliases for convenience
-export type RfqDetails = Rfq;
-export type RfqRow = RfqDashboardRow;

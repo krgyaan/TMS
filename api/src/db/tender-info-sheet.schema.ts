@@ -12,12 +12,14 @@ export const tenderInformation = pgTable("tender_information", {
     teRejectionReason: integer("te_rejection_reason"),
     teRejectionRemarks: text("te_rejection_remarks"),
 
+    processingFeeRequired: varchar("processing_fee_required", { length: 5 }),
     processingFeeAmount: numeric("processing_fee_amount", { precision: 12, scale: 2 }),
     processingFeeMode: text("processing_fee_mode").array(),
+    tenderFeeRequired: varchar("tender_fee_required", { length: 5 }),
     tenderFeeAmount: numeric("tender_fee_amount", { precision: 12, scale: 2 }),
     tenderFeeMode: text("tender_fee_mode").array(),
-
     emdRequired: varchar("emd_required", { length: 10 }),
+    emdAmount: numeric("emd_amount", { precision: 12, scale: 2 }),
     emdMode: text("emd_mode").array(),
 
     reverseAuctionApplicable: varchar("reverse_auction_applicable", { length: 5 }),
@@ -31,24 +33,33 @@ export const tenderInformation = pgTable("tender_information", {
     deliveryTimeInstallationInclusive: boolean("delivery_time_installation_inclusive"),
     deliveryTimeInstallationDays: integer("delivery_time_installation_days"),
 
-    pbgInFormOf: varchar("pbg_in_form_of", { length: 20 }),
+    pbgRequired: varchar("pbg_required", { length: 5 }),
+    pbgMode: varchar("pbg_mode", { length: 20 }),
     pbgPercentage: numeric("pbg_percentage", { precision: 5, scale: 2 }),
-    pbgDurationMonths: integer("pbg_duration_months"),
+    pbgDurationMonths: integer("pbg_duration"),
 
-    sdInFormOf: varchar("sd_in_form_of", { length: 20 }),
-    securityDepositPercentage: numeric("security_deposit_percentage", { precision: 5, scale: 2 }),
-    sdDurationMonths: integer("sd_duration_months"),
+    sdRequired: varchar("sd_required", { length: 5 }),
+    sdMode: varchar("sd_mode", { length: 20 }),
+    sdPercentage: numeric("sd_percentage", { precision: 5, scale: 2 }),
+    sdDurationMonths: integer("sd_duration"),
 
+    ldRequired: varchar("ld_required", { length: 5 }),
     ldPercentagePerWeek: numeric("ld_percentage_per_week", { precision: 5, scale: 2 }),
     maxLdPercentage: numeric("max_ld_percentage", { precision: 5, scale: 2 }),
 
     physicalDocsRequired: varchar("physical_docs_required", { length: 5 }),
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
+    techEligibilityAge: integer("technical_eligibility_age"),
 
-    techEligibilityAgeYears: integer("technical_eligibility_age_years"),
+    workOrderValue1Required: varchar("wo1_required", { length: 5 }),
     orderValue1: numeric("order_value_1", { precision: 12, scale: 2 }),
+    wo1Custom: text("wo1_custom"),
+    workOrderValue2Required: varchar("wo2_required", { length: 5 }),
     orderValue2: numeric("order_value_2", { precision: 12, scale: 2 }),
+    wo2Custom: text("wo2_custom"),
+    workOrderValue3Required: varchar("wo3_required", { length: 5 }),
     orderValue3: numeric("order_value_3", { precision: 12, scale: 2 }),
+    wo3Custom: text("wo3_custom"),
 
     avgAnnualTurnoverType: varchar("avg_annual_turnover_type", { length: 20 }),
     avgAnnualTurnoverValue: numeric("avg_annual_turnover_value", { precision: 12, scale: 2 }),
@@ -62,7 +73,6 @@ export const tenderInformation = pgTable("tender_information", {
     netWorthType: varchar("net_worth_type", { length: 20 }),
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
-    clientOrganisation: varchar("client_organisation", { length: 255 }),
     courierAddress: text("courier_address"),
 
     teFinalRemark: text("te_final_remark"),

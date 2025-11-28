@@ -1,0 +1,1 @@
+ALTER TABLE "tender_clients" ADD COLUMN "client_organisation" varchar(255);
