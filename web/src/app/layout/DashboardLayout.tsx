@@ -10,8 +10,8 @@ export default function DashboardLayout() {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className="flex flex-col min-h-screen">
-                <DocumentTitle />
+            <SidebarInset>
+                <DocumentTitle title={"Dashboard - TMS"} />
                 <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-accent">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1 cursor-pointer" />
@@ -28,15 +28,16 @@ export default function DashboardLayout() {
                         <ModeToggle />
                     </div>
                 </header>
-                <main className="flex-1 min-h-0 overflow-auto p-4 mb-[0px]">
-                    <Outlet />
-                </main>
-
-                <SidebarFooter className="min-h-[60px] bg-card border-t p-4">
-                    <div className="flex justify-center items-center">
-                        <span className="text-sm text-muted-foreground py-2">Copyright © 2025 Volks Energie. All rights reserved.</span>
+                <div className="p-2">
+                    <div className="mb-[60px]">
+                        <Outlet />
                     </div>
-                </SidebarFooter>
+                    <SidebarFooter className="min-h-[60px] absolute bg-card bottom-0 left-0 right-0 p-4 border-t">
+                        <div className="flex justify-center items-center">
+                            <span className="text-sm text-muted-foreground py-2">Copyright © 2025 Volks Energie. All rights reserved.</span>
+                        </div>
+                    </SidebarFooter>
+                </div>
             </SidebarInset>
         </SidebarProvider>
     );

@@ -90,10 +90,11 @@ const EmployeeImprestForm: React.FC = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    const createMutation = useMutation(createImprest, {
+    const createMutation = useMutation({
+        mutationFn: createImprest,
         onSuccess: async created => {
             toast.success("Created imprest");
-            // upload proofs if any
+
             if (pondFiles.length > 0) {
                 try {
                     await uploadProofs(created.id, pondFiles);
@@ -103,8 +104,8 @@ const EmployeeImprestForm: React.FC = () => {
                     toast.error("Imprest created but file upload failed");
                 }
             }
-            // Invalidate any relevant queries (like list)
-            qc.invalidateQueries(["employee-imprests"]);
+
+            qc.invalidateQueries({ queryKey: ["employee-imprests"] });
             navigate(paths?.employeeImprest ?? "/employee-imprest");
         },
         onError: (err: any) => {

@@ -11,11 +11,6 @@ import { Public } from "../auth/decorators/public.decorator";
 export class EmployeeImprestController {
     constructor(private readonly service: EmployeeImprestService) {}
 
-    @Get()
-    test(): string {
-        return "hello";
-    }
-
     @Post()
     create(@Body() body: CreateEmployeeImprestDto) {
         console.log(body);

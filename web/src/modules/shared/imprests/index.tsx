@@ -12,6 +12,7 @@ import { Eye, Trash, CheckSquare, FileText, Plus } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
 import Lightbox from "yet-another-react-lightbox"; // you asked for this lightbox
 import "yet-another-react-lightbox/styles.css";
+import { paths } from "@/app/routes/paths";
 
 // -----------------------------
 // Dummy Data
@@ -316,6 +317,7 @@ const ImprestDetailsPage: React.FC = () => {
                         <Button onClick={() => setPayImprestOpen(true)}>Pay Imprest</Button>
                         <Button onClick={() => setPayImprestOpen(true)}> Imprest</Button>
                         <Button onClick={() => console.log("Download Excel (placeholder)")}>Imprest Voucher</Button>
+                        <Button onClick={() => navigate(paths.shared.createImprests)}>Add Imprest</Button>
                         <Button variant="ghost" onClick={() => console.log("Download Excel placeholder")}>
                             Download Excel
                         </Button>
