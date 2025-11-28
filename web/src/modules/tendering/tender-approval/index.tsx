@@ -8,12 +8,13 @@ import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useAllTenders } from '@/hooks/api/useTenderApprovals';
-import type { TenderApproval, TenderInfoWithNames } from '@/types/api.types';
+import type { TenderApproval, TenderApprovalRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { toast } from 'sonner';
 
 const TABS_NAMES = {
     '0': 'Pending',
@@ -26,7 +27,7 @@ type TabConfig = {
     key: '0' | '1' | '2' | '3';
     name: string;
     count: number;
-    data: TenderInfoWithNames[];
+    data: TenderApprovalRow[];
 };
 
 const TenderApproval = () => {
@@ -39,16 +40,28 @@ const TenderApproval = () => {
         error
     } = useAllTenders();
 
-    const approvalActions: ActionItem<TenderApproval>[] = [
+    const approvalActions: ActionItem<any>[] = [
         {
             label: 'Approve',
-            onClick: (row: TenderApproval) => navigate(paths.tendering.tenderApprovalCreate(row.tenderId)),
+            onClick: (row: any) => {
+                const tenderId = row.tenderId || row.id;
+                if (!tenderId) {
+                    toast.error('Unable to approve: Tender ID is missing');
+                    return;
+                }
+                navigate(paths.tendering.tenderApprovalCreate(tenderId));
+            },
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
             label: 'View',
-            onClick: (row: TenderApproval) => {
-                navigate(paths.tendering.tenderApprovalCreate(row.id));
+            onClick: (row: any) => {
+                const tenderId = row.tenderId || row.id;
+                if (!tenderId) {
+                    toast.error('Unable to view: Tender ID is missing');
+                    return;
+                }
+                navigate(paths.tendering.tenderApprovalView(tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
@@ -59,7 +72,7 @@ const TenderApproval = () => {
 
         return Object.entries(TABS_NAMES).map(([key, name]) => {
             // Access tabsData as object, not array
-            const tabData = (tabsData as unknown as Record<string, TenderInfoWithNames[]>)[name] || [];
+            const tabData = (tabsData as Record<string, TenderApprovalRow[]>)[name] || [];
             return {
                 key: key as '0' | '1' | '2' | '3',
                 name,
@@ -69,7 +82,7 @@ const TenderApproval = () => {
         });
     }, [tabsData]);
 
-    const colDefs = useMemo<ColDef<TenderInfoWithNames>[]>(() => [
+    const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
         {
             field: 'tenderNo',
             headerName: 'Tender No',
@@ -265,7 +278,7 @@ const TenderApproval = () => {
                         >
                             {tab.data.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <Loader2 className="h-12 w-12 animate-spin mb-4" />
+                                    {/* <Loader2 className="h-12 w-12 animate-spin mb-4" /> */}
                                     <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
                                 </div>
                             ) : (

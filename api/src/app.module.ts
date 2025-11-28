@@ -84,6 +84,10 @@ import { EmployeeImprestModule } from "./modules/employee-imprest/employee-impre
         LeadTypesModule,
         TendersModule,
         EmployeeImprestModule,
+        TenderInfoSheetsModule,
+        TenderApprovalModule,
+        PhysicalDocsModule,
+        RfqsModule,
     ],
     controllers: [AppController],
     providers: [

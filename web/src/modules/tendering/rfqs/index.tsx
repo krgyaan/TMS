@@ -1,67 +1,253 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ColDef, RowSelectionOptions } from "ag-grid-community";
-import { useFetchJson } from "@/hooks/usFetchJson";
-import { dateCol, currencyCol, logoCol, booleanIconCol } from "@/components/data-grid";
-import DataTable from "@/components/ui/data-table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DataTable from '@/components/ui/data-table';
+import type { ColDef } from 'ag-grid-community';
+import { useMemo, useState } from 'react';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
+import type { ActionItem } from '@/components/ui/ActionMenu';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import type { RfqDashboardRow } from '@/types/api.types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { formatDateTime } from '@/hooks/useFormatedDate';
+import { useRfqs, useDeleteRfq } from '@/hooks/api/useRfqs';
 
-interface IRow {
-    mission: string;
-    company: string;
-    location: string;
-    date: string;
-    time: string;
-    rocket: string;
-    price: number;
-    successful: boolean;
-}
+const Rfqs = () => {
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
+    const navigate = useNavigate();
 
-const rowSelection: RowSelectionOptions = {
-    mode: "multiRow",
-    headerCheckbox: false,
-};
+    const { data: tabsData, isLoading: loading, error } = useRfqs();
 
-const index = () => {
-    const { data, loading } = useFetchJson<IRow>("https://www.ag-grid.com/example-assets/space-mission-data.json");
+    const deleteMutation = useDeleteRfq();
 
-    const [colDefs] = useState<ColDef[]>([
-        { field: "mission", width: 150 },
-        logoCol("company", { width: 130 }),
-        { field: "location", width: 225 },
-        dateCol("date"),
-        currencyCol("price", { locale: "en-IN", currency: "INR", maximumFractionDigits: 0 }, { width: 130 }),
-        booleanIconCol("successful", { width: 120 }),
-        { field: "rocket" },
-    ]);
+    const rfqsActions: ActionItem<RfqDashboardRow>[] = [
+        {
+            label: 'Send',
+            onClick: (row: RfqDashboardRow) => row.rfqId ? navigate(paths.tendering.rfqsEdit(row.tenderId)) : navigate(paths.tendering.rfqsCreate(row.tenderId)),
+            icon: <CheckCircle className="h-4 w-4" />,
+        },
+        {
+            label: 'View',
+            onClick: (row: RfqDashboardRow) => {
+                navigate(paths.tendering.rfqsView(row.tenderId));
+            },
+            icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: 'Delete',
+            onClick: (row: RfqDashboardRow) => {
+                if (row.rfqId && confirm('Are you sure you want to delete this RFQ?')) {
+                    deleteMutation.mutate(row.rfqId);
+                }
+            },
+            icon: <Trash2 className="h-4 w-4" />,
+            // show: (row: RfqDashboardRow) => row.rfqId !== null,
+        },
+    ];
+
+    const tabsConfig = useMemo<{ key: 'pending' | 'sent'; name: string; count: number; data: RfqDashboardRow[] }[]>(() => {
+        if (!tabsData || typeof tabsData !== 'object') return [];
+
+        return [
+            {
+                key: 'pending',
+                name: 'Pending',
+                count: tabsData.filter((doc) => doc.rfqId === null).length,
+                data: tabsData.filter((doc) => doc.rfqId === null),
+            },
+            {
+                key: 'sent',
+                name: 'Sent',
+                count: tabsData.filter((doc) => doc.rfqId !== null).length,
+                data: tabsData.filter((doc) => doc.rfqId !== null),
+            },
+        ];
+    }, [tabsData]);
+
+    const colDefs = useMemo<ColDef<RfqDashboardRow>[]>(() => [
+        {
+            field: 'tenderNo',
+            headerName: 'Tender No',
+            flex: 1,
+            minWidth: 120,
+            sortable: true,
+            filter: true,
+            valueGetter: (params: any) => params.data?.tenderNo || '—',
+        },
+        {
+            field: 'tenderName',
+            headerName: 'Tender Name',
+            flex: 2,
+            minWidth: 200,
+            sortable: true,
+            filter: true,
+            valueGetter: (params: any) => params.data?.tenderName || '—',
+        },
+        {
+            field: 'dueDate',
+            headerName: 'Due Date',
+            flex: 1.5,
+            minWidth: 150,
+            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'vendorOrganizationNames',
+            headerName: 'Vendor',
+            minWidth: 300,
+            valueGetter: (params) => {
+                const names = params.data?.vendorOrganizationNames;
+                if (!names) return '—';
+
+                return names /*.split(', ').join(',\n')*/;
+            },
+            // cellStyle: { whiteSpace: 'pre-line' },
+            // autoHeight: true,
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'itemName',
+            headerName: 'Item',
+            flex: 1,
+            minWidth: 120,
+            valueGetter: (params: any) => params.data?.itemName ? params.data.itemName : '—',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'statusName',
+            headerName: 'Status',
+            flex: 1,
+            minWidth: 120,
+            valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            sortable: true,
+            filter: true,
+        },
+        {
+            headerName: 'Actions',
+            filter: false,
+            cellRenderer: createActionColumnRenderer(rfqsActions),
+            sortable: false,
+            pinned: 'right',
+            width: 120,
+        },
+    ], [rfqsActions]);
+
+    if (loading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-4 w-48 mt-2" />
+                </CardHeader>
+                <CardContent className="p-6">
+                    <div className="space-y-4">
+                        <div className="flex gap-2">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <Skeleton key={i} className="h-10 w-24 flex-1" />
+                            ))}
+                        </div>
+                        <Skeleton className="h-[500px] w-full" />
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>RFQs</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                            Failed to load RFQs. Please try again later.
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>RFQs</CardTitle>
-                <CardDescription>All RFQs listed</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>RFQs</CardTitle>
+                        <CardDescription className="mt-2">
+                            Review and approve RFQs.
+                        </CardDescription>
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={data || []}
-                    loading={loading}
-                    columnDefs={colDefs}
-                    gridOptions={{
-                        defaultColDef: { editable: false, filter: true },
-                        rowSelection,
-                        pagination: true,
-                        enableRangeSelection: true,
-                        enableCellTextSelection: true,
-                        copyHeadersToClipboard: true,
-                        suppressCopyRowsToClipboard: false,
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={rows => console.log("Row Selected!", rows)}
-                />
+            <CardContent className="px-0">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent')}>
+                    <TabsList className="m-auto">
+                        {tabsConfig.map((tab) => (
+                            <TabsTrigger
+                                key={tab.key}
+                                value={tab.key}
+                                className="data-[state=active]:shadow-md flex items-center gap-1"
+                            >
+                                <span className="font-semibold text-sm">{tab.name}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                    {tab.count}
+                                </Badge>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+
+                    {tabsConfig.map((tab) => (
+                        <TabsContent
+                            key={tab.key}
+                            value={tab.key}
+                            className="px-0"
+                        >
+                            {tab.data.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                    <FileX2 className="h-12 w-12 mb-4" />
+                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} RFQs</p>
+                                    <p className="text-sm mt-2">
+                                        {tab.key === 'pending'
+                                            ? 'Tenders requiring RFQs will appear here'
+                                            : 'Sent RFQs will be shown here'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <DataTable
+                                    data={tab.data}
+                                    columnDefs={colDefs as ColDef<any>[]}
+                                    loading={false}
+                                    gridOptions={{
+                                        defaultColDef: {
+                                            editable: false,
+                                            filter: true,
+                                            sortable: true,
+                                            resizable: true
+                                        },
+                                        pagination: true,
+                                        paginationPageSize: 50,
+                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No RFQs found</span>',
+                                    }}
+                                    enablePagination
+                                    height="auto"
+                                />
+                            )}
+                        </TabsContent>
+                    ))}
+                </Tabs>
             </CardContent>
         </Card>
     );
 };
 
-export default index;
+export default Rfqs;

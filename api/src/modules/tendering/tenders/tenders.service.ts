@@ -88,7 +88,7 @@ export class TenderInfosService {
     }
 
     async findAll(filters?: TenderListFilters): Promise<TenderInfoWithNames[]> {
-        const conditions = [eq(tenderInfos.deleteStatus, "0")];
+        const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters?.unallocated) {
             conditions.push(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1));
@@ -180,7 +180,7 @@ export class TenderInfosService {
         return {
             id: tender.id,
             tenderId: tender.id,
-            tlStatus: tender.tlStatus as '0' | '1' | '2' | '3' | null,
+            tlStatus: tender.tlStatus as number | null,
             rfqTo: rfqToNumbers,
             tenderFeeMode: tender.tenderFeeMode ?? null,
             emdMode: tender.emdMode ?? null,
@@ -197,7 +197,7 @@ export class TenderInfosService {
     async updateApproval(
         id: number,
         data: {
-            tlStatus: '0' | '1' | '2' | '3';
+            tlStatus: number;
             rfqTo?: string;
             tenderFeeMode?: string;
             emdMode?: string;
@@ -221,7 +221,7 @@ export class TenderInfosService {
         };
 
         // Clear YES decision fields if decision is NO
-        if (data.tlStatus === '0') {
+        if (data.tlStatus === 0) {
             updateData.rfqTo = null;
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;

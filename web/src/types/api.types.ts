@@ -245,6 +245,23 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
     };
 }
 
+export interface VendorPerson {
+    id: number;
+    organizationId: number;
+    name: string;
+    email?: string;
+    address?: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VendorOrganizationWithPersons {
+    id: number;
+    name: string;
+    persons: VendorPerson[];
+}
+
 export interface Website {
     id: number;
     name: string;
@@ -496,7 +513,7 @@ export interface TenderInfo {
     location?: number | null;
     website?: number | null;
     deleteStatus: "0" | "1";
-    tlStatus: "0" | "1" | "2" | "3";
+    tlStatus: number;
     tlRemarks?: string | null;
     rfqTo?: string | null;
     courierAddress?: string | null;
@@ -528,8 +545,8 @@ export interface CreateTenderInfoDto {
     website?: number;
     remarks?: string;
     deleteStatus?: "0" | "1";
-    tlStatus?: "0" | "1" | "2" | "3";
-    tlRemarks?: string;
+    tlStatus?: "0" | "1" | "2" | "3" | number;
+    tlRemarks?: string | null;
     rfqTo?: string;
     courierAddress?: string;
 }
@@ -712,7 +729,7 @@ export interface IncompleteField {
 }
 
 export interface SaveTenderApprovalDto {
-    tlStatus: '0' | '1' | '2' | '3';
+    tlStatus: '0' | '1' | '2' | '3' | number;
     rfqTo?: number[]; // vendor org IDs
     tenderFeeMode?: string;
     emdMode?: string;
@@ -727,7 +744,7 @@ export interface SaveTenderApprovalDto {
 export interface TenderApproval {
     id: number;
     tenderId: number;
-    tlStatus: '0' | '1' | '2' | '3';
+    tlStatus: '0' | '1' | '2' | '3' | number;
     rfqTo: number[] | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
@@ -746,9 +763,141 @@ export interface TenderWithRelations extends TenderInfoWithNames {
     approval?: TenderApproval | null;
 }
 
+export interface TenderApprovalRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    status: number;
+    teamMemberName: string;
+    itemName: string;
+    statusName: string;
+    tlStatus: string | number;
+}
+
 export type TenderApprovalTabData = {
     key: '0' | '1' | '2' | '3';
     name: string;
     count: number;
-    data: TenderInfoWithNames[];
+    data: TenderApprovalRow[];
 };
+
+export interface PhysicalDocsDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    courierAddress: string;
+    physicalDocsRequired: string;
+    physicalDocsDeadline: Date;
+    teamMemberName: string;
+    statusName: string;
+    physicalDocs: number | null;
+    courierNo: number | null;
+}
+
+export interface PhysicalDocsPerson {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+}
+
+export interface PhysicalDocs {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocsPerson[];
+}
+
+export interface CreatePhysicalDocsDto {
+    tenderId: number;
+    courierNo: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
+}
+
+export interface UpdatePhysicalDocsDto {
+    id: number;
+    courierNo?: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
+}
+
+export interface RfqDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    itemName: string;
+    rfqTo: string;
+    teamMemberName: string;
+    statusName: string;
+    dueDate: Date;
+    rfqId: number | null;
+    vendorOrganizationNames: string | null;
+}
+
+export interface Rfq {
+    id: number;
+    tenderId: number;
+    dueDate: Date;
+    docList: string | null;
+    requestedVendor: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    items: RfqItem[];
+    documents: RfqDocument[];
+}
+
+export interface RfqItem {
+    id: number;
+    rfqId: number;
+    requirement: string;
+    unit: string | null;
+    qty: string | null;
+}
+
+export interface RfqDocument {
+    id: number;
+    rfqId: number;
+    docType: string;
+    path: string;
+    metadata: any;
+}
+
+export interface CreateRfqDto {
+    tenderId: number;
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
+    documents?: Array<{
+        docType: string;
+        path: string;
+        metadata?: any;
+    }>;
+}
+
+export interface UpdateRfqDto {
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items?: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
+}
+
+// Type aliases for convenience
+export type RfqDetails = Rfq;
+export type RfqRow = RfqDashboardRow;
