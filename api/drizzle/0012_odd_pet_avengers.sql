@@ -1,0 +1,20 @@
+CREATE TABLE "employee_imprest" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name_id" integer NOT NULL,
+	"party_name" varchar(255),
+	"project_name" varchar(255),
+	"amount" integer NOT NULL,
+	"category" varchar(255),
+	"team_id" integer,
+	"remark" text,
+	"invoice_proof" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"approval_status" integer DEFAULT 0 NOT NULL,
+	"tally_status" integer DEFAULT 0 NOT NULL,
+	"proof_status" integer DEFAULT 0 NOT NULL,
+	"status" integer DEFAULT 1 NOT NULL,
+	"approved_date" timestamp with time zone,
+	"ip" varchar(100),
+	"strtotime" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);

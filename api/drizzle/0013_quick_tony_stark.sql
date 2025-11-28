@@ -1,0 +1,1 @@
+ALTER TABLE "employee_imprest" RENAME TO "employee_imprests";

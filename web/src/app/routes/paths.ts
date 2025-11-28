@@ -23,7 +23,7 @@ export const paths = {
         tenderView: (id: number | string) => `/tendering/tenders/${id}`,
         infoSheetCreate: (tenderId: number | string) => `/tendering/info-sheet/create/${tenderId}`,
         infoSheetEdit: (tenderId: number | string) => `/tendering/info-sheet/edit/${tenderId}`,
-        tenderApproval: '/tendering/tender-approval',
+        tenderApproval: "/tendering/tender-approval",
         tenderApprovalCreate: (tenderId: number | string) => `/tendering/tender-approval/create/${tenderId}`,
         tenderApprovalView: (tenderId: number | string) => `/tendering/tender-approval/${tenderId}`,
         physicalDocs: '/tendering/physical-docs',
@@ -217,6 +217,9 @@ export const paths = {
         followUpsEdit: "/shared/follow-up/edit",
         followUpsShow: "/shared/follow-up/show",
         couriers: "/shared/couriers",
+        courierDispatch: "/shared/couriers/dispatch",
+        courierCreate: "/shared/couriers/create",
         imprests: "/shared/imprests",
+        createImprests: "/shared/imprests/create",
     },
 };

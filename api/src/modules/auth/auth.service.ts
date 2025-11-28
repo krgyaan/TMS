@@ -1,14 +1,9 @@
-﻿import { z } from 'zod';
-import {
-    Inject,
-    Injectable,
-    UnauthorizedException,
-    BadRequestException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import authConfig, { type AuthConfig } from '../../config/auth.config';
-import { UsersService, type SafeUser } from '../master/users/users.service';
-import { GoogleService } from '../integrations/google/google.service';
+﻿import { z } from "zod";
+import { Inject, Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import authConfig, { type AuthConfig } from "../../config/auth.config";
+import { UsersService, type SafeUser } from "../master/users/users.service";
+import { GoogleService } from "../integrations/google/google.service";
 
 type AuthSession = {
     user: SafeUser;
@@ -19,7 +14,7 @@ type SessionWithToken = {
     user: SafeUser;
 };
 
-const GoogleLoginStateSchema = z.object({ purpose: z.literal('google-login') });
+const GoogleLoginStateSchema = z.object({ purpose: z.literal("google-login") });
 
 @Injectable()
 export class AuthService {
@@ -27,23 +22,20 @@ export class AuthService {
         @Inject(authConfig.KEY) private readonly config: AuthConfig,
         private readonly jwtService: JwtService,
         private readonly usersService: UsersService,
-        private readonly googleService: GoogleService,
-    ) { }
+        private readonly googleService: GoogleService
+    ) {}
 
-    async loginWithPassword(
-        email: string,
-        password: string,
-    ): Promise<SessionWithToken> {
+    async loginWithPassword(email: string, password: string): Promise<SessionWithToken> {
         const user = await this.usersService.findByEmail(email);
         if (!user) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException("Invalid credentials");
         }
         const valid = await this.usersService.verifyPassword(user, password);
         if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException("Invalid credentials");
         }
         if (!user.isActive) {
-            throw new UnauthorizedException('Account is inactive');
+            throw new UnauthorizedException("Account is inactive");
         }
         return this.issueSession(user.id);
     }
@@ -51,35 +43,29 @@ export class AuthService {
     async getProfile(userId: number): Promise<SafeUser> {
         const user = await this.usersService.findById(userId);
         if (!user) {
-            throw new UnauthorizedException('User not found');
+            throw new UnauthorizedException("User not found");
         }
         return this.usersService.sanitizeUser(user);
     }
 
     async generateGoogleLoginUrl(): Promise<{ url: string }> {
-        const state = await this.jwtService.signAsync(
-            { purpose: 'google-login' },
-            { secret: this.config.stateSecret, expiresIn: '5m' },
-        );
+        const state = await this.jwtService.signAsync({ purpose: "google-login" }, { secret: this.config.stateSecret, expiresIn: "5m" });
         return this.googleService.createAuthUrlWithState(state);
     }
 
-    async handleGoogleLoginCallback(
-        code: string,
-        state?: string,
-    ): Promise<SessionWithToken> {
+    async handleGoogleLoginCallback(code: string, state?: string): Promise<SessionWithToken> {
         if (!state) {
-            throw new BadRequestException('Missing OAuth state parameter');
+            throw new BadRequestException("Missing OAuth state parameter");
         }
 
         try {
             GoogleLoginStateSchema.parse(
                 await this.jwtService.verifyAsync(state, {
                     secret: this.config.stateSecret,
-                }),
+                })
             );
         } catch {
-            throw new BadRequestException('Google login state verification failed');
+            throw new BadRequestException("Google login state verification failed");
         }
 
         const exchangeResult = await this.googleService.exchangeCode(code);
@@ -87,9 +73,7 @@ export class AuthService {
         const profile = exchangeResult.profile;
 
         if (!profile.email) {
-            throw new BadRequestException(
-                'Google account does not expose an email address',
-            );
+            throw new BadRequestException("Google account does not expose an email address");
         }
 
         let user = await this.usersService.findByEmail(profile.email);

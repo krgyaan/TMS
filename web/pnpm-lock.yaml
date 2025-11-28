@@ -128,6 +128,9 @@ importers:
       filepond-plugin-file-validate-type:
         specifier: ^1.2.9
         version: 1.2.9(filepond@4.32.8)
+      filepond-plugin-image-preview:
+        specifier: ^4.6.12
+        version: 4.6.12(filepond@4.32.8)
       lucide-react:
         specifier: ^0.542.0
         version: 0.542.0(react@19.1.1)
@@ -1957,6 +1960,11 @@ packages:
     resolution: {integrity: sha512-Tzv07aNdZvjUXDRA3XL16QMEvh6llDrXlcZ6W0eTHQ+taHaVg/JKJTFs/AViO+6ZcpPCcQStbhYEL2HoS+vldw==}
     peerDependencies:
       filepond: '>=1.x <5.x'
+
+  filepond-plugin-image-preview@4.6.12:
+    resolution: {integrity: sha512-Y8ETX5QVV0mbPB0586UH8AUmG9tZg8PuN5bdEAIlZVJFTct5ebViJ7+Am94/VhTPjLqZjBf1zmDq5JU6XRsZKw==}
+    peerDependencies:
+      filepond: '>=4.x <5.x'
 
   filepond@4.32.8:
     resolution: {integrity: sha512-svcz5lh4YKrV92zogqpOKzVEOXbD/zT7RAHso5Lqp0GujP+kxF2PSl9Tb6AdYVzfMRtoPsExcphJPpBLoo8eYg==}
@@ -4483,6 +4491,10 @@ snapshots:
       tslib: 2.8.1
 
   filepond-plugin-file-validate-type@1.2.9(filepond@4.32.8):
+    dependencies:
+      filepond: 4.32.8
+
+  filepond-plugin-image-preview@4.6.12(filepond@4.32.8):
     dependencies:
       filepond: 4.32.8
 
