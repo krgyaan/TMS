@@ -1,6 +1,6 @@
-# Project Structure
+# 📁 Project Structure
 
-## Backend (`api/`) - NestJS
+## 📂 Backend (`api/`) - NestJS
 
 - **Drizzle ORM**: Over 52 migrations
 - **Modular Architecture**, with major domains:
@@ -11,7 +11,7 @@
     - **crm**: Leads, follow-ups
     - **shared**: Couriers, follow-ups, enums
 
-## Frontend (`web/`) - React + Vite
+## 📂 Frontend (`web/`) - React + Vite
 
 - **UI**: [shadcn/ui](https://ui.shadcn.com/) components
 - **Feature Modules**: Mirror backend domains
@@ -19,7 +19,7 @@
 - **Services Layer**: `/services/api/`
 - **Routes**: Organized by domain
 
-## Machine Learning & OCR (`ml-ocr/`) - Python
+## 📂 Machine Learning & OCR (`ml-ocr/`) - Python
 
 - **OCR Text Extraction**
 - **LLM Post-processing**
