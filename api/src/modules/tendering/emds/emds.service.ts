@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, sql, or, gt, notExists, exists } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import {
@@ -15,8 +15,6 @@ import {
 } from '../../../db/emds.schema';
 import { tenderInfos } from '../../../db/tenders.schema';
 import { tenderInformation } from '../../../db/tender-info-sheet.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
 import { TenderInfosService } from '../tenders/tenders.service';
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto } from './dto/emds.dto';
 
@@ -33,10 +31,54 @@ const mapInstrumentType = (mode: string): 'DD' | 'FDR' | 'BG' | 'Cheque' | 'Bank
     return mapping[mode] || 'DD';
 };
 
-// Map frontend mode to database purpose
-const mapPurpose = (purpose: 'EMD' | 'Tender Fee' | 'Processing Fee'): 'EMD' | 'Tender Fee' | 'Processing Fee' => {
-    return purpose;
+const PAYMENT_REQUEST_STATUS = {
+    CANCELLED: 'Cancelled',
+    APPROVED: 'Approved',
+    RETURNED: 'Returned',
+} as const;
+
+const INSTRUMENT_ACTION = {
+    REJECTED: 1,
+    APPROVED_MIN: 1,
+} as const;
+
+interface TenderPaymentRow {
+    tenderId: number;
+    tenderNo: string | null;
+    tenderName: string | null;
+    teamMemberName: string | null;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    dueDate: Date | null;
+    statusName: string;
+    id: number;
+}
+
+// Type for the query result
+type TenderWithRelations = {
+    id: number;
+    tenderNo: string | null;
+    tenderName: string | null;
+    gstValues: string | null;
+    tenderFees: string | null;
+    emd: string | null;
+    dueDate: Date | null;
+    teamMember: {
+        name: string | null;
+    } | null;
+    paymentRequests: Array<{
+        id: number;
+        status: string | null;
+        createdAt: Date | null;
+        instruments: Array<{
+            id: number;
+            action: number | null;
+        }>;
+    }>;
 };
+
+type PaymentFilter = 'PENDING' | 'SENT' | 'REQUESTED' | 'REJECTED' | 'CANCELLED' | 'APPROVED' | 'RETURNED';
 
 @Injectable()
 export class EmdsService {
@@ -44,6 +86,10 @@ export class EmdsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
     ) { }
+
+    async findAllByFilters(statusFilter?: string): Promise<TenderPaymentRow[]> {
+
+    }
 
     async create(tenderId: number, payload: CreatePaymentRequestDto) {
         // Verify tender exists
@@ -227,112 +273,6 @@ export class EmdsService {
                 paymentMethod: details.portalNetBanking === 'YES' ? 'Netbanking' : details.portalDebitCard === 'YES' ? 'Debit Card' : null,
             });
         }
-    }
-
-    async findAllByFilters(statusFilter?: string) {
-        const baseConditions = [
-            gt(tenderInfos.emd, sql`0`),
-            gt(tenderInfos.tenderFees, sql`0`),
-            gt(tenderInformation.processingFeeAmount, sql`0`),
-            TenderInfosService.getExcludeDnbTlStatusCondition()
-        ];
-        const statusMap: Record<string, string> = {
-            'requested': 'Pending',      // Frontend 'REQUESTED' -> DB 'Pending' (sent but not acted upon - initial status)
-            'approved': 'Approved',      // Frontend 'APPROVED' -> DB 'Approved'
-            'cancelled': 'Cancelled',    // Frontend 'CANCELLED' -> DB 'Cancelled'
-            'returned': 'Returned',      // Frontend 'RETURNED' -> DB 'Returned'
-            'sent': 'Pending',
-            'rejected': 'Cancelled',     // Rejected maps to Cancelled
-        };
-
-        // Tab-specific filters based on payment request status
-        let paymentRequestCondition;
-        let joinStatusFilter: string | undefined;
-
-        if (!statusFilter || statusFilter.toUpperCase() === 'PENDING') {
-            // Pending: tenderId NOT IN paymentRequests (no request raised yet)
-            paymentRequestCondition = notExists(
-                this.db
-                    .select()
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.tenderId, tenderInfos.id))
-            );
-        } else {
-            // Map frontend status to database status
-            const normalizedFilter = statusFilter.toUpperCase();
-            const lowerFilter = statusFilter.toLowerCase();
-            const dbStatus = statusMap[normalizedFilter] || statusMap[lowerFilter];
-            if (dbStatus) {
-                // Requested/Approved/Cancelled/Returned: tenderId IN paymentRequests with specific status
-                paymentRequestCondition = exists(
-                    this.db
-                        .select()
-                        .from(paymentRequests)
-                        .where(
-                            and(
-                                eq(paymentRequests.tenderId, tenderInfos.id),
-                                eq(paymentRequests.status, dbStatus)
-                            )
-                        )
-                );
-                joinStatusFilter = dbStatus;
-            }
-        }
-
-        const whereConditions = paymentRequestCondition
-            ? [...baseConditions, paymentRequestCondition]
-            : baseConditions;
-
-        // Query tenders with joins
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                teamMemberName: users.name,
-                gstValues: tenderInfos.gstValues,
-                tenderFees: tenderInfos.tenderFees,
-                emd: tenderInfos.emd,
-                dueDate: tenderInfos.dueDate,
-                paymentRequestId: paymentRequests.id,
-                paymentRequestStatus: paymentRequests.status,
-            })
-            .from(tenderInfos)
-            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(users, eq(tenderInfos.teamMember, users.id))
-            .leftJoin(
-                paymentRequests,
-                and(
-                    eq(paymentRequests.tenderId, tenderInfos.id),
-                    // For non-pending tabs, join only matching status payment requests
-                    joinStatusFilter ? eq(paymentRequests.status, joinStatusFilter) : undefined
-                )
-            )
-            .where(and(...whereConditions))
-            .orderBy(tenderInfos.createdAt);
-
-        // Remove duplicates by tenderId (keep first payment request if multiple exist)
-        const uniqueRows = new Map<number, typeof rows[0]>();
-        for (const row of rows) {
-            if (!uniqueRows.has(row.tenderId)) {
-                uniqueRows.set(row.tenderId, row);
-            }
-        }
-
-        // Transform results to match frontend IRow interface
-        return Array.from(uniqueRows.values()).map((row) => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            teamMemberName: row.teamMemberName,
-            gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            tenderFees: row.tenderFees ? Number(row.tenderFees) : 0,
-            emd: row.emd ? Number(row.emd) : 0,
-            dueDate: row.dueDate || null,
-            statusName: row.paymentRequestStatus || '', // Empty string if no payment request exists
-            id: row.paymentRequestId || 0, // Payment request ID, 0 if no request exists
-        }));
     }
 
     async findByTenderId(tenderId: number) {

@@ -1,0 +1,21 @@
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "cash_margin_percent" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "fdr_margin_percent" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "stamp_charges" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "sfms_charges" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "stamp_charges_deducted" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "sfms_charges_deducted" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "other_charges_deducted" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "extended_amount" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "fdr_amt" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "fdr_per" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "fdr_roi" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "bg_charge_deducted" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "new_stamp_charge_deducted" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_bg_details" ALTER COLUMN "bg_fdr_cancel_amount" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_cheque_details" ALTER COLUMN "amount" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_fdr_details" ALTER COLUMN "roi" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "instrument_fdr_details" ALTER COLUMN "margin_percent" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "payment_instruments" ALTER COLUMN "amount" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "payment_instruments" ALTER COLUMN "credit_amount" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "payment_requests" ALTER COLUMN "amount_required" SET DATA TYPE numeric(15, 2);--> statement-breakpoint
+ALTER TABLE "tender_clients" DROP COLUMN "client_organisation";

@@ -270,8 +270,11 @@ const pay_on_portals = mysqlTable('pay_on_portals', {
 // Mapping: old emd_id → new payment_requests.id
 const emdToRequestMap = new Map<number, number>();
 
-const parseAmount = (val: string | null): string => {
-    if (!val) return '0.00';
+const parseAmount = (val: string | number | null): string => {
+    if (!val && val !== 0) return '0.00';
+    if (typeof val === 'number') {
+        return isNaN(val) ? '0.00' : val.toFixed(2);
+    }
     const num = parseFloat(val.replace(/,/g, '').trim());
     return isNaN(num) ? '0.00' : num.toFixed(2);
 };
@@ -286,6 +289,20 @@ const parseDateToString = (val: string | Date | null): string | null => {
     if (!val) return null;
     const d = new Date(val);
     return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+};
+
+const parseCourierDeadline = (val: string | number | null): number | null => {
+    if (!val) return null;
+    if (typeof val === 'number') return val;
+    const num = parseInt(val.toString().trim(), 10);
+    return isNaN(num) ? null : num;
+};
+
+const parseAction = (val: string | number | null): number | null => {
+    if (!val) return null;
+    if (typeof val === 'number') return val;
+    const num = parseInt(val.toString().trim(), 10);
+    return isNaN(num) ? null : num;
 };
 
 const mapStatus = (status: string | null): 'Pending' | 'Requested' | 'Approved' | 'Issued' | 'Dispatched' | 'Received' | 'Returned' | 'Cancelled' | 'Refunded' | 'Encashed' | 'Extended' => {
@@ -352,6 +369,13 @@ async function migrateFDRs() {
             rejectionReason: r.remarks ?? r.fdr_remark,
             action: r.action ? Number(r.action) : null,
             extraPdfPaths: r.generated_fdr ? r.generated_fdr : null,
+            reqNo: r.req_no,
+            reqReceive: r.req_receive,
+            transferDate: parseDateToString(r.transfer_date),
+            referenceNo: r.reference_no,
+            creditDate: parseDateToString(r.date),
+            creditAmount: r.amount ? parseAmount(r.amount) : null,
+            remarks: r.remarks,
             createdAt: parseDate(r.created_at) ?? new Date(),
             updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
@@ -362,6 +386,9 @@ async function migrateFDRs() {
             fdrDate: parseDateToString(r.fdr_date),
             fdrSource: r.fdr_source,
             fdrPurpose: r.fdr_needs,
+            fdrExpiryDate: parseDateToString(r.fdr_expiry),
+            fdrRemark: r.fdr_remark,
+            fdrNeeds: r.fdr_needs,
         });
     }
 }
@@ -381,14 +408,19 @@ async function migrateDDs() {
             payableAt: r.dd_payable,
             issueDate: parseDateToString(r.dd_date),
             status: mapStatus(r.status),
-            // utr: r.utr ?? r.utr_num,
+            utr: r.utr,
             docketNo: r.docket_no,
             courierAddress: r.courier_add,
+            courierDeadline: parseCourierDeadline(r.courier_deadline),
             generatedPdf: r.generated_dd,
             cancelPdf: r.ddcancel_pdf,
             docketSlip: r.docket_slip,
             rejectionReason: r.remarks,
             action: r.action ? Number(r.action) : null,
+            transferDate: parseDateToString(r.transfer_date),
+            referenceNo: r.reference_no,
+            creditDate: parseDateToString(r.date),
+            creditAmount: r.amount ? parseAmount(r.amount) : null,
             createdAt: parseDate(r.created_at) ?? new Date(),
             updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
@@ -399,6 +431,8 @@ async function migrateDDs() {
             ddDate: parseDateToString(r.dd_date),
             // bankName: r.bank_name ?? null,
             reqNo: r.req_no,
+            ddNeeds: r.dd_needs,
+            ddPurpose: r.dd_purpose,
         });
     }
 }
@@ -418,14 +452,16 @@ async function migrateBGs() {
             issueDate: parseDateToString(r.bg_date),
             expiryDate: parseDateToString(r.bg_expiry),
             validityDate: parseDateToString(r.bg_expiry),
-            claimExpiryDate: parseDateToString(r.claim_expiry),
+            claimExpiryDate: parseDateToString(r.bg_claim ?? r.claim_expiry),
             status: mapStatus(r.status),
             docketNo: r.docket_no,
             docketSlip: r.docket_slip,
+            courierAddress: r.bg_courier_addr,
+            courierDeadline: parseCourierDeadline(r.bg_courier_deadline),
             rejectionReason: r.reason_req,
             extensionRequestPdf: r.request_extension_pdf,
             cancellationRequestPdf: r.request_cancellation_pdf,
-            action: r.action ? Number(r.action) : null,
+            action: parseAction(r.action),
             createdAt: parseDate(r.created_at) ?? new Date(),
             updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
@@ -435,7 +471,7 @@ async function migrateBGs() {
             bgNo: r.bg_no,
             bgDate: parseDateToString(r.bg_date),
             validityDate: parseDateToString(r.bg_expiry),
-            claimExpiryDate: parseDateToString(r.claim_expiry),
+            claimExpiryDate: parseDateToString(r.bg_claim ?? r.claim_expiry),
             beneficiaryName: r.bg_favour,
             beneficiaryAddress: r.bg_address,
             bankName: r.bg_bank,
@@ -453,6 +489,36 @@ async function migrateBGs() {
             extensionLetterPath: r.ext_letter,
             // cancellationLetterPath: r.cancellation_letter_path ?? null,
             prefilledSignedBg: r.prefilled_signed_bg,
+            bgNeeds: r.bg_needs,
+            bgPurpose: r.bg_purpose,
+            bgSoftCopy: r.bg_soft_copy,
+            bgPo: r.bg_po,
+            bgClientUser: r.bg_client_user,
+            bgClientCp: r.bg_client_cp,
+            bgClientFin: r.bg_client_fin,
+            bgBankAcc: r.bg_bank_acc,
+            bgBankIfsc: r.bg_bank_ifsc,
+            courierNo: r.courier_no,
+            approveBg: r.approve_bg,
+            bgFormatTe: r.bg_format_te,
+            bgFormatTl: r.bg_format_tl,
+            sfmsConf: r.sfms_conf,
+            fdrAmt: parseAmount(r.fdr_amt),
+            fdrPer: parseAmount(r.fdr_per),
+            fdrCopy: r.fdr_copy,
+            fdrNo: r.fdr_no,
+            fdrValidity: parseDateToString(r.fdr_validity),
+            fdrRoi: parseAmount(r.fdr_roi),
+            bgChargeDeducted: parseAmount(r.bg_charge_deducted),
+            newStampChargeDeducted: parseAmount(r.new_stamp_charge_deducted),
+            stampCoveringLetter: r.stamp_covering_letter,
+            cancelRemark: r.cancel_remark,
+            cancellConfirm: r.cancell_confirm,
+            bgFdrCancelDate: r.bg_fdr_cancel_date,
+            bgFdrCancelAmount: parseAmount(r.bg_fdr_cancel_amount),
+            bgFdrCancelRefNo: r.bg_fdr_cancel_ref_no,
+            bg2Remark: r.bg2_remark,
+            reasonReq: r.reason_req,
         });
     }
 }
@@ -471,10 +537,11 @@ async function migrateCheques() {
             favouring: r.cheque_favour,
             issueDate: parseDateToString(r.cheque_date),
             status: mapStatus(r.status),
-            // utr: r.utr ?? r.utr_num,
+            utr: r.utr,
             rejectionReason: r.reason ?? r.stop_reason_text,
             generatedPdf: r.generated_pdfs,
             action: r.action ? Number(r.action) : null,
+            remarks: r.remarks,
             createdAt: parseDate(r.created_at) ?? new Date(),
             updatedAt: parseDate(r.updated_at) ?? new Date(),
         }).returning({ id: paymentInstruments.id });
@@ -486,6 +553,19 @@ async function migrateCheques() {
             bankName: r.cheque_bank,
             chequeImagePath: r.cheque_img,
             cancelledImagePath: r.cancelled_img,
+            linkedDdId: r.dd_id ? Number(r.dd_id) : null,
+            linkedFdrId: r.fdr_id ? Number(r.fdr_id) : null,
+            reqType: r.req_type,
+            chequeNeeds: r.cheque_needs,
+            chequeReason: r.cheque_reason,
+            dueDate: parseDateToString(r.duedate),
+            handover: r.handover,
+            confirmation: r.confirmation,
+            transferDate: parseDateToString(r.transfer_date),
+            amount: r.amount ? parseAmount(r.amount) : null,
+            btTransferDate: parseDateToString(r.bt_transfer_date),
+            reference: r.reference,
+            stopReasonText: r.stop_reason_text,
         });
     }
 }
@@ -514,6 +594,12 @@ async function migrateBankTransfers() {
             ifsc: r.bt_ifsc,
             transactionId: r.utr || r.utr_num,
             transactionDate: parseDate(r.date_time || r.transfer_date),
+            utrMsg: r.utr_msg,
+            utrNum: r.utr_num,
+            remarks: r.remarks,
+            reason: r.reason,
+            returnTransferDate: parseDateToString(r.transfer_date),
+            returnUtr: r.utr,
         });
     }
 }
@@ -541,6 +627,14 @@ async function migratePortalPayments() {
             paymentMethod: r.is_netbanking ? 'Netbanking' : r.is_debit ? 'Debit Card' : 'Other',
             transactionId: r.utr || r.utr_num,
             transactionDate: parseDate(r.date_time),
+            utrMsg: r.utr_msg,
+            utrNum: r.utr_num,
+            isNetbanking: r.is_netbanking,
+            isDebit: r.is_debit,
+            remarks: r.remarks,
+            reason: r.reason,
+            returnTransferDate: parseDateToString(r.transfer_date),
+            returnUtr: r.utr,
         });
     }
 }

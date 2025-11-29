@@ -13,36 +13,36 @@ import { tenderStatusHistory } from './tender-status-history.schema';
 import { tenderIncompleteFields } from './tender-incomplete-fields.schema';
 
 export const tenderInfosRelations = relations(tenderInfos, ({ one, many }) => ({
-  team: one(teams, {
-    fields: [tenderInfos.team],
-    references: [teams.id],
-  }),
-  organization: one(organizations, {
-    fields: [tenderInfos.organization],
-    references: [organizations.id],
-  }),
-  item: one(items, {
-    fields: [tenderInfos.item],
-    references: [items.id],
-  }),
-  teamMember: one(users, {
-    fields: [tenderInfos.teamMember],
-    references: [users.id],
-  }),
-  status: one(statuses, {
-    fields: [tenderInfos.status],
-    references: [statuses.id],
-  }),
-  location: one(locations, {
-    fields: [tenderInfos.location],
-    references: [locations.id],
-  }),
-  website: one(websites, {
-    fields: [tenderInfos.website],
-    references: [websites.id],
-  }),
-  rfqs: many(rfqs),
-  paymentRequests: many(paymentRequests),
-  tenderStatusHistory: many(tenderStatusHistory),
-  tenderIncompleteFields: many(tenderIncompleteFields),
+    team: one(teams, {
+        fields: [tenderInfos.team],
+        references: [teams.id],
+    }),
+    organization: one(organizations, {
+        fields: [tenderInfos.organization],
+        references: [organizations.id],
+    }),
+    item: one(items, {
+        fields: [tenderInfos.item],
+        references: [items.id],
+    }),
+    teamMember: one(users, {
+        fields: [tenderInfos.teamMember],
+        references: [users.id],
+    }),
+    status: one(statuses, {
+        fields: [tenderInfos.status],
+        references: [statuses.id],
+    }),
+    location: one(locations, {
+        fields: [tenderInfos.location],
+        references: [locations.id],
+    }),
+    website: one(websites, {
+        fields: [tenderInfos.website],
+        references: [websites.id],
+    }),
+    rfqs: many(rfqs),
+    paymentRequests: many(paymentRequests),
+    tenderStatusHistory: many(tenderStatusHistory),
+    tenderIncompleteFields: many(tenderIncompleteFields),
 }));

@@ -253,6 +253,13 @@
       "when": 1764241407777,
       "tag": "0035_lyrical_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1764328451989,
+      "tag": "0036_lumpy_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

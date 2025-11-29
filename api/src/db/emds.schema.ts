@@ -38,7 +38,7 @@ export const paymentRequests = pgTable('payment_requests', {
     projectName: varchar('project_name', { length: 500 }),
 
     purpose: paymentPurposeEnum('purpose').notNull(),
-    amountRequired: decimal('amount_required', { precision: 18, scale: 2 }).notNull(),
+    amountRequired: decimal('amount_required', { precision: 15, scale: 2 }).notNull(),
     dueDate: timestamp('due_date'),
     requestedBy: varchar('requested_by', { length: 200 }),
 
@@ -73,7 +73,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
     instrumentType: instrumentTypeEnum('instrument_type').notNull(),
 
     // Common fields
-    amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
+    amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
     favouring: varchar('favouring', { length: 500 }),
     payableAt: varchar('payable_at', { length: 500 }),
 
@@ -109,7 +109,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
     transferDate: date('transfer_date'),
     creditDate: date('credit_date'),
 
-    creditAmount: decimal('credit_amount', { precision: 18, scale: 2 }),
+    creditAmount: decimal('credit_amount', { precision: 15, scale: 2 }),
 
     remarks: text('remarks'),
 
@@ -165,8 +165,8 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     fdrNo: varchar('fdr_no', { length: 100 }),
     fdrDate: date('fdr_date'),
     fdrSource: varchar('fdr_source', { length: 200 }),
-    roi: decimal('roi', { precision: 6, scale: 2 }),
-    marginPercent: decimal('margin_percent', { precision: 6, scale: 2 }),
+    roi: decimal('roi', { precision: 15, scale: 2 }),
+    marginPercent: decimal('margin_percent', { precision: 15, scale: 2 }),
     fdrPurpose: varchar('fdr_purpose', { length: 500 }),
     fdrExpiryDate: date('fdr_expiry_date'),
 
@@ -196,20 +196,20 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     bankName: varchar('bank_name', { length: 300 }),
 
     // Margin percentages
-    cashMarginPercent: decimal('cash_margin_percent', { precision: 6, scale: 2 }),
-    fdrMarginPercent: decimal('fdr_margin_percent', { precision: 6, scale: 2 }),
+    cashMarginPercent: decimal('cash_margin_percent', { precision: 15, scale: 2 }),
+    fdrMarginPercent: decimal('fdr_margin_percent', { precision: 15, scale: 2 }),
 
     // Charges
-    stampCharges: decimal('stamp_charges', { precision: 12, scale: 2 }),
-    sfmsCharges: decimal('sfms_charges', { precision: 12, scale: 2 }),
+    stampCharges: decimal('stamp_charges', { precision: 15, scale: 2 }),
+    sfmsCharges: decimal('sfms_charges', { precision: 15, scale: 2 }),
 
     // Deducted charges
-    stampChargesDeducted: decimal('stamp_charges_deducted', { precision: 12, scale: 2 }),
-    sfmsChargesDeducted: decimal('sfms_charges_deducted', { precision: 12, scale: 2 }),
-    otherChargesDeducted: decimal('other_charges_deducted', { precision: 12, scale: 2 }),
+    stampChargesDeducted: decimal('stamp_charges_deducted', { precision: 15, scale: 2 }),
+    sfmsChargesDeducted: decimal('sfms_charges_deducted', { precision: 15, scale: 2 }),
+    otherChargesDeducted: decimal('other_charges_deducted', { precision: 15, scale: 2 }),
 
     // Extension fields
-    extendedAmount: decimal('extended_amount', { precision: 18, scale: 2 }),
+    extendedAmount: decimal('extended_amount', { precision: 15, scale: 2 }),
     extendedValidityDate: date('extended_validity_date'),
     extendedClaimExpiryDate: date('extended_claim_expiry_date'),
     extendedBankName: varchar('extended_bank_name', { length: 300 }),
@@ -250,16 +250,16 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     sfmsConf: varchar('sfms_conf', { length: 255 }),
 
     // FDR Details (for BG)
-    fdrAmt: decimal('fdr_amt', { precision: 18, scale: 2 }),
-    fdrPer: decimal('fdr_per', { precision: 6, scale: 2 }),
+    fdrAmt: decimal('fdr_amt', { precision: 15, scale: 2 }),
+    fdrPer: decimal('fdr_per', { precision: 15, scale: 2 }),
     fdrCopy: varchar('fdr_copy', { length: 255 }),
     fdrNo: varchar('fdr_no', { length: 255 }),
     fdrValidity: date('fdr_validity'),
-    fdrRoi: decimal('fdr_roi', { precision: 6, scale: 2 }),
+    fdrRoi: decimal('fdr_roi', { precision: 15, scale: 2 }),
 
     // BG Charges
-    bgChargeDeducted: decimal('bg_charge_deducted', { precision: 12, scale: 2 }),
-    newStampChargeDeducted: decimal('new_stamp_charge_deducted', { precision: 12, scale: 2 }),
+    bgChargeDeducted: decimal('bg_charge_deducted', { precision: 15, scale: 2 }),
+    newStampChargeDeducted: decimal('new_stamp_charge_deducted', { precision: 15, scale: 2 }),
 
     // Cancellation Details
     stampCoveringLetter: varchar('stamp_covering_letter', { length: 255 }),
@@ -268,7 +268,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
 
     // FDR Cancellation Details
     bgFdrCancelDate: varchar('bg_fdr_cancel_date', { length: 255 }),
-    bgFdrCancelAmount: decimal('bg_fdr_cancel_amount', { precision: 18, scale: 2 }),
+    bgFdrCancelAmount: decimal('bg_fdr_cancel_amount', { precision: 15, scale: 2 }),
     bgFdrCancelRefNo: varchar('bg_fdr_cancel_ref_no', { length: 255 }),
 
     // Remarks
@@ -319,7 +319,7 @@ export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
     stopReasonText: text('stop_reason_text'),
 
     // Amount (for action 3)
-    amount: decimal('amount', { precision: 18, scale: 2 }),
+    amount: decimal('amount', { precision: 15, scale: 2 }),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
