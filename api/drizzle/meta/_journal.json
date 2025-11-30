@@ -260,6 +260,27 @@
       "when": 1764328451989,
       "tag": "0036_lumpy_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1764480098139,
+      "tag": "0037_shocking_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1764537483905,
+      "tag": "0038_overconfident_hex",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1764545770959,
+      "tag": "0039_fixed_scarecrow",
+      "breakpoints": true
     }
   ]
 }

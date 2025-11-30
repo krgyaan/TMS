@@ -5,6 +5,9 @@ import { toast } from 'sonner';
 
 export const paymentRequestsKey = {
     all: ['payment-requests'] as const,
+    dashboard: () => [...paymentRequestsKey.all, 'dashboard'] as const,
+    dashboardTab: (tab: string) => [...paymentRequestsKey.dashboard(), tab] as const,
+    dashboardCounts: () => [...paymentRequestsKey.dashboard(), 'counts'] as const,
     lists: () => [...paymentRequestsKey.all, 'list'] as const,
     list: (filters?: { status?: string }) => [...paymentRequestsKey.lists(), { filters }] as const,
     details: () => [...paymentRequestsKey.all, 'detail'] as const,
@@ -13,10 +16,28 @@ export const paymentRequestsKey = {
     byTenderId: (tenderId: number) => [...paymentRequestsKey.byTender(), tenderId] as const,
 };
 
+// Dashboard hook with counts
+export const usePaymentDashboard = (tab: string = 'pending') => {
+    return useQuery({
+        queryKey: paymentRequestsKey.dashboardTab(tab),
+        queryFn: () => emdsService.getDashboard({ tab: tab as any }),
+    });
+};
+
+// Counts only hook (for initial tab badge rendering)
+export const usePaymentDashboardCounts = () => {
+    return useQuery({
+        queryKey: paymentRequestsKey.dashboardCounts(),
+        queryFn: () => emdsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
+    });
+};
+
+// Keep existing hooks for backward compatibility
 export const usePaymentRequests = (statusFilter?: string) => {
     return useQuery({
         queryKey: paymentRequestsKey.list({ status: statusFilter }),
-        queryFn: () => emdsService.getAll({ status: statusFilter }),
+        queryFn: () => emdsService.getDashboard({ tab: statusFilter as any }).then(res => res.data),
     });
 };
 
@@ -43,8 +64,9 @@ export const useCreatePaymentRequest = () => {
         mutationFn: ({ tenderId, data }: { tenderId: number; data: any }) =>
             emdsService.create(tenderId, data),
         onSuccess: (_, variables) => {
+            // Invalidate all dashboard queries
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.byTenderId(variables.tenderId) });
-            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
             toast.success('Payment request(s) created successfully');
         },
         onError: (error) => {
@@ -61,8 +83,7 @@ export const useUpdatePaymentRequest = () => {
             emdsService.update(id, data),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.detail(variables.id) });
-            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
-            // Also invalidate by tender if we have the tenderId
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
             if (data?.tenderId) {
                 queryClient.invalidateQueries({ queryKey: paymentRequestsKey.byTenderId(data.tenderId) });
             }
@@ -82,7 +103,7 @@ export const useUpdatePaymentStatus = () => {
             emdsService.updateStatus(id, { status, remarks }),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.detail(variables.id) });
-            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.all });
+            queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
             if (data?.tenderId) {
                 queryClient.invalidateQueries({ queryKey: paymentRequestsKey.byTenderId(data.tenderId) });
             }

@@ -1,8 +1,41 @@
 import { BaseApiService } from './base.service';
 
-type PaymentRequestFilters = {
-    status?: string;
+type DashboardFilters = {
+    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
+    userId?: number;
 };
+
+interface DashboardRow {
+    id: number | null;
+    type: 'request' | 'missing';
+    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    amountRequired: string;
+    status: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    createdAt: string | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
+}
+
+interface DashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+interface DashboardResponse {
+    data: DashboardRow[];
+    counts: DashboardCounts;
+}
 
 type CreatePaymentRequestDto = {
     emdMode?: string;
@@ -25,17 +58,22 @@ class EmdsService extends BaseApiService {
         super('/emds');
     }
 
-    async create(tenderId: number, data: CreatePaymentRequestDto) {
-        return this.post<any[], CreatePaymentRequestDto>(`/tenders/${tenderId}`, data);
+    // Dashboard endpoints
+    async getDashboard(filters?: DashboardFilters): Promise<DashboardResponse> {
+        const params = new URLSearchParams();
+        if (filters?.tab) params.append('tab', filters.tab);
+        if (filters?.userId) params.append('userId', filters.userId.toString());
+        const query = params.toString();
+        return this.get<DashboardResponse>(`/dashboard${query ? `?${query}` : ''}`);
     }
 
-    async getAll(filters?: PaymentRequestFilters) {
-        const params = new URLSearchParams();
-        if (filters?.status) {
-            params.append('status', filters.status);
-        }
-        const query = params.toString();
-        return this.get<any[]>(query ? `?${query}` : '');
+    async getDashboardCounts(): Promise<DashboardCounts> {
+        return this.get<DashboardCounts>('/dashboard/counts');
+    }
+
+    // Existing endpoints
+    async create(tenderId: number, data: CreatePaymentRequestDto) {
+        return this.post<any[], CreatePaymentRequestDto>(`/tenders/${tenderId}`, data);
     }
 
     async getByTenderId(tenderId: number) {
@@ -56,3 +94,4 @@ class EmdsService extends BaseApiService {
 }
 
 export const emdsService = new EmdsService();
+export type { DashboardRow, DashboardCounts, DashboardResponse };

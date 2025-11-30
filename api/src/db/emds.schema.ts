@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, foreignKey, integer, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, foreignKey, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { tenderInfos } from './tenders.schema';
 
 // Enums
@@ -82,12 +82,14 @@ export const paymentInstruments = pgTable('payment_instruments', {
     validityDate: date('validity_date'),
     claimExpiryDate: date('claim_expiry_date'),
 
-    status: varchar('status', { length: 100 }).default('Pending'),
     utr: varchar('utr', { length: 255 }),
     docketNo: varchar('docket_no', { length: 255 }),
     courierAddress: text('courier_address'),
 
-    action: integer('action'),
+    action: integer('action').default(0),
+    status: varchar('status', { length: 100 }).default('ACCOUNTS_FORM_PENDING').notNull(),
+    currentStage: integer('current_stage').default(1),
+    isActive: boolean('is_active').default(true),
     courierDeadline: integer('courier_deadline'),
 
     rejectionReason: text('rejection_reason'),
@@ -102,16 +104,22 @@ export const paymentInstruments = pgTable('payment_instruments', {
     extensionRequestPdf: varchar('extension_request_pdf', { length: 500 }),
     cancellationRequestPdf: varchar('cancellation_request_pdf', { length: 500 }),
 
-    // NEW FIELDS - Added from MySQL
+    // Additional common fields
     reqNo: varchar('req_no', { length: 200 }),
     reqReceive: varchar('req_receive', { length: 500 }),
     referenceNo: varchar('reference_no', { length: 200 }),
     transferDate: date('transfer_date'),
     creditDate: date('credit_date'),
-
     creditAmount: decimal('credit_amount', { precision: 15, scale: 2 }),
-
     remarks: text('remarks'),
+
+    // Legacy IDs for traceability
+    legacyDdId: integer('legacy_dd_id'),
+    legacyFdrId: integer('legacy_fdr_id'),
+    legacyBgId: integer('legacy_bg_id'),
+    legacyChequeId: integer('legacy_cheque_id'),
+    legacyBtId: integer('legacy_bt_id'),
+    legacyPortalId: integer('legacy_portal_id'),
 
     // Legacy data storage for unmapped fields
     legacyData: jsonb('legacy_data'),
@@ -130,6 +138,12 @@ export const paymentInstruments = pgTable('payment_instruments', {
         { typeIdx: index('instruments_type_idx').on(table.instrumentType) },
         { statusIdx: index('instruments_status_idx').on(table.status) },
         { utrIdx: index('instruments_utr_idx').on(table.utr) },
+        { legacyDdIdx: index('instruments_legacy_dd_id_idx').on(table.legacyDdId) },
+        { legacyFdrIdx: index('instruments_legacy_fdr_id_idx').on(table.legacyFdrId) },
+        { legacyBgIdx: index('instruments_legacy_bg_id_idx').on(table.legacyBgId) },
+        { legacyChequeIdx: index('instruments_legacy_cheque_id_idx').on(table.legacyChequeId) },
+        { legacyBtIdx: index('instruments_legacy_bt_id_idx').on(table.legacyBtId) },
+        { legacyPortalIdx: index('instruments_legacy_portal_id_idx').on(table.legacyPortalId) },
     ];
 });
 
@@ -145,9 +159,9 @@ export const instrumentDdDetails = pgTable('instrument_dd_details', {
     bankName: varchar('bank_name', { length: 300 }),
     reqNo: varchar('req_no', { length: 100 }),
 
-    // NEW FIELDS - Added from MySQL emd_demand_drafts
     ddNeeds: varchar('dd_needs', { length: 255 }),
     ddPurpose: varchar('dd_purpose', { length: 255 }),
+    ddRemarks: text('dd_remarks'),
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -170,7 +184,6 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
     fdrPurpose: varchar('fdr_purpose', { length: 500 }),
     fdrExpiryDate: date('fdr_expiry_date'),
 
-    // NEW FIELDS - Added from MySQL emd_fdrs
     fdrNeeds: varchar('fdr_needs', { length: 255 }),
     fdrRemark: text('fdr_remark'),
 
@@ -218,10 +231,6 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
     extensionLetterPath: varchar('extension_letter_path', { length: 500 }),
     cancellationLetterPath: varchar('cancellation_letter_path', { length: 500 }),
     prefilledSignedBg: text('prefilled_signed_bg'),
-
-    // ============================================
-    // NEW FIELDS - Added from MySQL emd_bgs
-    // ============================================
 
     // BG Basic Info
     bgNeeds: varchar('bg_needs', { length: 255 }),
@@ -294,10 +303,6 @@ export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
     chequeImagePath: varchar('cheque_image_path', { length: 500 }),
     cancelledImagePath: varchar('cancelled_image_path', { length: 500 }),
 
-    // ============================================
-    // NEW FIELDS - Added from MySQL emd_cheques
-    // ============================================
-
     // Linked references
     linkedDdId: integer('linked_dd_id'),
     linkedFdrId: integer('linked_fdr_id'),
@@ -342,10 +347,6 @@ export const instrumentTransferDetails = pgTable('instrument_transfer_details', 
     transactionDate: timestamp('transaction_date'),
     paymentMethod: varchar('payment_method', { length: 50 }),
 
-    // ============================================
-    // NEW FIELDS - Added from MySQL
-    // ============================================
-
     // Bank Transfer specific
     utrMsg: text('utr_msg'),
     utrNum: varchar('utr_num', { length: 200 }),
@@ -369,6 +370,34 @@ export const instrumentTransferDetails = pgTable('instrument_transfer_details', 
 ]);
 
 // ============================================
+// INSTRUMENT STATUS HISTORY
+// ============================================
+export const instrumentStatusHistory = pgTable('instrument_status_history', {
+    id: serial('id').primaryKey(),
+    instrumentId: integer('instrument_id').notNull(),
+    fromStatus: varchar('from_status', { length: 100 }).notNull(),
+    toStatus: varchar('to_status', { length: 100 }).notNull(),
+    fromAction: integer('from_action').notNull(),
+    toAction: integer('to_action').notNull(),
+    fromStage: integer('from_stage').notNull(),
+    toStage: integer('to_stage').notNull(),
+    formData: jsonb('form_data'),
+    remarks: text('remarks'),
+    rejectionReason: text('rejection_reason'),
+    isResubmission: boolean('is_resubmission').notNull().default(false),
+    previousInstrumentId: integer('previous_instrument_id'),
+    changedBy: integer('changed_by').notNull(),
+    changedByName: varchar('changed_by_name', { length: 200 }).notNull(),
+    changedByRole: varchar('changed_by_role', { length: 200 }).notNull(),
+    ipAddress: varchar('ip_address', { length: 200 }).notNull(),
+    userAgent: varchar('user_agent', { length: 200 }).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
+]);
+
+// ============================================
 // TYPES
 // ============================================
 export type PaymentRequest = typeof paymentRequests.$inferSelect;
@@ -378,6 +407,7 @@ export type InstrumentFdrDetails = typeof instrumentFdrDetails.$inferSelect;
 export type InstrumentBgDetails = typeof instrumentBgDetails.$inferSelect;
 export type InstrumentChequeDetails = typeof instrumentChequeDetails.$inferSelect;
 export type InstrumentTransferDetails = typeof instrumentTransferDetails.$inferSelect;
+export type InstrumentStatusHistory = typeof instrumentStatusHistory.$inferSelect;
 
 export type NewPaymentRequest = typeof paymentRequests.$inferInsert;
 export type NewPaymentInstrument = typeof paymentInstruments.$inferInsert;
@@ -386,3 +416,4 @@ export type NewInstrumentFdrDetails = typeof instrumentFdrDetails.$inferInsert;
 export type NewInstrumentBgDetails = typeof instrumentBgDetails.$inferInsert;
 export type NewInstrumentChequeDetails = typeof instrumentChequeDetails.$inferInsert;
 export type NewInstrumentTransferDetails = typeof instrumentTransferDetails.$inferInsert;
+export type NewInstrumentStatusHistory = typeof instrumentStatusHistory.$inferInsert;

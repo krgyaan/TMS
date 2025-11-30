@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { TendersModule } from '../tenders/tenders.module';
 import { EmdsController } from './emds.controller';
 import { EmdsService } from './emds.service';
+import { InstrumentStatusService } from './services/instrument-status.service';
+import { InstrumentStatusHistoryService } from './services/instrument-status-history.service';
+import { TendersModule } from '../tenders/tenders.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule],
+    imports: [TendersModule],
     controllers: [EmdsController],
-    providers: [EmdsService],
-    exports: [EmdsService],
+    providers: [
+        EmdsService,
+        InstrumentStatusService,
+        InstrumentStatusHistoryService,
+    ],
+    exports: [EmdsService, InstrumentStatusService],
 })
 export class EmdsModule { }

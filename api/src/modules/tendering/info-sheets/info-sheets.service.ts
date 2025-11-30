@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { eq } from 'drizzle-orm';
@@ -13,6 +13,11 @@ import {
     type TenderFinancialDocument,
 } from '../../../db/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from './dto/info-sheet.dto';
+import { TenderInfosService } from '../tenders/tenders.service';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
@@ -20,11 +25,20 @@ export type TenderInfoSheetWithRelations = TenderInformation & {
     commercialDocuments: TenderFinancialDocument[];
 };
 
+// ============================================================================
+// Service
+// ============================================================================
+
 @Injectable()
 export class TenderInfoSheetsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService, // Injected
+    ) { }
 
-    async findByTenderId(tenderId: number): Promise<TenderInfoSheetWithRelations | null> {
+    async findByTenderId(
+        tenderId: number
+    ): Promise<TenderInfoSheetWithRelations | null> {
         const info = await this.db
             .select()
             .from(tenderInformation)
@@ -61,11 +75,35 @@ export class TenderInfoSheetsService {
         };
     }
 
-    async create(tenderId: number, payload: TenderInfoSheetPayload): Promise<TenderInfoSheetWithRelations> {
+    /**
+     * Get info sheet with tender details
+     * Uses shared tender service method
+     */
+    async findByTenderIdWithTender(tenderId: number) {
+        const [infoSheet, tender] = await Promise.all([
+            this.findByTenderId(tenderId),
+            this.tenderInfosService.getReference(tenderId),
+        ]);
+
+        return {
+            infoSheet,
+            tender,
+        };
+    }
+
+    async create(
+        tenderId: number,
+        payload: TenderInfoSheetPayload
+    ): Promise<TenderInfoSheetWithRelations> {
+        // Validate tender exists
+        await this.tenderInfosService.validateExists(tenderId);
+
         // Check if info sheet already exists
         const existing = await this.findByTenderId(tenderId);
         if (existing) {
-            throw new Error(`Info sheet already exists for tender ${tenderId}`);
+            throw new ConflictException(
+                `Info sheet already exists for tender ${tenderId}`
+            );
         }
 
         // Insert main info sheet
@@ -92,8 +130,10 @@ export class TenderInfoSheetsService {
                 commercialEvaluation: payload.commercialEvaluation ?? null,
                 mafRequired: payload.mafRequired ?? null,
                 deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                deliveryTimeInstallationInclusive: payload.deliveryTimeInstallationInclusive ?? false,
-                deliveryTimeInstallationDays: payload.deliveryTimeInstallationDays ?? null,
+                deliveryTimeInstallationInclusive:
+                    payload.deliveryTimeInstallationInclusive ?? false,
+                deliveryTimeInstallationDays:
+                    payload.deliveryTimeInstallationDays ?? null,
                 pbgRequired: payload.pbgRequired ?? null,
                 pbgMode: payload.pbgMode ?? null,
                 pbgPercentage: payload.pbgPercentage?.toString() ?? null,
@@ -118,11 +158,13 @@ export class TenderInfoSheetsService {
                 orderValue3: payload.orderValue3?.toString() ?? null,
                 wo3Custom: payload.wo3Custom ?? null,
                 avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                avgAnnualTurnoverValue: payload.avgAnnualTurnoverValue?.toString() ?? null,
+                avgAnnualTurnoverValue:
+                    payload.avgAnnualTurnoverValue?.toString() ?? null,
                 workingCapitalType: payload.workingCapitalType ?? null,
                 workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
                 solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                solvencyCertificateValue: payload.solvencyCertificateValue?.toString() ?? null,
+                solvencyCertificateValue:
+                    payload.solvencyCertificateValue?.toString() ?? null,
                 netWorthType: payload.netWorthType ?? null,
                 netWorthValue: payload.netWorthValue?.toString() ?? null,
                 courierAddress: payload.courierAddress ?? null,
@@ -166,13 +208,23 @@ export class TenderInfoSheetsService {
             );
         }
 
-        return this.findByTenderId(tenderId) as Promise<TenderInfoSheetWithRelations>;
+        return this.findByTenderId(
+            tenderId
+        ) as Promise<TenderInfoSheetWithRelations>;
     }
 
-    async update(tenderId: number, payload: TenderInfoSheetPayload): Promise<TenderInfoSheetWithRelations> {
+    async update(
+        tenderId: number,
+        payload: TenderInfoSheetPayload
+    ): Promise<TenderInfoSheetWithRelations> {
+        // Validate tender exists
+        await this.tenderInfosService.validateExists(tenderId);
+
         const existing = await this.findByTenderId(tenderId);
         if (!existing) {
-            throw new NotFoundException(`Info sheet not found for tender ${tenderId}`);
+            throw new NotFoundException(
+                `Info sheet not found for tender ${tenderId}`
+            );
         }
 
         // Update main info sheet
@@ -198,8 +250,10 @@ export class TenderInfoSheetsService {
                 commercialEvaluation: payload.commercialEvaluation ?? null,
                 mafRequired: payload.mafRequired ?? null,
                 deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                deliveryTimeInstallationInclusive: payload.deliveryTimeInstallationInclusive ?? false,
-                deliveryTimeInstallationDays: payload.deliveryTimeInstallationDays ?? null,
+                deliveryTimeInstallationInclusive:
+                    payload.deliveryTimeInstallationInclusive ?? false,
+                deliveryTimeInstallationDays:
+                    payload.deliveryTimeInstallationDays ?? null,
                 pbgRequired: payload.pbgRequired ?? null,
                 pbgMode: payload.pbgMode ?? null,
                 pbgPercentage: payload.pbgPercentage?.toString() ?? null,
@@ -224,11 +278,13 @@ export class TenderInfoSheetsService {
                 orderValue3: payload.orderValue3?.toString() ?? null,
                 wo3Custom: payload.wo3Custom ?? null,
                 avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                avgAnnualTurnoverValue: payload.avgAnnualTurnoverValue?.toString() ?? null,
+                avgAnnualTurnoverValue:
+                    payload.avgAnnualTurnoverValue?.toString() ?? null,
                 workingCapitalType: payload.workingCapitalType ?? null,
                 workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
                 solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                solvencyCertificateValue: payload.solvencyCertificateValue?.toString() ?? null,
+                solvencyCertificateValue:
+                    payload.solvencyCertificateValue?.toString() ?? null,
                 netWorthType: payload.netWorthType ?? null,
                 netWorthValue: payload.netWorthValue?.toString() ?? null,
                 courierAddress: payload.courierAddress ?? null,
@@ -239,9 +295,15 @@ export class TenderInfoSheetsService {
 
         // Delete existing related records
         await Promise.all([
-            this.db.delete(tenderClients).where(eq(tenderClients.tenderId, tenderId)),
-            this.db.delete(tenderTechnicalDocuments).where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
-            this.db.delete(tenderFinancialDocuments).where(eq(tenderFinancialDocuments.tenderId, tenderId)),
+            this.db
+                .delete(tenderClients)
+                .where(eq(tenderClients.tenderId, tenderId)),
+            this.db
+                .delete(tenderTechnicalDocuments)
+                .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
+            this.db
+                .delete(tenderFinancialDocuments)
+                .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
         ]);
 
         // Insert updated related records
@@ -278,6 +340,8 @@ export class TenderInfoSheetsService {
             );
         }
 
-        return this.findByTenderId(tenderId) as Promise<TenderInfoSheetWithRelations>;
+        return this.findByTenderId(
+            tenderId
+        ) as Promise<TenderInfoSheetWithRelations>;
     }
 }

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderInfosService } from '@/services/api';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { CreateTenderInfoDto, UpdateTenderInfoDto } from '@/types/api.types';
+import type { CreateTenderRequest, UpdateTenderRequest } from '@/types/api.types';
 
 export const tendersKey = {
     all: ['tenders'] as const,
@@ -36,7 +36,7 @@ export const useCreateTender = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateTenderInfoDto) => tenderInfosService.create(data),
+        mutationFn: (data: CreateTenderRequest) => tenderInfosService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             toast.success('Tender created successfully');
@@ -51,7 +51,7 @@ export const useUpdateTender = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateTenderInfoDto }) =>
+        mutationFn: ({ id, data }: { id: number; data: UpdateTenderRequest }) =>
             tenderInfosService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });

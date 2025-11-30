@@ -1,105 +1,163 @@
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { SelectField } from "@/components/form/SelectField";
-import { Textarea } from "@/components/ui/textarea";
-import { useFormContext } from "react-hook-form";
-import { DELIVERY_OPTIONS, PURPOSE_OPTIONS, TENDER_FEES_MODES } from "../constants";
-import { Input } from "@/components/ui/input";
-import { NumberInput } from "@/components/form/NumberInput";
+import { useEffect } from 'react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { SelectField } from '@/components/form/SelectField';
+import { NumberInput } from '@/components/form/NumberInput';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { useFormContext } from 'react-hook-form';
+import { Badge } from '@/components/ui/badge';
+import { formatINR } from '@/hooks/useINRFormatter';
+import {
+    TENDER_FEE_MODES,
+    DELIVERY_OPTIONS,
+    YES_NO_OPTIONS,
+    MODE_LABELS,
+} from '../constants';
 
 interface TenderFeeSectionProps {
-    prefix: "tenderFee" | "processingFee";
+    prefix: 'tenderFee' | 'processingFee';
     title: string;
     allowedModes: string[];
+    amount: number;
+    defaultPurpose?: string;
 }
 
-export function TenderFeeSection({ prefix, title, allowedModes }: TenderFeeSectionProps) {
+export function TenderFeeSection({
+    prefix,
+    title,
+    allowedModes,
+    amount,
+    defaultPurpose = 'TENDER_FEES',
+}: TenderFeeSectionProps) {
     const { control, watch, setValue } = useFormContext();
-    const mode = watch(`${prefix}Mode`);
+    const selectedMode = watch(`${prefix}.mode`);
+
+    // Pre-fill purpose when mode changes
+    useEffect(() => {
+        if (selectedMode) {
+            if (selectedMode === 'DD') {
+                setValue(`${prefix}.details.ddPurpose`, defaultPurpose);
+            } else if (selectedMode === 'BANK_TRANSFER') {
+                setValue(`${prefix}.details.btPurpose`, defaultPurpose);
+            } else if (selectedMode === 'PORTAL') {
+                setValue(`${prefix}.details.portalPurpose`, defaultPurpose);
+            }
+        }
+    }, [selectedMode, setValue, prefix, defaultPurpose]);
+
+    // Filter allowed modes
+    const availableModes = TENDER_FEE_MODES.filter(mode =>
+        allowedModes.includes(mode.value)
+    );
+
+    if (availableModes.length === 0) {
+        return (
+            <div className="border rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">{title}</h3>
+                    <Badge variant="secondary">{formatINR(amount)}</Badge>
+                </div>
+                <p className="text-muted-foreground text-sm">No payment modes configured for {title.toLowerCase()}.</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="border rounded-lg p-6 space-y-6">
-            <FieldWrapper control={control} name={`${prefix}Mode`} label={`Choose ${title} Mode`}>
+        <div className="border rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{title}</h3>
+                <Badge variant="secondary">{formatINR(amount)}</Badge>
+            </div>
+
+            {/* Mode Selection */}
+            <FieldWrapper control={control} name={`${prefix}.mode`} label="Select Payment Mode">
                 {() => (
-                    <RadioGroup onValueChange={(v) => setValue(`${prefix}Mode`, v)}>
-                        {(Array.isArray(allowedModes) ? allowedModes : []).length === 0 ? (
-                            <div className="text-muted-foreground text-sm italic px-2 py-1">No modes available</div>
-                        ) : (
-                            (allowedModes || []).map((mode: string) => (
-                                <div key={mode} className="flex items-center space-x-3">
-                                    <RadioGroupItem value={mode} id={`${prefix}-${mode}`} />
-                                    <Label htmlFor={`${prefix}-${mode}`} className="cursor-pointer">
-                                        {TENDER_FEES_MODES.find(m => m.value === mode)?.label || mode}
-                                    </Label>
-                                </div>
-                            ))
-                        )}
+                    <RadioGroup
+                        value={selectedMode || ''}
+                        onValueChange={(v) => setValue(`${prefix}.mode`, v)}
+                        className="flex flex-wrap gap-6"
+                    >
+                        {availableModes.map((mode) => (
+                            <div key={mode.value} className="flex items-center space-x-2">
+                                <RadioGroupItem value={mode.value} id={`${prefix}-${mode.value}`} />
+                                <Label htmlFor={`${prefix}-${mode.value}`} className="cursor-pointer">
+                                    {mode.label}
+                                </Label>
+                            </div>
+                        ))}
                     </RadioGroup>
                 )}
             </FieldWrapper>
 
-            {mode && (
-                <div className="mt-6 pl-6">
+            {/* Mode-specific Fields */}
+            {selectedMode && (
+                <div className="mt-6 pl-4 border-l-4 border-primary/50">
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Fill in the details for <strong>{MODE_LABELS[selectedMode] || selectedMode}</strong>
+                    </p>
 
-                    {/* DD */}
-                    {mode === "1" && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FieldWrapper control={control} name={`${prefix}.ddAmount`} label="Amount*">
-                                {(field) => <NumberInput step={0.01} {...field} required />}
+                    {/* Portal Payment */}
+                    {selectedMode === 'PORTAL' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <FieldWrapper control={control} name={`${prefix}.details.portalName`} label="Portal/Website Name *">
+                                {(field) => <Input placeholder="e.g., gem.gov.in" {...field} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.ddFavouring`} label="DD in Favour of*">
-                                {(field) => <Input {...field} required />}
-                            </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.ddPayableAt`} label="Payable At*">
-                                {(field) => <Input {...field} required />}
-                            </FieldWrapper>
-                            <SelectField control={control} name={`${prefix}.ddDeliverBy`} label="DD deliver by*" options={DELIVERY_OPTIONS} placeholder="Select Deliver By" />
-                            <SelectField control={control} name={`${prefix}.ddPurpose`} label="Purpose of DD*" options={PURPOSE_OPTIONS} placeholder="Select Purpose" />
-                            <FieldWrapper control={control} name={`${prefix}.ddCourierAddress`} label="Courier Address">
-                                {(field) => <Textarea {...field} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.ddCourierHours`} label="Time required for courier (Hours)">
-                                {(field) => <Input type="number" {...field} />}
-                            </FieldWrapper>
+                            <SelectField
+                                control={control}
+                                name={`${prefix}.details.portalNetBanking`}
+                                label="Net Banking Available *"
+                                options={YES_NO_OPTIONS}
+                                placeholder="Select"
+                            />
+                            <SelectField
+                                control={control}
+                                name={`${prefix}.details.portalDebitCard`}
+                                label="Debit Card Allowed *"
+                                options={YES_NO_OPTIONS}
+                                placeholder="Select"
+                            />
                         </div>
                     )}
 
                     {/* Bank Transfer */}
-                    {mode === "5" && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FieldWrapper control={control} name={`${prefix}.btAmount`} label="Amount*">
-                                {(field) => <NumberInput step={0.01} {...field} required />}
+                    {selectedMode === 'BANK_TRANSFER' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <FieldWrapper control={control} name={`${prefix}.details.btAccountName`} label="Account Name *">
+                                {(field) => <Input {...field} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.btAccountName`} label="Account Name*">
-                                {(field) => <Input {...field} required />}
+                            <FieldWrapper control={control} name={`${prefix}.details.btAccountNo`} label="Account Number *">
+                                {(field) => <Input {...field} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.btAccountNo`} label="Account Number*">
-                                {(field) => <Input {...field} required />}
-                            </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.btIfsc`} label="IFSC*">
-                                {(field) => <Input {...field} required />}
+                            <FieldWrapper control={control} name={`${prefix}.details.btIfsc`} label="IFSC Code *">
+                                {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
                             </FieldWrapper>
                         </div>
                     )}
 
-                    {/* Portal */}
-                    {mode === "6" && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FieldWrapper control={control} name={`${prefix}.portalAmount`} label="Amount*">
-                                {(field) => <NumberInput step={0.01} {...field} required />}
+                    {/* Demand Draft */}
+                    {selectedMode === 'DD' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <FieldWrapper control={control} name={`${prefix}.details.ddFavouring`} label="DD in Favour of *">
+                                {(field) => <Input {...field} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name={`${prefix}.portalName`} label="Name of Portal/Website*">
-                                {(field) => <Input placeholder="gem.gov.in" {...field} required />}
+                            <FieldWrapper control={control} name={`${prefix}.details.ddPayableAt`} label="Payable At *">
+                                {(field) => <Input {...field} />}
                             </FieldWrapper>
-                            <SelectField control={control} name={`${prefix}.portalNetBanking`} label="Net Banking Available*" options={[
-                                { value: "YES", label: "Yes" },
-                                { value: "NO", label: "No" },
-                            ]} placeholder="Select Net Banking Available" />
-                            <SelectField control={control} name={`${prefix}.portalDebitCard`} label="Yes Bank Debit Card Allowed*" options={[
-                                { value: "YES", label: "Yes" },
-                                { value: "NO", label: "No" },
-                            ]} placeholder="Select Net Banking Available" />
+                            <SelectField
+                                control={control}
+                                name={`${prefix}.details.ddDeliverBy`}
+                                label="Deliver By *"
+                                options={DELIVERY_OPTIONS}
+                                placeholder="Select"
+                            />
+                            <FieldWrapper control={control} name={`${prefix}.details.ddCourierAddress`} label="Courier Address">
+                                {(field) => <Textarea rows={2} {...field} />}
+                            </FieldWrapper>
+                            <FieldWrapper control={control} name={`${prefix}.details.ddCourierHours`} label="Courier Time (Hours)">
+                                {(field) => <NumberInput min={1} {...field} />}
+                            </FieldWrapper>
                         </div>
                     )}
                 </div>
@@ -107,31 +165,3 @@ export function TenderFeeSection({ prefix, title, allowedModes }: TenderFeeSecti
         </div>
     );
 }
-
-/*
-"Tender Fee Mode" section with 3 radio button options:
-1. Payment on Portal
-2. Bank Transfer
-3. Demand Draft
-Here are the fields for each Tender Fee payment option:
-1. Tender Fees Details:
-- Amount
-- DD deliver by
-- Purpose of DD
-- DD in favour of
-- DD Payable at
-- Courier Address
-- Time required for courier to reach destination
-2. Tender Fee Bank Transfer Details:
-- Amount
-- Purpose
-- Account Name
-- Account Number
-- IFSC
-3. Tender Fee Payment on Portal Details:
-- Amount
-- Purpose
-- Name of Portal/Website
-- Net Banking Available
-- Yes Bank Debit Card Allowed
-*/
