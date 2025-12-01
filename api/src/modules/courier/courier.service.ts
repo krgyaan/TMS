@@ -112,6 +112,59 @@ export class CourierService {
         return result[0] ?? null;
     }
 
+    async findOneWithDetails(id: number) {
+        const result = await this.db
+            .select({
+                id: couriers.id,
+                user_id: couriers.user_id,
+                to_org: couriers.to_org,
+                to_name: couriers.to_name,
+                to_addr: couriers.to_addr,
+                to_pin: couriers.to_pin,
+                to_mobile: couriers.to_mobile,
+                emp_from: couriers.emp_from,
+                del_date: couriers.del_date,
+                urgency: couriers.urgency,
+                courier_provider: couriers.courier_provider,
+                pickup_date: couriers.pickup_date,
+                docket_no: couriers.docket_no,
+                delivery_date: couriers.delivery_date,
+                delivery_pod: couriers.delivery_pod,
+                within_time: couriers.within_time,
+                courier_docs: couriers.courier_docs,
+                status: couriers.status,
+                tracking_number: couriers.tracking_number,
+                created_at: couriers.created_at,
+                updated_at: couriers.updated_at,
+                created_by_name: users.name,
+                created_by_email: users.email,
+            })
+            .from(couriers)
+            .leftJoin(users, eq(couriers.user_id, users.id))
+            .where(eq(couriers.id, id))
+            .limit(1);
+
+        if (!result[0]) {
+            throw new NotFoundException("Courier not found");
+        }
+
+        // Get sender (emp_from) details
+        const sender = await this.db
+            .select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+            })
+            .from(users)
+            .where(eq(users.id, result[0].emp_from))
+            .limit(1);
+
+        return {
+            ...result[0],
+            sender: sender[0] ?? null,
+        };
+    }
+
     async update(id: number, data: UpdateCourierDto, userId: number) {
         const existing = await this.findOne(id);
 

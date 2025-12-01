@@ -73,6 +73,11 @@ export class CourierController {
         return this.service.findOne(id);
     }
 
+    @Get(":id/details")
+    getOneWithDetails(@Param("id", ParseIntPipe) id: number) {
+        return this.service.findOneWithDetails(id);
+    }
+
     @Put(":id")
     update(@Param("id", ParseIntPipe) id: number, @Body() body: UpdateCourierDto, @CurrentUser("id") userId: number) {
         return this.service.update(id, body, userId);
