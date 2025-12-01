@@ -1,40 +1,40 @@
-import { BaseApiService } from './base.service'
-import type { User } from '@/types/api.types'
+import { BaseApiService } from "./base.service";
+import type { User } from "@/types/api.types";
 
 interface LoginResponse {
-    user: User
+    user: User;
     // No accessToken - it's in httpOnly cookie
 }
 
 interface GoogleAuthUrlResponse {
-    url: string
+    url: string;
 }
 
 class AuthService extends BaseApiService {
     constructor() {
-        super('/auth')
+        super("/auth");
     }
 
     async login(email: string, password: string): Promise<LoginResponse> {
-        return this.post<LoginResponse>('/login', { email, password })
+        return this.post<LoginResponse>("/login", { email, password });
     }
 
     async logout(): Promise<void> {
         // Backend will clear the cookie
-        return this.post<void>('/logout')
+        return this.post<void>("/logout");
     }
 
     async getCurrentUser(): Promise<{ user: User }> {
-        return this.get<{ user: User }>('/me')
+        return this.get<{ user: User }>("/me");
     }
 
     async getGoogleAuthUrl(): Promise<GoogleAuthUrlResponse> {
-        return this.get<GoogleAuthUrlResponse>('/google/url')
+        return this.get<GoogleAuthUrlResponse>("/google/url");
     }
 
     async googleCallback(code: string): Promise<LoginResponse> {
-        return this.post<LoginResponse>('/google/callback', { code })
+        return this.post<LoginResponse>("/google/callback", { code });
     }
 }
 
-export const authService = new AuthService()
+export const authService = new AuthService();
