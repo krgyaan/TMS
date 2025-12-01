@@ -7,12 +7,18 @@ export default function ProtectedRoute() {
     const location = useLocation()
     const [shouldFetch, setShouldFetch] = useState(false)
 
-    // Check if we have local user data
     const hasLocalAuth = isAuthenticated()
 
-    // Only fetch current user if we have local data
-    // (which means we might have a valid cookie)
-    const { data: user, isLoading, error } = useCurrentUser()
+    const { data: user, isLoading, error } = useCurrentUser();
+
+    // Show loading while checking auth
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+        );
+    }
 
     useEffect(() => {
         if (!hasLocalAuth) {

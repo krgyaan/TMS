@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useState, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
-import { setStoredUser, clearAuthSession, type AuthUser } from "@/lib/auth"
+import { setStoredUser, clearAuthSession } from "@/lib/auth"
+import type { AuthUser } from "@/types/auth.types"
 import { authKeys } from "@/hooks/api/useAuth"
 import { toast } from "sonner"
 
@@ -22,7 +23,7 @@ const GoogleLoginCallback = () => {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const params = useMemo(() => new URLSearchParams(location.search), [location.search])
-    const processed = useRef(false) 
+    const processed = useRef(false)
 
     const [message, setMessage] = useState("Completing sign-in...")
     const [error, setError] = useState<string | null>(null)

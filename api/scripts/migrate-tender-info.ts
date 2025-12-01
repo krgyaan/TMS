@@ -9,7 +9,7 @@ import {
     tenderClients,
     tenderTechnicalDocuments,
     tenderFinancialDocuments,
-} from './src/db/schema';
+} from '../src/db/schema';
 
 const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
 const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';

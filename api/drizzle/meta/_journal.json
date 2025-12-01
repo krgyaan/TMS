@@ -281,6 +281,20 @@
       "when": 1764545770959,
       "tag": "0039_fixed_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1764566294252,
+      "tag": "0040_colossal_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1764568064145,
+      "tag": "0041_slim_whizzer",
+      "breakpoints": true
     }
   ]
 }

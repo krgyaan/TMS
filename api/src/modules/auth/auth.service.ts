@@ -7,16 +7,24 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import authConfig, { type AuthConfig } from '../../config/auth.config';
-import { UsersService, type SafeUser } from '../master/users/users.service';
+import { UsersService, type UserWithRelations } from '../master/users/users.service';
 import { GoogleService } from '../integrations/google/google.service';
-
-type AuthSession = {
-    user: SafeUser;
-};
+import { DataScope } from '../../common/constants/roles.constant';
 
 type SessionWithToken = {
     accessToken: string;
-    user: SafeUser;
+    user: UserWithRelations;
+};
+
+// JWT payload type (what gets encoded in token)
+export type JwtPayload = {
+    sub: number;
+    email: string;
+    role: string | null;
+    roleId: number | null;
+    teamId: number | null;
+    dataScope: DataScope;
+    canSwitchTeams: boolean;
 };
 
 const GoogleLoginStateSchema = z.object({ purpose: z.literal('google-login') });
@@ -48,12 +56,12 @@ export class AuthService {
         return this.issueSession(user.id);
     }
 
-    async getProfile(userId: number): Promise<SafeUser> {
-        const user = await this.usersService.findById(userId);
+    async getProfile(userId: number): Promise<UserWithRelations> {
+        const user = await this.usersService.findDetailById(userId);
         if (!user) {
             throw new UnauthorizedException('User not found');
         }
-        return this.usersService.sanitizeUser(user);
+        return user;
     }
 
     async generateGoogleLoginUrl(): Promise<{ url: string }> {
@@ -105,11 +113,30 @@ export class AuthService {
         return this.issueSession(user.id);
     }
 
+    // UPDATED: Issue session with enriched JWT payload
     private async issueSession(userId: number): Promise<SessionWithToken> {
-        const user = await this.usersService.ensureUser(userId);
-        const payload = { sub: user.id, email: user.email };
+        // Get full user with relations
+        const userWithRelations = await this.usersService.findDetailById(userId);
+        if (!userWithRelations) {
+            throw new UnauthorizedException('User not found');
+        }
+
+        // Get auth info for JWT
+        const authInfo = await this.usersService.getUserAuthInfo(userId);
+
+        // Build enriched JWT payload
+        const payload: JwtPayload = {
+            sub: userId,
+            email: userWithRelations.email,
+            role: authInfo?.roleName ?? null,
+            roleId: authInfo?.roleId ?? null,
+            teamId: authInfo?.primaryTeamId ?? null,
+            dataScope: authInfo?.dataScope ?? DataScope.SELF,
+            canSwitchTeams: authInfo?.canSwitchTeams ?? false,
+        };
+
         const accessToken = await this.jwtService.signAsync(payload);
-        const safeUser = this.usersService.sanitizeUser(user);
-        return { accessToken, user: safeUser };
+
+        return { accessToken, user: userWithRelations };
     }
 }

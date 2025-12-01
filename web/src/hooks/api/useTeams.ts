@@ -1,75 +1,63 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teamsService } from '@/services/api';
-import type { CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
+import { teamService } from '@/services/api/team.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import type { CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
 
-export const teamsKey = {
+export const teamKeys = {
     all: ['teams'] as const,
-    lists: () => [...teamsKey.all, 'list'] as const,
-    list: (filters?: any) => [...teamsKey.lists(), { filters }] as const,
-    details: () => [...teamsKey.all, 'detail'] as const,
-    detail: (id: number) => [...teamsKey.details(), id] as const,
+    list: () => [...teamKeys.all, 'list'] as const,
+    detail: (id: number) => [...teamKeys.all, 'detail', id] as const,
 };
 
-export const useTeams = () => {
+interface UseTeamsOptions {
+    enabled?: boolean;
+}
+
+export function useTeams(options: UseTeamsOptions = {}) {
     return useQuery({
-        queryKey: teamsKey.lists(),
-        queryFn: () => teamsService.getAll(),
+        queryKey: teamKeys.list(),
+        queryFn: () => teamService.getAll(),
+        enabled: options.enabled ?? true,
+        staleTime: 5 * 60 * 1000, // 5 minutes - teams don't change often
     });
-};
+}
 
-export const useTeam = (id: number | null) => {
+export function useTeam(id: number) {
     return useQuery({
-        queryKey: teamsKey.detail(id!),
-        queryFn: () => teamsService.getById(id!),
+        queryKey: teamKeys.detail(id),
+        queryFn: () => teamService.getById(id),
         enabled: !!id,
     });
-};
+}
 
-export const useCreateTeam = () => {
+export function useCreateTeam() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateTeamDto) => teamsService.create(data),
+        mutationFn: (data: CreateTeamDto) => teamService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: teamKeys.all });
             toast.success('Team created successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
         },
     });
-};
+}
 
-export const useUpdateTeam = () => {
+export function useUpdateTeam() {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdateTeamDto }) =>
-            teamsService.update(id, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
-            queryClient.invalidateQueries({ queryKey: teamsKey.detail(variables.id) });
+            teamService.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: teamKeys.all });
             toast.success('Team updated successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
         },
     });
-};
-
-// export const useDeleteTeam = () => {
-//   const queryClient = useQueryClient();
-
-//   return useMutation({
-//     mutationFn: (id: number) => teamsService.delete(id),
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
-//       toast.success('Team deleted successfully');
-//     },
-//     onError: (error) => {
-//       toast.error(handleQueryError(error));
-//     },
-//   });
-// };
+}

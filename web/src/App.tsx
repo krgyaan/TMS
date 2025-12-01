@@ -1,4 +1,4 @@
-import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider } from "@/app/providers/ThemeProvider"
 import { DocumentTitle } from "@/components/document-title"
 import AppRoutes from "@/app/routes"
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';

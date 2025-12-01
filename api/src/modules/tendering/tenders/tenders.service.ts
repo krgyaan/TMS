@@ -111,22 +111,10 @@ export type TenderForApproval = {
     tlStatus: number;
 };
 
-// ============================================================================
-// Service
-// ============================================================================
-
 @Injectable()
 export class TenderInfosService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    // ========================================================================
-    // Static Utility Methods (Shared Query Conditions)
-    // ========================================================================
-
-    /**
-     * Get condition to exclude DNB/Lost status tenders
-     * Used by: RFQ, Physical Docs, and other dashboard queries
-     */
     static getExcludeDnbTlStatusCondition() {
         const statusIds = ['dnb', 'lost']
             .flatMap((cat) => StatusCache.getIds(cat))
@@ -135,23 +123,13 @@ export class TenderInfosService {
         return notInArray(tenderInfos.status, statusIds);
     }
 
-    /**
-     * Get condition for active (non-deleted) tenders
-     */
     static getActiveCondition() {
         return eq(tenderInfos.deleteStatus, 0);
     }
 
-    /**
-     * Get condition for approved tenders (tlStatus = 1)
-     */
     static getApprovedCondition() {
         return eq(tenderInfos.tlStatus, 1);
     }
-
-    // ========================================================================
-    // Private Helpers
-    // ========================================================================
 
     private mapJoinedRow = (row: {
         tenderInfos: typeof tenderInfos.$inferSelect;
@@ -209,10 +187,6 @@ export class TenderInfosService {
         };
     }
 
-    /**
-     * Build base query with all standard joins
-     * Reusable for any query that needs tender + relations
-     */
     private getBaseQueryBuilder() {
         return this.db
             .select(this.getTenderBaseSelect())
@@ -225,14 +199,6 @@ export class TenderInfosService {
             .leftJoin(websites, eq(websites.id, tenderInfos.website));
     }
 
-    // ========================================================================
-    // 🔥 SHARED METHODS - Used by child services (EMD, RFQ, etc.)
-    // ========================================================================
-
-    /**
-     * Check if tender exists (returns boolean, doesn't throw)
-     * Use when you just need to verify existence
-     */
     async exists(id: number): Promise<boolean> {
         const [result] = await this.db
             .select({ id: tenderInfos.id })
@@ -243,11 +209,6 @@ export class TenderInfosService {
         return !!result;
     }
 
-    /**
-     * Validate tender exists and is not deleted
-     * Throws NotFoundException if not found
-     * Use before creating child records
-     */
     async validateExists(id: number): Promise<TenderInfo> {
         const [tender] = await this.db
             .select()
@@ -262,10 +223,6 @@ export class TenderInfosService {
         return tender;
     }
 
-    /**
-     * Validate tender exists and is approved (tlStatus = 1)
-     * Use for operations that require approved tenders
-     */
     async validateApproved(id: number): Promise<TenderInfo> {
         const [tender] = await this.db
             .select()
@@ -288,10 +245,6 @@ export class TenderInfosService {
         return tender;
     }
 
-    /**
-     * Get minimal tender reference for display
-     * Use in lists, dropdowns, breadcrumbs
-     */
     async getReference(id: number): Promise<TenderReference> {
         const [row] = await this.db
             .select({
@@ -318,10 +271,6 @@ export class TenderInfosService {
         return row as TenderReference;
     }
 
-    /**
-     * Get tender data needed for EMD/Payment operations
-     * Includes: amounts, due date, organization info
-     */
     async getTenderForPayment(id: number): Promise<TenderForPayment> {
         const [row] = await this.db
             .select({
@@ -348,10 +297,6 @@ export class TenderInfosService {
         return row as TenderForPayment;
     }
 
-    /**
-     * Get tender data needed for RFQ operations
-     * Includes: team member, status, item, rfqTo
-     */
     async getTenderForRfq(id: number): Promise<TenderForRfq> {
         const [row] = await this.db
             .select({
@@ -380,9 +325,6 @@ export class TenderInfosService {
         return row as TenderForRfq;
     }
 
-    /**
-     * Get tender data needed for Physical Docs operations
-     */
     async getTenderForPhysicalDocs(id: number): Promise<TenderForPhysicalDocs> {
         const [row] = await this.db
             .select({
@@ -407,9 +349,6 @@ export class TenderInfosService {
         return row as TenderForPhysicalDocs;
     }
 
-    /**
-     * Get tender data needed for Approval operations
-     */
     async getTenderForApproval(id: number): Promise<TenderForApproval> {
         const [row] = await this.db
             .select({
@@ -442,10 +381,6 @@ export class TenderInfosService {
         return row as TenderForApproval;
     }
 
-    /**
-     * Get multiple tenders by IDs
-     * Use for bulk operations
-     */
     async findByIds(ids: number[]): Promise<TenderInfoWithNames[]> {
         if (ids.length === 0) return [];
 
@@ -465,10 +400,6 @@ export class TenderInfosService {
             })
         );
     }
-
-    // ========================================================================
-    // CRUD Operations (Existing)
-    // ========================================================================
 
     async findAll(filters?: TenderListFilters): Promise<TenderInfoWithNames[]> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
@@ -543,10 +474,6 @@ export class TenderInfosService {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
     }
-
-    // ========================================================================
-    // Approval Related (Existing)
-    // ========================================================================
 
     getApprovalData(tender: TenderInfoWithNames) {
         const rfqToNumbers = tender.rfqTo

@@ -13,7 +13,7 @@ import {
     instrumentBgDetails,
     instrumentChequeDetails,
     instrumentTransferDetails,
-} from './src/db/emds.schema';
+} from '../src/db/emds.schema';
 
 // Import status constants
 import {
@@ -23,7 +23,7 @@ import {
     CHEQUE_STATUSES,
     BT_STATUSES,
     PORTAL_STATUSES,
-} from './src/modules/tendering/emds/constants/emd-statuses';
+} from '../src/modules/tendering/emds/constants/emd-statuses';
 
 // ============================================
 // DATABASE CONNECTIONS

@@ -10,14 +10,14 @@ import {
     paymentInstruments,
     instrumentDdDetails,
     instrumentTransferDetails,
-} from './src/db/emds.schema';
+} from '../src/db/emds.schema';
 
 // Import status constants
 import {
     DD_STATUSES,
     BT_STATUSES,
     PORTAL_STATUSES,
-} from './src/modules/tendering/emds/constants/emd-statuses';
+} from '../src/modules/tendering/emds/constants/emd-statuses';
 
 const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
 const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';

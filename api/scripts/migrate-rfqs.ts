@@ -11,7 +11,7 @@ import {
     rfqResponses,
     rfqResponseItems,
     rfqResponseDocuments,
-} from './src/db/rfqs.schema';
+} from '../src/db/rfqs.schema';
 
 const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
 const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';

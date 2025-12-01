@@ -6,8 +6,11 @@ import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { users, type NewUser, type User } from '../../../db/users.schema';
 import { userProfiles } from '../../../db/user-profiles.schema';
+import { userRoles } from '../../../db/user-roles.schema';
+import { roles } from '../../../db/roles.schema';
 import { designations } from '../../../db/designations.schema';
 import { teams } from '../../../db/teams.schema';
+import { RoleName, DataScope, getDataScope, canSwitchTeams } from '../../../common/constants/roles.constant';
 
 export type SafeUser = Pick<
     User,
@@ -44,19 +47,42 @@ export type UserProfileSummary = {
     updatedAt?: Date | string | null;
 };
 
+// NEW: Role information type
+export type UserRoleInfo = {
+    id: number;
+    name: string;
+    dataScope: DataScope;
+    canSwitchTeams: boolean;
+};
+
+// UPDATED: Include role in UserWithRelations
 export type UserWithRelations = SafeUser & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
     designation: { id: number; name: string | null } | null;
+    role: UserRoleInfo | null;  // NEW
+};
+
+// NEW: Type for JWT payload enrichment
+export type UserAuthInfo = {
+    userId: number;
+    email: string;
+    roleName: string | null;
+    roleId: number | null;
+    primaryTeamId: number | null;
+    dataScope: DataScope;
+    canSwitchTeams: boolean;
 };
 
 @Injectable()
 export class UsersService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
+    // UPDATED: Include role in base query
     private baseUserQuery() {
         return this.db
             .select({
+                // User fields
                 id: users.id,
                 name: users.name,
                 email: users.email,
@@ -65,6 +91,7 @@ export class UsersService {
                 isActive: users.isActive,
                 createdAt: users.createdAt,
                 updatedAt: users.updatedAt,
+                // Profile fields
                 profileId: userProfiles.id,
                 profileUserId: userProfiles.userId,
                 profileFirstName: userProfiles.firstName,
@@ -85,17 +112,25 @@ export class UsersService {
                 profileLocale: userProfiles.locale,
                 profileCreatedAt: userProfiles.createdAt,
                 profileUpdatedAt: userProfiles.updatedAt,
+                // Team fields
                 teamId: teams.id,
                 teamName: teams.name,
+                // Designation fields
                 designationId: designations.id,
                 designationName: designations.name,
+                // Role fields (NEW)
+                roleId: roles.id,
+                roleName: roles.name,
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-            .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id));
+            .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
+            .leftJoin(userRoles, eq(userRoles.userId, users.id))  // NEW
+            .leftJoin(roles, eq(roles.id, userRoles.roleId));     // NEW
     }
 
+    // UPDATED: Include role in mapping
     private mapUserRow(row: any): UserWithRelations {
         const profile = row.profileId
             ? {
@@ -138,6 +173,17 @@ export class UsersService {
                 }
                 : null;
 
+        // NEW: Map role with computed properties
+        const role: UserRoleInfo | null =
+            row.roleId != null
+                ? {
+                    id: row.roleId,
+                    name: row.roleName,
+                    dataScope: getDataScope(row.roleName),
+                    canSwitchTeams: canSwitchTeams(row.roleName),
+                }
+                : null;
+
         return {
             id: row.id,
             name: row.name,
@@ -150,7 +196,60 @@ export class UsersService {
             profile,
             team,
             designation,
+            role,  // NEW
         };
+    }
+
+    // NEW: Get user auth info for JWT and guards
+    async getUserAuthInfo(userId: number): Promise<UserAuthInfo | null> {
+        const rows = await this.db
+            .select({
+                userId: users.id,
+                email: users.email,
+                roleName: roles.name,
+                roleId: roles.id,
+                primaryTeamId: userProfiles.primaryTeamId,
+            })
+            .from(users)
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .leftJoin(userRoles, eq(userRoles.userId, users.id))
+            .leftJoin(roles, eq(roles.id, userRoles.roleId))
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+            .limit(1);
+
+        const row = rows[0];
+        if (!row) return null;
+
+        return {
+            userId: row.userId,
+            email: row.email,
+            roleName: row.roleName,
+            roleId: row.roleId,
+            primaryTeamId: row.primaryTeamId,
+            dataScope: getDataScope(row.roleName ?? ''),
+            canSwitchTeams: canSwitchTeams(row.roleName ?? ''),
+        };
+    }
+
+    // NEW: Assign role to user
+    async assignRole(userId: number, roleId: number): Promise<void> {
+        await this.db
+            .insert(userRoles)
+            .values({ userId, roleId })
+            .onConflictDoUpdate({
+                target: userRoles.userId,
+                set: { roleId, updatedAt: new Date() },
+            });
+    }
+
+    // NEW: Get role by name
+    async getRoleByName(name: string): Promise<{ id: number; name: string } | null> {
+        const result = await this.db
+            .select({ id: roles.id, name: roles.name })
+            .from(roles)
+            .where(eq(roles.name, name))
+            .limit(1);
+        return result[0] ?? null;
     }
 
     async findAllWithRelations(): Promise<UserWithRelations[]> {
@@ -188,6 +287,35 @@ export class UsersService {
             .where(and(eq(users.email, email), isNull(users.deletedAt)))
             .limit(1);
         return result[0] ?? null;
+    }
+
+    // UPDATED: sanitizeUser now returns UserWithRelations for auth
+    async sanitizeUserWithRelations(userId: number): Promise<UserWithRelations | null> {
+        return this.findDetailById(userId);
+    }
+
+    // Keep original for backward compatibility
+    sanitizeUser(user: User): SafeUser {
+        const {
+            id,
+            name,
+            email,
+            username,
+            mobile,
+            isActive,
+            createdAt,
+            updatedAt,
+        } = user;
+        return {
+            id,
+            name,
+            email,
+            username,
+            mobile,
+            isActive,
+            createdAt,
+            updatedAt,
+        };
     }
 
     async create(data: NewUser): Promise<User> {
@@ -287,28 +415,6 @@ export class UsersService {
         }
     }
 
-    sanitizeUser(user: User): SafeUser {
-        const {
-            id,
-            name,
-            email,
-            username,
-            mobile,
-            isActive,
-            createdAt,
-            updatedAt,
-        } = user;
-        return {
-            id,
-            name,
-            email,
-            username,
-            mobile,
-            isActive,
-            createdAt,
-            updatedAt,
-        };
-    }
     private async hashPassword(plain: string) {
         return hash(plain);
     }
