@@ -42,6 +42,7 @@ import { TenderApprovalModule } from "./modules/tendering/tender-approval/tender
 import { EmployeeImprestModule } from "./modules/employee-imprest/employee-imprest.module";
 import { PhysicalDocsModule } from "./modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "./modules/tendering/rfqs/rfq.module";
+import { CourierModule } from "./modules/courier/courier.module";
 
 @Module({
     imports: [
@@ -90,6 +91,7 @@ import { RfqsModule } from "./modules/tendering/rfqs/rfq.module";
         TenderApprovalModule,
         PhysicalDocsModule,
         RfqsModule,
+        CourierModule,
     ],
     controllers: [AppController],
     providers: [

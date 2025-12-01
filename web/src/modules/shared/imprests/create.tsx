@@ -8,12 +8,12 @@ import { FilePond, registerPlugin } from "react-filepond";
 import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
 import FilePondPluginImagePreview from "filepond-plugin-image-preview";
 import { toast } from "sonner";
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import api from "@/lib/axios";
 
 import { ArrowLeft } from "lucide-react";
 
@@ -22,10 +22,10 @@ import { paths } from "@/app/routes/paths"; // optional, keep if you have route 
 registerPlugin(FilePondPluginFileValidateType, FilePondPluginImagePreview);
 
 /** ------------------------
- * Zod schemas (frontend)
+ * Zod schemas
  * ------------------------ */
 const createSchema = z.object({
-    name_id: z.number().int({ message: "Select a user" }),
+    // user_id: z.number().int({ message: "Select a user" }),
     party_name: z.string().optional().nullable(),
     project_name: z.string().optional().nullable(),
     amount: z.number().min(1, "Amount must be at least 1"),
@@ -45,8 +45,10 @@ async function fetchCategories() {
 }
 
 async function createImprest(payload: CreateFormValues) {
-    const res = await api.post("/employee-imprest", payload);
-    return res.data; // expect created record (with id)
+    console.log("req made");
+    const res = await api.post("/employee-imprest/", payload);
+    console.log("req completed");
+    return res.data;
 }
 
 async function uploadProofs(imprestId: number, files: File[]) {
@@ -71,7 +73,7 @@ const EmployeeImprestForm: React.FC = () => {
     const { register, handleSubmit, setValue, watch, formState } = useForm<CreateFormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
-            name_id: undefined as unknown as number,
+            // user_id: undefined as unknown as number,
             party_name: "",
             project_name: "",
             amount: undefined as unknown as number,
@@ -84,11 +86,11 @@ const EmployeeImprestForm: React.FC = () => {
     const { errors } = formState;
 
     // Fetch categories from API
-    const { data: categories = [], isLoading: catLoading } = useQuery({
-        queryKey: ["categories"],
-        queryFn: fetchCategories,
-        staleTime: 1000 * 60 * 5,
-    });
+    // const { data: categories = [], isLoading: catLoading } = useQuery({
+    //     queryKey: ["categories"],
+    //     queryFn: fetchCategories,
+    //     staleTime: 1000 * 60 * 5,
+    // });
 
     const createMutation = useMutation({
         mutationFn: createImprest,
@@ -106,7 +108,7 @@ const EmployeeImprestForm: React.FC = () => {
             }
 
             qc.invalidateQueries({ queryKey: ["employee-imprests"] });
-            navigate(paths?.employeeImprest ?? "/employee-imprest");
+            navigate(paths.shared.imprests ?? "/employee-imprest");
         },
         onError: (err: any) => {
             console.error(err);
@@ -119,7 +121,7 @@ const EmployeeImprestForm: React.FC = () => {
         createMutation.mutate({
             ...data,
             // ensure name_id, amount are numbers
-            name_id: Number(data.name_id),
+            // user_id: Number(data.user_id),
             amount: Number(data.amount),
             team_id: data.team_id ? Number(data.team_id) : undefined,
         });
@@ -136,7 +138,7 @@ const EmployeeImprestForm: React.FC = () => {
         <div className="container mx-auto py-6">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <Button variant="outline" size="sm" onClick={() => navigate(paths?.employeeImprest ?? -1)}>
+                    <Button variant="outline" size="sm" onClick={() => navigate(paths.shared.imprests ?? -1)}>
                         <ArrowLeft className="h-4 w-4" />
                         <span>Back</span>
                     </Button>
@@ -157,11 +159,11 @@ const EmployeeImprestForm: React.FC = () => {
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* Name (Assuming an admin selects name_id else frontend will prefill) */}
-                            <div className="space-y-2">
+                            {/* <div className="space-y-2">
                                 <Label>Name</Label>
-                                <Input type="number" placeholder="Enter user id (or use user select implementation)" {...register("name_id", { valueAsNumber: true })} />
-                                {errors.name_id && <p className="text-sm text-destructive">{errors.name_id.message}</p>}
-                            </div>
+                                <Input type="number" placeholder="Enter user id (or use user select implementation)" {...register("user_id", { valueAsNumber: true })} />
+                                {errors.user_id && <p className="text-sm text-destructive">{errors.user_id.message}</p>}
+                            </div> */}
 
                             {/* Party Name */}
                             <div className="space-y-2">
@@ -185,7 +187,7 @@ const EmployeeImprestForm: React.FC = () => {
                             </div>
 
                             {/* Category (fetched from API) */}
-                            <div className="space-y-2">
+                            {/* <div className="space-y-2">
                                 <Label>Category</Label>
                                 <Select onValueChange={val => setValue("category", val)}>
                                     <SelectTrigger className="w-full">
@@ -200,7 +202,7 @@ const EmployeeImprestForm: React.FC = () => {
                                     </SelectContent>
                                 </Select>
                                 {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
-                            </div>
+                            </div> */}
 
                             {/* Team - simple numeric input for now */}
                             <div className="space-y-2">

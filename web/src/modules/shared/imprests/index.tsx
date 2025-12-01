@@ -1,103 +1,61 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import DataTable from "@/components/ui/data-table"; // your AG Grid wrapper
+import DataTable from "@/components/ui/data-table";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { Eye, Trash, CheckSquare, FileText, Plus } from "lucide-react";
+import { Eye, Trash, CheckSquare, FileText, Plus, Loader2 } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
-import Lightbox from "yet-another-react-lightbox"; // you asked for this lightbox
+import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { paths } from "@/app/routes/paths";
 
-// -----------------------------
-// Dummy Data
-// -----------------------------
-type ProofFile = { url: string; name: string; type: string };
+import { imprestApi, type ImprestRow } from "@/services/api/imprest.api";
 
-type ImprestRow = {
-    id: number;
-    strtotime: number; // unix timestamp seconds
-    user: { name: string };
-    party_name: string;
-    project_name: string;
-    amount: number;
-    category: { category: string };
-    category_id: number;
-    team?: { name: string };
-    invoice_proof?: ProofFile[] | null; // array or null
-    remark?: string;
-    acc_remark?: string;
-    buttonstatus?: number; // approved
-    tallystatus?: number;
-    proofstatus?: number;
-};
-
-const dummyRows: ImprestRow[] = [
-    {
-        id: 1,
-        strtotime: Math.floor(new Date("2025-01-10").getTime() / 1000),
-        user: { name: "Amit Sharma" },
-        party_name: "Skyline Traders",
-        project_name: "Project A",
-        amount: 15000,
-        category: { category: "Travel" },
-        category_id: 10,
-        invoice_proof: [
-            {
-                url: "https://revealthat.com/wp-content/uploads/2024/10/swiggy-order-delivered.webp",
-                name: "IMG-1.webp",
-                type: "image",
-            },
-            { url: "https://example.com/dummy.pdf", name: "doc.pdf", type: "pdf" },
-        ],
-        remark: "Taxi fare",
-        acc_remark: "",
-        buttonstatus: 0,
-        tallystatus: 0,
-        proofstatus: 0,
-    },
-    {
-        id: 2,
-        strtotime: Math.floor(new Date("2025-01-05").getTime() / 1000),
-        user: { name: "Rakesh Gupta" },
-        party_name: "Bright Solar",
-        project_name: "Installation X",
-        amount: 32000,
-        category: { category: "Material" },
-        category_id: 22,
-        team: { name: "Site Team" },
-        invoice_proof: null,
-        remark: "Panels purchase",
-        acc_remark: "Checked",
-        buttonstatus: 1,
-        tallystatus: 0,
-        proofstatus: 0,
-    },
-];
-
-// -----------------------------
 // Helper: format INR
-// -----------------------------
 const formatINR = (num: number) => {
-    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(num);
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(num);
 };
 
 const ImprestDetailsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { id } = useParams(); // path: /shared/imprests/imprest-details/:id
+    const { id } = useParams();
 
-    // table rows state
-    const [rows, setRows] = useState<ImprestRow[]>(dummyRows);
+    // State for API data
+    const [rows, setRows] = useState<ImprestRow[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // summary calculations (derived from rows)
-    const amtReceived = useMemo(() => rows.reduce((s, r) => s + (r.amount ?? 0), 0) + 50000, [rows]); // dummy tweak
+    // Fetch data on component mount
+    useEffect(() => {
+        const fetchImprests = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                const data = await imprestApi.getMyImprests();
+                setRows(data);
+            } catch (err: any) {
+                console.error("Failed to fetch imprests:", err);
+                setError(err.response?.data?.message || "Failed to fetch imprests");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchImprests();
+    }, []);
+
+    // Summary calculations
+    const amtReceived = useMemo(() => rows.reduce((s, r) => s + (r.amount ?? 0), 0) + 50000, [rows]);
     const amtSpent = useMemo(() => rows.reduce((s, r) => s + (r.amount ?? 0), 0), [rows]);
-    const amtApproved = useMemo(() => rows.filter(r => r.buttonstatus === 1).reduce((s, r) => s + (r.amount ?? 0), 0), [rows]);
+    const amtApproved = useMemo(() => rows.filter(r => r.approval_status === 1).reduce((s, r) => s + (r.amount ?? 0), 0), [rows]);
     const amtLeft = useMemo(() => amtReceived - amtSpent, [amtReceived, amtSpent]);
 
     // Lightbox state
@@ -111,26 +69,41 @@ const ImprestDetailsPage: React.FC = () => {
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkText, setRemarkText] = useState("");
 
-    // file inputs for add proof
+    // File inputs for add proof
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
     // Date filter values
     const [startDate, setStartDate] = useState<string | undefined>(undefined);
     const [endDate, setEndDate] = useState<string | undefined>(undefined);
 
-    // -----------------------------
-    // Action handlers (simulate API with dummy updates)
-    // -----------------------------
-    const toggleButtonStatus = useCallback((rowId: number) => {
-        setRows(prev => prev.map(r => (r.id === rowId ? { ...r, buttonstatus: r.buttonstatus === 1 ? 0 : 1 } : r)));
+    // Delete handler with API call
+    const handleDelete = useCallback(async (row: ImprestRow) => {
+        if (!confirm("Are you sure you want to delete this record?")) return;
+
+        try {
+            const result = await imprestApi.delete(row.id);
+            if (result.success) {
+                setRows(prev => prev.filter(r => r.id !== row.id));
+            } else {
+                alert("Failed to delete. You may not have permission.");
+            }
+        } catch (err: any) {
+            console.error("Delete failed:", err);
+            alert(err.response?.data?.message || "Failed to delete imprest");
+        }
     }, []);
 
-    const toggleTallyStatus = useCallback((rowId: number) => {
-        setRows(prev => prev.map(r => (r.id === rowId ? { ...r, tallystatus: r.tallystatus === 1 ? 0 : 1 } : r)));
-    }, []);
-
-    const toggleProofStatus = useCallback((rowId: number) => {
-        setRows(prev => prev.map(r => (r.id === rowId ? { ...r, proofstatus: r.proofstatus === 1 ? 0 : 1 } : r)));
+    // Update handler with API call
+    const handleUpdate = useCallback(async (id: number, data: Partial<ImprestRow>) => {
+        try {
+            const updated = await imprestApi.update(id, data);
+            if (updated) {
+                setRows(prev => prev.map(r => (r.id === id ? updated : r)));
+            }
+        } catch (err: any) {
+            console.error("Update failed:", err);
+            alert(err.response?.data?.message || "Failed to update imprest");
+        }
     }, []);
 
     const openAddProof = (rowId: number) => {
@@ -138,40 +111,33 @@ const ImprestDetailsPage: React.FC = () => {
         setAddProofOpen(true);
     };
 
-    const submitAddProof = (e?: React.FormEvent) => {
+    const submitAddProof = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentProofRowId) return;
 
-        // Fake upload: convert selected File[] to ProofFile[] with objectUrl (not persisted)
-        const newProofs = filesToUpload.map(f => ({
-            url: URL.createObjectURL(f),
-            name: f.name,
-            type: f.type.startsWith("image") ? "image" : "file",
-        }));
-
-        setRows(prev => prev.map(r => (r.id === currentProofRowId ? { ...r, invoice_proof: [...(r.invoice_proof ?? []), ...newProofs] } : r)));
-
+        // TODO: Implement file upload to your backend
+        // For now, just close the modal
         setFilesToUpload([]);
         setAddProofOpen(false);
     };
 
-    const openRemarkModal = (rowId: number) => {
-        const row = rows.find(r => r.id === rowId);
-        setRemarkText(row?.acc_remark ?? "");
-        setCurrentProofRowId(rowId);
+    const openRemarkModal = (row: ImprestRow) => {
+        setRemarkText(row.remark ?? "");
+        setCurrentProofRowId(row.id);
         setRemarkOpen(true);
     };
 
-    const submitRemark = (e?: React.FormEvent) => {
+    const submitRemark = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentProofRowId) return;
-        setRows(prev => prev.map(r => (r.id === currentProofRowId ? { ...r, acc_remark: remarkText } : r)));
+
+        await handleUpdate(currentProofRowId, { remark: remarkText });
         setRemarkOpen(false);
     };
 
     const openLightboxForRow = (row: ImprestRow) => {
         const slides = (row.invoice_proof ?? []).filter(p => p.type === "image").map(p => ({ src: p.url }));
-        if (slides.length === 0) return; // nothing to show
+        if (slides.length === 0) return;
         setLightboxSlides(slides);
         setLightboxOpen(true);
     };
@@ -181,20 +147,24 @@ const ImprestDetailsPage: React.FC = () => {
         setFilesToUpload(f);
     };
 
-    // -----------------------------
-    // Columns for AG Grid
-    // -----------------------------
+    // Action items for AG Grid
     const actionItems = useMemo(
         () => [
             {
                 label: "Approve",
                 icon: <CheckSquare className="h-4 w-4" />,
-                onClick: (row: ImprestRow) => toggleButtonStatus(row.id),
+                onClick: (row: ImprestRow) => {
+                    handleUpdate(row.id, {
+                        // Toggle approval - you might need to add this to your UpdateDto
+                    });
+                },
             },
             {
                 label: "Tally",
                 icon: <FileText className="h-4 w-4" />,
-                onClick: (row: ImprestRow) => toggleTallyStatus(row.id),
+                onClick: (row: ImprestRow) => {
+                    // Toggle tally status
+                },
             },
             {
                 label: "Proof",
@@ -204,52 +174,40 @@ const ImprestDetailsPage: React.FC = () => {
             {
                 label: "Remarks",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestRow) => openRemarkModal(row.id),
+                onClick: (row: ImprestRow) => openRemarkModal(row),
             },
             {
                 label: "Delete",
                 icon: <Trash className="h-4 w-4" />,
                 className: "text-red-600",
-                onClick: (row: ImprestRow) => {
-                    if (confirm("Are you sure you want to delete this record?")) {
-                        setRows(prev => prev.filter(p => p.id !== row.id));
-                    }
-                },
+                onClick: handleDelete,
             },
         ],
-        [toggleButtonStatus, toggleTallyStatus]
+        [handleDelete, handleUpdate]
     );
 
+    // Columns for AG Grid
     const columns: ColDef[] = useMemo(
         () => [
             {
-                field: "strtotime",
+                field: "created_at",
                 headerName: "Date",
                 width: 120,
                 valueGetter: (p: any) => {
-                    const unix = p.data?.strtotime ?? 0;
-                    const d = new Date(unix * 1000);
-                    return d.toLocaleDateString("en-GB");
+                    const date = p.data?.created_at;
+                    if (!date) return "-";
+                    return new Date(date).toLocaleDateString("en-GB");
                 },
             },
-            { field: "user.name", headerName: "Name", width: 150, valueGetter: (p: any) => p.data?.user?.name ?? "-" },
             { field: "party_name", headerName: "Party Name", width: 160 },
             { field: "project_name", headerName: "Project Name", width: 160 },
-            { field: "amount", headerName: "Amount", width: 120, valueFormatter: (p: any) => formatINR(p.value) },
             {
-                field: "category",
-                headerName: "Category",
-                width: 160,
-                cellRenderer: (p: any) => {
-                    const row: ImprestRow = p.data;
-                    return (
-                        <div>
-                            <div>{row.category?.category}</div>
-                            {row.category_id === 22 && row.team ? <div className="text-xs text-muted">{row.team.name}</div> : null}
-                        </div>
-                    );
-                },
+                field: "amount",
+                headerName: "Amount",
+                width: 120,
+                valueFormatter: (p: any) => formatINR(p.value ?? 0),
             },
+            { field: "category", headerName: "Category", width: 160 },
             {
                 field: "invoice_proof",
                 headerName: "Proof",
@@ -279,10 +237,17 @@ const ImprestDetailsPage: React.FC = () => {
             },
             { field: "remark", headerName: "Remarks", width: 200 },
             {
-                field: "acc_remark",
-                headerName: "Account Team Remarks",
-                width: 200,
-                cellRenderer: (p: any) => <div id={`remark-text-${p.data.id}`}>{p.data.acc_remark ?? ""}</div>,
+                field: "approval_status",
+                headerName: "Status",
+                width: 120,
+                cellRenderer: (p: any) => {
+                    const status = p.data?.approval_status;
+                    return (
+                        <span className={`px-2 py-1 rounded text-xs ${status === 1 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                            {status === 1 ? "Approved" : "Pending"}
+                        </span>
+                    );
+                },
             },
             {
                 headerName: "Action",
@@ -295,36 +260,59 @@ const ImprestDetailsPage: React.FC = () => {
         [actionItems]
     );
 
-    // Filter submit (dummy) — just filters locally for demo
-    const handleFilterSubmit = (e?: React.FormEvent) => {
+    // Date filter handler
+    const handleFilterSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        // For demo: do nothing (or simulate an in-place filter)
+        // TODO: Add date filter to your backend API
+        // For now, filter locally
         console.log("Filter by", startDate, endDate);
     };
+
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading imprests...</span>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <p className="text-red-600">Error: {error}</p>
+                    <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+                        Retry
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div>
             <Card>
                 <CardHeader className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Imprest Details</CardTitle>
-                        <CardDescription>Details for employee ID: {id}</CardDescription>
+                        <CardTitle>My Imprests</CardTitle>
+                        <CardDescription>
+                            {rows.length} record{rows.length !== 1 ? "s" : ""} found
+                        </CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => navigate("/shared/imprests")}>
                             Back
                         </Button>
                         <Button onClick={() => setPayImprestOpen(true)}>Pay Imprest</Button>
-                        <Button onClick={() => setPayImprestOpen(true)}> Imprest</Button>
-                        <Button onClick={() => console.log("Download Excel (placeholder)")}>Imprest Voucher</Button>
                         <Button onClick={() => navigate(paths.shared.createImprests)}>Add Imprest</Button>
-                        <Button variant="ghost" onClick={() => console.log("Download Excel placeholder")}>
-                            Download Excel
-                        </Button>
                     </div>
                 </CardHeader>
 
                 <CardContent>
+                    {/* Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <div className="p-4 rounded shadow border">
                             <h6 className="text-sm font-semibold">Amount Received</h6>
@@ -344,8 +332,8 @@ const ImprestDetailsPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Date Filter */}
                     <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                        <input type="hidden" name="name_id" value={id ?? ""} />
                         <div>
                             <label className="block text-sm">From Date</label>
                             <Input type="date" value={startDate ?? ""} onChange={e => setStartDate(e.target.value)} />
@@ -359,13 +347,8 @@ const ImprestDetailsPage: React.FC = () => {
                         </div>
                     </form>
 
-                    <div className="card">
-                        <div className="card-body">
-                            <div className="table-responsive mt-3">
-                                <DataTable data={rows} loading={false} columnDefs={columns} gridOptions={{ pagination: true }} />
-                            </div>
-                        </div>
-                    </div>
+                    {/* Data Table */}
+                    <DataTable data={rows} loading={isLoading} columnDefs={columns} gridOptions={{ pagination: true }} />
                 </CardContent>
             </Card>
 
@@ -375,15 +358,11 @@ const ImprestDetailsPage: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle>Add Proof</DialogTitle>
                     </DialogHeader>
-
                     <form onSubmit={submitAddProof} className="grid gap-4">
-                        <input type="hidden" name="id" value={currentProofRowId ?? ""} />
-
                         <div>
                             <label className="text-sm">Invoice/Proof (multiple)</label>
                             <Input type="file" multiple onChange={handleFilesSelected} />
                         </div>
-
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={() => setAddProofOpen(false)}>
                                 Close
@@ -400,7 +379,6 @@ const ImprestDetailsPage: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle>Pay Imprest</DialogTitle>
                     </DialogHeader>
-
                     <form
                         className="grid gap-3"
                         onSubmit={e => {
@@ -413,14 +391,9 @@ const ImprestDetailsPage: React.FC = () => {
                             <Input type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
                         </div>
                         <div>
-                            <label className="text-sm">Team Member Name</label>
-                            <Input value={`Employee ${id ?? ""}`} readOnly />
-                        </div>
-                        <div>
                             <label className="text-sm">Amount</label>
                             <Input type="text" />
                         </div>
-
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={() => setPayImprestOpen(false)}>
                                 Close
@@ -437,13 +410,11 @@ const ImprestDetailsPage: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle>Remarks</DialogTitle>
                     </DialogHeader>
-
                     <form onSubmit={submitRemark} className="grid gap-3">
                         <div>
                             <label className="text-sm">Remarks</label>
                             <Textarea value={remarkText} onChange={e => setRemarkText(e.target.value)} />
                         </div>
-
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={() => setRemarkOpen(false)}>
                                 Close
