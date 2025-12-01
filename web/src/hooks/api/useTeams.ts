@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teamsService } from '@/services/api';
-import type { CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { teamsService } from "@/services";
+import type { CreateTeamDto, UpdateTeamDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const teamsKey = {
-    all: ['teams'] as const,
-    lists: () => [...teamsKey.all, 'list'] as const,
+    all: ["teams"] as const,
+    lists: () => [...teamsKey.all, "list"] as const,
     list: (filters?: any) => [...teamsKey.lists(), { filters }] as const,
-    details: () => [...teamsKey.all, 'detail'] as const,
+    details: () => [...teamsKey.all, "detail"] as const,
     detail: (id: number) => [...teamsKey.details(), id] as const,
 };
 
@@ -34,9 +34,9 @@ export const useCreateTeam = () => {
         mutationFn: (data: CreateTeamDto) => teamsService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
-            toast.success('Team created successfully');
+            toast.success("Team created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -46,14 +46,13 @@ export const useUpdateTeam = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateTeamDto }) =>
-            teamsService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateTeamDto }) => teamsService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: teamsKey.lists() });
             queryClient.invalidateQueries({ queryKey: teamsKey.detail(variables.id) });
-            toast.success('Team updated successfully');
+            toast.success("Team updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

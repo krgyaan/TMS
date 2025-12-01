@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { loanPartiesService } from '@/services/api';
-import type { CreateLoanPartyDto, UpdateLoanPartyDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { loanPartiesService } from "@/services";
+import type { CreateLoanPartyDto, UpdateLoanPartyDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const loanPartiesKey = {
-    all: ['loanParties'] as const,
-    lists: () => [...loanPartiesKey.all, 'list'] as const,
+    all: ["loanParties"] as const,
+    lists: () => [...loanPartiesKey.all, "list"] as const,
     list: (filters?: any) => [...loanPartiesKey.lists(), { filters }] as const,
-    details: () => [...loanPartiesKey.all, 'detail'] as const,
+    details: () => [...loanPartiesKey.all, "detail"] as const,
     detail: (id: number) => [...loanPartiesKey.details(), id] as const,
 };
 
@@ -32,7 +32,7 @@ export const useLoanParty = (id: number | null) => {
 // Search lead types
 export const useLoanPartySearch = (query: string) => {
     return useQuery({
-        queryKey: [...loanPartiesKey.all, 'search', query],
+        queryKey: [...loanPartiesKey.all, "search", query],
         // queryFn: () => loanPartiesService.search(query),
         enabled: query.length > 0,
     });
@@ -46,9 +46,9 @@ export const useCreateLoanParty = () => {
         mutationFn: (data: CreateLoanPartyDto) => loanPartiesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
-            toast.success('Loan Party created successfully');
+            toast.success("Loan Party created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -59,14 +59,13 @@ export const useUpdateLoanParty = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateLoanPartyDto }) =>
-            loanPartiesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateLoanPartyDto }) => loanPartiesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.lists() });
             queryClient.invalidateQueries({ queryKey: loanPartiesKey.detail(variables.id) });
-            toast.success('Loan Party updated successfully');
+            toast.success("Loan Party updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

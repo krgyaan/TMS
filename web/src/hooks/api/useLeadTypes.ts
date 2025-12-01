@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leadTypesService } from '@/services/api';
-import type { CreateLeadTypeDto, UpdateLeadTypeDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { leadTypesService } from "@/services";
+import type { CreateLeadTypeDto, UpdateLeadTypeDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const leadTypesKey = {
-    all: ['leadTypes'] as const,
-    lists: () => [...leadTypesKey.all, 'list'] as const,
+    all: ["leadTypes"] as const,
+    lists: () => [...leadTypesKey.all, "list"] as const,
     list: (filters?: any) => [...leadTypesKey.lists(), { filters }] as const,
-    details: () => [...leadTypesKey.all, 'detail'] as const,
+    details: () => [...leadTypesKey.all, "detail"] as const,
     detail: (id: number) => [...leadTypesKey.details(), id] as const,
 };
 
@@ -32,7 +32,7 @@ export const useLeadType = (id: number | null) => {
 // Search lead types
 export const useLeadTypeSearch = (query: string) => {
     return useQuery({
-        queryKey: [...leadTypesKey.all, 'search', query],
+        queryKey: [...leadTypesKey.all, "search", query],
         // queryFn: () => leadTypesService.search(query),
         enabled: query.length > 0,
     });
@@ -46,9 +46,9 @@ export const useCreateLeadType = () => {
         mutationFn: (data: CreateLeadTypeDto) => leadTypesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: leadTypesKey.lists() });
-            toast.success('Lead Type created successfully');
+            toast.success("Lead Type created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -59,14 +59,13 @@ export const useUpdateLeadType = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateLeadTypeDto }) =>
-            leadTypesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateLeadTypeDto }) => leadTypesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: leadTypesKey.lists() });
             queryClient.invalidateQueries({ queryKey: leadTypesKey.detail(variables.id) });
-            toast.success('Lead Type updated successfully');
+            toast.success("Lead Type updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
