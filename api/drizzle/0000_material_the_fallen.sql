@@ -1,6 +1,8 @@
-CREATE TYPE "public"."deleteStatus" AS ENUM('0', '1');--> statement-breakpoint
-CREATE TYPE "public"."tlStatus" AS ENUM('0', '1', '2', '3');--> statement-breakpoint
 CREATE TYPE "public"."incomplete_field_status" AS ENUM('pending', 'resolved');--> statement-breakpoint
+CREATE TYPE "public"."instrument_status" AS ENUM('Pending', 'Requested', 'Approved', 'Issued', 'Dispatched', 'Received', 'Returned', 'Cancelled', 'Refunded', 'Encashed', 'Extended');--> statement-breakpoint
+CREATE TYPE "public"."instrument_type" AS ENUM('DD', 'FDR', 'BG', 'Cheque', 'Bank Transfer', 'Portal Payment', 'Surety Bond');--> statement-breakpoint
+CREATE TYPE "public"."payment_purpose" AS ENUM('EMD', 'Tender Fee', 'Processing Fee', 'Security Deposit', 'Performance BG', 'Surety Bond', 'Other Payment');--> statement-breakpoint
+CREATE TYPE "public"."payment_request_type" AS ENUM('TMS', 'Other Than TMS', 'Old Entries', 'Other Than Tender');--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -86,7 +88,7 @@ CREATE TABLE "teams" (
 --> statement-breakpoint
 CREATE TABLE "employee_imprests" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"name_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
 	"party_name" varchar(255),
 	"project_name" varchar(255),
 	"amount" integer NOT NULL,
@@ -358,10 +360,10 @@ CREATE TABLE "tender_infos" (
 	"location" bigint,
 	"website" bigint,
 	"courier_address" text,
-	"delete_status" "deleteStatus" DEFAULT '0' NOT NULL,
+	"delete_status" integer DEFAULT 0 NOT NULL,
 	"tl_remarks" varchar(200),
 	"rfq_to" varchar(15),
-	"tl_status" "tlStatus" DEFAULT '0' NOT NULL,
+	"tl_status" integer DEFAULT 0 NOT NULL,
 	"tender_fee_mode" varchar(100),
 	"emd_mode" varchar(100),
 	"approve_pqr_selection" varchar(50),
@@ -461,6 +463,214 @@ CREATE TABLE "tender_incomplete_fields" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "tender_status_history" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"tender_id" bigint NOT NULL,
+	"prev_status" bigint,
+	"new_status" bigint NOT NULL,
+	"comment" text,
+	"changed_by" bigint NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "physical_docs" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"tender_id" integer NOT NULL,
+	"courier_no" integer NOT NULL,
+	"submitted_docs" varchar(2000),
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "physical_docs_persons" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"physical_doc_id" bigint NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"email" varchar(255) NOT NULL,
+	"phone" varchar(255) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfq_documents" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"rfq_id" bigint NOT NULL,
+	"doc_type" varchar(50) NOT NULL,
+	"path" text NOT NULL,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfq_items" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"rfq_id" bigint NOT NULL,
+	"requirement" text NOT NULL,
+	"unit" varchar(64),
+	"qty" numeric,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfq_response_documents" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"rfq_response_id" bigint NOT NULL,
+	"doc_type" varchar(50) NOT NULL,
+	"path" varchar(255) NOT NULL,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfq_response_items" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"rfq_response_id" bigint NOT NULL,
+	"requirement" text NOT NULL,
+	"unit" varchar(64),
+	"qty" numeric,
+	"unit_price" numeric(15, 2),
+	"total_price" numeric(15, 2),
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfq_responses" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"rfq_id" bigint NOT NULL,
+	"vendor_id" bigint NOT NULL,
+	"receipt_datetime" timestamp with time zone NOT NULL,
+	"gst_percentage" numeric(5, 2),
+	"gst_type" varchar(50),
+	"delivery_time" integer,
+	"freight_type" varchar(50),
+	"notes" text,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "rfqs" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"tender_id" bigint NOT NULL,
+	"due_date" timestamp with time zone,
+	"doc_list" text,
+	"requested_vendor" varchar(255),
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "instrument_bg_details" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"bg_no" varchar(100),
+	"bg_date" date,
+	"validity_date" date,
+	"claim_expiry_date" date,
+	"beneficiary_name" varchar(500),
+	"beneficiary_address" text,
+	"bank_name" varchar(300),
+	"cash_margin_percent" numeric(6, 2),
+	"fdr_margin_percent" numeric(6, 2),
+	"stamp_charges" numeric(12, 2),
+	"sfms_charges" numeric(12, 2),
+	"stamp_charges_deducted" numeric(12, 2),
+	"sfms_charges_deducted" numeric(12, 2),
+	"other_charges_deducted" numeric(12, 2),
+	"extended_amount" numeric(18, 2),
+	"extended_validity_date" date,
+	"extended_claim_expiry_date" date,
+	"extended_bank_name" varchar(300),
+	"extension_letter_path" varchar(500),
+	"cancellation_letter_path" varchar(500),
+	"prefilled_signed_bg" varchar(500)
+);
+--> statement-breakpoint
+CREATE TABLE "instrument_cheque_details" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"cheque_no" varchar(50),
+	"cheque_date" date,
+	"bank_name" varchar(300),
+	"cheque_image_path" varchar(500),
+	"cancelled_image_path" varchar(500)
+);
+--> statement-breakpoint
+CREATE TABLE "instrument_dd_details" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"dd_no" varchar(100),
+	"dd_date" date,
+	"bank_name" varchar(300),
+	"req_no" varchar(100)
+);
+--> statement-breakpoint
+CREATE TABLE "instrument_fdr_details" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"fdr_no" varchar(100),
+	"fdr_date" date,
+	"fdr_source" varchar(200),
+	"roi" numeric(6, 2),
+	"margin_percent" numeric(6, 2),
+	"fdr_purpose" varchar(500)
+);
+--> statement-breakpoint
+CREATE TABLE "instrument_transfer_details" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"portal_name" varchar(200),
+	"account_name" varchar(500),
+	"account_number" varchar(50),
+	"ifsc" varchar(20),
+	"transaction_id" varchar(500),
+	"transaction_date" timestamp,
+	"payment_method" varchar(50)
+);
+--> statement-breakpoint
+CREATE TABLE "payment_instruments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"request_id" integer NOT NULL,
+	"instrument_type" "instrument_type" NOT NULL,
+	"amount" numeric(18, 2) NOT NULL,
+	"favouring" varchar(500),
+	"payable_at" varchar(500),
+	"issue_date" date,
+	"expiry_date" date,
+	"validity_date" date,
+	"claim_expiry_date" date,
+	"instrument_status" "instrument_status" DEFAULT 'Pending',
+	"utr" varchar(255),
+	"docket_no" varchar(255),
+	"courier_address" text,
+	"action" integer,
+	"courier_deadline" integer,
+	"rejection_reason" text,
+	"generated_pdf" varchar(500),
+	"cancel_pdf" varchar(500),
+	"docket_slip" varchar(500),
+	"covering_letter" varchar(500),
+	"generated_pdfs" text,
+	"extension_request_pdf" varchar(500),
+	"cancellation_request_pdf" varchar(500),
+	"remarks" text,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "payment_instruments_docket_no_unique" UNIQUE("docket_no")
+);
+--> statement-breakpoint
+CREATE TABLE "payment_requests" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"tender_id" integer NOT NULL,
+	"type" "payment_request_type" DEFAULT 'TMS',
+	"tender_no" varchar(500) DEFAULT 'NA',
+	"project_name" varchar(500),
+	"purpose" "payment_purpose" NOT NULL,
+	"amount_required" numeric(18, 2) NOT NULL,
+	"due_date" timestamp,
+	"requested_by" varchar(200),
+	"status" varchar(50) DEFAULT 'Pending',
+	"remarks" text,
+	"legacy_emd_id" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_designation_id_designations_id_fk" FOREIGN KEY ("designation_id") REFERENCES "public"."designations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_primary_team_id_teams_id_fk" FOREIGN KEY ("primary_team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -485,6 +695,17 @@ ALTER TABLE "tender_infos" ADD CONSTRAINT "tender_infos_team_member_users_id_fk"
 ALTER TABLE "tender_infos" ADD CONSTRAINT "tender_infos_status_statuses_id_fk" FOREIGN KEY ("status") REFERENCES "public"."statuses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tender_infos" ADD CONSTRAINT "tender_infos_location_locations_id_fk" FOREIGN KEY ("location") REFERENCES "public"."locations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tender_infos" ADD CONSTRAINT "tender_infos_website_websites_id_fk" FOREIGN KEY ("website") REFERENCES "public"."websites"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tender_status_history" ADD CONSTRAINT "tender_status_history_tender_id_tender_infos_id_fk" FOREIGN KEY ("tender_id") REFERENCES "public"."tender_infos"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tender_status_history" ADD CONSTRAINT "tender_status_history_prev_status_statuses_id_fk" FOREIGN KEY ("prev_status") REFERENCES "public"."statuses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tender_status_history" ADD CONSTRAINT "tender_status_history_new_status_statuses_id_fk" FOREIGN KEY ("new_status") REFERENCES "public"."statuses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tender_status_history" ADD CONSTRAINT "tender_status_history_changed_by_users_id_fk" FOREIGN KEY ("changed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "physical_docs_persons" ADD CONSTRAINT "physical_docs_persons_physical_doc_id_physical_docs_id_fk" FOREIGN KEY ("physical_doc_id") REFERENCES "public"."physical_docs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfq_items" ADD CONSTRAINT "rfq_items_rfq_id_rfqs_id_fk" FOREIGN KEY ("rfq_id") REFERENCES "public"."rfqs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfq_response_documents" ADD CONSTRAINT "rfq_response_documents_rfq_response_id_rfq_responses_id_fk" FOREIGN KEY ("rfq_response_id") REFERENCES "public"."rfq_responses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfq_response_items" ADD CONSTRAINT "rfq_response_items_rfq_response_id_rfq_responses_id_fk" FOREIGN KEY ("rfq_response_id") REFERENCES "public"."rfq_responses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfq_responses" ADD CONSTRAINT "rfq_responses_rfq_id_rfqs_id_fk" FOREIGN KEY ("rfq_id") REFERENCES "public"."rfqs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfq_responses" ADD CONSTRAINT "rfq_responses_vendor_id_vendors_id_fk" FOREIGN KEY ("vendor_id") REFERENCES "public"."vendors"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rfqs" ADD CONSTRAINT "rfqs_tender_id_tender_infos_id_fk" FOREIGN KEY ("tender_id") REFERENCES "public"."tender_infos"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "users_mobile_idx" ON "users" USING btree ("mobile");--> statement-breakpoint
 CREATE UNIQUE INDEX "roles_name_guard_index" ON "roles" USING btree ("name","guard_name");--> statement-breakpoint
 CREATE INDEX "tender_clients_tender_id_idx" ON "tender_clients" USING btree ("tender_id");--> statement-breakpoint
