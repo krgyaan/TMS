@@ -43,9 +43,28 @@ import { EmployeeImprestModule } from "./modules/employee-imprest/employee-impre
 import { PhysicalDocsModule } from "./modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "./modules/tendering/rfqs/rfq.module";
 import { CourierModule } from "./modules/courier/courier.module";
+import { ServeStaticModule } from "@nestjs/serve-static";
+import { join } from "path";
+import { existsSync } from "fs";
+
+const uploadsPath = join(process.cwd(), "uploads");
+console.log("=== STATIC FILES DEBUG ===");
+console.log("Current working directory:", process.cwd());
+console.log("Uploads path:", uploadsPath);
+console.log("Uploads folder exists:", existsSync(uploadsPath));
+console.log("Couriers folder exists:", existsSync(join(uploadsPath, "couriers")));
+console.log("==========================");
 
 @Module({
     imports: [
+        ServeStaticModule.forRoot({
+            rootPath: join(process.cwd(), "uploads"),
+            serveRoot: "/uploads",
+            serveStaticOptions: {
+                index: false,
+                fallthrough: true,
+            },
+        }),
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
