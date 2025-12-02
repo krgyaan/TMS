@@ -1,4 +1,3 @@
-// api/src/db/user-roles.schema.ts
 import {
     pgTable,
     bigserial,

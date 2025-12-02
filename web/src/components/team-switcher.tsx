@@ -1,8 +1,7 @@
-'use client';
-
-import * as React from 'react';
-import { ChevronsUpDown, Building2, Check, Globe } from 'lucide-react';
-
+import { ChevronsUpDown, Check, Building2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTeams } from '@/hooks/api/useTeams';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,48 +16,54 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
-import { useTeamContext } from '@/contexts/TeamContext';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function TeamSwitcher() {
     const { isMobile } = useSidebar();
-    const { activeTeam, activeTeamId, availableTeams, canSwitchTeam, userRole, dataScope, isLoadingTeams, setActiveTeam, currentUser } = useTeamContext();
+    const {
+        role,
+        dataScope,
+        canSwitchTeams,
+        teamId: userTeamId,
+        activeTeamId,
+        setActiveTeamId,
+    } = useAuth();
 
-    // Display info based on role
-    const displayName = activeTeam?.name ?? 'All Teams';
-    const displaySubtext = React.useMemo(() => {
-        if (!currentUser) return '';
+    const { data: teams = [], isLoading: isLoadingTeams } = useTeams();
 
-        switch (dataScope) {
-            case 'self':
-                return `${userRole} • Personal View`;
-            case 'team':
-                return `${userRole} • Team View`;
-            case 'all':
-                return activeTeamId ? `${userRole} • Filtered` : `${userRole} • All Data`;
-            default:
-                return userRole ?? '';
-        }
-    }, [dataScope, userRole, activeTeamId, currentUser]);
-
-    // If user can't switch teams, show read-only display
-    if (!canSwitchTeam) {
+    if (isLoadingTeams) {
         return (
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton
-                        size="lg"
-                        className="cursor-default hover:bg-transparent"
-                    >
-                        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                    <SidebarMenuButton size="lg" className="cursor-default">
+                        <Skeleton className="h-8 w-8 rounded-lg" />
+                        <div className="grid flex-1 gap-1">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-3 w-16" />
+                        </div>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        );
+    }
+
+    const userTeam = teams.find((t) => t.id === userTeamId);
+    const activeTeam = activeTeamId ? teams.find((t) => t.id === activeTeamId) : null;
+
+    if (!canSwitchTeams) {
+        return (
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent">
+                        <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                             <Building2 className="size-4" />
                         </div>
                         <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-medium">
-                                {currentUser?.team?.name ?? 'No Team'}
+                            <span className="truncate font-semibold">
+                                {userTeam?.name ?? 'My Team'}
                             </span>
                             <span className="truncate text-xs text-muted-foreground">
-                                {displaySubtext}
+                                {role} • {dataScope} access
                             </span>
                         </div>
                     </SidebarMenuButton>
@@ -67,7 +72,9 @@ export function TeamSwitcher() {
         );
     }
 
-    // Admin/Super User: Show team switcher
+    const displayTeam = activeTeam ?? userTeam;
+    const displayName = activeTeamId === null ? 'All Teams' : (displayTeam?.name ?? 'Select Team');
+
     return (
         <SidebarMenu>
             <SidebarMenuItem>
@@ -77,17 +84,17 @@ export function TeamSwitcher() {
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                {activeTeamId ? (
-                                    <Building2 className="size-4" />
+                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                                {activeTeamId === null ? (
+                                    <span className="text-xs font-bold">ALL</span>
                                 ) : (
-                                    <Globe className="size-4" />
+                                    <Building2 className="size-4" />
                                 )}
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{displayName}</span>
+                                <span className="truncate font-semibold">{displayName}</span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    {displaySubtext}
+                                    {role} • {dataScope} access
                                 </span>
                             </div>
                             <ChevronsUpDown className="ml-auto size-4" />
@@ -99,61 +106,46 @@ export function TeamSwitcher() {
                         side={isMobile ? 'bottom' : 'right'}
                         sideOffset={4}
                     >
-                        <DropdownMenuLabel className="text-muted-foreground text-xs">
-                            Switch Team View
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                            View Data For
                         </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
 
-                        {/* All Teams Option */}
                         <DropdownMenuItem
-                            onClick={() => setActiveTeam(null)}
+                            onClick={() => setActiveTeamId(null)}
                             className="gap-2 p-2"
                         >
-                            <div className="flex size-6 items-center justify-center rounded-md border bg-background">
-                                <Globe className="size-3.5 shrink-0" />
+                            <div className="flex size-6 items-center justify-center rounded-sm border bg-muted">
+                                <span className="text-[10px] font-bold">ALL</span>
                             </div>
-                            <span className="flex-1">All Teams</span>
+                            <span>All Teams</span>
                             {activeTeamId === null && (
-                                <Check className="size-4 text-primary" />
+                                <Check className="ml-auto size-4" />
                             )}
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />
 
-                        <DropdownMenuLabel className="text-muted-foreground text-xs">
-                            Teams
-                        </DropdownMenuLabel>
-
-                        {isLoadingTeams ? (
-                            <DropdownMenuItem disabled className="gap-2 p-2">
-                                <span className="text-muted-foreground">Loading teams...</span>
-                            </DropdownMenuItem>
-                        ) : availableTeams.length === 0 ? (
-                            <DropdownMenuItem disabled className="gap-2 p-2">
-                                <span className="text-muted-foreground">No teams available</span>
-                            </DropdownMenuItem>
-                        ) : (
-                            availableTeams.map((team) => (
-                                <DropdownMenuItem
-                                    key={team.id}
-                                    onClick={() => setActiveTeam(team.id)}
-                                    className="gap-2 p-2"
-                                >
-                                    <div className="flex size-6 items-center justify-center rounded-md border bg-background">
-                                        <Building2 className="size-3.5 shrink-0" />
-                                    </div>
-                                    <span className="flex-1">{team.name}</span>
-                                    {/* Show badge if it's user's primary team */}
-                                    {team.id === currentUser?.team?.id && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            My Team
-                                        </Badge>
+                        {teams.map((team) => (
+                            <DropdownMenuItem
+                                key={team.id}
+                                onClick={() => setActiveTeamId(team.id)}
+                                className="gap-2 p-2"
+                            >
+                                <div className="flex size-6 items-center justify-center rounded-sm border">
+                                    <span className="text-xs">{team.name.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <span className={cn(team.id === userTeamId && 'font-medium')}>
+                                    {team.name}
+                                    {team.id === userTeamId && (
+                                        <span className="ml-1 text-xs text-muted-foreground">*</span>
                                     )}
-                                    {activeTeamId === team.id && (
-                                        <Check className="size-4 text-primary" />
-                                    )}
-                                </DropdownMenuItem>
-                            ))
-                        )}
+                                </span>
+                                {activeTeamId === team.id && (
+                                    <Check className="ml-auto size-4" />
+                                )}
+                            </DropdownMenuItem>
+                        ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>

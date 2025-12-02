@@ -9,14 +9,14 @@ import { JwtService } from '@nestjs/jwt';
 import authConfig, { type AuthConfig } from '../../config/auth.config';
 import { UsersService, type UserWithRelations } from '../master/users/users.service';
 import { GoogleService } from '../integrations/google/google.service';
+import { PermissionService } from './services/permission.service';
 import { DataScope } from '../../common/constants/roles.constant';
 
 type SessionWithToken = {
     accessToken: string;
-    user: UserWithRelations;
+    user: UserWithRelations & { permissions: string[] };
 };
 
-// JWT payload type (what gets encoded in token)
 export type JwtPayload = {
     sub: number;
     email: string;
@@ -25,6 +25,8 @@ export type JwtPayload = {
     teamId: number | null;
     dataScope: DataScope;
     canSwitchTeams: boolean;
+    iat?: number;
+    exp?: number;
 };
 
 const GoogleLoginStateSchema = z.object({ purpose: z.literal('google-login') });
@@ -36,6 +38,7 @@ export class AuthService {
         private readonly jwtService: JwtService,
         private readonly usersService: UsersService,
         private readonly googleService: GoogleService,
+        private readonly permissionService: PermissionService,
     ) { }
 
     async loginWithPassword(
@@ -46,22 +49,31 @@ export class AuthService {
         if (!user) {
             throw new UnauthorizedException('Invalid credentials');
         }
+
         const valid = await this.usersService.verifyPassword(user, password);
         if (!valid) {
             throw new UnauthorizedException('Invalid credentials');
         }
+
         if (!user.isActive) {
             throw new UnauthorizedException('Account is inactive');
         }
+
         return this.issueSession(user.id);
     }
 
-    async getProfile(userId: number): Promise<UserWithRelations> {
+    async getProfile(userId: number): Promise<UserWithRelations & { permissions: string[] }> {
         const user = await this.usersService.findDetailById(userId);
         if (!user) {
             throw new UnauthorizedException('User not found');
         }
-        return user;
+
+        const permissions = await this.permissionService.getUserPermissions(
+            userId,
+            user.role?.id ?? null
+        );
+
+        return { ...user, permissions };
     }
 
     async generateGoogleLoginUrl(): Promise<{ url: string }> {
@@ -113,18 +125,22 @@ export class AuthService {
         return this.issueSession(user.id);
     }
 
-    // UPDATED: Issue session with enriched JWT payload
+    async refreshSession(userId: number): Promise<SessionWithToken> {
+        return this.issueSession(userId);
+    }
+
     private async issueSession(userId: number): Promise<SessionWithToken> {
-        // Get full user with relations
         const userWithRelations = await this.usersService.findDetailById(userId);
         if (!userWithRelations) {
             throw new UnauthorizedException('User not found');
         }
 
-        // Get auth info for JWT
+        if (!userWithRelations.isActive) {
+            throw new UnauthorizedException('Account is inactive');
+        }
+
         const authInfo = await this.usersService.getUserAuthInfo(userId);
 
-        // Build enriched JWT payload
         const payload: JwtPayload = {
             sub: userId,
             email: userWithRelations.email,
@@ -137,6 +153,15 @@ export class AuthService {
 
         const accessToken = await this.jwtService.signAsync(payload);
 
-        return { accessToken, user: userWithRelations };
+        // Get permissions for frontend
+        const permissions = await this.permissionService.getUserPermissions(
+            userId,
+            authInfo?.roleId ?? null
+        );
+
+        return {
+            accessToken,
+            user: { ...userWithRelations, permissions },
+        };
     }
 }

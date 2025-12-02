@@ -1,102 +1,120 @@
-﻿import { useEffect, useMemo, useState, useRef } from "react"
-import { useLocation, useNavigate } from "react-router-dom"
-import { useQueryClient } from "@tanstack/react-query"
-import { setStoredUser, clearAuthSession } from "@/lib/auth"
-import type { AuthUser } from "@/types/auth.types"
-import { authKeys } from "@/hooks/api/useAuth"
-import { toast } from "sonner"
-
-const decodeUser = (value: string | null): AuthUser | null => {
-    if (!value) return null
-    try {
-        const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
-        const json = window.atob(normalized)
-        return JSON.parse(json) as AuthUser
-    } catch (error) {
-        console.warn("Failed to decode Google login payload", error)
-        return null
-    }
-}
+﻿import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { setStoredUser, clearAuthSession } from "@/lib/auth";
+import type { AuthUser } from "@/types/auth.types";
+import { authKeys } from "@/hooks/api/useAuth";
+import { authService } from "@/services/api";
+import { toast } from "sonner";
 
 const GoogleLoginCallback = () => {
-    const location = useLocation()
-    const navigate = useNavigate()
-    const queryClient = useQueryClient()
-    const params = useMemo(() => new URLSearchParams(location.search), [location.search])
-    const processed = useRef(false)
+    const location = useLocation();
+    const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const processed = useRef(false);
 
-    const [message, setMessage] = useState("Completing sign-in...")
-    const [error, setError] = useState<string | null>(null)
+    const [message, setMessage] = useState("Completing sign-in...");
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (processed.current) {
-            console.log("⏭️ Google Callback - Already processed, skipping...")
-            return
+            console.log("⏭️ Google Callback - Already processed, skipping...");
+            return;
         }
-        processed.current = true
+        processed.current = true;
 
-        console.log("🔍 Google Callback - Processing...")
-        console.log("📋 URL Params:", Object.fromEntries(params.entries()))
+        const handleCallback = async () => {
+            const params = new URLSearchParams(location.search);
+            const code = params.get("code");
+            const state = params.get("state");
+            const errorParam = params.get("error");
 
-        const status = params.get("status")
+            console.log("🔍 Google Callback - Processing...");
+            console.log("📋 URL Params:", { code: !!code, state: !!state, error: errorParam });
 
-        if (status !== "success") {
-            const err = params.get("error") ?? "Google sign-in failed"
-            console.error("❌ Google login failed:", err)
-            setError(err)
-            setMessage("")
-            clearAuthSession()
-            toast.error(err)
+            // Handle error from Google
+            if (errorParam) {
+                console.error("❌ Google OAuth error:", errorParam);
+                setError(`Google sign-in failed: ${errorParam}`);
+                setMessage("");
+                clearAuthSession();
+                toast.error(`Google sign-in failed: ${errorParam}`);
+                setTimeout(() => navigate("/login", { replace: true }), 2000);
+                return;
+            }
 
-            setTimeout(() => navigate("/login", { replace: true }), 2000)
-            return
-        }
+            // Validate we have the code
+            if (!code) {
+                console.error("❌ No authorization code received");
+                setError("No authorization code received from Google");
+                setMessage("");
+                clearAuthSession();
+                toast.error("Google sign-in failed");
+                setTimeout(() => navigate("/login", { replace: true }), 2000);
+                return;
+            }
 
-        // Decode user data from URL
-        const user = decodeUser(params.get("user"))
-        console.log("👤 Decoded user:", user)
+            try {
+                setMessage("Verifying with server...");
 
-        if (user) {
-            console.log("✅ Storing user data...")
+                // Call backend to exchange code for session
+                const response = await authService.googleCallback(code, state ?? undefined);
+                const user = response.user as AuthUser;
 
-            setStoredUser(user)
+                console.log("✅ Google auth successful");
+                console.log("👤 User:", user.name);
+                console.log("🎭 Role:", user.role?.name ?? "No role");
+                console.log("👥 Team:", user.team?.name ?? "No team");
 
-            queryClient.setQueryData(authKeys.currentUser, user)
+                // Store user data
+                setStoredUser(user);
+                queryClient.setQueryData(authKeys.currentUser, user);
 
-            console.log("✅ User stored, navigating to dashboard...")
-            toast.success(`Welcome back, ${user.name}!`)
+                setMessage("Success! Redirecting...");
+                toast.success(`Welcome, ${user.name}!`);
 
-            setTimeout(() => {
-                navigate("/", { replace: true })
-            }, 100)
+                // Navigate to dashboard
+                setTimeout(() => {
+                    navigate("/", { replace: true });
+                }, 500);
 
-        } else {
-            console.error("❌ Failed to decode user data")
-            setError("Failed to decode user information")
-            setMessage("")
-            toast.error("Failed to complete Google sign-in")
-            setTimeout(() => navigate("/login", { replace: true }), 2000)
-        }
-    }, [navigate, params, queryClient])
+            } catch (err) {
+                console.error("❌ Google callback failed:", err);
+
+                const errorMessage = err instanceof Error
+                    ? err.message
+                    : "Failed to complete Google sign-in";
+
+                setError(errorMessage);
+                setMessage("");
+                clearAuthSession();
+                toast.error(errorMessage);
+
+                setTimeout(() => navigate("/login", { replace: true }), 2000);
+            }
+        };
+
+        handleCallback();
+    }, [location.search, navigate, queryClient]);
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-6">
             <div className="max-w-md text-center space-y-4">
                 {message && (
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                        <p className="text-muted-foreground text-sm">{message}</p>
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full" />
+                        <p className="text-muted-foreground">{message}</p>
                     </div>
                 )}
                 {error && (
-                    <div className="text-red-500">
-                        <p className="text-sm font-medium">{error}</p>
-                        <p className="text-xs mt-2">Redirecting to login...</p>
+                    <div className="text-destructive space-y-2">
+                        <p className="font-medium">{error}</p>
+                        <p className="text-sm text-muted-foreground">Redirecting to login...</p>
                     </div>
                 )}
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default GoogleLoginCallback
+export default GoogleLoginCallback;

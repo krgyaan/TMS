@@ -1,53 +1,32 @@
-﻿import { useEffect, useState } from "react"
-import { Navigate, Outlet, useLocation } from "react-router-dom"
-import { useCurrentUser } from "@/hooks/api/useAuth"
-import { isAuthenticated, clearAuthSession } from "@/lib/auth"
+﻿import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useCurrentUser } from "@/hooks/api/useAuth";
+import { getStoredUser, clearAuthSession } from "@/lib/auth";
 
 export default function ProtectedRoute() {
-    const location = useLocation()
-    const [shouldFetch, setShouldFetch] = useState(false)
+    const location = useLocation();
+    const { data: user, isLoading, isError } = useCurrentUser();
 
-    const hasLocalAuth = isAuthenticated()
+    const storedUser = getStoredUser();
 
-    const { data: user, isLoading, error } = useCurrentUser();
-
-    // Show loading while checking auth
     if (isLoading) {
+        if (!storedUser) {
+            return <Navigate to="/login" replace state={{ from: location }} />;
+        }
+
         return (
             <div className="flex h-screen w-screen items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                <div className="flex flex-col items-center gap-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                </div>
             </div>
         );
     }
 
-    useEffect(() => {
-        if (!hasLocalAuth) {
-            setShouldFetch(false)
-            return
-        }
-        setShouldFetch(true)
-    }, [hasLocalAuth])
-
-    // Loading state while checking authentication
-    if (hasLocalAuth && isLoading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center text-sm text-muted-foreground">
-                Restoring session... {shouldFetch}
-            </div>
-        )
+    if (isError || !user) {
+        clearAuthSession();
+        return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
-    // If there's an error or no local auth, redirect to login
-    if (error || !hasLocalAuth) {
-        clearAuthSession()
-        return <Navigate to="/login" replace state={{ from: location }} />
-    }
-
-    // If we have a valid user, allow access
-    if (user) {
-        return <Outlet />
-    }
-
-    // Default: redirect to login
-    return <Navigate to="/login" replace state={{ from: location }} />
+    return <Outlet />;
 }

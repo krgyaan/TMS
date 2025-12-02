@@ -2,7 +2,7 @@ export const paths = {
     // ==================== AUTH ====================
     auth: {
         login: "/login",
-        googleCallback: "/auth/google/callback",
+        googleCallback: "/auth/google/callback"
     },
 
     // ==================== INTEGRATIONS ====================

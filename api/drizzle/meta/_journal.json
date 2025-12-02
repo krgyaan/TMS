@@ -295,6 +295,13 @@
       "when": 1764568064145,
       "tag": "0041_slim_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1764592560825,
+      "tag": "0042_groovy_karma",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,9 @@ export * from './physical-docs.schema';
 export * from './rfqs.schema';
 export * from './emds.schema';
 export * from './user-roles.schema';
+export * from './permissions.schema';
+export * from './role-permissions.schema';
+export * from './user-permissions.schema';
 
 // Relations
 export * from './users.relations';

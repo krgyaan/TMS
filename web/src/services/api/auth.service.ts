@@ -30,8 +30,18 @@ class AuthService extends BaseApiService {
         return this.get<GoogleAuthUrlResponse>('/google/url');
     }
 
-    async googleCallback(code: string): Promise<LoginResponse> {
-        return this.post<LoginResponse>('/google/callback', { code });
+    /**
+     * Exchange Google OAuth code for session
+     */
+    async googleCallback(code: string, state?: string): Promise<LoginResponse> {
+        return this.post<LoginResponse>('/google/callback', { code, state });
+    }
+
+    /**
+     * Refresh the current session to get updated role/team info
+     */
+    async refreshSession(): Promise<LoginResponse> {
+        return this.post<LoginResponse>('/refresh');
     }
 }
 
