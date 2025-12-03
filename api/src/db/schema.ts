@@ -37,6 +37,7 @@ export * from './user-roles.schema';
 export * from './permissions.schema';
 export * from './role-permissions.schema';
 export * from './user-permissions.schema';
+export * from './workflows.schema';
 
 // Relations
 export * from './users.relations';

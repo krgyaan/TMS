@@ -3,7 +3,6 @@ import { drizzle as mysqlDrizzle } from 'drizzle-orm/mysql2';
 import mysql2 from 'mysql2/promise';
 import { mysqlTable, varchar, bigint, text, timestamp, int, decimal } from 'drizzle-orm/mysql-core';
 import { Client } from 'pg';
-import { eq } from 'drizzle-orm';
 import {
     rfqs,
     rfqItems,
@@ -13,17 +12,25 @@ import {
     rfqResponseDocuments,
 } from '../src/db/rfqs.schema';
 
-const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
-const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
-const pgClient = new Client({ connectionString: PG_URL });
-const mysqlPool = mysql2.createPool(MYSQL_URL);
+interface DatabaseConfig {
+    postgres: string;
+    mysql: string;
+}
 
-let db: ReturnType<typeof pgDrizzle>;
-let mysqlDb: ReturnType<typeof mysqlDrizzle>;
+const config: DatabaseConfig = {
+    postgres: process.env.PG_URL || 'postgresql://postgres:gyan@localhost:5432/new_tms',
+    mysql: process.env.MYSQL_URL || 'mysql://root:gyan@localhost:3306/mydb',
+};
 
-// Old rfqs table (MySQL)
-const mysql_rfqs = mysqlTable('rfqs', {
+// ============================================================================
+// MYSQL SCHEMA DEFINITIONS
+// ============================================================================
+
+const mysqlRfqs = mysqlTable('rfqs', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     tender_id: varchar('tender_id', { length: 255 }).notNull(),
     team_name: varchar('team_name', { length: 255 }),
@@ -44,63 +51,7 @@ const mysql_rfqs = mysqlTable('rfqs', {
     updated_at: timestamp('updated_at'),
 });
 
-// Old rfq_technicals table (MySQL)
-const mysql_rfq_technicals = mysqlTable('rfq_technicals', {
-    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
-    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
-    tender_id: bigint('tender_id', { mode: 'number' }),
-    name: varchar('name', { length: 255 }),
-    file_path: varchar('file_path', { length: 255 }),
-    created_at: timestamp('created_at'),
-    updated_at: timestamp('updated_at'),
-});
-
-// Old rfq_scopes table (MySQL)
-const mysql_rfq_scopes = mysqlTable('rfq_scopes', {
-    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
-    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
-    tender_id: bigint('tender_id', { mode: 'number' }),
-    name: varchar('name', { length: 255 }),
-    file_path: varchar('file_path', { length: 255 }),
-    created_at: timestamp('created_at'),
-    updated_at: timestamp('updated_at'),
-});
-
-// Old rfq_miis table (MySQL)
-const mysql_rfq_miis = mysqlTable('rfq_miis', {
-    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
-    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
-    tender_id: bigint('tender_id', { mode: 'number' }),
-    name: varchar('name', { length: 255 }),
-    file_path: varchar('file_path', { length: 255 }),
-    created_at: timestamp('created_at'),
-    updated_at: timestamp('updated_at'),
-});
-
-// Old rfq_mafs table (MySQL)
-const mysql_rfq_mafs = mysqlTable('rfq_mafs', {
-    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
-    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
-    tender_id: bigint('tender_id', { mode: 'number' }),
-    name: varchar('name', { length: 255 }),
-    file_path: varchar('file_path', { length: 255 }),
-    created_at: timestamp('created_at'),
-    updated_at: timestamp('updated_at'),
-});
-
-// Old rfq_boqs table (MySQL)
-const mysql_rfq_boqs = mysqlTable('rfq_boqs', {
-    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
-    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
-    tender_id: bigint('tender_id', { mode: 'number' }),
-    name: varchar('name', { length: 255 }),
-    file_path: varchar('file_path', { length: 255 }),
-    created_at: timestamp('created_at'),
-    updated_at: timestamp('updated_at'),
-});
-
-// Old rfq_items table (MySQL)
-const mysql_rfq_items = mysqlTable('rfq_items', {
+const mysqlRfqItems = mysqlTable('rfq_items', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     rfq_id: int('rfq_id').notNull(),
     tender_id: int('tender_id'),
@@ -111,8 +62,57 @@ const mysql_rfq_items = mysqlTable('rfq_items', {
     updated_at: timestamp('updated_at'),
 });
 
-// Old rfq_responses table (MySQL)
-const mysql_rfq_responses = mysqlTable('rfq_responses', {
+const mysqlRfqTechnicals = mysqlTable('rfq_technicals', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
+    tender_id: bigint('tender_id', { mode: 'number' }),
+    name: varchar('name', { length: 255 }),
+    file_path: varchar('file_path', { length: 255 }),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysqlRfqScopes = mysqlTable('rfq_scopes', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
+    tender_id: bigint('tender_id', { mode: 'number' }),
+    name: varchar('name', { length: 255 }),
+    file_path: varchar('file_path', { length: 255 }),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysqlRfqMiis = mysqlTable('rfq_miis', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
+    tender_id: bigint('tender_id', { mode: 'number' }),
+    name: varchar('name', { length: 255 }),
+    file_path: varchar('file_path', { length: 255 }),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysqlRfqMafs = mysqlTable('rfq_mafs', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
+    tender_id: bigint('tender_id', { mode: 'number' }),
+    name: varchar('name', { length: 255 }),
+    file_path: varchar('file_path', { length: 255 }),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysqlRfqBoqs = mysqlTable('rfq_boqs', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
+    tender_id: bigint('tender_id', { mode: 'number' }),
+    name: varchar('name', { length: 255 }),
+    file_path: varchar('file_path', { length: 255 }),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysqlRfqResponses = mysqlTable('rfq_responses', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     rfq_id: bigint('rfq_id', { mode: 'number' }).notNull(),
     receipt_datetime: timestamp('receipt_datetime').notNull(),
@@ -128,767 +128,643 @@ const mysql_rfq_responses = mysqlTable('rfq_responses', {
     updated_at: timestamp('updated_at'),
 });
 
-// Map old rfqs.id -> new rfqs.id
-const rfqIdMap = new Map<number, number>();
+const mysqlQuotationReceiptItems = mysqlTable('quotation_receipt_items', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    quotation_receipt_id: bigint('quotation_receipt_id', { mode: 'number' }).notNull(),
+    item_id: bigint('item_id', { mode: 'number' }).notNull(),
+    description: text('description'),
+    quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
+    unit: varchar('unit', { length: 50 }).notNull(),
+    unit_price: decimal('unit_price', { precision: 12, scale: 2 }).notNull(),
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
 
-// Map old rfq_responses.id -> new rfqResponses.id
-const rfqResponseIdMap = new Map<number, number>();
+// ============================================================================
+// TYPES
+// ============================================================================
 
-// Map old tender_id (string) -> new tender_id (number)
-// This should be populated from tender migration or loaded from DB
-const tenderIdMap = new Map<string, number>();
-
-// Default vendor ID for rfq_responses (loaded from DB)
-let defaultVendorId: number | null = null;
-
-const parseDecimal = (val: string | number | null | undefined): string | null => {
-    if (val === null || val === undefined || val === '') return null;
-    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/,/g, '').trim());
-    return isNaN(num) ? null : num.toFixed(2);
-};
-
-const parseInteger = (val: string | number | null | undefined): number | null => {
-    if (val === null || val === undefined || val === '') return null;
-    const num = typeof val === 'number' ? val : parseInt(String(val).trim(), 10);
-    return isNaN(num) ? null : num;
-};
-
-const parseDate = (val: string | Date | null | undefined): Date | null => {
-    if (!val) return null;
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d;
-};
-
-const parseDateFromString = (val: string | null | undefined): Date | null => {
-    if (!val || val.trim() === '') return null;
-
-    // Try various date formats
-    const formats = [
-        val, // as-is
-        val.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'), // DD-MM-YYYY to YYYY-MM-DD
-        val.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'), // DD/MM/YYYY to YYYY-MM-DD
-    ];
-
-    for (const format of formats) {
-        const d = new Date(format);
-        if (!isNaN(d.getTime())) return d;
-    }
-
-    return null;
-};
-
-const safeString = (val: string | null | undefined, maxLength?: number): string | null => {
-    if (val === null || val === undefined) return null;
-    const str = String(val).trim();
-    if (str === '') return null;
-    return maxLength ? str.substring(0, maxLength) : str;
-};
-
-async function loadTenderIdMappings() {
-    console.log('Loading tender ID mappings...');
-
-    // Query PostgreSQL for existing tenders to build the mapping
-    // This assumes tenders have already been migrated
-    const result = await pgClient.query(`
-        SELECT id, tender_no FROM tender_infos
-    `);
-
-    for (const row of result.rows) {
-        // Map by tender_no (string) -> id (number)
-        tenderIdMap.set(String(row.tender_no), row.id);
-        // Also map by old id if it's numeric
-        tenderIdMap.set(String(row.id), row.id);
-    }
-
-    console.log(`Loaded ${tenderIdMap.size} tender mappings`);
+interface MigrationStats {
+    rfqs: { success: number; errors: number; skipped: number };
+    rfqItems: { success: number; errors: number; skipped: number };
+    rfqDocuments: { success: number; errors: number; skipped: number };
+    rfqResponses: { success: number; errors: number; skipped: number };
+    rfqResponseItems: { success: number; errors: number; skipped: number };
+    rfqResponseDocuments: { success: number; errors: number; skipped: number };
 }
 
-async function loadDefaultVendorId() {
-    console.log('Loading default vendor ID...');
-
-    // Query PostgreSQL for first available vendor
-    const result = await pgClient.query(`
-        SELECT id FROM vendors ORDER BY id LIMIT 1
-    `);
-
-    if (result.rows.length > 0) {
-        defaultVendorId = result.rows[0].id;
-        console.log(`Loaded default vendor ID: ${defaultVendorId}`);
-    } else {
-        console.warn('No vendors found in database. RFQ responses will be skipped.');
-        defaultVendorId = null;
-    }
+interface MigrationContext {
+    pgDb: ReturnType<typeof pgDrizzle>;
+    pgClient: Client;
+    mysqlDb: ReturnType<typeof mysqlDrizzle>;
+    rfqIds: Set<number>;
+    rfqResponseIds: Set<number>;
+    defaultVendorId: number | null;
+    stats: MigrationStats;
 }
 
-async function migrateRfqs() {
-    console.log('Migrating rfqs...');
-    const rows = await mysqlDb.select().from(mysql_rfqs);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
-    for (const r of rows) {
+const Parsers = {
+    decimal(val: string | number | null | undefined): string | null {
+        if (val === null || val === undefined || val === '') return null;
+        const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/,/g, '').trim());
+        return isNaN(num) ? null : num.toFixed(2);
+    },
+
+    integer(val: string | number | null | undefined): number | null {
+        if (val === null || val === undefined || val === '') return null;
+        const num = typeof val === 'number' ? val : parseInt(String(val).trim(), 10);
+        return isNaN(num) ? null : num;
+    },
+
+    date(val: string | Date | null | undefined): Date | null {
+        if (!val) return null;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    },
+
+    dateFromString(val: string | null | undefined): Date | null {
+        if (!val || val.trim() === '') return null;
+        const formats = [
+            val,
+            val.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'),
+            val.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'),
+        ];
+        for (const format of formats) {
+            const d = new Date(format);
+            if (!isNaN(d.getTime())) return d;
+        }
+        return null;
+    },
+
+    string(val: string | null | undefined, maxLength?: number): string | null {
+        if (val === null || val === undefined) return null;
+        const str = String(val).trim();
+        if (str === '') return null;
+        return maxLength ? str.substring(0, maxLength) : str;
+    },
+
+    parseDocumentPaths(val: string | null | undefined): string[] {
+        if (!val || val.trim() === '') return [];
+
         try {
-            // Parse tender_id - could be string ID or tender number
-            const tenderIdStr = String(r.tender_id).trim();
-            let tenderId = tenderIdMap.get(tenderIdStr);
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) {
+                return parsed.filter(s => s && typeof s === 'string' && s.trim() !== '');
+            }
+            if (typeof parsed === 'string' && parsed.trim() !== '') {
+                return [parsed];
+            }
+        } catch {
+            const commaSplit = val.split(',').map(s => s.trim()).filter(s => s !== '');
+            if (commaSplit.length > 1 || commaSplit[0] !== val.trim()) {
+                return commaSplit;
+            }
+            const newlineSplit = val.split('\n').map(s => s.trim()).filter(s => s !== '');
+            if (newlineSplit.length > 1) {
+                return newlineSplit;
+            }
+            if (val.trim() !== '') {
+                return [val.trim()];
+            }
+        }
+        return [];
+    },
+};
 
-            // If not found in map, try parsing as integer
+// ============================================================================
+// MIGRATORS
+// ============================================================================
+
+class RfqsMigrator {
+    constructor(private ctx: MigrationContext) { }
+
+    async migrate(): Promise<void> {
+        console.log('Migrating rfqs...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlRfqs);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
+        }
+
+        this.logStats();
+    }
+
+    private async migrateRow(row: typeof mysqlRfqs.$inferSelect): Promise<void> {
+        try {
+            // Direct parse - tender IDs are preserved
+            const tenderId = Parsers.integer(row.tender_id);
+
             if (!tenderId) {
-                tenderId = parseInteger(tenderIdStr) ?? undefined;
+                console.warn(`  ⚠ Skipping RFQ id=${row.id}: invalid tender_id="${row.tender_id}"`);
+                this.ctx.stats.rfqs.skipped++;
+                return;
             }
 
-            // Skip RFQ if tenderId cannot be resolved (prevents FK constraint violation)
-            if (!tenderId) {
-                console.warn(`Skipping RFQ id=${r.id}: No tender found for tender_id="${r.tender_id}"`);
-                skippedCount++;
-                continue;
-            }
-
-            // Parse due_date from string
-            const dueDate = parseDateFromString(r.due_date);
-
-            // Build requested vendor from organization/team
-            const requestedVendor = safeString(r.organisation, 255);
-
-            const [newRecord] = await db.insert(rfqs).values({
+            // ✅ Preserve original ID
+            await this.ctx.pgDb.insert(rfqs).values({
+                id: row.id,
                 tenderId: tenderId,
-                dueDate: dueDate,
-                docList: r.docs_list ?? null,
-                requestedVendor: requestedVendor,
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
-            }).returning({ id: rfqs.id });
+                dueDate: Parsers.dateFromString(row.due_date),
+                docList: row.docs_list ?? null,
+                requestedVendor: Parsers.string(row.organisation, 255),
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+            });
 
-            rfqIdMap.set(r.id, newRecord.id);
+            this.ctx.rfqIds.add(row.id);
 
-            // Migrate inline item if exists (from old rfqs table)
-            if (r.requirements || r.qty || r.unit) {
-                await db.insert(rfqItems).values({
-                    rfqId: newRecord.id,
-                    requirement: r.requirements ?? 'Not specified',
-                    unit: safeString(r.unit, 64),
-                    qty: parseDecimal(r.qty),
-                    createdAt: parseDate(r.created_at) ?? new Date(),
-                    updatedAt: parseDate(r.updated_at) ?? new Date(),
+            // Migrate inline item if exists
+            if (row.requirements || row.qty || row.unit) {
+                await this.ctx.pgDb.insert(rfqItems).values({
+                    // Auto-generate ID for inline items
+                    rfqId: row.id,
+                    requirement: row.requirements ?? 'Not specified',
+                    unit: Parsers.string(row.unit, 64),
+                    qty: Parsers.decimal(row.qty),
+                    createdAt: Parsers.date(row.created_at) ?? new Date(),
+                    updatedAt: Parsers.date(row.updated_at) ?? new Date(),
                 });
             }
 
-            // Migrate inline document references from rfqs table
-            // These were stored as file paths in the old table
-            const inlineDocuments = [
-                { type: 'technical', path: r.techical },
-                { type: 'boq', path: r.boq },
-                { type: 'scope', path: r.scope },
-                { type: 'maf', path: r.maf },
-                { type: 'mii', path: r.mii },
+            // Migrate inline document references
+            const inlineDocs = [
+                { type: 'technical', path: row.techical },
+                { type: 'boq', path: row.boq },
+                { type: 'scope', path: row.scope },
+                { type: 'maf', path: row.maf },
+                { type: 'mii', path: row.mii },
             ];
 
-            for (const doc of inlineDocuments) {
+            for (const doc of inlineDocs) {
                 if (doc.path && doc.path.trim() !== '') {
-                    await db.insert(rfqDocuments).values({
-                        rfqId: newRecord.id,
+                    await this.ctx.pgDb.insert(rfqDocuments).values({
+                        // Auto-generate ID
+                        rfqId: row.id,
                         docType: doc.type,
                         path: doc.path,
-                        metadata: JSON.stringify({
-                            source: 'rfqs_table_inline',
-                            originalField: doc.type,
-                        }),
-                        createdAt: parseDate(r.created_at) ?? new Date(),
+                        metadata: { source: 'rfqs_inline', originalField: doc.type },
+                        createdAt: Parsers.date(row.created_at) ?? new Date(),
                     });
+                    this.ctx.stats.rfqDocuments.success++;
                 }
             }
 
-            count++;
+            this.ctx.stats.rfqs.success++;
         } catch (err) {
-            console.error(`Error migrating RFQ id=${r.id}, tender_id="${r.tender_id}":`, err);
-            errorCount++;
+            console.error(`  ✗ Error migrating RFQ id=${row.id}:`, err);
+            this.ctx.stats.rfqs.errors++;
         }
     }
 
-    console.log(`Migrated ${count} rfqs (${errorCount} errors, ${skippedCount} skipped)`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.rfqs;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateRfqItems() {
-    console.log('Migrating rfq_items...');
-    const rows = await mysqlDb.select().from(mysql_rfq_items);
-    let count = 0;
-    let errorCount = 0;
+class RfqItemsMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
+    async migrate(): Promise<void> {
+        console.log('Migrating rfq_items...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlRfqItems);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
+        }
+
+        this.logStats();
+    }
+
+    private async migrateRow(row: typeof mysqlRfqItems.$inferSelect): Promise<void> {
         try {
-            const newRfqId = rfqIdMap.get(r.rfq_id);
+            if (!this.ctx.rfqIds.has(row.rfq_id)) {
+                console.warn(`  ⚠ Skipping rfq_item id=${row.id}: RFQ ${row.rfq_id} not found`);
+                this.ctx.stats.rfqItems.skipped++;
+                return;
+            }
 
-            if (!newRfqId) {
-                console.warn(`Skipping rfq_item id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
+            // ✅ Preserve original ID
+            await this.ctx.pgDb.insert(rfqItems).values({
+                id: row.id,
+                rfqId: row.rfq_id,
+                requirement: row.requirement ?? 'Not specified',
+                unit: Parsers.string(row.unit, 64),
+                qty: Parsers.decimal(row.qty),
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+            });
+
+            this.ctx.stats.rfqItems.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating rfq_item id=${row.id}:`, err);
+            this.ctx.stats.rfqItems.errors++;
+        }
+    }
+
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.rfqItems;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
+}
+
+class RfqDocumentsMigrator {
+    constructor(private ctx: MigrationContext) { }
+
+    async migrateAll(): Promise<void> {
+        await this.migrateTable(mysqlRfqTechnicals as any, 'technical', 'rfq_technicals');
+        await this.migrateTable(mysqlRfqScopes as any, 'scope', 'rfq_scopes');
+        await this.migrateTable(mysqlRfqMiis as any, 'mii', 'rfq_miis');
+        await this.migrateTable(mysqlRfqMafs as any, 'maf', 'rfq_mafs');
+        await this.migrateTable(mysqlRfqBoqs as any, 'boq', 'rfq_boqs');
+    }
+
+    private async migrateTable(
+        table: typeof mysqlRfqTechnicals,
+        docType: string,
+        sourceName: string
+    ): Promise<void> {
+        console.log(`Migrating ${sourceName}...`);
+        const rows = await this.ctx.mysqlDb.select().from(table);
+        let success = 0, errors = 0, skipped = 0;
+
+        for (const row of rows) {
+            if (!this.ctx.rfqIds.has(row.rfq_id)) {
+                skipped++;
+                continue;
+            }
+            if (!row.file_path || row.file_path.trim() === '') {
+                skipped++;
                 continue;
             }
 
-            await db.insert(rfqItems).values({
-                rfqId: newRfqId,
-                requirement: r.requirement ?? 'Not specified',
-                unit: safeString(r.unit, 64),
-                qty: parseDecimal(r.qty),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
-            });
-
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_item id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
+            try {
+                // Auto-generate IDs (merged from multiple tables)
+                await this.ctx.pgDb.insert(rfqDocuments).values({
+                    rfqId: row.rfq_id,
+                    docType: docType,
+                    path: row.file_path,
+                    metadata: {
+                        name: row.name,
+                        source: sourceName,
+                        originalId: row.id,
+                        tenderId: row.tender_id,
+                    },
+                    createdAt: Parsers.date(row.created_at) ?? new Date(),
+                });
+                success++;
+                this.ctx.stats.rfqDocuments.success++;
+            } catch (err) {
+                console.error(`  ✗ Error migrating ${sourceName} id=${row.id}:`, err);
+                errors++;
+                this.ctx.stats.rfqDocuments.errors++;
+            }
         }
-    }
 
-    console.log(`Migrated ${count} rfq_items (${errorCount} errors)`);
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-// ============================================
-// Migration: Document tables -> rfqDocuments (PostgreSQL)
-// ============================================
+class RfqResponsesMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-async function migrateRfqTechnicals() {
-    console.log('Migrating rfq_technicals...');
-    const rows = await mysqlDb.select().from(mysql_rfq_technicals);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
+    async migrate(): Promise<void> {
+        console.log('Migrating rfq_responses...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlRfqResponses);
 
-    for (const r of rows) {
-        const newRfqId = rfqIdMap.get(r.rfq_id);
-        if (!newRfqId) {
-            console.warn(`Skipping rfq_technical id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-            skippedCount++;
-            continue;
-        }
-        if (!r.file_path || r.file_path.trim() === '') {
-            console.warn(`Skipping rfq_technical id=${r.id}: Empty file_path`);
-            skippedCount++;
-            continue;
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            await db.insert(rfqDocuments).values({
-                rfqId: newRfqId,
-                docType: 'technical',
-                path: r.file_path,
-                metadata: JSON.stringify({
-                    name: r.name,
-                    source: 'rfq_technicals',
-                    originalId: r.id,
-                    tenderId: r.tender_id,
-                }),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-            });
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_technical id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
-        }
+        this.logStats();
     }
 
-    console.log(`Migrated ${count} rfq_technicals (${errorCount} errors, ${skippedCount} skipped)`);
-}
-
-async function migrateRfqScopes() {
-    console.log('Migrating rfq_scopes...');
-    const rows = await mysqlDb.select().from(mysql_rfq_scopes);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
-
-    for (const r of rows) {
-        const newRfqId = rfqIdMap.get(r.rfq_id);
-        if (!newRfqId) {
-            console.warn(`Skipping rfq_scope id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-            skippedCount++;
-            continue;
-        }
-        if (!r.file_path || r.file_path.trim() === '') {
-            console.warn(`Skipping rfq_scope id=${r.id}: Empty file_path`);
-            skippedCount++;
-            continue;
-        }
-
+    private async migrateRow(row: typeof mysqlRfqResponses.$inferSelect): Promise<void> {
         try {
-            await db.insert(rfqDocuments).values({
-                rfqId: newRfqId,
-                docType: 'scope',
-                path: r.file_path,
-                metadata: JSON.stringify({
-                    name: r.name,
-                    source: 'rfq_scopes',
-                    originalId: r.id,
-                    tenderId: r.tender_id,
-                }),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-            });
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_scope id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
-        }
-    }
-
-    console.log(`Migrated ${count} rfq_scopes (${errorCount} errors, ${skippedCount} skipped)`);
-}
-
-async function migrateRfqMiis() {
-    console.log('Migrating rfq_miis...');
-    const rows = await mysqlDb.select().from(mysql_rfq_miis);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
-
-    for (const r of rows) {
-        const newRfqId = rfqIdMap.get(r.rfq_id);
-        if (!newRfqId) {
-            console.warn(`Skipping rfq_mii id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-            skippedCount++;
-            continue;
-        }
-        if (!r.file_path || r.file_path.trim() === '') {
-            console.warn(`Skipping rfq_mii id=${r.id}: Empty file_path`);
-            skippedCount++;
-            continue;
-        }
-
-        try {
-            await db.insert(rfqDocuments).values({
-                rfqId: newRfqId,
-                docType: 'mii',
-                path: r.file_path,
-                metadata: JSON.stringify({
-                    name: r.name,
-                    source: 'rfq_miis',
-                    originalId: r.id,
-                    tenderId: r.tender_id,
-                }),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-            });
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_mii id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
-        }
-    }
-
-    console.log(`Migrated ${count} rfq_miis (${errorCount} errors, ${skippedCount} skipped)`);
-}
-
-async function migrateRfqMafs() {
-    console.log('Migrating rfq_mafs...');
-    const rows = await mysqlDb.select().from(mysql_rfq_mafs);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
-
-    for (const r of rows) {
-        const newRfqId = rfqIdMap.get(r.rfq_id);
-        if (!newRfqId) {
-            console.warn(`Skipping rfq_maf id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-            skippedCount++;
-            continue;
-        }
-        if (!r.file_path || r.file_path.trim() === '') {
-            console.warn(`Skipping rfq_maf id=${r.id}: Empty file_path`);
-            skippedCount++;
-            continue;
-        }
-
-        try {
-            await db.insert(rfqDocuments).values({
-                rfqId: newRfqId,
-                docType: 'maf',
-                path: r.file_path,
-                metadata: JSON.stringify({
-                    name: r.name,
-                    source: 'rfq_mafs',
-                    originalId: r.id,
-                    tenderId: r.tender_id,
-                }),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-            });
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_maf id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
-        }
-    }
-
-    console.log(`Migrated ${count} rfq_mafs (${errorCount} errors, ${skippedCount} skipped)`);
-}
-
-async function migrateRfqBoqs() {
-    console.log('Migrating rfq_boqs...');
-    const rows = await mysqlDb.select().from(mysql_rfq_boqs);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
-
-    for (const r of rows) {
-        const newRfqId = rfqIdMap.get(r.rfq_id);
-        if (!newRfqId) {
-            console.warn(`Skipping rfq_boq id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-            skippedCount++;
-            continue;
-        }
-        if (!r.file_path || r.file_path.trim() === '') {
-            console.warn(`Skipping rfq_boq id=${r.id}: Empty file_path`);
-            skippedCount++;
-            continue;
-        }
-
-        try {
-            await db.insert(rfqDocuments).values({
-                rfqId: newRfqId,
-                docType: 'boq',
-                path: r.file_path,
-                metadata: JSON.stringify({
-                    name: r.name,
-                    source: 'rfq_boqs',
-                    originalId: r.id,
-                    tenderId: r.tender_id,
-                }),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-            });
-            count++;
-        } catch (err) {
-            console.error(`Error migrating rfq_boq id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
-        }
-    }
-
-    console.log(`Migrated ${count} rfq_boqs (${errorCount} errors, ${skippedCount} skipped)`);
-}
-
-// ============================================
-// Migration: rfq_responses (MySQL) -> rfqResponses + rfqResponseDocuments (PostgreSQL)
-// ============================================
-
-async function migrateRfqResponses() {
-    console.log('Migrating rfq_responses...');
-    const rows = await mysqlDb.select().from(mysql_rfq_responses);
-    let count = 0;
-    let errorCount = 0;
-    let skippedCount = 0;
-
-    for (const r of rows) {
-        try {
-            const newRfqId = rfqIdMap.get(r.rfq_id);
-
-            if (!newRfqId) {
-                console.warn(`Skipping rfq_response id=${r.id}: No RFQ found for rfq_id=${r.rfq_id}`);
-                skippedCount++;
-                continue;
+            if (!this.ctx.rfqIds.has(row.rfq_id)) {
+                console.warn(`  ⚠ Skipping rfq_response id=${row.id}: RFQ ${row.rfq_id} not found`);
+                this.ctx.stats.rfqResponses.skipped++;
+                return;
             }
 
-            // Use default vendor ID loaded from database
-            if (!defaultVendorId) {
-                console.warn(`Skipping rfq_response id=${r.id}: No vendor available in database`);
-                skippedCount++;
-                continue;
+            if (!this.ctx.defaultVendorId) {
+                console.warn(`  ⚠ Skipping rfq_response id=${row.id}: No vendor available`);
+                this.ctx.stats.rfqResponses.skipped++;
+                return;
             }
 
-            const [newRecord] = await db.insert(rfqResponses).values({
-                rfqId: newRfqId,
-                vendorId: defaultVendorId,
-                receiptDatetime: parseDate(r.receipt_datetime) ?? new Date(),
-                gstPercentage: parseDecimal(r.gst_percentage),
-                gstType: r.gst_type ?? null,
-                deliveryTime: r.delivery_time ?? null,
-                freightType: r.freight_type ?? null,
+            // ✅ Preserve original ID
+            await this.ctx.pgDb.insert(rfqResponses).values({
+                id: row.id,
+                rfqId: row.rfq_id,
+                vendorId: this.ctx.defaultVendorId,
+                receiptDatetime: Parsers.date(row.receipt_datetime) ?? new Date(),
+                gstPercentage: Parsers.decimal(row.gst_percentage),
+                gstType: row.gst_type ?? null,
+                deliveryTime: row.delivery_time ?? null,
+                freightType: row.freight_type ?? null,
                 notes: null,
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
-            }).returning({ id: rfqResponses.id });
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+            });
 
-            rfqResponseIdMap.set(r.id, newRecord.id);
+            this.ctx.rfqResponseIds.add(row.id);
 
             // Migrate response documents
-            const responseDocuments = [
-                { type: 'quotation', path: r.quotation_document },
-                { type: 'maf', path: r.maf_document },
-                { type: 'mii', path: r.mii_document },
-            ];
+            await this.migrateResponseDocuments(row);
 
-            for (const doc of responseDocuments) {
-                if (doc.path && doc.path.trim() !== '') {
-                    // Truncate path to 255 characters for varchar constraint
-                    const truncatedPath = safeString(doc.path, 255);
-                    if (truncatedPath && truncatedPath.length < doc.path.length) {
-                        console.warn(`Truncating path for rfq_response id=${r.id}, docType=${doc.type}: ${doc.path.length} -> ${truncatedPath.length} chars`);
-                    }
-
-                    if (truncatedPath) {
-                        await db.insert(rfqResponseDocuments).values({
-                            rfqResponseId: newRecord.id,
-                            docType: doc.type,
-                            path: truncatedPath,
-                            metadata: JSON.stringify({
-                                source: 'rfq_responses',
-                                originalField: doc.type,
-                            }),
-                            createdAt: parseDate(r.created_at) ?? new Date(),
-                        });
-                    }
-                }
-            }
-
-            // Handle technical_documents (text field, might contain multiple paths)
-            if (r.technical_documents && r.technical_documents.trim() !== '') {
-                // Could be comma-separated, JSON array, or newline-separated
-                let techDocs: string[] = [];
-
-                try {
-                    const parsed = JSON.parse(r.technical_documents);
-                    // Handle both array and single value
-                    if (Array.isArray(parsed)) {
-                        techDocs = parsed.filter(s => s && typeof s === 'string');
-                    } else if (typeof parsed === 'string') {
-                        techDocs = [parsed];
-                    }
-                } catch {
-                    // Try comma-separated
-                    techDocs = r.technical_documents.split(',').map(s => s.trim()).filter(s => s);
-                    // If no commas, try newline-separated
-                    if (techDocs.length === 1 && techDocs[0] === r.technical_documents.trim()) {
-                        techDocs = r.technical_documents.split('\n').map(s => s.trim()).filter(s => s);
-                    }
-                }
-
-                // Filter out empty values
-                techDocs = techDocs.filter(docPath => docPath && docPath.trim() !== '');
-
-                for (const docPath of techDocs) {
-                    // Truncate path to 255 characters for varchar constraint
-                    const truncatedPath = safeString(docPath, 255);
-                    if (truncatedPath && truncatedPath.length < docPath.length) {
-                        console.warn(`Truncating technical_document path for rfq_response id=${r.id}: ${docPath.length} -> ${truncatedPath.length} chars`);
-                    }
-
-                    if (truncatedPath) {
-                        await db.insert(rfqResponseDocuments).values({
-                            rfqResponseId: newRecord.id,
-                            docType: 'technical',
-                            path: truncatedPath,
-                            metadata: JSON.stringify({
-                                source: 'rfq_responses_technical_documents',
-                            }),
-                            createdAt: parseDate(r.created_at) ?? new Date(),
-                        });
-                    }
-                }
-            }
-
-            count++;
+            this.ctx.stats.rfqResponses.success++;
         } catch (err) {
-            console.error(`Error migrating rfq_response id=${r.id}, rfq_id=${r.rfq_id}:`, err);
-            errorCount++;
+            console.error(`  ✗ Error migrating rfq_response id=${row.id}:`, err);
+            this.ctx.stats.rfqResponses.errors++;
         }
     }
 
-    console.log(`Migrated ${count} rfq_responses (${errorCount} errors, ${skippedCount} skipped)`);
-}
+    private async migrateResponseDocuments(row: typeof mysqlRfqResponses.$inferSelect): Promise<void> {
+        const docs = [
+            { type: 'quotation', path: row.quotation_document },
+            { type: 'maf', path: row.maf_document },
+            { type: 'mii', path: row.mii_document },
+        ];
 
-// ============================================
-// Main Migration Function
-// ============================================
+        for (const doc of docs) {
+            const path = Parsers.string(doc.path, 255);
+            if (path) {
+                try {
+                    // Auto-generate ID
+                    await this.ctx.pgDb.insert(rfqResponseDocuments).values({
+                        rfqResponseId: row.id,
+                        docType: doc.type,
+                        path: path,
+                        metadata: { source: 'rfq_responses', originalField: doc.type },
+                        createdAt: Parsers.date(row.created_at) ?? new Date(),
+                    });
+                    this.ctx.stats.rfqResponseDocuments.success++;
+                } catch (err) {
+                    this.ctx.stats.rfqResponseDocuments.errors++;
+                }
+            }
+        }
 
-async function runMigration() {
-    try {
-        console.log('='.repeat(60));
-        console.log('Starting RFQ Migration: MySQL → PostgreSQL');
-        console.log('='.repeat(60));
+        // Handle technical_documents (multiple paths)
+        const techPaths = Parsers.parseDocumentPaths(row.technical_documents);
+        for (const techPath of techPaths) {
+            const path = Parsers.string(techPath, 255);
+            if (path) {
+                try {
+                    await this.ctx.pgDb.insert(rfqResponseDocuments).values({
+                        rfqResponseId: row.id,
+                        docType: 'technical',
+                        path: path,
+                        metadata: { source: 'rfq_responses_technical_documents' },
+                        createdAt: Parsers.date(row.created_at) ?? new Date(),
+                    });
+                    this.ctx.stats.rfqResponseDocuments.success++;
+                } catch (err) {
+                    this.ctx.stats.rfqResponseDocuments.errors++;
+                }
+            }
+        }
+    }
 
-        console.log('\nConnecting to databases...');
-        await pgClient.connect();
-        db = pgDrizzle(pgClient as any);
-        mysqlDb = mysqlDrizzle(mysqlPool as any);
-        console.log('Connected successfully!\n');
-
-        // Step 0: Load tender ID mappings
-        console.log('Step 0/10: Loading tender ID mappings...');
-        await loadTenderIdMappings();
-
-        // Step 0.5: Load default vendor ID
-        console.log('\nStep 0.5/10: Loading default vendor ID...');
-        await loadDefaultVendorId();
-
-        // Step 1: Migrate rfqs (main table)
-        console.log('\nStep 1/10: Migrating rfqs...');
-        await migrateRfqs();
-
-        // Step 2: Migrate rfq_items
-        console.log('\nStep 2/10: Migrating rfq_items...');
-        await migrateRfqItems();
-
-        // Step 3-7: Migrate document tables
-        console.log('\nStep 3/10: Migrating rfq_technicals...');
-        await migrateRfqTechnicals();
-
-        console.log('\nStep 4/10: Migrating rfq_scopes...');
-        await migrateRfqScopes();
-
-        console.log('\nStep 5/10: Migrating rfq_miis...');
-        await migrateRfqMiis();
-
-        console.log('\nStep 6/10: Migrating rfq_mafs...');
-        await migrateRfqMafs();
-
-        console.log('\nStep 7/10: Migrating rfq_boqs...');
-        await migrateRfqBoqs();
-
-        // Step 8: Migrate rfq_responses
-        console.log('\nStep 8/10: Migrating rfq_responses...');
-        await migrateRfqResponses();
-
-        // Step 9: Print summary
-        console.log('\nStep 9/10: Generating Summary...');
-
-        console.log('\n' + '='.repeat(60));
-        console.log('MIGRATION SUMMARY');
-        console.log('='.repeat(60));
-        console.log(`Total rfqs migrated: ${rfqIdMap.size}`);
-        console.log(`Total rfq_responses migrated: ${rfqResponseIdMap.size}`);
-        console.log('='.repeat(60));
-        console.log('Migration completed successfully!');
-        console.log('='.repeat(60));
-
-    } catch (err) {
-        console.error('\nMigration failed:', err);
-        throw err;
-    } finally {
-        console.log('\nClosing database connections...');
-        await pgClient.end();
-        await mysqlPool.end();
-        console.log('Connections closed.');
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.rfqResponses;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
     }
 }
 
-// Run migration
-runMigration()
+class RfqResponseItemsMigrator {
+    constructor(private ctx: MigrationContext) { }
+
+    async migrate(): Promise<void> {
+        console.log('Migrating quotation_receipt_items → rfq_response_items...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlQuotationReceiptItems);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
+        }
+
+        this.logStats();
+    }
+
+    private async migrateRow(row: typeof mysqlQuotationReceiptItems.$inferSelect): Promise<void> {
+        try {
+            // quotation_receipt_id = rfq_responses.id
+            if (!this.ctx.rfqResponseIds.has(row.quotation_receipt_id)) {
+                console.warn(`  ⚠ Skipping item id=${row.id}: rfq_response ${row.quotation_receipt_id} not found`);
+                this.ctx.stats.rfqResponseItems.skipped++;
+                return;
+            }
+
+            // ✅ Preserve original ID
+            await this.ctx.pgDb.insert(rfqResponseItems).values({
+                id: row.id,
+                rfqResponseId: row.quotation_receipt_id,
+                rfqItemId: row.item_id,
+                requirement: row.description ?? 'Not specified',
+                unit: Parsers.string(row.unit, 64),
+                qty: Parsers.decimal(row.quantity),
+                unitPrice: Parsers.decimal(row.unit_price),
+                totalPrice: Parsers.decimal(row.amount),
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+            });
+
+            this.ctx.stats.rfqResponseItems.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating item id=${row.id}:`, err);
+            this.ctx.stats.rfqResponseItems.errors++;
+        }
+    }
+
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.rfqResponseItems;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
+}
+
+// ============================================================================
+// SEQUENCE RESETTER
+// ============================================================================
+
+class SequenceResetter {
+    constructor(private ctx: MigrationContext) { }
+
+    async reset(): Promise<void> {
+        console.log('Resetting PostgreSQL sequences...');
+
+        const sequences = [
+            'rfqs',
+            'rfq_items',
+            'rfq_documents',
+            'rfq_responses',
+            'rfq_response_items',
+            'rfq_response_documents',
+        ];
+
+        for (const table of sequences) {
+            try {
+                await this.ctx.pgClient.query(`
+                    SELECT setval(
+                        pg_get_serial_sequence('${table}', 'id'),
+                        COALESCE((SELECT MAX(id) FROM ${table}), 1),
+                        true
+                    )
+                `);
+                console.log(`  ✓ ${table} sequence reset`);
+            } catch (err) {
+                console.error(`  ✗ Error resetting ${table} sequence:`, err);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIGRATION ORCHESTRATOR
+// ============================================================================
+
+class MigrationOrchestrator {
+    private pgClient: Client;
+    private mysqlPool: mysql2.Pool;
+    private ctx!: MigrationContext;
+
+    constructor(private dbConfig: DatabaseConfig) {
+        this.pgClient = new Client({ connectionString: dbConfig.postgres });
+        this.mysqlPool = mysql2.createPool(dbConfig.mysql);
+    }
+
+    async run(): Promise<void> {
+        try {
+            this.printHeader();
+            await this.connect();
+            await this.initializeContext();
+            await this.executeMigration();
+            this.printSummary();
+        } finally {
+            await this.disconnect();
+        }
+    }
+
+    private printHeader(): void {
+        console.log('\n' + '═'.repeat(60));
+        console.log('  RFQ MIGRATION: MySQL → PostgreSQL');
+        console.log('  (Preserving Original IDs)');
+        console.log('═'.repeat(60));
+    }
+
+    private async connect(): Promise<void> {
+        console.log('\n📡 Connecting to databases...');
+        await this.pgClient.connect();
+        console.log('  ✓ PostgreSQL connected');
+        console.log('  ✓ MySQL pool ready');
+    }
+
+    private async initializeContext(): Promise<void> {
+        // Load default vendor ID
+        const vendorResult = await this.pgClient.query(
+            'SELECT id FROM vendors ORDER BY id LIMIT 1'
+        );
+        const defaultVendorId = vendorResult.rows.length > 0 ? vendorResult.rows[0].id : null;
+
+        if (defaultVendorId) {
+            console.log(`  ✓ Default vendor ID: ${defaultVendorId}`);
+        } else {
+            console.warn('  ⚠ No vendors found - rfq_responses will be skipped');
+        }
+
+        this.ctx = {
+            pgDb: pgDrizzle(this.pgClient as any),
+            pgClient: this.pgClient,
+            mysqlDb: mysqlDrizzle(this.mysqlPool as any),
+            rfqIds: new Set(),
+            rfqResponseIds: new Set(),
+            defaultVendorId,
+            stats: {
+                rfqs: { success: 0, errors: 0, skipped: 0 },
+                rfqItems: { success: 0, errors: 0, skipped: 0 },
+                rfqDocuments: { success: 0, errors: 0, skipped: 0 },
+                rfqResponses: { success: 0, errors: 0, skipped: 0 },
+                rfqResponseItems: { success: 0, errors: 0, skipped: 0 },
+                rfqResponseDocuments: { success: 0, errors: 0, skipped: 0 },
+            },
+        };
+    }
+
+    private async executeMigration(): Promise<void> {
+        const steps = [
+            { name: 'Migrate rfqs', fn: () => new RfqsMigrator(this.ctx).migrate() },
+            { name: 'Migrate rfq_items', fn: () => new RfqItemsMigrator(this.ctx).migrate() },
+            { name: 'Migrate rfq_documents', fn: () => new RfqDocumentsMigrator(this.ctx).migrateAll() },
+            { name: 'Migrate rfq_responses', fn: () => new RfqResponsesMigrator(this.ctx).migrate() },
+            { name: 'Migrate rfq_response_items', fn: () => new RfqResponseItemsMigrator(this.ctx).migrate() },
+            { name: 'Reset sequences', fn: () => new SequenceResetter(this.ctx).reset() },
+        ];
+
+        console.log('\n📋 Starting migration...\n');
+
+        for (let i = 0; i < steps.length; i++) {
+            console.log(`[${i + 1}/${steps.length}] ${steps[i].name}`);
+            await steps[i].fn();
+            console.log('');
+        }
+    }
+
+    private printSummary(): void {
+        const { stats, rfqIds, rfqResponseIds } = this.ctx;
+
+        console.log('═'.repeat(60));
+        console.log('  MIGRATION SUMMARY');
+        console.log('═'.repeat(60));
+        console.log('');
+        console.log('  Table                    Success   Errors   Skipped');
+        console.log('  ───────────────────────────────────────────────────────');
+        console.log(`  rfqs                     ${this.pad(stats.rfqs.success)}      ${this.pad(stats.rfqs.errors)}       ${stats.rfqs.skipped}`);
+        console.log(`  rfq_items                ${this.pad(stats.rfqItems.success)}      ${this.pad(stats.rfqItems.errors)}       ${stats.rfqItems.skipped}`);
+        console.log(`  rfq_documents            ${this.pad(stats.rfqDocuments.success)}      ${this.pad(stats.rfqDocuments.errors)}       ${stats.rfqDocuments.skipped}`);
+        console.log(`  rfq_responses            ${this.pad(stats.rfqResponses.success)}      ${this.pad(stats.rfqResponses.errors)}       ${stats.rfqResponses.skipped}`);
+        console.log(`  rfq_response_items       ${this.pad(stats.rfqResponseItems.success)}      ${this.pad(stats.rfqResponseItems.errors)}       ${stats.rfqResponseItems.skipped}`);
+        console.log(`  rfq_response_documents   ${this.pad(stats.rfqResponseDocuments.success)}      ${this.pad(stats.rfqResponseDocuments.errors)}       ${stats.rfqResponseDocuments.skipped}`);
+        console.log('  ───────────────────────────────────────────────────────');
+        console.log(`  RFQ IDs tracked:         ${rfqIds.size}`);
+        console.log(`  Response IDs tracked:    ${rfqResponseIds.size}`);
+        console.log('');
+        console.log('═'.repeat(60));
+        console.log('  ✅ Migration completed successfully!');
+        console.log('═'.repeat(60));
+    }
+
+    private pad(num: number): string {
+        return num.toString().padStart(4);
+    }
+
+    private async disconnect(): Promise<void> {
+        console.log('\n🔌 Closing connections...');
+        await this.pgClient.end();
+        await this.mysqlPool.end();
+        console.log('  ✓ All connections closed');
+    }
+}
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+async function main(): Promise<void> {
+    const orchestrator = new MigrationOrchestrator(config);
+    await orchestrator.run();
+}
+
+main()
     .then(() => {
-        console.log('\nExiting with success code 0');
+        console.log('\n👋 Exiting with code 0\n');
         process.exit(0);
     })
     .catch((err) => {
-        console.error('\nExiting with error code 1');
-        console.error(err);
+        console.error('\n❌ Migration failed:', err);
+        console.error('\n👋 Exiting with code 1\n');
         process.exit(1);
     });
-
-
-
-/*
-// MySQL
-CREATE TABLE rfqs (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-tender_id varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-team_name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-organisation varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-location varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-item_name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-techical varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-boq varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-scope varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-maf varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-docs_list text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-mii varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-requirements varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-qty varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-unit varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-due_date varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_technicals (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint NOT NULL,
-tender_id bigint DEFAULT NULL,
-name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-file_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_scopes (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint NOT NULL,
-tender_id bigint DEFAULT NULL,
-name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-file_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_miis (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint NOT NULL,
-tender_id bigint DEFAULT NULL,
-name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-file_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_mafs (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint NOT NULL,
-tender_id bigint DEFAULT NULL,
-name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-file_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_items (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id int NOT NULL,
-tender_id int DEFAULT NULL,
-requirement text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-unit varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-qty int DEFAULT NULL,
-created_at timestamp NULL DEFAULT NULL,
-updated_at timestamp NULL DEFAULT NULL,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_items (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id int NOT NULL,
-tender_id int DEFAULT NULL,
-requirement text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-unit varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-qty int DEFAULT NULL,
-created_at timestamp NULL DEFAULT NULL,
-updated_at timestamp NULL DEFAULT NULL,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_boqs (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint NOT NULL,
-tender_id bigint DEFAULT NULL,
-name varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-file_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-PRIMARY KEY (id)
-)
-CREATE TABLE rfq_responses (
-id bigint unsigned NOT NULL AUTO_INCREMENT,
-rfq_id bigint unsigned NOT NULL,
-receipt_datetime datetime NOT NULL,
-gst_percentage decimal(5,2) NOT NULL,
-gst_type enum('inclusive','extra') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-delivery_time int NOT NULL,
-freight_type enum('inclusive','extra') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-quotation_document varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-technical_documents text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-maf_document varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-mii_document varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-created_at timestamp NULL DEFAULT NULL,
-updated_at timestamp NULL DEFAULT NULL,
-PRIMARY KEY (id)
-)
-*/

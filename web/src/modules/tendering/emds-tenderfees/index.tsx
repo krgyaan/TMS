@@ -112,7 +112,7 @@ const EmdsAndTenderFeesPage = () => {
             headerName: 'Tender No',
             width: 150,
             cellRenderer: (params: ICellRendererParams<DashboardRow>) => (
-                <span className="font-medium text-primary hover:underline cursor-pointer"
+                <span className="font-medium hover:underline cursor-pointer"
                     onClick={() => navigate(paths.tendering.tenderView(params.data!.tenderId))}>
                     {params.value}
                 </span>
@@ -199,7 +199,7 @@ const EmdsAndTenderFeesPage = () => {
                 const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
 
                 return (
-                    <span className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
                         {formatDateTime(params.value)}
                     </span>
                 );
@@ -304,10 +304,6 @@ const EmdsAndTenderFeesPage = () => {
                             )}
                         </CardDescription>
                     </div>
-                    <Button onClick={() => navigate(paths.tendering.tenders)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        View Tenders
-                    </Button>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">

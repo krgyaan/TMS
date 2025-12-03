@@ -63,6 +63,7 @@ export const rfqResponses = pgTable("rfq_responses", {
 export const rfqResponseItems = pgTable("rfq_response_items", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     rfqResponseId: bigint("rfq_response_id", { mode: "number" }).notNull().references(() => rfqResponses.id),
+    rfqItemId: bigint("item_id", { mode: "number" }).notNull().references(() => rfqItems.id),
     requirement: text("requirement").notNull(),
     unit: varchar("unit", { length: 64 }),
     qty: numeric("qty"),

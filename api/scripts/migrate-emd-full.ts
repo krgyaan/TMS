@@ -4,7 +4,7 @@ import { drizzle as mysqlDrizzle } from 'drizzle-orm/mysql2';
 import mysql2 from 'mysql2/promise';
 import { mysqlTable, varchar, bigint, text, date, timestamp, decimal, int } from 'drizzle-orm/mysql-core';
 import { Client } from 'pg';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
     paymentRequests,
     paymentInstruments,
@@ -15,35 +15,25 @@ import {
     instrumentTransferDetails,
 } from '../src/db/emds.schema';
 
-// Import status constants
-import {
-    DD_STATUSES,
-    FDR_STATUSES,
-    BG_STATUSES,
-    CHEQUE_STATUSES,
-    BT_STATUSES,
-    PORTAL_STATUSES,
-} from '../src/modules/tendering/emds/constants/emd-statuses';
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
-// ============================================
-// DATABASE CONNECTIONS
-// ============================================
+interface DatabaseConfig {
+    postgres: string;
+    mysql: string;
+}
 
-const PG_URL = 'postgresql://postgres:gyan@localhost:5432/new_tms';
-const MYSQL_URL = 'mysql://root:gyan@localhost:3306/mydb';
+const config: DatabaseConfig = {
+    postgres: process.env.PG_URL || 'postgresql://postgres:gyan@localhost:5432/new_tms',
+    mysql: process.env.MYSQL_URL || 'mysql://root:gyan@localhost:3306/mydb',
+};
 
-const pgClient = new Client({ connectionString: PG_URL });
-pgClient.connect();
-const db = pgDrizzle(pgClient);
+// ============================================================================
+// MYSQL SCHEMA DEFINITIONS
+// ============================================================================
 
-const mysqlPool = mysql2.createPool(MYSQL_URL);
-const mysqlDb = mysqlDrizzle(mysqlPool);
-
-// ============================================
-// MYSQL TABLE DEFINITIONS
-// ============================================
-
-const emds = mysqlTable('emds', {
+const mysqlEmds = mysqlTable('emds', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     type: varchar('type', { length: 50 }),
     tender_id: bigint('tender_id', { mode: 'number' }),
@@ -55,7 +45,7 @@ const emds = mysqlTable('emds', {
     updated_at: timestamp('updated_at'),
 });
 
-const emd_fdrs = mysqlTable('emd_fdrs', {
+const mysqlEmdFdrs = mysqlTable('emd_fdrs', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     fdr_favour: varchar('fdr_favour', { length: 255 }),
@@ -88,7 +78,7 @@ const emd_fdrs = mysqlTable('emd_fdrs', {
     updated_at: timestamp('updated_at'),
 });
 
-const emd_demand_drafts = mysqlTable('emd_demand_drafts', {
+const mysqlEmdDemandDrafts = mysqlTable('emd_demand_drafts', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     dd_favour: varchar('dd_favour', { length: 255 }),
@@ -117,7 +107,7 @@ const emd_demand_drafts = mysqlTable('emd_demand_drafts', {
     updated_at: timestamp('updated_at'),
 });
 
-const emd_bgs = mysqlTable('emd_bgs', {
+const mysqlEmdBgs = mysqlTable('emd_bgs', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     bg_favour: varchar('bg_favour', { length: 255 }),
@@ -185,7 +175,7 @@ const emd_bgs = mysqlTable('emd_bgs', {
     updated_at: timestamp('updated_at'),
 });
 
-const emd_cheques = mysqlTable('emd_cheques', {
+const mysqlEmdCheques = mysqlTable('emd_cheques', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     dd_id: bigint('dd_id', { mode: 'number' }),
@@ -218,7 +208,7 @@ const emd_cheques = mysqlTable('emd_cheques', {
     updated_at: timestamp('updated_at'),
 });
 
-const bank_transfers = mysqlTable('bank_transfers', {
+const mysqlBankTransfers = mysqlTable('bank_transfers', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     bt_amount: varchar('bt_amount', { length: 200 }),
@@ -238,7 +228,7 @@ const bank_transfers = mysqlTable('bank_transfers', {
     updated_at: timestamp('updated_at'),
 });
 
-const pay_on_portals = mysqlTable('pay_on_portals', {
+const mysqlPayOnPortals = mysqlTable('pay_on_portals', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
     portal: varchar('portal', { length: 255 }),
@@ -258,1291 +248,1106 @@ const pay_on_portals = mysqlTable('pay_on_portals', {
     updated_at: timestamp('updated_at'),
 });
 
-// ============================================
-// MAPPING TABLES
-// ============================================
+// ============================================================================
+// TYPES
+// ============================================================================
 
-// Mapping: old emd_id → new payment_requests.id
-const emdToRequestMap = new Map<number, number>();
+interface MigrationStats {
+    paymentRequests: { success: number; errors: number; skipped: number };
+    fdrs: { success: number; errors: number; skipped: number };
+    dds: { success: number; errors: number; skipped: number };
+    bgs: { success: number; errors: number; skipped: number };
+    cheques: { success: number; errors: number; skipped: number };
+    bankTransfers: { success: number; errors: number; skipped: number };
+    portalPayments: { success: number; errors: number; skipped: number };
+}
 
-// Mapping: old instrument IDs → new instrument IDs (for linked references)
-const legacyDdToNewIdMap = new Map<number, number>();
-const legacyFdrToNewIdMap = new Map<number, number>();
+interface MigrationContext {
+    pgDb: ReturnType<typeof pgDrizzle>;
+    pgClient: Client;
+    mysqlDb: ReturnType<typeof mysqlDrizzle>;
+    emdIds: Set<number>;
+    legacyFdrToInstrumentId: Map<number, number>;
+    legacyDdToInstrumentId: Map<number, number>;
+    stats: MigrationStats;
+}
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
-const parseAmount = (val: string | number | null | undefined): string => {
-    if (val === null || val === undefined || val === '') return '0.00';
-    if (typeof val === 'number') {
-        return isNaN(val) ? '0.00' : val.toFixed(2);
-    }
-    const cleaned = val.toString().replace(/,/g, '').trim();
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? '0.00' : num.toFixed(2);
-};
-
-const parseDate = (val: string | Date | null | undefined): Date | null => {
-    if (!val) return null;
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d;
-};
-
-const parseDateToString = (val: string | Date | null | undefined): string | null => {
-    if (!val) return null;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString().split('T')[0];
-};
-
-const parseCourierDeadline = (val: string | number | null | undefined): number | null => {
-    if (val === null || val === undefined || val === '') return null;
-    if (typeof val === 'number') return val;
-    const num = parseInt(val.toString().trim(), 10);
-    return isNaN(num) ? null : num;
-};
-
-const parseAction = (val: string | number | null | undefined): number | null => {
-    if (val === null || val === undefined || val === '') return null;
-    if (typeof val === 'number') return val;
-    const num = parseInt(val.toString().trim(), 10);
-    return isNaN(num) ? null : num;
-};
-
-// ============================================
-// STATUS MAPPING FUNCTIONS
-// ============================================
-
-type StatusMapping = {
-    [key: string]: string;
-};
-
-const mapDdStatus = (status: string | null, action: number | null): string => {
-    if (!status && !action) return DD_STATUSES.ACCOUNTS_FORM_PENDING;
-
-    const s = (status || '').toLowerCase().trim();
-    const statusMap: StatusMapping = {
-        'pending': DD_STATUSES.ACCOUNTS_FORM_PENDING,
-        'submitted': DD_STATUSES.ACCOUNTS_FORM_SUBMITTED,
-        'accepted': DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'approved': DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'rejected': DD_STATUSES.ACCOUNTS_FORM_REJECTED,
-        'cancelled': DD_STATUSES.CANCELLED_AT_BRANCH,
-        'returned': DD_STATUSES.COURIER_RETURN_RECEIVED,
-        'refunded': DD_STATUSES.BANK_RETURN_COMPLETED,
-    };
-
-    // Action-based mapping
-    if (action) {
-        switch (action) {
-            case 1: return DD_STATUSES.ACCOUNTS_FORM_SUBMITTED;
-            case 3: return DD_STATUSES.COURIER_RETURN_INITIATED;
-            case 4: return DD_STATUSES.BANK_RETURN_INITIATED;
-            case 6: return DD_STATUSES.CANCELLATION_REQUESTED;
-            case 7: return DD_STATUSES.CANCELLED_AT_BRANCH;
+const Parsers = {
+    amount(val: string | number | null | undefined): string {
+        if (val === null || val === undefined || val === '') return '0.00';
+        if (typeof val === 'number') {
+            return isNaN(val) ? '0.00' : val.toFixed(2);
         }
-    }
+        const cleaned = val.toString().replace(/,/g, '').trim();
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? '0.00' : num.toFixed(2);
+    },
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+    date(val: string | Date | null | undefined): Date | null {
+        if (!val) return null;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    },
 
-    return DD_STATUSES.ACCOUNTS_FORM_PENDING;
+    dateString(val: string | Date | null | undefined): string | null {
+        if (!val) return null;
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0];
+    },
+
+    integer(val: string | number | null | undefined): number | null {
+        if (val === null || val === undefined || val === '') return null;
+        if (typeof val === 'number') return val;
+        const num = parseInt(val.toString().trim(), 10);
+        return isNaN(num) ? null : num;
+    },
+
+    string(val: string | null | undefined, maxLength?: number): string | null {
+        if (val === null || val === undefined) return null;
+        const str = String(val).trim();
+        if (str === '') return null;
+        return maxLength ? str.substring(0, maxLength) : str;
+    },
 };
 
-const mapFdrStatus = (status: string | null, action: number | null): string => {
-    if (!status && !action) return FDR_STATUSES.ACCOUNTS_FORM_PENDING;
+// ============================================================================
+// STATUS MAPPING - Based on actual MySQL data
+// ============================================================================
 
-    const s = (status || '').toLowerCase().trim();
-    const statusMap: StatusMapping = {
-        'pending': FDR_STATUSES.ACCOUNTS_FORM_PENDING,
-        'submitted': FDR_STATUSES.ACCOUNTS_FORM_SUBMITTED,
-        'accepted': FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'approved': FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'rejected': FDR_STATUSES.ACCOUNTS_FORM_REJECTED,
-        'returned': FDR_STATUSES.COURIER_RETURN_RECEIVED,
-        'refunded': FDR_STATUSES.BANK_RETURN_COMPLETED,
-    };
-
-    if (action) {
+const StatusMapper = {
+    fdr(status: string | null, action: number | null): string {
+        // Action-based mapping
         switch (action) {
-            case 1: return FDR_STATUSES.ACCOUNTS_FORM_SUBMITTED;
-            case 3: return FDR_STATUSES.COURIER_RETURN_INITIATED;
-            case 4: return FDR_STATUSES.BANK_RETURN_INITIATED;
+            case 1: return 'FDR_ACCOUNTS_FORM_SUBMITTED';
+            case 3: return 'FDR_COURIER_RETURN_INITIATED';
+            case 4: return 'FDR_BANK_RETURN_INITIATED';
+            default: return 'FDR_ACCOUNTS_FORM_PENDING';
         }
-    }
+    },
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+    dd(status: string | null, action: number | null): string {
+        const s = (status || '').toLowerCase().trim();
 
-    return FDR_STATUSES.ACCOUNTS_FORM_PENDING;
-};
+        // Action-based mapping (priority)
+        switch (action) {
+            case 1: return 'DD_ACCOUNTS_FORM_SUBMITTED';
+            case 4: return 'DD_BANK_RETURN_INITIATED';
+            case 6: return 'DD_CANCELLATION_REQUESTED';
+            case 7: return 'DD_CANCELLED_AT_BRANCH';
+        }
 
-const mapBgStatus = (status: string | null, action: number | string | null): string => {
-    if (!status && !action) return BG_STATUSES.BANK_REQUEST_PENDING;
+        // Status-based mapping
+        if (s === 'accepted') return 'DD_ACCOUNTS_FORM_ACCEPTED';
+        if (s === 'rejected') return 'DD_ACCOUNTS_FORM_REJECTED';
+        if (s === 'dd requested') return 'DD_ACCOUNTS_FORM_PENDING'; // DD creation requested
 
-    const s = (status || '').toLowerCase().trim();
-    const actionNum = parseAction(action);
+        return 'DD_ACCOUNTS_FORM_PENDING';
+    },
 
-    const statusMap: StatusMapping = {
-        'pending': BG_STATUSES.BANK_REQUEST_PENDING,
-        'submitted': BG_STATUSES.BANK_REQUEST_SUBMITTED,
-        'accepted': BG_STATUSES.BANK_REQUEST_ACCEPTED,
-        'approved': BG_STATUSES.BANK_REQUEST_ACCEPTED,
-        'rejected': BG_STATUSES.BANK_REQUEST_REJECTED,
-        'created': BG_STATUSES.BG_CREATED,
-        'cancelled': BG_STATUSES.BG_CANCELLATION_CONFIRMED,
-        'returned': BG_STATUSES.COURIER_RETURN_RECEIVED,
-        'extended': BG_STATUSES.EXTENSION_COMPLETED,
-    };
+    bg(status: string | null, action: string | number | null): string {
+        const s = (status || '').toLowerCase().trim();
+        const actionNum = typeof action === 'number' ? action : parseInt(String(action || ''), 10);
 
-    if (actionNum) {
+        // Action-based mapping (priority)
         switch (actionNum) {
-            case 1: return BG_STATUSES.BANK_REQUEST_SUBMITTED;
-            case 2: return BG_STATUSES.BG_CREATED;
-            case 3: return BG_STATUSES.FDR_CAPTURED;
-            case 5: return BG_STATUSES.EXTENSION_REQUESTED;
-            case 6: return BG_STATUSES.COURIER_RETURN_INITIATED;
-            case 7: return BG_STATUSES.CANCELLATION_REQUESTED;
-            case 8: return BG_STATUSES.BG_CANCELLATION_CONFIRMED;
-            case 9: return BG_STATUSES.FDR_CANCELLATION_CONFIRMED;
+            case 1: return 'BG_BANK_REQUEST_SUBMITTED';
+            case 2: return 'BG_CREATED';
+            case 3: return 'BG_FDR_CAPTURED';
+            case 4: return 'BG_FOLLOWUP_INITIATED';
+            case 5: return 'BG_EXTENSION_REQUESTED';
+            case 7: return 'BG_CANCELLATION_REQUESTED';
+            case 8: return 'BG_CANCELLATION_CONFIRMED';
+            case 9: return 'BG_FDR_CANCELLATION_CONFIRMED';
         }
-    }
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+        // Status-based mapping
+        if (s === 'accepted') return 'BG_BANK_REQUEST_ACCEPTED';
+        if (s === 'rejected') return 'BG_BANK_REQUEST_REJECTED';
 
-    return BG_STATUSES.BANK_REQUEST_PENDING;
-};
+        return 'BG_BANK_REQUEST_PENDING';
+    },
 
-const mapChequeStatus = (status: string | null, action: number | null): string => {
-    if (!status && !action) return CHEQUE_STATUSES.ACCOUNTS_FORM_PENDING;
+    cheque(status: string | null, action: number | null): string {
+        const s = (status || '').toLowerCase().trim();
 
-    const s = (status || '').toLowerCase().trim();
-    const statusMap: StatusMapping = {
-        'pending': CHEQUE_STATUSES.ACCOUNTS_FORM_PENDING,
-        'submitted': CHEQUE_STATUSES.ACCOUNTS_FORM_SUBMITTED,
-        'accepted': CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'approved': CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'rejected': CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED,
-        'stopped': CHEQUE_STATUSES.STOP_COMPLETED,
-        'cancelled': CHEQUE_STATUSES.CANCELLED,
-        'deposited': CHEQUE_STATUSES.DEPOSIT_COMPLETED,
-    };
-
-    if (action) {
+        // Action-based mapping (priority)
         switch (action) {
-            case 1: return CHEQUE_STATUSES.ACCOUNTS_FORM_SUBMITTED;
-            case 2: return CHEQUE_STATUSES.STOP_REQUESTED;
-            case 3: return CHEQUE_STATUSES.BANK_PAYMENT_INITIATED;
-            case 4: return CHEQUE_STATUSES.DEPOSIT_INITIATED;
-            case 5: return CHEQUE_STATUSES.CANCELLED;
+            case 1: return 'CHEQUE_ACCOUNTS_FORM_SUBMITTED';
+            case 2: return 'CHEQUE_STOP_REQUESTED';
+            case 3: return 'CHEQUE_BANK_PAYMENT_INITIATED';
+            case 4: return 'CHEQUE_DEPOSIT_INITIATED';
+            case 5: return 'CHEQUE_CANCELLED';
+            case 6: return 'CHEQUE_CANCELLED'; // Additional cancel action
         }
-    }
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+        // Status-based mapping
+        if (s === 'accepted') return 'CHEQUE_ACCOUNTS_FORM_ACCEPTED';
+        if (s === 'rejected') return 'CHEQUE_ACCOUNTS_FORM_REJECTED';
+        if (s === 'dd requested') return 'CHEQUE_ACCOUNTS_FORM_PENDING'; // Linked DD requested
+        if (s === 'fdr requested') return 'CHEQUE_ACCOUNTS_FORM_PENDING'; // Linked FDR requested
 
-    return CHEQUE_STATUSES.ACCOUNTS_FORM_PENDING;
-};
+        return 'CHEQUE_ACCOUNTS_FORM_PENDING';
+    },
 
-const mapBtStatus = (status: string | null, action: number | null): string => {
-    if (!status && !action) return BT_STATUSES.ACCOUNTS_FORM_PENDING;
+    bankTransfer(status: string | null, action: number | null): string {
+        const s = (status || '').toLowerCase().trim();
 
-    const s = (status || '').toLowerCase().trim();
-    const statusMap: StatusMapping = {
-        'pending': BT_STATUSES.ACCOUNTS_FORM_PENDING,
-        'submitted': BT_STATUSES.ACCOUNTS_FORM_SUBMITTED,
-        'accepted': BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'approved': BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'rejected': BT_STATUSES.ACCOUNTS_FORM_REJECTED,
-        'completed': BT_STATUSES.PAYMENT_COMPLETED,
-        'returned': BT_STATUSES.RETURN_COMPLETED,
-        'settled': BT_STATUSES.SETTLED,
-    };
-
-    if (action) {
+        // Action-based mapping (priority)
         switch (action) {
-            case 1: return BT_STATUSES.ACCOUNTS_FORM_SUBMITTED;
-            case 3: return BT_STATUSES.RETURN_INITIATED;
+            case 1: return 'BT_ACCOUNTS_FORM_SUBMITTED';
+            case 3: return 'BT_RETURN_INITIATED';
         }
-    }
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+        // Status-based mapping
+        if (s === 'accepted') return 'BT_ACCOUNTS_FORM_ACCEPTED';
+        if (s === 'rejected') return 'BT_ACCOUNTS_FORM_REJECTED';
 
-    return BT_STATUSES.ACCOUNTS_FORM_PENDING;
-};
+        return 'BT_ACCOUNTS_FORM_PENDING';
+    },
 
-const mapPortalStatus = (status: string | null, action: number | null): string => {
-    if (!status && !action) return PORTAL_STATUSES.ACCOUNTS_FORM_PENDING;
+    portal(status: string | null, action: number | null): string {
+        const s = (status || '').toLowerCase().trim();
 
-    const s = (status || '').toLowerCase().trim();
-    const statusMap: StatusMapping = {
-        'pending': PORTAL_STATUSES.ACCOUNTS_FORM_PENDING,
-        'submitted': PORTAL_STATUSES.ACCOUNTS_FORM_SUBMITTED,
-        'accepted': PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'approved': PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-        'rejected': PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED,
-        'completed': PORTAL_STATUSES.PAYMENT_COMPLETED,
-        'returned': PORTAL_STATUSES.RETURN_COMPLETED,
-        'settled': PORTAL_STATUSES.SETTLED,
-    };
-
-    if (action) {
+        // Action-based mapping (priority)
         switch (action) {
-            case 1: return PORTAL_STATUSES.ACCOUNTS_FORM_SUBMITTED;
-            case 3: return PORTAL_STATUSES.RETURN_INITIATED;
+            case 1: return 'PORTAL_ACCOUNTS_FORM_SUBMITTED';
+            case 3: return 'PORTAL_RETURN_INITIATED';
         }
-    }
 
-    for (const [key, value] of Object.entries(statusMap)) {
-        if (s.includes(key)) return value;
-    }
+        // Status-based mapping
+        if (s === 'accepted') return 'PORTAL_ACCOUNTS_FORM_ACCEPTED';
+        if (s === 'rejected') return 'PORTAL_ACCOUNTS_FORM_REJECTED';
 
-    return PORTAL_STATUSES.ACCOUNTS_FORM_PENDING;
+        return 'PORTAL_ACCOUNTS_FORM_PENDING';
+    },
+
+    /**
+     * Get stage number from status string
+     */
+    getStage(status: string): number {
+        // DD Stages (7 stages)
+        if (status.startsWith('DD_')) {
+            if (status.includes('ACCOUNTS_FORM')) return 1;
+            if (status.includes('FOLLOWUP')) return 2;
+            if (status.includes('COURIER_RETURN')) return 3;
+            if (status.includes('BANK_RETURN')) return 4;
+            if (status.includes('PROJECT_SETTLEMENT')) return 5;
+            if (status.includes('CANCELLATION') && !status.includes('CANCELLED_AT_BRANCH')) return 6;
+            if (status.includes('CANCELLED_AT_BRANCH')) return 7;
+        }
+
+        // FDR Stages (4 stages)
+        if (status.startsWith('FDR_')) {
+            if (status.includes('ACCOUNTS_FORM')) return 1;
+            if (status.includes('FOLLOWUP')) return 2;
+            if (status.includes('COURIER_RETURN')) return 3;
+            if (status.includes('BANK_RETURN')) return 4;
+        }
+
+        // BG Stages (9 stages)
+        if (status.startsWith('BG_')) {
+            if (status.includes('BANK_REQUEST')) return 1;
+            if (status.includes('CREATED') || status.includes('CREATION')) return 2;
+            if (status.includes('FDR_CAPTURE')) return 3;
+            if (status.includes('FOLLOWUP')) return 4;
+            if (status.includes('EXTENSION')) return 5;
+            if (status.includes('COURIER_RETURN')) return 6;
+            if (status.includes('CANCELLATION') && !status.includes('CONFIRMED')) return 7;
+            if (status === 'BG_CANCELLATION_CONFIRMED') return 8;
+            if (status === 'BG_FDR_CANCELLATION_CONFIRMED') return 9;
+        }
+
+        // Cheque Stages (6 stages)
+        if (status.startsWith('CHEQUE_')) {
+            if (status.includes('ACCOUNTS_FORM')) return 1;
+            if (status.includes('FOLLOWUP')) return 2;
+            if (status.includes('STOP')) return 3;
+            if (status.includes('BANK_PAYMENT')) return 4;
+            if (status.includes('DEPOSIT')) return 5;
+            if (status.includes('CANCELLED')) return 6;
+        }
+
+        // Bank Transfer Stages (4 stages)
+        if (status.startsWith('BT_')) {
+            if (status.includes('ACCOUNTS_FORM') || status.includes('PAYMENT_COMPLETED')) return 1;
+            if (status.includes('FOLLOWUP')) return 2;
+            if (status.includes('RETURN')) return 3;
+            if (status.includes('SETTLED')) return 4;
+        }
+
+        // Portal Stages (4 stages)
+        if (status.startsWith('PORTAL_')) {
+            if (status.includes('ACCOUNTS_FORM') || status.includes('PAYMENT_COMPLETED')) return 1;
+            if (status.includes('FOLLOWUP')) return 2;
+            if (status.includes('RETURN')) return 3;
+            if (status.includes('SETTLED')) return 4;
+        }
+
+        return 1;
+    },
 };
 
-// Get current stage from status
-const getStageFromStatus = (status: string): number => {
-    const stagePatterns: [RegExp, number][] = [
-        [/ACCOUNTS_FORM/, 1],
-        [/FOLLOWUP/, 2],
-        [/COURIER_RETURN|STOP/, 3],
-        [/BANK_RETURN|BANK_PAYMENT|DEPOSIT/, 4],
-        [/PROJECT_SETTLEMENT/, 5],
-        [/CANCELLATION/, 6],
-        [/CANCELLED_AT_BRANCH|EXTENSION/, 7],
-        [/BG_CANCELLATION/, 8],
-        [/FDR_CANCELLATION/, 9],
-    ];
+// ============================================================================
+// MIGRATORS
+// ============================================================================
 
-    for (const [pattern, stage] of stagePatterns) {
-        if (pattern.test(status)) return stage;
+class PaymentRequestsMigrator {
+    constructor(private ctx: MigrationContext) { }
+
+    async migrate(): Promise<void> {
+        console.log('Migrating payment_requests from emds...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlEmds);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
+        }
+
+        this.logStats();
     }
-    return 1;
-};
 
-// ============================================
-// MIGRATION FUNCTIONS
-// ============================================
-
-async function migratePaymentRequests() {
-    console.log('Migrating payment_requests from emds...');
-    const rows = await mysqlDb.select().from(emds);
-    let count = 0;
-
-    for (const r of rows) {
+    private async migrateRow(row: typeof mysqlEmds.$inferSelect): Promise<void> {
         try {
-            const [newRecord] = await db.insert(paymentRequests).values({
-                tenderId: Number(r.tender_id ?? 0),
-                type: (r.type as 'TMS' | 'Other Than TMS' | 'Old Entries' | 'Other Than Tender') ?? 'TMS',
-                tenderNo: r.tender_no ?? 'NA',
-                projectName: r.project_name ?? null,
+            // ✅ Preserve original ID
+            await this.ctx.pgDb.insert(paymentRequests).values({
+                id: row.id,
+                tenderId: Number(row.tender_id ?? 0),
+                type: (row.type as any) ?? 'TMS',
+                tenderNo: row.tender_no ?? 'NA',
+                projectName: row.project_name ?? null,
                 purpose: 'EMD',
-                amountRequired: '0.00', // Will be updated after instruments migration
-                dueDate: parseDate(r.due_date),
-                requestedBy: r.requested_by ?? null,
+                amountRequired: '0.00', // Updated after instruments
+                dueDate: Parsers.date(row.due_date),
+                requestedBy: row.requested_by ?? null,
                 status: 'Pending',
                 remarks: null,
-                legacyEmdId: Number(r.id),
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
-            }).returning({ id: paymentRequests.id });
+                legacyEmdId: row.id,
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+            });
 
-            emdToRequestMap.set(Number(r.id ?? 0), newRecord.id);
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate EMD ID ${r.id}:`, error);
+            this.ctx.emdIds.add(row.id);
+            this.ctx.stats.paymentRequests.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating EMD id=${row.id}:`, err);
+            this.ctx.stats.paymentRequests.errors++;
         }
     }
 
-    console.log(`Migrated ${count} payment requests`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.paymentRequests;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateFDRs() {
-    console.log('Migrating FDRs...');
-    const rows = await mysqlDb.select().from(emd_fdrs);
-    let count = 0;
-    let skipped = 0;
+class FdrMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping FDR ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating FDRs...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlEmdFdrs);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapFdrStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlEmdFdrs.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping FDR id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.fdrs.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.fdr(row.status, row.action);
+
+            // Insert instrument (auto-generate ID)
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId, // Uses preserved EMD ID
                 instrumentType: 'FDR',
-                amount: parseAmount(r.fdr_amt ?? r.amount),
-                favouring: r.fdr_favour ?? r.fdr_payable ?? null,
-                payableAt: r.fdr_payable ?? null,
-                issueDate: parseDateToString(r.fdr_date),
-                expiryDate: parseDateToString(r.fdr_expiry),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                utr: r.utr ?? null,
-                docketNo: r.docket_no ?? null,
-                courierAddress: r.courier_add ?? null,
-                courierDeadline: r.courier_deadline ? Number(r.courier_deadline) : null,
-                generatedPdf: r.generated_fdr ?? null,
-                cancelPdf: r.fdrcancel_pdf ?? null,
-                docketSlip: r.docket_slip ?? null,
-                coveringLetter: r.covering_letter ?? null,
-                rejectionReason: r.remarks ?? null,
-                action: r.action ? Number(r.action) : null,
-                extraPdfPaths: r.generated_fdr ?? null,
-                reqNo: r.req_no ?? null,
-                reqReceive: r.req_receive ?? null,
-                transferDate: parseDateToString(r.transfer_date),
-                referenceNo: r.reference_no ?? null,
-                creditDate: parseDateToString(r.date),
-                creditAmount: r.amount ? parseAmount(r.amount) : null,
-                remarks: r.fdr_remark ?? null,
-                legacyFdrId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.fdr_amt ?? row.amount),
+                favouring: row.fdr_favour ?? row.fdr_payable ?? null,
+                payableAt: row.fdr_payable ?? null,
+                issueDate: Parsers.dateString(row.fdr_date),
+                expiryDate: Parsers.dateString(row.fdr_expiry),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: row.action ?? null,
+                utr: row.utr ?? null,
+                docketNo: row.docket_no ?? null,
+                courierAddress: row.courier_add ?? null,
+                courierDeadline: row.courier_deadline ?? null,
+                generatedPdf: row.generated_fdr ?? null,
+                cancelPdf: row.fdrcancel_pdf ?? null,
+                docketSlip: row.docket_slip ?? null,
+                coveringLetter: row.covering_letter ?? null,
+                reqNo: row.req_no ?? null,
+                reqReceive: row.req_receive ?? null,
+                transferDate: Parsers.dateString(row.transfer_date),
+                referenceNo: row.reference_no ?? null,
+                creditDate: Parsers.dateString(row.date),
+                creditAmount: row.amount ? Parsers.amount(row.amount) : null,
+                remarks: row.fdr_remark ?? row.remarks ?? null,
+                legacyFdrId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            legacyFdrToNewIdMap.set(Number(r.id), instResult.id);
+            // Track for cheque linking
+            this.ctx.legacyFdrToInstrumentId.set(row.id, instrument.id);
 
-            await db.insert(instrumentFdrDetails).values({
-                instrumentId: instResult.id,
-                fdrNo: r.fdr_no ?? null,
-                fdrDate: parseDateToString(r.fdr_date),
-                fdrSource: r.fdr_source ?? null,
-                fdrPurpose: r.fdr_needs ?? null,
-                fdrExpiryDate: parseDateToString(r.fdr_expiry),
-                fdrRemark: r.fdr_remark ?? null,
-                fdrNeeds: r.fdr_needs ?? null,
+            // Insert FDR details
+            await this.ctx.pgDb.insert(instrumentFdrDetails).values({
+                instrumentId: instrument.id,
+                fdrNo: row.fdr_no ?? null,
+                fdrDate: Parsers.dateString(row.fdr_date),
+                fdrSource: row.fdr_source ?? null,
+                fdrPurpose: row.fdr_needs ?? null,
+                fdrExpiryDate: Parsers.dateString(row.fdr_expiry),
+                fdrNeeds: row.fdr_needs ?? null,
+                fdrRemark: row.fdr_remark ?? null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate FDR ID ${r.id}:`, error);
+            this.ctx.stats.fdrs.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating FDR id=${row.id}:`, err);
+            this.ctx.stats.fdrs.errors++;
         }
     }
 
-    console.log(`Migrated ${count} FDRs, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.fdrs;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateDDs() {
-    console.log('Migrating Demand Drafts...');
-    const rows = await mysqlDb.select().from(emd_demand_drafts);
-    let count = 0;
-    let skipped = 0;
+class DdMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping DD ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating Demand Drafts...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlEmdDemandDrafts);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapDdStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlEmdDemandDrafts.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping DD id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.dds.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.dd(row.status, row.action);
+
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId,
                 instrumentType: 'DD',
-                amount: parseAmount(r.dd_amt ?? r.amount),
-                favouring: r.dd_favour ?? null,
-                payableAt: r.dd_payable ?? null,
-                issueDate: parseDateToString(r.dd_date),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                utr: r.utr ?? null,
-                docketNo: r.docket_no ?? null,
-                courierAddress: r.courier_add ?? null,
-                courierDeadline: parseCourierDeadline(r.courier_deadline),
-                generatedPdf: r.generated_dd ?? null,
-                cancelPdf: r.ddcancel_pdf ?? null,
-                docketSlip: r.docket_slip ?? null,
-                rejectionReason: null,
-                action: r.action ? Number(r.action) : null,
-                reqNo: r.req_no ?? null,
-                transferDate: parseDateToString(r.transfer_date),
-                referenceNo: r.reference_no ?? null,
-                creditDate: parseDateToString(r.date),
-                creditAmount: r.amount ? parseAmount(r.amount) : null,
-                remarks: r.remarks ?? null,
-                legacyDdId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.dd_amt ?? row.amount),
+                favouring: row.dd_favour ?? null,
+                payableAt: row.dd_payable ?? null,
+                issueDate: Parsers.dateString(row.dd_date),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: row.action ?? null,
+                utr: row.utr ?? null,
+                docketNo: row.docket_no ?? null,
+                courierAddress: row.courier_add ?? null,
+                courierDeadline: Parsers.integer(row.courier_deadline),
+                generatedPdf: row.generated_dd ?? null,
+                cancelPdf: row.ddcancel_pdf ?? null,
+                docketSlip: row.docket_slip ?? null,
+                reqNo: row.req_no ?? null,
+                transferDate: Parsers.dateString(row.transfer_date),
+                referenceNo: row.reference_no ?? null,
+                creditDate: Parsers.dateString(row.date),
+                creditAmount: row.amount ? Parsers.amount(row.amount) : null,
+                remarks: row.remarks ?? null,
+                legacyDdId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            legacyDdToNewIdMap.set(Number(r.id), instResult.id);
+            // Track for cheque linking
+            this.ctx.legacyDdToInstrumentId.set(row.id, instrument.id);
 
-            await db.insert(instrumentDdDetails).values({
-                instrumentId: instResult.id,
-                ddNo: r.dd_no ?? null,
-                ddDate: parseDateToString(r.dd_date),
+            // Insert DD details
+            await this.ctx.pgDb.insert(instrumentDdDetails).values({
+                instrumentId: instrument.id,
+                ddNo: row.dd_no ?? null,
+                ddDate: Parsers.dateString(row.dd_date),
                 bankName: null,
-                reqNo: r.req_no ?? null,
-                ddNeeds: r.dd_needs ?? null,
-                ddPurpose: r.dd_purpose ?? null,
-                ddRemarks: r.remarks ?? null,
+                reqNo: row.req_no ?? null,
+                ddNeeds: row.dd_needs ?? null,
+                ddPurpose: row.dd_purpose ?? null,
+                ddRemarks: row.remarks ?? null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate DD ID ${r.id}:`, error);
+            this.ctx.stats.dds.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating DD id=${row.id}:`, err);
+            this.ctx.stats.dds.errors++;
         }
     }
 
-    console.log(`Migrated ${count} DDs, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.dds;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateBGs() {
-    console.log('Migrating BGs...');
-    const rows = await mysqlDb.select().from(emd_bgs);
-    let count = 0;
-    let skipped = 0;
+class BgMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping BG ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating BGs...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlEmdBgs);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapBgStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlEmdBgs.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping BG id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.bgs.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.bg(row.status, row.action);
+
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId,
                 instrumentType: 'BG',
-                amount: parseAmount(r.bg_amt),
-                favouring: r.bg_favour ?? null,
-                issueDate: parseDateToString(r.bg_date),
-                expiryDate: parseDateToString(r.bg_expiry),
-                validityDate: parseDateToString(r.bg_validity ?? r.bg_expiry),
-                claimExpiryDate: parseDateToString(r.bg_claim ?? r.claim_expiry),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                docketNo: r.docket_no ?? null,
-                docketSlip: r.docket_slip ?? null,
-                courierAddress: r.bg_courier_addr ?? null,
-                courierDeadline: parseCourierDeadline(r.bg_courier_deadline),
-                rejectionReason: r.reason_req ?? null,
-                extensionRequestPdf: r.request_extension_pdf ?? null,
-                cancellationRequestPdf: r.request_cancellation_pdf ?? null,
-                action: parseAction(r.action),
-                remarks: r.bg2_remark ?? null,
-                legacyBgId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.bg_amt),
+                favouring: row.bg_favour ?? null,
+                issueDate: Parsers.dateString(row.bg_date),
+                expiryDate: Parsers.dateString(row.bg_expiry),
+                validityDate: Parsers.dateString(row.bg_validity ?? row.bg_expiry),
+                claimExpiryDate: Parsers.dateString(row.bg_claim ?? row.claim_expiry),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: Parsers.integer(row.action),
+                docketNo: row.docket_no ?? null,
+                docketSlip: row.docket_slip ?? null,
+                courierAddress: row.bg_courier_addr ?? null,
+                courierDeadline: Parsers.integer(row.bg_courier_deadline),
+                rejectionReason: row.reason_req ?? null,
+                extensionRequestPdf: row.request_extension_pdf ?? null,
+                cancellationRequestPdf: row.request_cancellation_pdf ?? null,
+                remarks: row.bg2_remark ?? null,
+                legacyBgId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            await db.insert(instrumentBgDetails).values({
-                instrumentId: instResult.id,
-                bgNo: r.bg_no ?? null,
-                bgDate: parseDateToString(r.bg_date),
-                validityDate: parseDateToString(r.bg_validity ?? r.bg_expiry),
-                claimExpiryDate: parseDateToString(r.bg_claim ?? r.claim_expiry),
-                beneficiaryName: r.bg_favour ?? null,
-                beneficiaryAddress: r.bg_address ?? null,
-                bankName: r.bg_bank ?? r.bg_bank_name ?? null,
-                cashMarginPercent: parseAmount(r.bg_cont_percent),
-                fdrMarginPercent: parseAmount(r.bg_fdr_percent),
-                stampCharges: parseAmount(r.bg_stamp ?? r.new_stamp_charge_deducted),
-                sfmsCharges: null,
-                stampChargesDeducted: parseAmount(r.stamp_charge_deducted),
-                sfmsChargesDeducted: parseAmount(r.sfms_charge_deducted),
-                otherChargesDeducted: parseAmount(r.other_charge_deducted),
-                extendedAmount: parseAmount(r.new_bg_amt),
-                extendedValidityDate: parseDateToString(r.new_bg_expiry),
-                extendedClaimExpiryDate: r.new_bg_claim ? parseDateToString(r.new_bg_claim.toString()) : null,
-                extendedBankName: r.new_bg_bank_name ?? null,
-                extensionLetterPath: r.ext_letter ?? null,
-                cancellationLetterPath: null,
-                prefilledSignedBg: r.prefilled_signed_bg ?? null,
-                bgNeeds: r.bg_needs ?? null,
-                bgPurpose: r.bg_purpose ?? null,
-                bgSoftCopy: r.bg_soft_copy ?? null,
-                bgPo: r.bg_po ?? null,
-                bgClientUser: r.bg_client_user ?? null,
-                bgClientCp: r.bg_client_cp ?? null,
-                bgClientFin: r.bg_client_fin ?? null,
-                bgBankAcc: r.bg_bank_acc ?? null,
-                bgBankIfsc: r.bg_bank_ifsc ?? null,
-                courierNo: r.courier_no ?? null,
-                approveBg: r.approve_bg ?? null,
-                bgFormatTe: r.bg_format_te ?? null,
-                bgFormatTl: r.bg_format_tl ?? null,
-                sfmsConf: r.sfms_conf ?? null,
-                fdrAmt: parseAmount(r.fdr_amt),
-                fdrPer: parseAmount(r.fdr_per),
-                fdrCopy: r.fdr_copy ?? null,
-                fdrNo: r.fdr_no ?? null,
-                fdrValidity: parseDateToString(r.fdr_validity),
-                fdrRoi: parseAmount(r.fdr_roi),
-                bgChargeDeducted: parseAmount(r.bg_charge_deducted),
-                newStampChargeDeducted: parseAmount(r.new_stamp_charge_deducted),
-                stampCoveringLetter: r.stamp_covering_letter ?? null,
-                cancelRemark: r.cancel_remark ?? null,
-                cancellConfirm: r.cancell_confirm ?? null,
-                bgFdrCancelDate: r.bg_fdr_cancel_date ?? null,
-                bgFdrCancelAmount: parseAmount(r.bg_fdr_cancel_amount),
-                bgFdrCancelRefNo: r.bg_fdr_cancel_ref_no ?? null,
-                bg2Remark: r.bg2_remark ?? null,
-                reasonReq: r.reason_req ?? null,
+            // Insert BG details
+            await this.ctx.pgDb.insert(instrumentBgDetails).values({
+                instrumentId: instrument.id,
+                bgNo: row.bg_no ?? null,
+                bgDate: Parsers.dateString(row.bg_date),
+                validityDate: Parsers.dateString(row.bg_validity ?? row.bg_expiry),
+                claimExpiryDate: Parsers.dateString(row.bg_claim ?? row.claim_expiry),
+                beneficiaryName: row.bg_favour ?? null,
+                beneficiaryAddress: row.bg_address ?? null,
+                bankName: row.bg_bank ?? row.bg_bank_name ?? null,
+                cashMarginPercent: Parsers.amount(row.bg_cont_percent),
+                fdrMarginPercent: Parsers.amount(row.bg_fdr_percent),
+                stampCharges: Parsers.amount(row.bg_stamp ?? row.new_stamp_charge_deducted),
+                stampChargesDeducted: Parsers.amount(row.stamp_charge_deducted),
+                sfmsChargesDeducted: Parsers.amount(row.sfms_charge_deducted),
+                otherChargesDeducted: Parsers.amount(row.other_charge_deducted),
+                extendedAmount: Parsers.amount(row.new_bg_amt),
+                extendedValidityDate: Parsers.dateString(row.new_bg_expiry),
+                extendedClaimExpiryDate: row.new_bg_claim ? Parsers.dateString(row.new_bg_claim.toString()) : null,
+                extendedBankName: row.new_bg_bank_name ?? null,
+                extensionLetterPath: row.ext_letter ?? null,
+                prefilledSignedBg: row.prefilled_signed_bg ?? null,
+                bgNeeds: row.bg_needs ?? null,
+                bgPurpose: row.bg_purpose ?? null,
+                bgSoftCopy: row.bg_soft_copy ?? null,
+                bgPo: row.bg_po ?? null,
+                bgClientUser: row.bg_client_user ?? null,
+                bgClientCp: row.bg_client_cp ?? null,
+                bgClientFin: row.bg_client_fin ?? null,
+                bgBankAcc: row.bg_bank_acc ?? null,
+                bgBankIfsc: row.bg_bank_ifsc ?? null,
+                courierNo: row.courier_no ?? null,
+                approveBg: row.approve_bg ?? null,
+                bgFormatTe: row.bg_format_te ?? null,
+                bgFormatTl: row.bg_format_tl ?? null,
+                sfmsConf: row.sfms_conf ?? null,
+                fdrAmt: Parsers.amount(row.fdr_amt),
+                fdrPer: Parsers.amount(row.fdr_per),
+                fdrCopy: row.fdr_copy ?? null,
+                fdrNo: row.fdr_no ?? null,
+                fdrValidity: Parsers.dateString(row.fdr_validity),
+                fdrRoi: Parsers.amount(row.fdr_roi),
+                bgChargeDeducted: Parsers.amount(row.bg_charge_deducted),
+                newStampChargeDeducted: Parsers.amount(row.new_stamp_charge_deducted),
+                stampCoveringLetter: row.stamp_covering_letter ?? null,
+                cancelRemark: row.cancel_remark ?? null,
+                cancellConfirm: row.cancell_confirm ?? null,
+                bgFdrCancelDate: row.bg_fdr_cancel_date ?? null,
+                bgFdrCancelAmount: Parsers.amount(row.bg_fdr_cancel_amount),
+                bgFdrCancelRefNo: row.bg_fdr_cancel_ref_no ?? null,
+                bg2Remark: row.bg2_remark ?? null,
+                reasonReq: row.reason_req ?? null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate BG ID ${r.id}:`, error);
+            this.ctx.stats.bgs.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating BG id=${row.id}:`, err);
+            this.ctx.stats.bgs.errors++;
         }
     }
 
-    console.log(`Migrated ${count} BGs, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.bgs;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateCheques() {
-    console.log('Migrating Cheques...');
-    const rows = await mysqlDb.select().from(emd_cheques);
-    let count = 0;
-    let skipped = 0;
+class ChequeMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping Cheque ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating Cheques...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlEmdCheques);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapChequeStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlEmdCheques.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping Cheque id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.cheques.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.cheque(row.status, row.action);
+
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId,
                 instrumentType: 'Cheque',
-                amount: parseAmount(r.cheque_amt ?? r.amount),
-                favouring: r.cheque_favour ?? null,
-                issueDate: parseDateToString(r.cheque_date),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                utr: r.utr ?? null,
-                rejectionReason: r.reason ?? r.stop_reason_text ?? null,
-                generatedPdf: r.generated_pdfs ?? null,
-                action: r.action ? Number(r.action) : null,
-                remarks: r.remarks ?? null,
-                legacyChequeId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.cheque_amt ?? row.amount),
+                favouring: row.cheque_favour ?? null,
+                issueDate: Parsers.dateString(row.cheque_date),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: row.action ?? null,
+                utr: row.utr ?? null,
+                rejectionReason: row.reason ?? row.stop_reason_text ?? null,
+                generatedPdf: row.generated_pdfs ?? null,
+                remarks: row.remarks ?? null,
+                legacyChequeId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            // Map linked DD and FDR to new IDs
-            const linkedDdNewId = r.dd_id ? legacyDdToNewIdMap.get(Number(r.dd_id)) : null;
-            const linkedFdrNewId = r.fdr_id ? legacyFdrToNewIdMap.get(Number(r.fdr_id)) : null;
+            // Map linked DD/FDR IDs to new instrument IDs
+            let linkedDdId: number | null = null;
+            let linkedFdrId: number | null = null;
 
-            await db.insert(instrumentChequeDetails).values({
-                instrumentId: instResult.id,
-                chequeNo: r.cheque_no ?? null,
-                chequeDate: parseDateToString(r.cheque_date),
-                bankName: r.cheque_bank ?? null,
-                chequeImagePath: r.cheque_img ?? null,
-                cancelledImagePath: r.cancelled_img ?? null,
-                linkedDdId: linkedDdNewId ?? (r.dd_id ? Number(r.dd_id) : null),
-                linkedFdrId: linkedFdrNewId ?? (r.fdr_id ? Number(r.fdr_id) : null),
-                reqType: r.req_type ?? null,
-                chequeNeeds: r.cheque_needs ?? null,
-                chequeReason: r.cheque_reason ?? null,
-                dueDate: parseDateToString(r.duedate),
-                transferDate: parseDateToString(r.transfer_date),
-                btTransferDate: parseDateToString(r.bt_transfer_date),
-                handover: r.handover ?? null,
-                confirmation: r.confirmation ?? null,
-                reference: r.reference ?? null,
-                stopReasonText: r.stop_reason_text ?? null,
-                amount: r.amount ? parseAmount(r.amount) : null,
+            if (row.dd_id) {
+                linkedDdId = this.ctx.legacyDdToInstrumentId.get(row.dd_id) ?? null;
+                if (!linkedDdId) {
+                    console.warn(`  ⚠ Cheque id=${row.id}: DD link ${row.dd_id} not found, setting to NULL`);
+                }
+            }
+
+            if (row.fdr_id) {
+                linkedFdrId = this.ctx.legacyFdrToInstrumentId.get(row.fdr_id) ?? null;
+                if (!linkedFdrId) {
+                    console.warn(`  ⚠ Cheque id=${row.id}: FDR link ${row.fdr_id} not found, setting to NULL`);
+                }
+            }
+
+            // Insert Cheque details
+            await this.ctx.pgDb.insert(instrumentChequeDetails).values({
+                instrumentId: instrument.id,
+                chequeNo: row.cheque_no ?? null,
+                chequeDate: Parsers.dateString(row.cheque_date),
+                bankName: row.cheque_bank ?? null,
+                chequeImagePath: row.cheque_img ?? null,
+                cancelledImagePath: row.cancelled_img ?? null,
+                linkedDdId: linkedDdId,
+                linkedFdrId: linkedFdrId,
+                reqType: row.req_type ?? null,
+                chequeNeeds: row.cheque_needs ?? null,
+                chequeReason: row.cheque_reason ?? null,
+                dueDate: Parsers.dateString(row.duedate),
+                transferDate: Parsers.dateString(row.transfer_date),
+                btTransferDate: Parsers.dateString(row.bt_transfer_date),
+                handover: row.handover ?? null,
+                confirmation: row.confirmation ?? null,
+                reference: row.reference ?? null,
+                stopReasonText: row.stop_reason_text ?? null,
+                amount: row.amount ? Parsers.amount(row.amount) : null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate Cheque ID ${r.id}:`, error);
+            this.ctx.stats.cheques.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating Cheque id=${row.id}:`, err);
+            this.ctx.stats.cheques.errors++;
         }
     }
 
-    console.log(`Migrated ${count} Cheques, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.cheques;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migrateBankTransfers() {
-    console.log('Migrating Bank Transfers...');
-    const rows = await mysqlDb.select().from(bank_transfers);
-    let count = 0;
-    let skipped = 0;
+class BankTransferMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping Bank Transfer ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating Bank Transfers...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlBankTransfers);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapBtStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlBankTransfers.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping Bank Transfer id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.bankTransfers.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.bankTransfer(row.status, row.action);
+
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId,
                 instrumentType: 'Bank Transfer',
-                amount: parseAmount(r.bt_amount),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                utr: r.utr ?? r.utr_num ?? null,
-                action: r.action ? Number(r.action) : null,
-                remarks: r.remarks ?? null,
-                rejectionReason: r.reason ?? null,
-                legacyBtId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.bt_amount),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: row.action ?? null,
+                utr: row.utr ?? row.utr_num ?? null,
+                rejectionReason: row.reason ?? null,
+                remarks: row.remarks ?? null,
+                legacyBtId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            await db.insert(instrumentTransferDetails).values({
-                instrumentId: instResult.id,
-                accountName: r.bt_acc_name ?? null,
-                accountNumber: r.bt_acc ?? null,
-                ifsc: r.bt_ifsc ?? null,
-                transactionId: r.utr ?? r.utr_num ?? null,
-                transactionDate: parseDate(r.date_time ?? r.transfer_date),
-                utrMsg: r.utr_msg ?? null,
-                utrNum: r.utr_num ?? null,
-                remarks: r.remarks ?? null,
-                reason: r.reason ?? null,
-                returnTransferDate: parseDateToString(r.transfer_date),
-                returnUtr: r.utr ?? null,
+            // Insert Transfer details
+            await this.ctx.pgDb.insert(instrumentTransferDetails).values({
+                instrumentId: instrument.id,
+                accountName: row.bt_acc_name ?? null,
+                accountNumber: row.bt_acc ?? null,
+                ifsc: row.bt_ifsc ?? null,
+                transactionId: row.utr ?? row.utr_num ?? null,
+                transactionDate: Parsers.date(row.date_time ?? row.transfer_date),
+                utrMsg: row.utr_msg ?? null,
+                utrNum: row.utr_num ?? null,
+                remarks: row.remarks ?? null,
+                reason: row.reason ?? null,
+                returnTransferDate: Parsers.dateString(row.transfer_date),
+                returnUtr: row.utr ?? null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate Bank Transfer ID ${r.id}:`, error);
+            this.ctx.stats.bankTransfers.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating Bank Transfer id=${row.id}:`, err);
+            this.ctx.stats.bankTransfers.errors++;
         }
     }
 
-    console.log(`Migrated ${count} Bank Transfers, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.bankTransfers;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-async function migratePortalPayments() {
-    console.log('Migrating Portal Payments...');
-    const rows = await mysqlDb.select().from(pay_on_portals);
-    let count = 0;
-    let skipped = 0;
+class PortalPaymentMigrator {
+    constructor(private ctx: MigrationContext) { }
 
-    for (const r of rows) {
-        const requestId = emdToRequestMap.get(r.emd_id ?? 0);
-        if (!requestId) {
-            skipped++;
-            console.warn(`Skipping Portal Payment ID ${r.id}: No matching EMD found for emd_id ${r.emd_id}`);
-            continue;
+    async migrate(): Promise<void> {
+        console.log('Migrating Portal Payments...');
+        const rows = await this.ctx.mysqlDb.select().from(mysqlPayOnPortals);
+
+        for (const row of rows) {
+            await this.migrateRow(row);
         }
 
-        try {
-            const mappedStatus = mapPortalStatus(r.status, r.action);
+        this.logStats();
+    }
 
-            const [instResult] = await db.insert(paymentInstruments).values({
-                requestId,
+    private async migrateRow(row: typeof mysqlPayOnPortals.$inferSelect): Promise<void> {
+        try {
+            const emdId = row.emd_id ?? 0;
+
+            if (!this.ctx.emdIds.has(emdId)) {
+                console.warn(`  ⚠ Skipping Portal Payment id=${row.id}: EMD ${emdId} not found`);
+                this.ctx.stats.portalPayments.skipped++;
+                return;
+            }
+
+            const status = StatusMapper.portal(row.status, row.action);
+
+            const [instrument] = await this.ctx.pgDb.insert(paymentInstruments).values({
+                requestId: emdId,
                 instrumentType: 'Portal Payment',
-                amount: parseAmount(r.amount),
-                status: mappedStatus,
-                currentStage: getStageFromStatus(mappedStatus),
-                utr: r.utr ?? r.utr_num ?? null,
-                action: r.action ? Number(r.action) : null,
-                remarks: r.remarks ?? null,
-                rejectionReason: r.reason ?? null,
-                legacyPortalId: Number(r.id),
-                legacyData: {
-                    original_status: r.status,
-                    original_action: r.action,
-                },
-                createdAt: parseDate(r.created_at) ?? new Date(),
-                updatedAt: parseDate(r.updated_at) ?? new Date(),
+                amount: Parsers.amount(row.amount),
+                status: status,
+                currentStage: StatusMapper.getStage(status),
+                action: row.action ?? null,
+                utr: row.utr ?? row.utr_num ?? null,
+                rejectionReason: row.reason ?? null,
+                remarks: row.remarks ?? null,
+                legacyPortalId: row.id,
+                legacyData: { original_status: row.status, original_action: row.action },
+                createdAt: Parsers.date(row.created_at) ?? new Date(),
+                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
             }).returning({ id: paymentInstruments.id });
 
-            await db.insert(instrumentTransferDetails).values({
-                instrumentId: instResult.id,
-                portalName: r.portal ?? null,
-                paymentMethod: r.is_netbanking === 'yes' || r.is_netbanking === '1' ? 'Netbanking' :
-                    r.is_debit === 'yes' || r.is_debit === '1' ? 'Debit Card' : 'Other',
-                transactionId: r.utr ?? r.utr_num ?? null,
-                transactionDate: parseDate(r.date_time),
-                utrMsg: r.utr_msg ?? null,
-                utrNum: r.utr_num ?? null,
-                isNetbanking: r.is_netbanking ?? null,
-                isDebit: r.is_debit ?? null,
-                remarks: r.remarks ?? null,
-                reason: r.reason ?? null,
-                returnTransferDate: parseDateToString(r.transfer_date),
-                returnUtr: r.utr ?? null,
+            // Determine payment method
+            let paymentMethod = 'Other';
+            if (row.is_netbanking === 'yes' || row.is_netbanking === '1') {
+                paymentMethod = 'Netbanking';
+            } else if (row.is_debit === 'yes' || row.is_debit === '1') {
+                paymentMethod = 'Debit Card';
+            }
+
+            // Insert Transfer details
+            await this.ctx.pgDb.insert(instrumentTransferDetails).values({
+                instrumentId: instrument.id,
+                portalName: row.portal ?? null,
+                paymentMethod: paymentMethod,
+                transactionId: row.utr ?? row.utr_num ?? null,
+                transactionDate: Parsers.date(row.date_time),
+                utrMsg: row.utr_msg ?? null,
+                utrNum: row.utr_num ?? null,
+                isNetbanking: row.is_netbanking ?? null,
+                isDebit: row.is_debit ?? null,
+                remarks: row.remarks ?? null,
+                reason: row.reason ?? null,
+                returnTransferDate: Parsers.dateString(row.transfer_date),
+                returnUtr: row.utr ?? null,
             });
 
-            count++;
-        } catch (error) {
-            console.error(`Failed to migrate Portal Payment ID ${r.id}:`, error);
+            this.ctx.stats.portalPayments.success++;
+        } catch (err) {
+            console.error(`  ✗ Error migrating Portal Payment id=${row.id}:`, err);
+            this.ctx.stats.portalPayments.errors++;
         }
     }
 
-    console.log(`Migrated ${count} Portal Payments, skipped ${skipped}`);
+    private logStats(): void {
+        const { success, errors, skipped } = this.ctx.stats.portalPayments;
+        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+    }
 }
 
-// ============================================
+// ============================================================================
 // POST-MIGRATION UPDATES
-// ============================================
+// ============================================================================
 
-async function updatePaymentRequestAmounts() {
-    console.log('Updating payment request amounts...');
+class PostMigrationUpdater {
+    constructor(private ctx: MigrationContext) { }
 
-    const requests = await db.select({ id: paymentRequests.id }).from(paymentRequests);
-    let updated = 0;
+    async updateAmounts(): Promise<void> {
+        console.log('Updating payment request amounts...');
 
-    for (const req of requests) {
-        try {
-            const instruments = await db
-                .select({ amount: paymentInstruments.amount })
-                .from(paymentInstruments)
-                .where(eq(paymentInstruments.requestId, req.id));
+        const requests = await this.ctx.pgDb.select({ id: paymentRequests.id }).from(paymentRequests);
+        let updated = 0;
 
-            const totalAmount = instruments.reduce(
-                (sum, inst) => sum + parseFloat(inst.amount || '0'),
-                0
-            );
+        for (const req of requests) {
+            try {
+                const instruments = await this.ctx.pgDb
+                    .select({ amount: paymentInstruments.amount })
+                    .from(paymentInstruments)
+                    .where(eq(paymentInstruments.requestId, req.id));
 
-            await db
-                .update(paymentRequests)
-                .set({ amountRequired: totalAmount.toFixed(2) })
-                .where(eq(paymentRequests.id, req.id));
+                const totalAmount = instruments.reduce(
+                    (sum, inst) => sum + parseFloat(inst.amount || '0'),
+                    0
+                );
 
-            updated++;
-        } catch (error) {
-            console.error(`Failed to update amount for request ${req.id}:`, error);
-        }
-    }
+                await this.ctx.pgDb
+                    .update(paymentRequests)
+                    .set({ amountRequired: totalAmount.toFixed(2) })
+                    .where(eq(paymentRequests.id, req.id));
 
-    console.log(`Updated amounts for ${updated} payment requests`);
-}
-
-async function updatePaymentRequestStatuses() {
-    console.log('Updating payment request statuses...');
-
-    const requests = await db.select({ id: paymentRequests.id }).from(paymentRequests);
-    let updated = 0;
-
-    for (const req of requests) {
-        try {
-            const instruments = await db
-                .select({ status: paymentInstruments.status })
-                .from(paymentInstruments)
-                .where(eq(paymentInstruments.requestId, req.id));
-
-            if (instruments.length === 0) {
-                continue;
-            }
-
-            // Determine overall status based on instrument statuses
-            let overallStatus = 'Pending';
-            const statuses = instruments.map(i => i.status);
-
-            if (statuses.every(s => s.includes('COMPLETED') || s.includes('RECEIVED') || s.includes('CONFIRMED'))) {
-                overallStatus = 'Completed';
-            } else if (statuses.some(s => s.includes('REJECTED'))) {
-                overallStatus = 'Partially Rejected';
-            } else if (statuses.some(s => s.includes('SUBMITTED') || s.includes('INITIATED'))) {
-                overallStatus = 'In Progress';
-            } else if (statuses.some(s => s.includes('ACCEPTED') || s.includes('APPROVED'))) {
-                overallStatus = 'Approved';
-            }
-
-            await db
-                .update(paymentRequests)
-                .set({ status: overallStatus })
-                .where(eq(paymentRequests.id, req.id));
-
-            updated++;
-        } catch (error) {
-            console.error(`Failed to update status for request ${req.id}:`, error);
-        }
-    }
-
-    console.log(`Updated statuses for ${updated} payment requests`);
-}
-
-async function updateLinkedChequeReferences() {
-    console.log('Updating linked cheque references...');
-
-    // Get all cheque details with legacy linked IDs
-    const chequeDetails = await db
-        .select({
-            id: instrumentChequeDetails.id,
-            linkedDdId: instrumentChequeDetails.linkedDdId,
-            linkedFdrId: instrumentChequeDetails.linkedFdrId,
-        })
-        .from(instrumentChequeDetails);
-
-    let updated = 0;
-
-    for (const detail of chequeDetails) {
-        try {
-            const updates: { linkedDdId?: number; linkedFdrId?: number } = {};
-
-            // Check if linkedDdId needs to be updated to new ID
-            if (detail.linkedDdId) {
-                const newDdId = legacyDdToNewIdMap.get(detail.linkedDdId);
-                if (newDdId && newDdId !== detail.linkedDdId) {
-                    updates.linkedDdId = newDdId;
-                }
-            }
-
-            // Check if linkedFdrId needs to be updated to new ID
-            if (detail.linkedFdrId) {
-                const newFdrId = legacyFdrToNewIdMap.get(detail.linkedFdrId);
-                if (newFdrId && newFdrId !== detail.linkedFdrId) {
-                    updates.linkedFdrId = newFdrId;
-                }
-            }
-
-            if (Object.keys(updates).length > 0) {
-                await db
-                    .update(instrumentChequeDetails)
-                    .set(updates)
-                    .where(eq(instrumentChequeDetails.id, detail.id));
                 updated++;
+            } catch (err) {
+                console.error(`  ✗ Error updating amount for request ${req.id}:`, err);
             }
-        } catch (error) {
-            console.error(`Failed to update linked references for cheque detail ${detail.id}:`, error);
+        }
+
+        console.log(`  ✓ Updated amounts for ${updated} payment requests`);
+    }
+
+    async updateStatuses(): Promise<void> {
+        console.log('Updating payment request statuses...');
+
+        const requests = await this.ctx.pgDb.select({ id: paymentRequests.id }).from(paymentRequests);
+        let updated = 0;
+
+        for (const req of requests) {
+            try {
+                const instruments = await this.ctx.pgDb
+                    .select({ status: paymentInstruments.status })
+                    .from(paymentInstruments)
+                    .where(eq(paymentInstruments.requestId, req.id));
+
+                if (instruments.length === 0) continue;
+
+                const statuses = instruments.map(i => i.status);
+                let overallStatus = 'Pending';
+
+                if (statuses.every(s => s.includes('COMPLETED') || s.includes('RECEIVED') || s.includes('CONFIRMED'))) {
+                    overallStatus = 'Completed';
+                } else if (statuses.some(s => s.includes('REJECTED'))) {
+                    overallStatus = 'Partially Rejected';
+                } else if (statuses.some(s => s.includes('SUBMITTED') || s.includes('INITIATED'))) {
+                    overallStatus = 'In Progress';
+                } else if (statuses.some(s => s.includes('ACCEPTED') || s.includes('APPROVED'))) {
+                    overallStatus = 'Approved';
+                }
+
+                await this.ctx.pgDb
+                    .update(paymentRequests)
+                    .set({ status: overallStatus })
+                    .where(eq(paymentRequests.id, req.id));
+
+                updated++;
+            } catch (err) {
+                console.error(`  ✗ Error updating status for request ${req.id}:`, err);
+            }
+        }
+
+        console.log(`  ✓ Updated statuses for ${updated} payment requests`);
+    }
+}
+
+// ============================================================================
+// SEQUENCE RESETTER
+// ============================================================================
+
+class SequenceResetter {
+    constructor(private ctx: MigrationContext) { }
+
+    async reset(): Promise<void> {
+        console.log('Resetting PostgreSQL sequences...');
+
+        const tables = [
+            'payment_requests',
+            'payment_instruments',
+            'instrument_dd_details',
+            'instrument_fdr_details',
+            'instrument_bg_details',
+            'instrument_cheque_details',
+            'instrument_transfer_details',
+        ];
+
+        for (const table of tables) {
+            try {
+                await this.ctx.pgClient.query(`
+                    SELECT setval(
+                        pg_get_serial_sequence('${table}', 'id'),
+                        COALESCE((SELECT MAX(id) FROM ${table}), 1),
+                        true
+                    )
+                `);
+                console.log(`  ✓ ${table} sequence reset`);
+            } catch (err) {
+                console.error(`  ✗ Error resetting ${table} sequence:`, err);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// MIGRATION ORCHESTRATOR
+// ============================================================================
+
+class MigrationOrchestrator {
+    private pgClient: Client;
+    private mysqlPool: mysql2.Pool;
+    private ctx!: MigrationContext;
+
+    constructor(private dbConfig: DatabaseConfig) {
+        this.pgClient = new Client({ connectionString: dbConfig.postgres });
+        this.mysqlPool = mysql2.createPool(dbConfig.mysql);
+    }
+
+    async run(): Promise<void> {
+        try {
+            this.printHeader();
+            await this.connect();
+            this.initializeContext();
+            await this.executeMigration();
+            this.printSummary();
+        } finally {
+            await this.disconnect();
         }
     }
 
-    console.log(`Updated linked references for ${updated} cheque details`);
-}
+    private printHeader(): void {
+        console.log('\n' + '═'.repeat(60));
+        console.log('  EMD MIGRATION: MySQL → PostgreSQL');
+        console.log('  (Preserving EMD IDs, Auto-generating Instrument IDs)');
+        console.log('═'.repeat(60));
+    }
 
-// ============================================
-// VERIFICATION FUNCTIONS
-// ============================================
+    private async connect(): Promise<void> {
+        console.log('\n📡 Connecting to databases...');
+        await this.pgClient.connect();
+        console.log('  ✓ PostgreSQL connected');
+        console.log('  ✓ MySQL pool ready');
+    }
 
-async function verifyMigration() {
-    console.log('\n========================================');
-    console.log('MIGRATION VERIFICATION');
-    console.log('========================================\n');
+    private initializeContext(): void {
+        this.ctx = {
+            pgDb: pgDrizzle(this.pgClient as any),
+            pgClient: this.pgClient,
+            mysqlDb: mysqlDrizzle(this.mysqlPool as any),
+            emdIds: new Set(),
+            legacyFdrToInstrumentId: new Map(),
+            legacyDdToInstrumentId: new Map(),
+            stats: {
+                paymentRequests: { success: 0, errors: 0, skipped: 0 },
+                fdrs: { success: 0, errors: 0, skipped: 0 },
+                dds: { success: 0, errors: 0, skipped: 0 },
+                bgs: { success: 0, errors: 0, skipped: 0 },
+                cheques: { success: 0, errors: 0, skipped: 0 },
+                bankTransfers: { success: 0, errors: 0, skipped: 0 },
+                portalPayments: { success: 0, errors: 0, skipped: 0 },
+            },
+        };
+    }
 
-    // Count records in MySQL
-    const mysqlCounts = {
-        emds: (await mysqlDb.select().from(emds)).length,
-        fdrs: (await mysqlDb.select().from(emd_fdrs)).length,
-        dds: (await mysqlDb.select().from(emd_demand_drafts)).length,
-        bgs: (await mysqlDb.select().from(emd_bgs)).length,
-        cheques: (await mysqlDb.select().from(emd_cheques)).length,
-        bankTransfers: (await mysqlDb.select().from(bank_transfers)).length,
-        portalPayments: (await mysqlDb.select().from(pay_on_portals)).length,
-    };
+    private async executeMigration(): Promise<void> {
+        const steps = [
+            { name: 'Migrate payment_requests (EMDs)', fn: () => new PaymentRequestsMigrator(this.ctx).migrate() },
+            { name: 'Migrate FDRs', fn: () => new FdrMigrator(this.ctx).migrate() },
+            { name: 'Migrate Demand Drafts', fn: () => new DdMigrator(this.ctx).migrate() },
+            { name: 'Migrate Bank Guarantees', fn: () => new BgMigrator(this.ctx).migrate() },
+            { name: 'Migrate Cheques', fn: () => new ChequeMigrator(this.ctx).migrate() },
+            { name: 'Migrate Bank Transfers', fn: () => new BankTransferMigrator(this.ctx).migrate() },
+            { name: 'Migrate Portal Payments', fn: () => new PortalPaymentMigrator(this.ctx).migrate() },
+            { name: 'Update amounts', fn: () => new PostMigrationUpdater(this.ctx).updateAmounts() },
+            { name: 'Update statuses', fn: () => new PostMigrationUpdater(this.ctx).updateStatuses() },
+            { name: 'Reset sequences', fn: () => new SequenceResetter(this.ctx).reset() },
+        ];
 
-    // Count records in PostgreSQL
-    const pgRequestsCount = await db.select({ count: sql<number>`count(*)` }).from(paymentRequests);
-    const pgInstrumentsCount = await db.select({ count: sql<number>`count(*)` }).from(paymentInstruments);
+        console.log('\n📋 Starting migration...\n');
 
-    // Count by instrument type
-    const pgFdrCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'FDR'));
-
-    const pgDdCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'DD'));
-
-    const pgBgCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'BG'));
-
-    const pgChequeCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'Cheque'));
-
-    const pgBtCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'Bank Transfer'));
-
-    const pgPortalCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(eq(paymentInstruments.instrumentType, 'Portal Payment'));
-
-    // Count detail tables
-    const pgDdDetailsCount = await db.select({ count: sql<number>`count(*)` }).from(instrumentDdDetails);
-    const pgFdrDetailsCount = await db.select({ count: sql<number>`count(*)` }).from(instrumentFdrDetails);
-    const pgBgDetailsCount = await db.select({ count: sql<number>`count(*)` }).from(instrumentBgDetails);
-    const pgChequeDetailsCount = await db.select({ count: sql<number>`count(*)` }).from(instrumentChequeDetails);
-    const pgTransferDetailsCount = await db.select({ count: sql<number>`count(*)` }).from(instrumentTransferDetails);
-
-    console.log('MySQL Source Counts:');
-    console.log('--------------------');
-    console.log(`  EMDs (payment_requests):  ${mysqlCounts.emds}`);
-    console.log(`  FDRs:                     ${mysqlCounts.fdrs}`);
-    console.log(`  Demand Drafts:            ${mysqlCounts.dds}`);
-    console.log(`  Bank Guarantees:          ${mysqlCounts.bgs}`);
-    console.log(`  Cheques:                  ${mysqlCounts.cheques}`);
-    console.log(`  Bank Transfers:           ${mysqlCounts.bankTransfers}`);
-    console.log(`  Portal Payments:          ${mysqlCounts.portalPayments}`);
-    console.log(`  Total Instruments:        ${mysqlCounts.fdrs + mysqlCounts.dds + mysqlCounts.bgs + mysqlCounts.cheques + mysqlCounts.bankTransfers + mysqlCounts.portalPayments}`);
-
-    console.log('\nPostgreSQL Target Counts:');
-    console.log('-------------------------');
-    console.log(`  Payment Requests:         ${pgRequestsCount[0].count}`);
-    console.log(`  Total Instruments:        ${pgInstrumentsCount[0].count}`);
-    console.log(`    - FDRs:                 ${pgFdrCount[0].count}`);
-    console.log(`    - Demand Drafts:        ${pgDdCount[0].count}`);
-    console.log(`    - Bank Guarantees:      ${pgBgCount[0].count}`);
-    console.log(`    - Cheques:              ${pgChequeCount[0].count}`);
-    console.log(`    - Bank Transfers:       ${pgBtCount[0].count}`);
-    console.log(`    - Portal Payments:      ${pgPortalCount[0].count}`);
-
-    console.log('\nDetail Tables:');
-    console.log('--------------');
-    console.log(`  DD Details:               ${pgDdDetailsCount[0].count}`);
-    console.log(`  FDR Details:              ${pgFdrDetailsCount[0].count}`);
-    console.log(`  BG Details:               ${pgBgDetailsCount[0].count}`);
-    console.log(`  Cheque Details:           ${pgChequeDetailsCount[0].count}`);
-    console.log(`  Transfer Details:         ${pgTransferDetailsCount[0].count}`);
-
-    // Verification checks
-    console.log('\nVerification Results:');
-    console.log('---------------------');
-
-    const checks = [
-        {
-            name: 'Payment Requests',
-            mysql: mysqlCounts.emds,
-            pg: Number(pgRequestsCount[0].count),
-        },
-        {
-            name: 'FDRs',
-            mysql: mysqlCounts.fdrs,
-            pg: Number(pgFdrCount[0].count),
-        },
-        {
-            name: 'Demand Drafts',
-            mysql: mysqlCounts.dds,
-            pg: Number(pgDdCount[0].count),
-        },
-        {
-            name: 'Bank Guarantees',
-            mysql: mysqlCounts.bgs,
-            pg: Number(pgBgCount[0].count),
-        },
-        {
-            name: 'Cheques',
-            mysql: mysqlCounts.cheques,
-            pg: Number(pgChequeCount[0].count),
-        },
-        {
-            name: 'Bank Transfers',
-            mysql: mysqlCounts.bankTransfers,
-            pg: Number(pgBtCount[0].count),
-        },
-        {
-            name: 'Portal Payments',
-            mysql: mysqlCounts.portalPayments,
-            pg: Number(pgPortalCount[0].count),
-        },
-    ];
-
-    let allPassed = true;
-    for (const check of checks) {
-        const status = check.mysql === check.pg ? '✅ PASS' : '❌ FAIL';
-        const diff = check.pg - check.mysql;
-        const diffStr = diff === 0 ? '' : ` (${diff > 0 ? '+' : ''}${diff})`;
-        console.log(`  ${check.name}: ${status} - MySQL: ${check.mysql}, PG: ${check.pg}${diffStr}`);
-        if (check.mysql !== check.pg) {
-            allPassed = false;
+        for (let i = 0; i < steps.length; i++) {
+            console.log(`[${i + 1}/${steps.length}] ${steps[i].name}`);
+            await steps[i].fn();
+            console.log('');
         }
     }
 
-    // Check for orphaned records
-    console.log('\nOrphan Checks:');
-    console.log('--------------');
+    private printSummary(): void {
+        const { stats, emdIds, legacyFdrToInstrumentId, legacyDdToInstrumentId } = this.ctx;
 
-    const orphanedInstruments = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(sql`${paymentInstruments.requestId} NOT IN (SELECT id FROM payment_requests)`);
+        const totalInstruments =
+            stats.fdrs.success +
+            stats.dds.success +
+            stats.bgs.success +
+            stats.cheques.success +
+            stats.bankTransfers.success +
+            stats.portalPayments.success;
 
-    console.log(`  Instruments without requests: ${orphanedInstruments[0].count}`);
-
-    if (Number(orphanedInstruments[0].count) > 0) {
-        allPassed = false;
-        console.log('  ❌ WARNING: Found orphaned instruments!');
-    } else {
-        console.log('  ✅ No orphaned instruments');
+        console.log('═'.repeat(60));
+        console.log('  MIGRATION SUMMARY');
+        console.log('═'.repeat(60));
+        console.log('');
+        console.log('  Table                    Success   Errors   Skipped');
+        console.log('  ───────────────────────────────────────────────────────');
+        console.log(`  payment_requests         ${this.pad(stats.paymentRequests.success)}      ${this.pad(stats.paymentRequests.errors)}       ${stats.paymentRequests.skipped}`);
+        console.log(`  FDRs                     ${this.pad(stats.fdrs.success)}      ${this.pad(stats.fdrs.errors)}       ${stats.fdrs.skipped}`);
+        console.log(`  Demand Drafts            ${this.pad(stats.dds.success)}      ${this.pad(stats.dds.errors)}       ${stats.dds.skipped}`);
+        console.log(`  Bank Guarantees          ${this.pad(stats.bgs.success)}      ${this.pad(stats.bgs.errors)}       ${stats.bgs.skipped}`);
+        console.log(`  Cheques                  ${this.pad(stats.cheques.success)}      ${this.pad(stats.cheques.errors)}       ${stats.cheques.skipped}`);
+        console.log(`  Bank Transfers           ${this.pad(stats.bankTransfers.success)}      ${this.pad(stats.bankTransfers.errors)}       ${stats.bankTransfers.skipped}`);
+        console.log(`  Portal Payments          ${this.pad(stats.portalPayments.success)}      ${this.pad(stats.portalPayments.errors)}       ${stats.portalPayments.skipped}`);
+        console.log('  ───────────────────────────────────────────────────────');
+        console.log(`  Total Instruments:       ${totalInstruments}`);
+        console.log(`  EMD IDs Preserved:       ${emdIds.size}`);
+        console.log(`  FDR→Instrument Maps:     ${legacyFdrToInstrumentId.size}`);
+        console.log(`  DD→Instrument Maps:      ${legacyDdToInstrumentId.size}`);
+        console.log('');
+        console.log('═'.repeat(60));
+        console.log('  ✅ Migration completed successfully!');
+        console.log('═'.repeat(60));
     }
 
-    // Check for null amounts
-    const nullAmounts = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(paymentInstruments)
-        .where(sql`${paymentInstruments.amount} IS NULL OR ${paymentInstruments.amount} = '0.00'`);
-
-    console.log(`  Instruments with zero/null amount: ${nullAmounts[0].count}`);
-
-    // Summary
-    console.log('\n========================================');
-    if (allPassed) {
-        console.log('✅ MIGRATION VERIFICATION PASSED');
-    } else {
-        console.log('❌ MIGRATION VERIFICATION FAILED');
-        console.log('   Please review the discrepancies above');
+    private pad(num: number): string {
+        return num.toString().padStart(4);
     }
-    console.log('========================================\n');
 
-    return allPassed;
-}
-
-async function generateMigrationReport() {
-    console.log('\nGenerating migration report...');
-
-    const report = {
-        timestamp: new Date().toISOString(),
-        mappings: {
-            emdToRequest: Object.fromEntries(emdToRequestMap),
-            ddToNewId: Object.fromEntries(legacyDdToNewIdMap),
-            fdrToNewId: Object.fromEntries(legacyFdrToNewIdMap),
-        },
-        statistics: {
-            totalRequestsMigrated: emdToRequestMap.size,
-            totalDdsMigrated: legacyDdToNewIdMap.size,
-            totalFdrsMigrated: legacyFdrToNewIdMap.size,
-        },
-    };
-
-    // Write report to file
-    const fs = await import('fs');
-    const reportPath = `./migration-report-${Date.now()}.json`;
-    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-    console.log(`Migration report saved to: ${reportPath}`);
-
-    return report;
-}
-
-// ============================================
-// CLEANUP FUNCTIONS (Optional - use with caution)
-// ============================================
-
-async function cleanupBeforeMigration() {
-    console.log('Cleaning up existing data in PostgreSQL...');
-
-    // Delete in reverse order of dependencies
-    await db.delete(instrumentTransferDetails);
-    await db.delete(instrumentChequeDetails);
-    await db.delete(instrumentBgDetails);
-    await db.delete(instrumentFdrDetails);
-    await db.delete(instrumentDdDetails);
-    await db.delete(paymentInstruments);
-    await db.delete(paymentRequests);
-
-    console.log('Cleanup completed');
-}
-
-// ============================================
-// ROLLBACK FUNCTION (if needed)
-// ============================================
-
-async function rollbackMigration() {
-    console.log('Rolling back migration...');
-
-    try {
-        // Delete all migrated data
-        await db.delete(instrumentTransferDetails);
-        await db.delete(instrumentChequeDetails);
-        await db.delete(instrumentBgDetails);
-        await db.delete(instrumentFdrDetails);
-        await db.delete(instrumentDdDetails);
-        await db.delete(paymentInstruments);
-        await db.delete(paymentRequests);
-
-        console.log('Rollback completed successfully');
-    } catch (error) {
-        console.error('Rollback failed:', error);
-        throw error;
+    private async disconnect(): Promise<void> {
+        console.log('\n🔌 Closing connections...');
+        await this.pgClient.end();
+        await this.mysqlPool.end();
+        console.log('  ✓ All connections closed');
     }
 }
 
-// ============================================
-// MAIN MIGRATION RUNNER
-// ============================================
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
 
-async function runMigration(options: {
-    cleanup?: boolean;
-    verify?: boolean;
-    generateReport?: boolean;
-} = {}) {
-    const startTime = Date.now();
-
-    console.log('========================================');
-    console.log('EMD MIGRATION: MySQL → PostgreSQL');
-    console.log('========================================');
-    console.log(`Started at: ${new Date().toISOString()}`);
-    console.log('');
-
-    try {
-        // Optional cleanup
-        if (options.cleanup) {
-            await cleanupBeforeMigration();
-        }
-
-        // Step 1: Migrate Payment Requests (EMDs)
-        console.log('\n--- Step 1/9: Payment Requests ---');
-        await migratePaymentRequests();
-
-        // Step 2: Migrate FDRs (must be before cheques for linking)
-        console.log('\n--- Step 2/9: FDRs ---');
-        await migrateFDRs();
-
-        // Step 3: Migrate DDs (must be before cheques for linking)
-        console.log('\n--- Step 3/9: Demand Drafts ---');
-        await migrateDDs();
-
-        // Step 4: Migrate BGs
-        console.log('\n--- Step 4/9: Bank Guarantees ---');
-        await migrateBGs();
-
-        // Step 5: Migrate Cheques (after FDRs and DDs for linking)
-        console.log('\n--- Step 5/9: Cheques ---');
-        await migrateCheques();
-
-        // Step 6: Migrate Bank Transfers
-        console.log('\n--- Step 6/9: Bank Transfers ---');
-        await migrateBankTransfers();
-
-        // Step 7: Migrate Portal Payments
-        console.log('\n--- Step 7/9: Portal Payments ---');
-        await migratePortalPayments();
-
-        // Step 8: Post-migration updates
-        console.log('\n--- Step 8/9: Post-Migration Updates ---');
-        await updatePaymentRequestAmounts();
-        await updatePaymentRequestStatuses();
-        await updateLinkedChequeReferences();
-
-        // Step 9: Verification
-        if (options.verify !== false) {
-            console.log('\n--- Step 9/9: Verification ---');
-            await verifyMigration();
-        }
-
-        // Generate report
-        if (options.generateReport !== false) {
-            await generateMigrationReport();
-        }
-
-        const endTime = Date.now();
-        const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-        console.log('\n========================================');
-        console.log('✅ MIGRATION COMPLETED SUCCESSFULLY');
-        console.log(`Duration: ${duration} seconds`);
-        console.log(`Finished at: ${new Date().toISOString()}`);
-        console.log('========================================\n');
-
-    } catch (error) {
-        console.error('\n========================================');
-        console.error('❌ MIGRATION FAILED');
-        console.error('========================================');
-        console.error('Error:', error);
-        console.error('\nYou may need to run rollback if partial migration occurred.');
-        throw error;
-    }
+async function main(): Promise<void> {
+    const orchestrator = new MigrationOrchestrator(config);
+    await orchestrator.run();
 }
 
-// ============================================
-// CLI INTERFACE
-// ============================================
-
-async function main() {
-    const args = process.argv.slice(2);
-
-    if (args.includes('--help') || args.includes('-h')) {
-        console.log(`
-EMD Migration Script - MySQL to PostgreSQL
-
-Usage: npx ts-node migrate-emd-full.ts [options]
-
-Options:
-  --cleanup       Clean existing data before migration
-  --no-verify     Skip verification step
-  --no-report     Skip report generation
-  --rollback      Rollback previous migration
-  --verify-only   Only run verification (no migration)
-  --help, -h      Show this help message
-
-Examples:
-  npx ts-node migrate-emd-full.ts
-  npx ts-node migrate-emd-full.ts --cleanup
-  npx ts-node migrate-emd-full.ts --rollback
-  npx ts-node migrate-emd-full.ts --verify-only
-`);
+main()
+    .then(() => {
+        console.log('\n👋 Exiting with code 0\n');
         process.exit(0);
-    }
-
-    if (args.includes('--rollback')) {
-        await rollbackMigration();
-        process.exit(0);
-    }
-
-    if (args.includes('--verify-only')) {
-        const passed = await verifyMigration();
-        process.exit(passed ? 0 : 1);
-    }
-
-    await runMigration({
-        cleanup: args.includes('--cleanup'),
-        verify: !args.includes('--no-verify'),
-        generateReport: !args.includes('--no-report'),
+    })
+    .catch((err) => {
+        console.error('\n❌ Migration failed:', err);
+        console.error('\n👋 Exiting with code 1\n');
+        process.exit(1);
     });
-
-    // Close connections
-    await pgClient.end();
-    await mysqlPool.end();
-
-    process.exit(0);
-}
-
-main().catch(err => {
-    console.error('Fatal error:', err);
-    process.exit(1);
-});
