@@ -158,7 +158,7 @@ const CourierDashboard: React.FC = () => {
             {
                 label: "View",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: Courier) => navigate(`/courier/show/${row.id}`),
+                onClick: (row: Courier) => navigate(paths.shared.courierView(row.id)),
             },
             {
                 label: "Delete",

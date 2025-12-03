@@ -1,37 +1,60 @@
-import { useState } from "react";
+// src/pages/courier/CourierDispatchForm.tsx
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, FileText } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, Upload, FileText, Package, MapPin, User, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { paths } from "@/app/routes/paths";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import * as z from "zod";
+import { useCourier, useCreateCourierDispatch } from "@/hooks/api/useCouriers";
+import { COURIER_STATUS } from "@/types/courier.types";
+import { format } from "date-fns";
 
 // Validation schema
 const courierDispatchSchema = z.object({
     courier_provider: z.string().min(1, "Courier provider is required"),
     pickup_date: z.string().min(1, "Pickup date and time is required"),
     docket_no: z.string().min(1, "Docket number is required"),
-    docket_slip: z.instanceof(FileList).optional(),
 });
 
 type CourierDispatchFormData = z.infer<typeof courierDispatchSchema>;
 
+// Allowed file types
+const ALLOWED_FILE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+
 const CourierDispatchForm = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const courierId = id ? parseInt(id, 10) : 0;
+
+    // File state
     const [file, setFile] = useState<File | null>(null);
+
+    // API hooks
+    const { data: courier, isLoading: courierLoading, error: courierError } = useCourier(courierId);
+    const dispatchMutation = useCreateCourierDispatch();
 
     const {
         register,
         handleSubmit,
-        formState: { errors },
-        setValue,
+        formState: { errors, isSubmitting },
+        reset,
     } = useForm<CourierDispatchFormData>({
         resolver: zodResolver(courierDispatchSchema),
         defaultValues: {
@@ -41,114 +64,127 @@ const CourierDispatchForm = () => {
         },
     });
 
-    // Mock data - replace with actual API call
-    const courierData = {
-        id: id || "1",
-        reference_no: "COU-2024-001",
-        recipient_name: "John Doe",
-        destination: "Mohan Estate",
-    };
+    // Redirect if courier is already dispatched or doesn't exist
+    useEffect(() => {
+        if (courier && courier.status !== COURIER_STATUS.PENDING) {
+            toast.error("This courier has already been dispatched or processed");
+            navigate(paths.shared.couriers);
+        }
+    }, [courier, navigate]);
 
+    // Handle form submission
     const onSubmit = async (data: CourierDispatchFormData) => {
-        setIsSubmitting(true);
+        if (!courierId) {
+            toast.error("Invalid courier ID");
+            return;
+        }
 
-        // Show loading toast
-        const toastId = toast.loading("Submitting courier dispatch form...");
+        const toastId = toast.loading("Dispatching courier...");
 
         try {
-            const formData = new FormData();
-            formData.append("id", id || "");
-            formData.append("courier_provider", data.courier_provider);
-            formData.append("pickup_date", data.pickup_date);
-            formData.append("docket_no", data.docket_no);
+            await dispatchMutation.mutateAsync({
+                id: courierId,
+                data: {
+                    courier_provider: data.courier_provider,
+                    docket_no: data.docket_no,
+                    pickup_date: data.pickup_date,
+                    docket_slip: file || undefined,
+                },
+            });
 
-            if (file) {
-                formData.append("docket_slip", file);
-            }
-
-            // Simulate API call - replace with actual API
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Replace with actual API call
-            // const response = await fetch('/api/courier/dispatch', {
-            //   method: 'POST',
-            //   body: formData,
-            // });
-
-            // if (!response.ok) {
-            //   throw new Error('Submission failed');
-            // }
-
-            toast.success("Courier dispatch form submitted successfully!", {
+            toast.success("Courier dispatched successfully!", {
                 id: toastId,
                 description: `Docket #${data.docket_no} has been recorded.`,
-                action: {
-                    label: "View All",
-                    onClick: () => navigate("/courier"),
-                },
             });
 
-            navigate("/courier");
-        } catch (error) {
-            toast.error("Failed to submit courier dispatch form", {
+            navigate(paths.shared.couriers);
+        } catch (error: any) {
+            toast.error(error.message || "Failed to dispatch courier", {
                 id: toastId,
                 description: "Please check your connection and try again.",
-                action: {
-                    label: "Retry",
-                    onClick: () => handleSubmit(onSubmit)(),
-                },
             });
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
+    // Handle file selection
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0];
-        if (selectedFile) {
-            // Validate file type
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/gif",
-                "text/plain",
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            ];
 
-            if (!allowedTypes.includes(selectedFile.type)) {
-                toast.error("Invalid file type", {
-                    description: "Please select a valid file type (images, PDF, Word, PowerPoint, or text files).",
-                });
-                event.target.value = ""; // Reset input
-                return;
-            }
+        if (!selectedFile) return;
 
-            // Validate file size (25MB)
-            if (selectedFile.size > 25 * 1024 * 1024) {
-                toast.error("File too large", {
-                    description: "File size must be less than 25MB.",
-                });
-                event.target.value = ""; // Reset input
-                return;
-            }
-
-            setFile(selectedFile);
-            toast.success("File selected", {
-                description: `${selectedFile.name} has been selected for upload.`,
+        // Validate file type
+        if (!ALLOWED_FILE_TYPES.includes(selectedFile.type)) {
+            toast.error("Invalid file type", {
+                description: "Please select an image, PDF, or Word document.",
             });
+            event.target.value = "";
+            return;
         }
-    };
 
-    const removeFile = () => {
-        setFile(null);
-        setValue("docket_slip", undefined as any);
-        toast.info("File removed", {
-            description: "Docket slip file has been removed.",
+        // Validate file size
+        if (selectedFile.size > MAX_FILE_SIZE) {
+            toast.error("File too large", {
+                description: "File size must be less than 25MB.",
+            });
+            event.target.value = "";
+            return;
+        }
+
+        setFile(selectedFile);
+        toast.success("File selected", {
+            description: `${selectedFile.name} ready for upload.`,
         });
     };
+
+    // Remove selected file
+    const removeFile = () => {
+        setFile(null);
+        // Reset file input
+        const fileInput = document.getElementById("docket_slip") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        toast.info("File removed");
+    };
+
+    // Format file size
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    // Loading state
+    if (courierLoading) {
+        return (
+            <div className="container mx-auto py-6 space-y-6">
+                <div className="flex items-center space-x-4">
+                    <Skeleton className="h-9 w-24" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-64" />
+                        <Skeleton className="h-4 w-48" />
+                    </div>
+                </div>
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-96 w-full" />
+            </div>
+        );
+    }
+
+    // Error state
+    if (courierError || !courier) {
+        return (
+            <div className="container mx-auto py-6">
+                <Card>
+                    <CardContent className="py-12 text-center">
+                        <p className="text-muted-foreground mb-4">{courierError ? "Failed to load courier details" : "Courier not found"}</p>
+                        <Button onClick={() => navigate(paths.shared.couriers)}>
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Back to Couriers
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto py-6 space-y-6">
@@ -161,7 +197,7 @@ const CourierDispatchForm = () => {
                     </Button>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Courier Dispatch Form</h1>
-                        <p className="text-muted-foreground">Dispatch details for {courierData.reference_no}</p>
+                        <p className="text-muted-foreground">Dispatch details for Courier #{courier.id}</p>
                     </div>
                 </div>
             </div>
@@ -169,11 +205,42 @@ const CourierDispatchForm = () => {
             {/* Courier Info Card */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Courier Information</CardTitle>
-                    <CardDescription>
-                        Reference: {courierData.reference_no} | Recipient: {courierData.recipient_name} | Destination: {courierData.destination}
-                    </CardDescription>
+                    <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Courier Information
+                    </CardTitle>
                 </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                Recipient
+                            </p>
+                            <p className="font-medium">{courier.to_name}</p>
+                            <p className="text-sm text-muted-foreground">{courier.to_org}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                Destination
+                            </p>
+                            <p className="font-medium">{courier.to_addr}</p>
+                            <p className="text-sm text-muted-foreground">PIN: {courier.to_pin}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Expected Delivery
+                            </p>
+                            <p className="font-medium">{format(new Date(courier.del_date), "PPP")}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">Contact</p>
+                            <p className="font-medium">{courier.to_mobile}</p>
+                        </div>
+                    </div>
+                </CardContent>
             </Card>
 
             {/* Dispatch Form */}
@@ -184,80 +251,97 @@ const CourierDispatchForm = () => {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                        <input type="hidden" name="id" value={id} />
-
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {/* Courier Provider */}
                             <div className="space-y-2">
-                                <Label htmlFor="courier_provider">Courier Provider</Label>
-                                <Input id="courier_provider" placeholder="Enter courier provider name" {...register("courier_provider")} />
+                                <Label htmlFor="courier_provider">
+                                    Courier Provider <span className="text-destructive">*</span>
+                                </Label>
+                                <Input id="courier_provider" placeholder="e.g., BlueDart, DTDC, FedEx" {...register("courier_provider")} disabled={isSubmitting} />
                                 {errors.courier_provider && <p className="text-sm text-destructive">{errors.courier_provider.message}</p>}
                             </div>
 
                             {/* Pickup Date and Time */}
                             <div className="space-y-2">
-                                <Label htmlFor="pickup_date">Pickup Date and Time</Label>
-                                <Input id="pickup_date" type="datetime-local" {...register("pickup_date")} />
+                                <Label htmlFor="pickup_date">
+                                    Pickup Date and Time <span className="text-destructive">*</span>
+                                </Label>
+                                <Input id="pickup_date" type="datetime-local" {...register("pickup_date")} disabled={isSubmitting} />
                                 {errors.pickup_date && <p className="text-sm text-destructive">{errors.pickup_date.message}</p>}
                             </div>
 
                             {/* Docket Number */}
                             <div className="space-y-2">
-                                <Label htmlFor="docket_no">Docket No</Label>
-                                <Input id="docket_no" placeholder="Enter docket number" {...register("docket_no")} />
+                                <Label htmlFor="docket_no">
+                                    Docket No <span className="text-destructive">*</span>
+                                </Label>
+                                <Input id="docket_no" placeholder="Enter docket/AWB number" {...register("docket_no")} disabled={isSubmitting} />
                                 {errors.docket_no && <p className="text-sm text-destructive">{errors.docket_no.message}</p>}
                             </div>
                         </div>
 
                         {/* Docket Slip File Upload */}
                         <div className="space-y-4">
-                            <Label htmlFor="docket_slip">Docket Slip</Label>
+                            <Label htmlFor="docket_slip">
+                                Docket Slip <span className="text-muted-foreground">(Optional)</span>
+                            </Label>
 
                             {!file ? (
-                                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer">
+                                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
                                     <Input
                                         id="docket_slip"
                                         type="file"
                                         className="hidden"
-                                        accept=".jpg,.jpeg,.png,.gif,.txt,.pdf,.doc,.docx,.ppt,.pptx"
+                                        accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
                                         onChange={handleFileChange}
+                                        disabled={isSubmitting}
                                     />
                                     <Label htmlFor="docket_slip" className="cursor-pointer flex flex-col items-center justify-center space-y-2">
                                         <Upload className="h-8 w-8 text-muted-foreground" />
                                         <div className="text-sm text-muted-foreground">
-                                            <span className="font-medium">Click to upload</span> or drag and drop
+                                            <span className="font-medium text-primary">Click to upload</span> or drag and drop
                                         </div>
-                                        <div className="text-xs text-muted-foreground">Supports: Images, PDF, Word, PowerPoint, Text files (Max 25MB)</div>
+                                        <div className="text-xs text-muted-foreground">Images, PDF, or Word documents (Max 25MB)</div>
                                     </Label>
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
                                     <div className="flex items-center space-x-3">
-                                        <FileText className="h-8 w-8 text-blue-500" />
+                                        <div className="p-2 bg-blue-100 rounded-lg">
+                                            <FileText className="h-6 w-6 text-blue-600" />
+                                        </div>
                                         <div>
-                                            <p className="font-medium">{file.name}</p>
-                                            <p className="text-sm text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                            <p className="font-medium text-sm">{file.name}</p>
+                                            <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                                         </div>
                                     </div>
-                                    <Button type="button" variant="outline" size="sm" onClick={removeFile}>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={removeFile}
+                                        disabled={isSubmitting}
+                                        className="text-destructive hover:text-destructive"
+                                    >
                                         Remove
                                     </Button>
                                 </div>
                             )}
-
-                            {errors.docket_slip && <p className="text-sm text-destructive">{errors.docket_slip.message}</p>}
                         </div>
 
                         {/* Submit Button */}
-                        <div className="flex justify-end pt-4">
-                            <Button type="submit" disabled={isSubmitting} className="flex items-center space-x-2 min-w-24">
+                        <div className="flex justify-end gap-4 pt-4 border-t">
+                            <Button type="button" variant="outline" onClick={() => navigate(paths.shared.couriers)} disabled={isSubmitting}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting} className="min-w-32">
                                 {isSubmitting ? (
                                     <>
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                        <span>Submitting...</span>
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                                        Dispatching...
                                     </>
                                 ) : (
-                                    <span>Submit</span>
+                                    "Dispatch Courier"
                                 )}
                             </Button>
                         </div>

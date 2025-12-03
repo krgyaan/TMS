@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { courierApi } from "@/services/courier.service";
-import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput } from "@/types/courier.types";
+import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput } from "@/types/courier.types";
 
 // Query keys
 export const courierKeys = {
@@ -120,6 +120,31 @@ export const useUpdateCourierStatus = () => {
 };
 
 /**
+ * Create dispatch info
+ */
+
+export const useCreateCourierDispatch = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: CreateDispatchInput }) => courierApi.createDispatch(id, data),
+
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: courierKeys.all });
+            queryClient.invalidateQueries({ queryKey: courierKeys.detail(variables.id) });
+            toast.success("Dispatch request created successfully");
+        },
+
+        onError: (error: any) => {
+            const backendMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message;
+
+            const finalMessage = Array.isArray(backendMessage) ? backendMessage[0] : backendMessage || "Failed to dispatch courier";
+
+            toast.error(finalMessage);
+        },
+    });
+};
+/**
  * Update dispatch info
  */
 export const useUpdateCourierDispatch = () => {
@@ -137,8 +162,9 @@ export const useUpdateCourierDispatch = () => {
     });
 };
 
-// Upload courier documents
-
+/**
+ * Upload courier documents
+ */
 export const useUploadCourierDocs = () => {
     const queryClient = useQueryClient();
 

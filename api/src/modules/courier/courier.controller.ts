@@ -1,5 +1,5 @@
 // src/modules/courier/courier.controller.ts
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile } from "@nestjs/common";
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException } from "@nestjs/common";
 import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
@@ -8,6 +8,26 @@ import { CourierService } from "./courier.service";
 import type { CreateCourierDto } from "./zod/create-courier.schema";
 import type { UpdateCourierDto } from "./zod/update-courier.schema";
 import { CurrentUser } from "../../decorators/current-user.decorator";
+
+// Allowed file types
+const ALLOWED_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+// File filter function
+const fileFilter = (req: any, file: Express.Multer.File, callback: (error: Error | null, acceptFile: boolean) => void) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        callback(null, true);
+    } else {
+        callback(new BadRequestException(`Invalid file type: ${file.mimetype}. Allowed types: images, PDF, Word documents.`), false);
+    }
+};
 
 // Multer config
 const multerConfig = {
@@ -35,6 +55,22 @@ const podMulterConfig = {
     }),
 };
 
+// Multer config for docket slip
+const docketSlipMulterConfig = {
+    storage: diskStorage({
+        destination: "./uploads/couriers/docket-slips",
+        filename: (req, file, callback) => {
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            callback(null, `docket-${uniqueSuffix}${ext}`);
+        },
+    }),
+    limits: {
+        fileSize: 25 * 1024 * 1024,
+    },
+    fileFilter,
+};
+
 @Controller("couriers")
 export class CourierController {
     constructor(private readonly service: CourierService) {}
@@ -42,6 +78,22 @@ export class CourierController {
     @Post()
     create(@Body() body: CreateCourierDto, @CurrentUser("id") userId: number) {
         return this.service.create(body, userId);
+    }
+
+    @Post(":id/dispatch")
+    @UseInterceptors(FileInterceptor("docket_slip", docketSlipMulterConfig))
+    createDispatch(
+        @Param("id", ParseIntPipe) id: number,
+        @Body()
+        body: {
+            courier_provider: string;
+            docket_no: string;
+            pickup_date: string;
+        },
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @CurrentUser("id") userId: number
+    ) {
+        return this.service.createDispatch(id, body, file, userId);
     }
 
     // Get all couriers for logged-in user

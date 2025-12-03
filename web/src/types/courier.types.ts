@@ -4,6 +4,12 @@ export type CourierDoc = {
     type: "image" | "file";
 };
 
+// export type DocketSlip = {
+//     url: string;
+//     name: string;
+//     type: "image" | "file";
+// };
+
 export type Courier = {
     id: number;
     user_id: number;
@@ -47,6 +53,13 @@ export type UpdateStatusInput = {
     within_time?: boolean;
 };
 
+export type CreateDispatchInput = {
+    courier_provider: string;
+    docket_no: string;
+    pickup_date: string;
+    docket_slip?: File;
+};
+
 export type UpdateDispatchInput = {
     courier_provider: string;
     docket_no: string;
@@ -68,6 +81,16 @@ export type CourierDashboardData = {
     };
 };
 
+export type CourierDetails = Courier & {
+    created_by_name: string | null;
+    created_by_email: string | null;
+    sender: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+};
+
 // Status constants (must match backend)
 export const COURIER_STATUS = {
     PENDING: 0,
@@ -78,9 +101,9 @@ export const COURIER_STATUS = {
 } as const;
 
 export const COURIER_STATUS_LABELS: Record<number, string> = {
-    [COURIER_STATUS.PENDING]: "Pending",
-    [COURIER_STATUS.DISPATCHED]: "Dispatched",
-    [COURIER_STATUS.NOT_DELIVERED]: "Not Delivered",
+    [COURIER_STATUS.PENDING]: "In Transit",
+    [COURIER_STATUS.DISPATCHED]: "Out for delivery",
+    [COURIER_STATUS.NOT_DELIVERED]: "Address incorrect/Not delivered/Returned",
     [COURIER_STATUS.DELIVERED]: "Delivered",
     [COURIER_STATUS.REJECTED]: "Rejected",
 };

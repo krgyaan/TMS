@@ -1,5 +1,5 @@
 // src/modules/courier/courier.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, and, desc } from "drizzle-orm";
 
 import { DRIZZLE } from "../../db/database.module";
@@ -9,6 +9,9 @@ import { users } from "../../db/users.schema";
 
 import type { CreateCourierDto } from "./zod/create-courier.schema";
 import type { UpdateCourierDto } from "./zod/update-courier.schema";
+import type { DispatchCourierDto } from "./zod/dispatch-courier.schema";
+
+import { MailerService } from "src/mailer/mailer.service";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -19,12 +22,37 @@ export const COURIER_STATUS = {
     REJECTED: 4,
 } as const;
 
+interface CourierDoc {
+    url: string;
+    name: string;
+    type: "image" | "file";
+}
+
 @Injectable()
 export class CourierService {
     constructor(
         @Inject(DRIZZLE)
-        private readonly db: DbInstance
+        private readonly db: DbInstance,
+        private readonly mailer: MailerService
     ) {}
+
+    private validateDispatchData(dispatchData: DispatchCourierDto): void {
+        if (!dispatchData.courier_provider?.trim()) {
+            throw new BadRequestException("Courier provider is required");
+        }
+        if (!dispatchData.docket_no?.trim()) {
+            throw new BadRequestException("Docket number is required");
+        }
+        if (!dispatchData.pickup_date) {
+            throw new BadRequestException("Pickup date is required");
+        }
+
+        // Validate pickup_date is a valid date
+        const pickupDate = new Date(dispatchData.pickup_date);
+        if (isNaN(pickupDate.getTime())) {
+            throw new BadRequestException("Invalid pickup date format");
+        }
+    }
 
     async create(data: CreateCourierDto, userId: number) {
         const result = await this.db
@@ -43,6 +71,14 @@ export class CourierService {
                 status: COURIER_STATUS.PENDING,
             })
             .returning();
+
+        const mail = await this.mailer.sendMail({
+            to: "abhijeetgaur.dev@gmail.com",
+            subject: "Welcome!",
+            html: "<h1>Hello!</h1><p>You are registered.</p>",
+        });
+
+        console.log(mail);
 
         return result[0];
     }
@@ -227,6 +263,49 @@ export class CourierService {
 
         const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
 
+        return result[0];
+    }
+
+    /**
+     * Dispatch with docket slip file (POST endpoint)
+     */
+    async createDispatch(id: number, dispatchData: DispatchCourierDto, file: Express.Multer.File | undefined, userId: number) {
+        const existing = await this.findOne(id);
+
+        if (!existing) {
+            throw new NotFoundException("Courier not found");
+        }
+
+        // Validate dispatch data
+        this.validateDispatchData(dispatchData);
+
+        // Prepare update data
+        const updateData: Record<string, any> = {
+            courier_provider: dispatchData.courier_provider.trim(),
+            docket_no: dispatchData.docket_no.trim(),
+            pickup_date: new Date(dispatchData.pickup_date),
+            status: COURIER_STATUS.DISPATCHED,
+            updated_at: new Date(),
+        };
+
+        console.log("FILE RECEIVED:", file);
+
+        // If file is uploaded, add it to courier_docs
+        if (file) {
+            console.log("FILE RECEIVED:", file);
+            const newDoc: CourierDoc = {
+                url: `/uploads/couriers/docket-slips/${file.filename}`,
+                name: file.originalname,
+                type: file.mimetype.startsWith("image/") ? "image" : "file",
+            };
+
+            const existingDocs = (existing.courier_docs as CourierDoc[]) || [];
+            updateData.courier_docs = [...existingDocs, newDoc];
+        }
+
+        const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
+
+        console.log(result);
         return result[0];
     }
 

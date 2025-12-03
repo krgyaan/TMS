@@ -1,6 +1,15 @@
 // src/api/courier.api.ts
 import api from "@/lib/axios";
-import type { Courier, CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CourierDashboardData } from "@/types/courier.types";
+import type {
+    Courier,
+    CourierDetails,
+    CreateCourierInput,
+    UpdateCourierInput,
+    UpdateStatusInput,
+    UpdateDispatchInput,
+    CourierDashboardData,
+    CreateDispatchInput,
+} from "@/types/courier.types";
 
 const ENDPOINT = "/couriers";
 
@@ -35,6 +44,11 @@ export const courierApi = {
         return response.data;
     },
 
+    getByIdWithDetails: async (id: number): Promise<CourierDetails> => {
+        const response = await api.get(`${ENDPOINT}/${id}/details`);
+        return response.data;
+    },
+
     // Create courier
     create: async (data: CreateCourierInput): Promise<Courier> => {
         const response = await api.post(ENDPOINT, data);
@@ -50,6 +64,27 @@ export const courierApi = {
     // Update status
     updateStatus: async (id: number, data: UpdateStatusInput): Promise<Courier> => {
         const response = await api.patch(`${ENDPOINT}/${id}/status`, data);
+        return response.data;
+    },
+
+    // Create dispatch info
+    createDispatch: async (id: number, data: CreateDispatchInput): Promise<Courier> => {
+        const formData = new FormData();
+
+        formData.append("courier_provider", data.courier_provider);
+        formData.append("docket_no", data.docket_no);
+        formData.append("pickup_date", data.pickup_date);
+
+        if (data.docket_slip) {
+            formData.append("docket_slip", data.docket_slip);
+        }
+
+        const response = await api.post(`${ENDPOINT}/${id}/dispatch`, formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+
         return response.data;
     },
 
