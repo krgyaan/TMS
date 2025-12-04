@@ -4,6 +4,7 @@ export * from './oauth-accounts.schema';
 export * from './roles.schema';
 export * from './designations.schema';
 export * from './teams.schema';
+export * from './employee-imprests.schema';
 export * from './imprest-categories.schema';
 export * from './followup-categories.schema';
 export * from './documents-submitted.schema';

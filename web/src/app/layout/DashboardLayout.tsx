@@ -2,28 +2,17 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { DocumentTitle } from "@/components/document-title";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbList,
-    BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import {
-    SidebarFooter,
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Outlet } from "react-router-dom"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarFooter, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Outlet } from "react-router-dom";
 
 export default function DashboardLayout() {
-
     return (
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-                <DocumentTitle title={'Dashboard - TMS'} />
+                <DocumentTitle title={"Dashboard - TMS"} />
                 <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-accent">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1 cursor-pointer" />
@@ -46,9 +35,7 @@ export default function DashboardLayout() {
                     </div>
                     <SidebarFooter className="min-h-[60px] absolute bg-card bottom-0 left-0 right-0 p-4 border-t">
                         <div className="flex justify-center items-center">
-                            <span className="text-sm text-muted-foreground py-2">
-                                Copyright © 2025 Volks Energie. All rights reserved.
-                            </span>
+                            <span className="text-sm text-muted-foreground py-2">Copyright © 2025 Volks Energie. All rights reserved.</span>
                         </div>
                     </SidebarFooter>
                 </div>

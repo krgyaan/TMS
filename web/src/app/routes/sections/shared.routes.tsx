@@ -7,7 +7,10 @@ const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-ups/create
 const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-ups/edit"));
 const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-ups/show"));
 const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
+const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/dispatch"));
+const CourierCreatePage = lazy(() => import("@/modules/shared/courier/create"));
 const Shared_Imprest = lazy(() => import("@/modules/shared/imprests"));
+const ImprestCreatePage = lazy(() => import("@/modules/shared/imprests/create"));
 
 export default function SharedRoutes() {
     return (
@@ -32,6 +35,8 @@ export default function SharedRoutes() {
                     </RouteWrapper>
                 }
             />
+            <Route path="couriers/dispatch" element={<CourierDispatchPage />} />
+            <Route path="couriers/create" element={<CourierCreatePage />} />
             <Route
                 path="imprests"
                 element={
@@ -40,6 +45,7 @@ export default function SharedRoutes() {
                     </RouteWrapper>
                 }
             />
+            <Route path="imprests/create" element={<ImprestCreatePage />} />
         </Routes>
     );
 }

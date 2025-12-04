@@ -115,7 +115,7 @@ const CourierDashboard: React.FC = () => {
             icon: <RefreshCw className="h-4 w-4" />,
             onClick: (row: CourierRow) => {
                 // Equivalent to: route('courier.despatch', $courier->id)
-                navigate(`/courier/dispatch/${row.id}`);
+                navigate(paths.shared.courierDispatch);
             },
         },
         {
@@ -216,7 +216,7 @@ const CourierDashboard: React.FC = () => {
                     <CardTitle>Courier Dashboard</CardTitle>
                     <CardDescription>Manage courier requests and statuses</CardDescription>
                 </div>
-                <Button onClick={() => navigate(paths.shared.followUpsCreate)}>Create Courier</Button>
+                <Button onClick={() => navigate(paths.shared.courierCreate)}>Create Courier</Button>
             </CardHeader>
 
             <CardContent>
@@ -287,11 +287,7 @@ const CourierDashboard: React.FC = () => {
                             <div className="delivery grid gap-3">
                                 <div className="grid gap-2">
                                     <label className="text-sm font-medium">Delivery Date & Time</label>
-                                    <Input
-                                        type="datetime-local"
-                                        value={deliveryDate ?? ""}
-                                        onChange={e => setDeliveryDate(e.target.value)}
-                                    />
+                                    <Input type="datetime-local" value={deliveryDate ?? ""} onChange={e => setDeliveryDate(e.target.value)} />
                                 </div>
 
                                 <div className="grid gap-2">

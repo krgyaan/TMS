@@ -215,11 +215,7 @@ export default function CreateFollowUpPage() {
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium mb-1">Organisation Name</label>
-                                <Input
-                                    value={partyName}
-                                    onChange={e => setPartyName(e.target.value)}
-                                    placeholder="Organisation name"
-                                />
+                                <Input value={partyName} onChange={e => setPartyName(e.target.value)} placeholder="Organisation name" />
                             </div>
                         </div>
 
@@ -241,38 +237,18 @@ export default function CreateFollowUpPage() {
 
                             <div className="space-y-3">
                                 {contactPersons.map((cp, idx) => (
-                                    <div
-                                        key={cp.id}
-                                        className={cn(
-                                            "grid grid-cols-1 md:grid-cols-12 gap-3 items-end",
-                                            "border rounded-md p-3"
-                                        )}
-                                    >
+                                    <div key={cp.id} className={cn("grid grid-cols-1 md:grid-cols-12 gap-3 items-end", "border rounded-md p-3")}>
                                         <div className="md:col-span-4">
                                             <label className="block text-xs font-medium mb-1">Name</label>
-                                            <Input
-                                                value={cp.name}
-                                                onChange={e => updateContactPerson(cp.id, "name", e.target.value)}
-                                                placeholder={`Contact ${idx + 1} name`}
-                                            />
+                                            <Input value={cp.name} onChange={e => updateContactPerson(cp.id, "name", e.target.value)} placeholder={`Contact ${idx + 1} name`} />
                                         </div>
                                         <div className="md:col-span-4">
                                             <label className="block text-xs font-medium mb-1">Email</label>
-                                            <Input
-                                                value={cp.email}
-                                                onChange={e => updateContactPerson(cp.id, "email", e.target.value)}
-                                                placeholder="Email"
-                                                type="email"
-                                            />
+                                            <Input value={cp.email} onChange={e => updateContactPerson(cp.id, "email", e.target.value)} placeholder="Email" type="email" />
                                         </div>
                                         <div className="md:col-span-3">
                                             <label className="block text-xs font-medium mb-1">Phone</label>
-                                            <Input
-                                                value={cp.phone}
-                                                onChange={e => updateContactPerson(cp.id, "phone", e.target.value)}
-                                                placeholder="Phone"
-                                                type="tel"
-                                            />
+                                            <Input value={cp.phone} onChange={e => updateContactPerson(cp.id, "phone", e.target.value)} placeholder="Phone" type="tel" />
                                         </div>
                                         <div className="md:col-span-1 flex justify-end">
                                             <Button
@@ -299,9 +275,7 @@ export default function CreateFollowUpPage() {
                                     </div>
                                 ))}
                             </div>
-                            {errors.contact_persons && (
-                                <p className="mt-2 text-sm text-red-600">{errors.contact_persons}</p>
-                            )}
+                            {errors.contact_persons && <p className="mt-2 text-sm text-red-600">{errors.contact_persons}</p>}
                         </div>
 
                         {/* Other fields row */}
@@ -324,13 +298,7 @@ export default function CreateFollowUpPage() {
 
                             <div>
                                 <label className="block text-sm font-medium mb-1">Amount Involved</label>
-                                <Input
-                                    value={amount}
-                                    onChange={e => setAmount(e.target.value)}
-                                    placeholder="0.00"
-                                    type="number"
-                                    step="any"
-                                />
+                                <Input value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" type="number" step="any" />
                             </div>
 
                             <div>
@@ -347,21 +315,14 @@ export default function CreateFollowUpPage() {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.assigned_to && (
-                                    <p className="mt-1 text-xs text-red-600">{errors.assigned_to}</p>
-                                )}
+                                {errors.assigned_to && <p className="mt-1 text-xs text-red-600">{errors.assigned_to}</p>}
                             </div>
                         </div>
 
                         {/* Comment */}
                         <div className="mt-6">
                             <label className="block text-sm font-medium mb-1">Comment</label>
-                            <Textarea
-                                value={comment}
-                                onChange={e => setComment(e.target.value)}
-                                rows={3}
-                                placeholder="Add comment for assignee."
-                            />
+                            <Textarea value={comment} onChange={e => setComment(e.target.value)} rows={3} placeholder="Add comment for assignee." />
                         </div>
 
                         {/* Submit */}
