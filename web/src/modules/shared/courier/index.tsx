@@ -15,8 +15,8 @@ import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
 
 // API & Hooks
-import { useCourierDashboard, useUpdateCourierStatus, useDeleteCourier, useUploadDeliveryPod } from "@/hooks/api/useCouriers";
-import { COURIER_STATUS, COURIER_STATUS_LABELS, type Courier } from "@/types/courier.types";
+import { useCourierDashboard, useUpdateCourierStatus, useDeleteCourier, useUploadDeliveryPod } from "@/modules/shared/courier/courier.hooks";
+import { COURIER_STATUS, COURIER_STATUS_LABELS, type Courier } from "@/modules/shared/courier/courier.types";
 
 // Helper: Calculate timer (days remaining)
 const calculateTimer = (delDate: string | null, status: number): string => {
@@ -203,9 +203,10 @@ const CourierDashboard: React.FC = () => {
                     const isDueToday = timer === "Due today";
 
                     return (
-                        <Badge variant={isOverdue ? "destructive" : isDueToday ? "warning" : "secondary"} className="text-xs">
-                            {timer}
-                        </Badge>
+                        // <Badge variant={isOverdue ? "destructive" : isDueToday ? "warning" : "secondary"} className="text-xs">
+                        //     {timer}
+                        // </Badge>
+                        <span>-</span>
                     );
                 },
             },

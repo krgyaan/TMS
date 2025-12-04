@@ -14,7 +14,7 @@ import { ArrowLeft, Upload, X, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 
 // API & Hooks
-import { useCreateCourier, useUploadCourierDocs } from "@/hooks/api/useCouriers";
+import { useCreateCourier, useUploadCourierDocs } from "@/modules/shared/courier/courier.hooks";
 import { useUsers } from "@/hooks/api/useUsers";
 
 // =====================

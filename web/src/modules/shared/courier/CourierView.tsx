@@ -26,7 +26,7 @@ import {
     Pencil,
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCourier } from "@/hooks/api/useCouriers";
+import { useCourier } from "@/modules/shared/courier/courier.hooks";
 
 // Modern styling constants
 const MODERN_STYLES = {

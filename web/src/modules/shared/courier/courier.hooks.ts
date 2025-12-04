@@ -1,8 +1,8 @@
 // src/hooks/use-couriers.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { courierApi } from "@/services/courier.service";
-import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput } from "@/types/courier.types";
+import { courierApi } from "@/modules/shared/courier/courier.service";
+import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput } from "@/modules/shared/courier/courier.types";
 
 // Query keys
 export const courierKeys = {

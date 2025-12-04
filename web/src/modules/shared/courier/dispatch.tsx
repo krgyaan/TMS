@@ -12,8 +12,8 @@ import { paths } from "@/app/routes/paths";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import * as z from "zod";
-import { useCourier, useCreateCourierDispatch } from "@/hooks/api/useCouriers";
-import { COURIER_STATUS } from "@/types/courier.types";
+import { useCourier, useCreateCourierDispatch } from "@/modules/shared/courier/courier.hooks";
+import { COURIER_STATUS } from "@/modules/shared/courier/courier.types";
 import { format } from "date-fns";
 
 // Validation schema

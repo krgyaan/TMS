@@ -1,3 +1,5 @@
+import { id } from "date-fns/locale";
+
 export const paths = {
     // ==================== AUTH ====================
     auth: {
@@ -26,22 +28,22 @@ export const paths = {
         tenderApproval: "/tendering/tender-approval",
         tenderApprovalCreate: (tenderId: number | string) => `/tendering/tender-approval/create/${tenderId}`,
         tenderApprovalView: (tenderId: number | string) => `/tendering/tender-approval/${tenderId}`,
-        physicalDocs: '/tendering/physical-docs',
+        physicalDocs: "/tendering/physical-docs",
         physicalDocsCreate: (tenderId: number | string) => `/tendering/physical-docs/create/${tenderId}`,
         physicalDocsEdit: (tenderId: number | string) => `/tendering/physical-docs/${tenderId}/edit`,
         physicalDocsView: (tenderId: number | string) => `/tendering/physical-docs/${tenderId}`,
-        rfqs: '/tendering/rfqs',
+        rfqs: "/tendering/rfqs",
         rfqsCreate: (tenderId: number | string) => `/tendering/rfqs/create/${tenderId}`,
         rfqsEdit: (tenderId: number | string) => `/tendering/rfqs/${tenderId}/edit`,
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
-        emdsTenderFees: '/tendering/emds-tenderfees',
-        checklists: '/tendering/checklists',
-        costingSheets: '/tendering/costing-sheets',
-        costingApproval: '/tendering/costing-approval',
-        bidSubmissions: '/tendering/bid-submissions',
-        tqs: '/tendering/tqs',
-        ras: '/tendering/ras',
-        results: '/tendering/results',
+        emdsTenderFees: "/tendering/emds-tenderfees",
+        checklists: "/tendering/checklists",
+        costingSheets: "/tendering/costing-sheets",
+        costingApproval: "/tendering/costing-approval",
+        bidSubmissions: "/tendering/bid-submissions",
+        tqs: "/tendering/tqs",
+        ras: "/tendering/ras",
+        results: "/tendering/results",
     },
 
     // ==================== OPERATIONS ====================
@@ -216,10 +218,16 @@ export const paths = {
         followUpsCreate: "/shared/follow-ups/create",
         followUpsEdit: "/shared/follow-up/edit",
         followUpsShow: "/shared/follow-up/show",
+
         couriers: "/shared/couriers",
         courierDispatch: "/shared/couriers/dispatch",
         courierCreate: "/shared/couriers/create",
-        imprests: "/shared/imprests",
-        createImprests: "/shared/imprests/create",
+        courierView: (id: number) => `/shared/couriers/show/${id}`,
+        courierEdit: (id: number) => `/shared/couriers/edit/${id}`,
+
+        imprest: "/shared/imprests",
+        imprestCreate: "/shared/imprests/create",
+        ImprestPaymentHistory: `/shared/imprests/payment-history/${id}`,
+        ImprestVoucher: `/shared/imprests/payment-voucher/${id}`,
     },
 };

@@ -9,7 +9,7 @@ import type {
     UpdateDispatchInput,
     CourierDashboardData,
     CreateDispatchInput,
-} from "@/types/courier.types";
+} from "@/modules/shared/courier/courier.types";
 
 const ENDPOINT = "/couriers";
 

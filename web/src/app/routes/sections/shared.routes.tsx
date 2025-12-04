@@ -1,20 +1,32 @@
+// src/routes/SharedRoutes.tsx (or wherever your file is)
 import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
-const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-ups"));
-const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-ups/create"));
-const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-ups/edit"));
-const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-ups/show"));
+// Follow-ups
+const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up"));
+const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-up/create"));
+const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/edit"));
+const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/show"));
+
+// Courier
 const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
-const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/dispatch"));
 const CourierCreatePage = lazy(() => import("@/modules/shared/courier/create"));
-const Shared_Imprest = lazy(() => import("@/modules/shared/imprests"));
-const ImprestCreatePage = lazy(() => import("@/modules/shared/imprests/create"));
+const CourierDispatchPage = lazy(() => import("@/modules/shared/courier/dispatch"));
+const CourierViewPage = lazy(() => import("@/modules/shared/courier/CourierView"));
+const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"));
+
+// Imprests
+const Shared_Imprest = lazy(() => import("@/modules/shared/imprest"));
+const ImprestCreatePage = lazy(() => import("@/modules/shared/imprest/create"));
+const ImprestPaymentHistoryPage = lazy(() => import("@/modules/shared/imprest/ImprestPaymentHistory"));
+const ImprestVoucherPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucher"));
+// const ImprestViewPage = lazy(() => import("@/modules/shared/imprests/show"));
 
 export default function SharedRoutes() {
     return (
         <Routes>
+            {/* Follow-ups Routes */}
             <Route
                 path="follow-ups"
                 element={
@@ -24,9 +36,9 @@ export default function SharedRoutes() {
                 }
             />
             <Route path="follow-ups/create" element={<FollowUpCreatePage />} />
-            <Route path="follow-up/edit" element={<FollowUpEditPage />} />
-            <Route path="follow-up/show" element={<FollowUpShowPage />} />
-            //Courier Routes
+            <Route path="follow-ups/edit/:id" element={<FollowUpEditPage />} />
+            <Route path="follow-ups/show/:id" element={<FollowUpShowPage />} />
+            {/* Courier Routes */}
             <Route
                 path="couriers"
                 element={
@@ -35,8 +47,11 @@ export default function SharedRoutes() {
                     </RouteWrapper>
                 }
             />
-            <Route path="couriers/dispatch" element={<CourierDispatchPage />} />
             <Route path="couriers/create" element={<CourierCreatePage />} />
+            <Route path="couriers/show/:id" element={<CourierViewPage />} />
+            <Route path="couriers/edit/:id" element={<CourierEditPage />} />
+            <Route path="couriers/dispatch/:id" element={<CourierDispatchPage />} />
+            {/* Imprests Routes */}
             <Route
                 path="imprests"
                 element={
@@ -46,6 +61,9 @@ export default function SharedRoutes() {
                 }
             />
             <Route path="imprests/create" element={<ImprestCreatePage />} />
+            <Route path="imprests/payment-history/:id" element={<ImprestPaymentHistoryPage />} />
+            <Route path="/shared/imprests/payment-voucher/:id" element={<ImprestVoucherPage />} />
+            {/* <Route path="imprests/show/:id" element={<ImprestViewPage />} /> */}
         </Routes>
     );
 }
