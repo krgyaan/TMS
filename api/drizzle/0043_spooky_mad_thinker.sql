@@ -1,0 +1,2 @@
+ALTER TABLE "rfq_response_items" ADD COLUMN "item_id" bigint NOT NULL;--> statement-breakpoint
+ALTER TABLE "rfq_response_items" ADD CONSTRAINT "rfq_response_items_item_id_rfq_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."rfq_items"("id") ON DELETE no action ON UPDATE no action;

@@ -1,47 +1,32 @@
-﻿import { useEffect, useState } from "react"
-import { Navigate, Outlet, useLocation } from "react-router-dom"
-import { useCurrentUser } from "@/hooks/api/useAuth"
-import { isAuthenticated, clearAuthSession } from "@/lib/auth"
+﻿import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useCurrentUser } from "@/hooks/api/useAuth";
+import { getStoredUser, clearAuthSession } from "@/lib/auth";
 
 export default function ProtectedRoute() {
-    const location = useLocation()
-    const [shouldFetch, setShouldFetch] = useState(false)
+    const location = useLocation();
+    const { data: user, isLoading, isError } = useCurrentUser();
 
-    // Check if we have local user data
-    const hasLocalAuth = isAuthenticated()
+    const storedUser = getStoredUser();
 
-    // Only fetch current user if we have local data
-    // (which means we might have a valid cookie)
-    const { data: user, isLoading, error } = useCurrentUser()
-
-    useEffect(() => {
-        if (!hasLocalAuth) {
-            setShouldFetch(false)
-            return
+    if (isLoading) {
+        if (!storedUser) {
+            return <Navigate to="/login" replace state={{ from: location }} />;
         }
-        setShouldFetch(true)
-    }, [hasLocalAuth])
 
-    // Loading state while checking authentication
-    if (hasLocalAuth && isLoading) {
         return (
-            <div className="flex h-screen w-screen items-center justify-center text-sm text-muted-foreground">
-                Restoring session... {shouldFetch}
+            <div className="flex h-screen w-screen items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                </div>
             </div>
-        )
+        );
     }
 
-    // If there's an error or no local auth, redirect to login
-    if (error || !hasLocalAuth) {
-        clearAuthSession()
-        return <Navigate to="/login" replace state={{ from: location }} />
+    if (isError || !user) {
+        clearAuthSession();
+        return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
-    // If we have a valid user, allow access
-    if (user) {
-        return <Outlet />
-    }
-
-    // Default: redirect to login
-    return <Navigate to="/login" replace state={{ from: location }} />
+    return <Outlet />;
 }

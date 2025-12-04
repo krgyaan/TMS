@@ -1,17 +1,32 @@
-﻿import { z } from "zod";
-import { Inject, Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import authConfig, { type AuthConfig } from "../../config/auth.config";
-import { UsersService, type SafeUser } from "../master/users/users.service";
-import { GoogleService } from "../integrations/google/google.service";
-
-type AuthSession = {
-    user: SafeUser;
-};
+import { z } from 'zod';
+import {
+    Inject,
+    Injectable,
+    UnauthorizedException,
+    BadRequestException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import authConfig, { type AuthConfig } from '../../config/auth.config';
+import { UsersService, type UserWithRelations } from '../master/users/users.service';
+import { GoogleService } from '../integrations/google/google.service';
+import { PermissionService } from './services/permission.service';
+import { DataScope } from '../../common/constants/roles.constant';
 
 type SessionWithToken = {
     accessToken: string;
-    user: SafeUser;
+    user: UserWithRelations & { permissions: string[] };
+};
+
+export type JwtPayload = {
+    sub: number;
+    email: string;
+    role: string | null;
+    roleId: number | null;
+    teamId: number | null;
+    dataScope: DataScope;
+    canSwitchTeams: boolean;
+    iat?: number;
+    exp?: number;
 };
 
 const GoogleLoginStateSchema = z.object({ purpose: z.literal("google-login") });
@@ -22,30 +37,40 @@ export class AuthService {
         @Inject(authConfig.KEY) private readonly config: AuthConfig,
         private readonly jwtService: JwtService,
         private readonly usersService: UsersService,
-        private readonly googleService: GoogleService
-    ) {}
+        private readonly googleService: GoogleService,
+        private readonly permissionService: PermissionService,
+    ) { }
 
     async loginWithPassword(email: string, password: string): Promise<SessionWithToken> {
         const user = await this.usersService.findByEmail(email);
         if (!user) {
             throw new UnauthorizedException("Invalid credentials");
         }
+
         const valid = await this.usersService.verifyPassword(user, password);
         if (!valid) {
             throw new UnauthorizedException("Invalid credentials");
         }
+
         if (!user.isActive) {
             throw new UnauthorizedException("Account is inactive");
         }
+
         return this.issueSession(user.id);
     }
 
-    async getProfile(userId: number): Promise<SafeUser> {
-        const user = await this.usersService.findById(userId);
+    async getProfile(userId: number): Promise<UserWithRelations & { permissions: string[] }> {
+        const user = await this.usersService.findDetailById(userId);
         if (!user) {
             throw new UnauthorizedException("User not found");
         }
-        return this.usersService.sanitizeUser(user);
+
+        const permissions = await this.permissionService.getUserPermissions(
+            userId,
+            user.role?.id ?? null
+        );
+
+        return { ...user, permissions };
     }
 
     async generateGoogleLoginUrl(): Promise<{ url: string }> {
@@ -89,11 +114,43 @@ export class AuthService {
         return this.issueSession(user.id);
     }
 
+    async refreshSession(userId: number): Promise<SessionWithToken> {
+        return this.issueSession(userId);
+    }
+
     private async issueSession(userId: number): Promise<SessionWithToken> {
-        const user = await this.usersService.ensureUser(userId);
-        const payload = { sub: user.id, email: user.email };
+        const userWithRelations = await this.usersService.findDetailById(userId);
+        if (!userWithRelations) {
+            throw new UnauthorizedException('User not found');
+        }
+
+        if (!userWithRelations.isActive) {
+            throw new UnauthorizedException('Account is inactive');
+        }
+
+        const authInfo = await this.usersService.getUserAuthInfo(userId);
+
+        const payload: JwtPayload = {
+            sub: userId,
+            email: userWithRelations.email,
+            role: authInfo?.roleName ?? null,
+            roleId: authInfo?.roleId ?? null,
+            teamId: authInfo?.primaryTeamId ?? null,
+            dataScope: authInfo?.dataScope ?? DataScope.SELF,
+            canSwitchTeams: authInfo?.canSwitchTeams ?? false,
+        };
+
         const accessToken = await this.jwtService.signAsync(payload);
-        const safeUser = this.usersService.sanitizeUser(user);
-        return { accessToken, user: safeUser };
+
+        // Get permissions for frontend
+        const permissions = await this.permissionService.getUserPermissions(
+            userId,
+            authInfo?.roleId ?? null
+        );
+
+        return {
+            accessToken,
+            user: { ...userWithRelations, permissions },
+        };
     }
 }

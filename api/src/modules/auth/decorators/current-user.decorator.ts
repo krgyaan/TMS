@@ -1,12 +1,16 @@
 ﻿import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
-import type { SafeUser } from '../../master/users/users.service';
+import type { ValidatedUser } from '../strategies/jwt.strategy';
 
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): SafeUser => {
-    const request = ctx
-      .switchToHttp()
-      .getRequest<Request & { user?: SafeUser }>();
-    return request.user as SafeUser;
-  },
+    (data: keyof ValidatedUser | undefined, ctx: ExecutionContext) => {
+        const request = ctx.switchToHttp().getRequest<Request & { user?: ValidatedUser }>();
+        const user = request.user;
+
+        if (data && user) {
+            return user[data];
+        }
+
+        return user;
+    },
 );

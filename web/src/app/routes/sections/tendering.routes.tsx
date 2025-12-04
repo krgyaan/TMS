@@ -21,6 +21,9 @@ const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/create
 const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/edit'));
 const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/show'));
 const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees'));
+const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/create'));
+const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/edit'));
+const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/show'));
 const Tendering_DocChecklist = lazy(() => import('@/modules/tendering/checklists'));
 const Tendering_CostingSheets = lazy(() => import('@/modules/tendering/costing-sheets'));
 const Tendering_CostingApproval = lazy(() => import('@/modules/tendering/costing-sheets'));
@@ -50,6 +53,9 @@ export default function TenderingRoutes() {
             <Route path="rfqs/:id/edit" element={<RouteWrapper><Tendering_RFQs_Edit /></RouteWrapper>} />
             <Route path="rfqs/:id" element={<RouteWrapper><Tendering_RFQs_Show /></RouteWrapper>} />
             <Route path="emds-tenderfees" element={<RouteWrapper><Tendering_EMD /></RouteWrapper>} />
+            <Route path="emds-tenderfees/create/:tenderId" element={<RouteWrapper><Tendering_EMD_Create /></RouteWrapper>} />
+            <Route path="emds-tenderfees/:id/edit" element={<RouteWrapper><Tendering_EMD_Edit /></RouteWrapper>} />
+            <Route path="emds-tenderfees/:id" element={<RouteWrapper><Tendering_EMD_Show /></RouteWrapper>} />
             <Route path="checklists" element={<RouteWrapper><Tendering_DocChecklist /></RouteWrapper>} />
             <Route path="costing-sheets" element={<RouteWrapper><Tendering_CostingSheets /></RouteWrapper>} />
             <Route path="costing-approval" element={<RouteWrapper><Tendering_CostingApproval /></RouteWrapper>} />

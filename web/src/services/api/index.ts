@@ -15,7 +15,7 @@ export { followupCategoriesService } from './followup-category.service'
 export { documentsSubmittedService } from './document-submitted.service'
 export { designationsService } from './designation.service'
 export { industriesService } from './industry.service';
-export { teamsService } from './team.service';
+export { teamService } from './team.service';
 export { rolesService } from './role.service';
 export { statesService } from './state.service';
 export { tqTypesService } from './tq-type.service';
@@ -23,3 +23,4 @@ export { leadTypesService } from './lead-type.service';
 export { loanPartiesService } from './loan-party.service';
 export { tenderInfosService } from './tenders.service';
 export { infoSheetsService } from './info-sheet.service';
+export { emdsService } from './emds.service';

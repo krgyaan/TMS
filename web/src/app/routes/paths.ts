@@ -2,7 +2,7 @@ export const paths = {
     // ==================== AUTH ====================
     auth: {
         login: "/login",
-        googleCallback: "/auth/google/callback",
+        googleCallback: "/auth/google/callback"
     },
 
     // ==================== INTEGRATIONS ====================
@@ -35,6 +35,9 @@ export const paths = {
         rfqsEdit: (tenderId: number | string) => `/tendering/rfqs/${tenderId}/edit`,
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
         emdsTenderFees: '/tendering/emds-tenderfees',
+        emdsTenderFeesCreate: (tenderId: number | string) => `/tendering/emds-tenderfees/create/${tenderId}`,
+        emdsTenderFeesEdit: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}/edit`,
+        emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
         checklists: '/tendering/checklists',
         costingSheets: '/tendering/costing-sheets',
         costingApproval: '/tendering/costing-approval',

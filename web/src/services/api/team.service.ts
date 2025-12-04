@@ -1,7 +1,8 @@
+import type { CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
 import { BaseApiService } from './base.service';
-import type { Team, CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
+import type { Team } from '@/types/auth.types';
 
-class TeamsService extends BaseApiService {
+class TeamService extends BaseApiService {
     constructor() {
         super('/teams');
     }
@@ -21,14 +22,6 @@ class TeamsService extends BaseApiService {
     async update(id: number, data: UpdateTeamDto): Promise<Team> {
         return this.patch<Team>(`/${id}`, data);
     }
-
-    // async delete(id: number): Promise<void> {
-    //     return this.delete<void>(`/${id}`);
-    // }
-
-    // async search(query: string): Promise<Team[]> {
-    //     return this.get<Team[]>('/search', { params: { q: query } });
-    // }
 }
 
-export const teamsService = new TeamsService();
+export const teamService = new TeamService();

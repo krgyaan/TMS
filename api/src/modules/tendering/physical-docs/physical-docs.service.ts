@@ -1,13 +1,25 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos } from '../../../db/tenders.schema';
 import { statuses } from '../../../db/statuses.schema';
 import { users } from '../../../db/users.schema';
-import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs, type NewPhysicalDocsPersons } from 'src/db/physical-docs.schema';
-import { tenderInformation } from 'src/db/tender-info-sheet.schema';
-import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from './dto/physical-docs.dto';
+import {
+    physicalDocs,
+    physicalDocsPersons,
+    type NewPhysicalDocs,
+} from '../../../db/physical-docs.schema';
+import { tenderInformation } from '../../../db/tender-info-sheet.schema';
+import type {
+    CreatePhysicalDocDto,
+    UpdatePhysicalDocDto,
+} from './dto/physical-docs.dto';
+import { TenderInfosService } from '../tenders/tenders.service';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type PhysicalDocDashboardRow = {
     tenderId: number;
@@ -20,14 +32,14 @@ type PhysicalDocDashboardRow = {
     statusName: string;
     physicalDocs: number | null;
     courierNo: number | null;
-}
+};
 
 type PhysicalDocPerson = {
     id: number;
     name: string;
     email: string;
     phone: string;
-}
+};
 
 type PhysicalDocWithPersons = {
     id: number;
@@ -35,36 +47,55 @@ type PhysicalDocWithPersons = {
     courierNo: number;
     submittedDocs: string | null;
     persons: PhysicalDocPerson[];
-}
+};
+
+// ============================================================================
+// Service
+// ============================================================================
 
 @Injectable()
 export class PhysicalDocsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService, // Injected
+    ) { }
 
     async findAll(): Promise<PhysicalDocDashboardRow[]> {
-        const rows = await this.db.select({
-            tenderId: tenderInfos.id,
-            tenderNo: tenderInfos.tenderNo,
-            tenderName: tenderInfos.tenderName,
-            courierAddress: tenderInfos.courierAddress,
-            physicalDocsRequired: tenderInformation?.physicalDocsRequired,
-            physicalDocsDeadline: tenderInformation?.physicalDocsDeadline,
-            teamMember: tenderInfos.teamMember,
-            status: tenderInfos.status,
-            teamMemberName: users.name,
-            statusName: statuses.name,
-            physicalDocs: physicalDocs?.id || null,
-            courierNo: physicalDocs?.courierNo || null,
-        })
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                courierAddress: tenderInfos.courierAddress,
+                physicalDocsRequired: tenderInformation.physicalDocsRequired,
+                physicalDocsDeadline: tenderInformation.physicalDocsDeadline,
+                teamMember: tenderInfos.teamMember,
+                status: tenderInfos.status,
+                teamMemberName: users.name,
+                statusName: statuses.name,
+                physicalDocs: physicalDocs.id,
+                courierNo: physicalDocs.courierNo,
+            })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(
+                tenderInformation,
+                eq(tenderInfos.id, tenderInformation.tenderId)
+            )
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(and(eq(tenderInfos.tlStatus, 1), eq(tenderInformation.physicalDocsRequired, 'Yes')));
+            .where(
+                and(
+                    TenderInfosService.getApprovedCondition(),
+                    eq(tenderInformation.physicalDocsRequired, 'Yes'),
+                    TenderInfosService.getExcludeDnbTlStatusCondition()
+                )
+            );
 
+        // Sort: pending first, then sent
         const pendingRows = rows.filter((row) => row.physicalDocs === null);
         const sentRows = rows.filter((row) => row.physicalDocs !== null);
+
         return [...pendingRows, ...sentRows] as unknown as PhysicalDocDashboardRow[];
     }
 
@@ -106,17 +137,20 @@ export class PhysicalDocsService {
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 courierAddress: tenderInfos.courierAddress,
-                physicalDocsRequired: tenderInformation?.physicalDocsRequired,
-                physicalDocsDeadline: tenderInformation?.physicalDocsDeadline,
+                physicalDocsRequired: tenderInformation.physicalDocsRequired,
+                physicalDocsDeadline: tenderInformation.physicalDocsDeadline,
                 teamMemberName: users.name,
                 statusName: statuses.name,
-                physicalDocs: physicalDocs?.id || null,
-                courierNo: physicalDocs?.courierNo || null,
+                physicalDocs: physicalDocs.id,
+                courierNo: physicalDocs.courierNo,
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(
+                tenderInformation,
+                eq(tenderInfos.id, tenderInformation.tenderId)
+            )
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
@@ -124,7 +158,9 @@ export class PhysicalDocsService {
         return rows[0] as unknown as PhysicalDocDashboardRow;
     }
 
-    async findByTenderIdWithPersons(tenderId: number): Promise<PhysicalDocWithPersons | null> {
+    async findByTenderIdWithPersons(
+        tenderId: number
+    ): Promise<PhysicalDocWithPersons | null> {
         const [physicalDoc] = await this.db
             .select()
             .from(physicalDocs)
@@ -155,7 +191,30 @@ export class PhysicalDocsService {
         };
     }
 
+    /**
+     * Get physical doc with tender details
+     * Uses shared tender service method
+     */
+    async findByIdWithTender(id: number) {
+        const physicalDoc = await this.findById(id);
+        if (!physicalDoc) {
+            throw new NotFoundException(`Physical doc with ID ${id} not found`);
+        }
+
+        const tender = await this.tenderInfosService.getTenderForPhysicalDocs(
+            physicalDoc.tenderId
+        );
+
+        return {
+            ...physicalDoc,
+            tender,
+        };
+    }
+
     async create(data: CreatePhysicalDocDto): Promise<PhysicalDocWithPersons> {
+        // Validate tender exists and is approved
+        await this.tenderInfosService.validateApproved(data.tenderId);
+
         return await this.db.transaction(async (tx) => {
             // Insert physical doc
             const [physicalDoc] = await tx
@@ -200,12 +259,16 @@ export class PhysicalDocsService {
         });
     }
 
-    async update(id: number, data: UpdatePhysicalDocDto): Promise<PhysicalDocWithPersons> {
+    async update(
+        id: number,
+        data: UpdatePhysicalDocDto
+    ): Promise<PhysicalDocWithPersons> {
         return await this.db.transaction(async (tx) => {
             // Update physical doc
             const updateData: Partial<NewPhysicalDocs> = {};
             if (data.courierNo !== undefined) updateData.courierNo = data.courierNo;
-            if (data.submittedDocs !== undefined) updateData.submittedDocs = data.submittedDocs;
+            if (data.submittedDocs !== undefined)
+                updateData.submittedDocs = data.submittedDocs;
             updateData.updatedAt = new Date();
 
             const [physicalDoc] = await tx
@@ -230,9 +293,10 @@ export class PhysicalDocsService {
                 const newPersons = data.physicalDocsPersons || [];
 
                 // Delete persons that are not in the new list
-                // We'll match by email as a unique identifier
                 const newEmails = new Set(newPersons.map((p) => p.email));
-                const personsToDelete = existingPersons.filter((p) => !newEmails.has(p.email));
+                const personsToDelete = existingPersons.filter(
+                    (p) => !newEmails.has(p.email)
+                );
 
                 for (const person of personsToDelete) {
                     await tx
@@ -242,7 +306,9 @@ export class PhysicalDocsService {
 
                 // Update or insert persons
                 for (const newPerson of newPersons) {
-                    const existingPerson = existingPersons.find((p) => p.email === newPerson.email);
+                    const existingPerson = existingPersons.find(
+                        (p) => p.email === newPerson.email
+                    );
 
                     if (existingPerson) {
                         // Update existing person
@@ -256,14 +322,12 @@ export class PhysicalDocsService {
                             .where(eq(physicalDocsPersons.id, existingPerson.id));
                     } else {
                         // Insert new person
-                        await tx
-                            .insert(physicalDocsPersons)
-                            .values({
-                                physicalDocId: id,
-                                name: newPerson.name,
-                                email: newPerson.email,
-                                phone: newPerson.phone,
-                            });
+                        await tx.insert(physicalDocsPersons).values({
+                            physicalDocId: id,
+                            name: newPerson.name,
+                            email: newPerson.email,
+                            phone: newPerson.phone,
+                        });
                     }
                 }
 
@@ -305,7 +369,10 @@ export class PhysicalDocsService {
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db.delete(physicalDocs).where(eq(physicalDocs.id, id)).returning();
+        const result = await this.db
+            .delete(physicalDocs)
+            .where(eq(physicalDocs.id, id))
+            .returning();
         if (!result[0]) {
             throw new NotFoundException(`Physical doc with ID ${id} not found`);
         }

@@ -1,0 +1,22 @@
+CREATE TABLE "instrument_status_history" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument_id" integer NOT NULL,
+	"from_status" varchar(100) NOT NULL,
+	"to_status" varchar(100) NOT NULL,
+	"from_action" integer NOT NULL,
+	"to_action" integer NOT NULL,
+	"from_stage" integer NOT NULL,
+	"to_stage" integer NOT NULL,
+	"form_data" jsonb,
+	"remarks" text,
+	"rejection_reason" text,
+	"is_resubmission" boolean DEFAULT false NOT NULL,
+	"previous_instrument_id" integer,
+	"changed_by" integer NOT NULL,
+	"changed_by_name" varchar(200) NOT NULL,
+	"changed_by_role" varchar(200) NOT NULL,
+	"ip_address" varchar(200) NOT NULL,
+	"user_agent" varchar(200) NOT NULL,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);

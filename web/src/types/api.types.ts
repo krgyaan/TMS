@@ -1,3 +1,29 @@
+import type { AuthUser, Team, UserRole, UserProfile } from './auth.types';
+
+export interface User {
+    id: number;
+    name: string;
+    email: string | null;
+    username: string | null;
+    mobile: string | null;
+    isActive: boolean;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+    deletedAt: Date | string | null;
+    profile: UserProfile | null;
+    team: Team | null;
+    designation: { id: number; name: string } | null;
+    role: UserRole | null;
+}
+
+export interface LoginResponse {
+    user: AuthUser;
+}
+
+export interface MeResponse {
+    user: AuthUser;
+}
+
 export interface PaginatedResponse<T> {
     data: T[]
     total: number
@@ -20,44 +46,6 @@ export interface NamedEntity {
     name: string | null
 }
 
-export interface UserProfile {
-    id?: number
-    userId: number
-    firstName?: string | null
-    lastName?: string | null
-    dateOfBirth?: string | null
-    gender?: string | null
-    employeeCode?: string | null
-    designationId?: number | null
-    primaryTeamId?: number | null
-    altEmail?: string | null
-    emergencyContactName?: string | null
-    emergencyContactPhone?: string | null
-    image?: string | null
-    signature?: string | null
-    dateOfJoining?: string | null
-    dateOfExit?: string | null
-    timezone?: string | null
-    locale?: string | null
-    createdAt?: string
-    updatedAt?: string
-}
-
-export interface User {
-    id: number
-    name: string
-    email: string
-    username: string | null
-    mobile: string | null
-    role?: string
-    isActive?: boolean
-    createdAt?: string
-    updatedAt?: string
-    team?: NamedEntity | null
-    designation?: NamedEntity | null
-    profile?: UserProfile | null
-}
-
 export interface CreateUserDto {
     name: string
     email: string
@@ -78,14 +66,6 @@ export interface Location {
     status?: boolean
     createdAt?: string
     updatedAt?: string
-}
-
-export interface Team {
-    id: number;
-    name: string;
-    description?: string;
-    createdAt: string;
-    updatedAt: string;
 }
 
 export interface ItemHeading {
@@ -391,14 +371,6 @@ export interface CreateIndustryDto {
 export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
 
 // ========== TEAMS ==========
-export interface Team {
-    id: number;
-    name: string;
-    description?: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
 
 export interface CreateTeamDto {
     name: string;
@@ -495,78 +467,8 @@ export interface CreateLoanPartyDto {
 }
 
 export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
-
-export interface TenderInfo {
-    id: number;
-    team: number;
-    tenderNo: string;
-    organization?: number | null;
-    tenderName: string;
-    item: number;
-    gstValues: number;
-    tenderFees: number;
-    emd: number;
-    teamMember: number;
-    dueDate: string;
-    remarks?: string | null;
-    status: number;
-    location?: number | null;
-    website?: number | null;
-    deleteStatus: "0" | "1";
-    tlStatus: number;
-    tlRemarks?: string | null;
-    rfqTo?: string | null;
-    courierAddress?: string | null;
-
-    tenderFeeMode?: string | null;
-    emdMode?: string | null;
-    approvePqrSelection?: "YES" | "NO" | null;
-    approveFinanceDocSelection?: "YES" | "NO" | null;
-    tenderApprovalStatus?: number | null;
-    oemNotAllowed?: number | null;
-    tenderApprovalRemarks?: string | null;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateTenderInfoDto {
-    team: number;
-    tenderNo: string;
-    tenderName: string;
-    item: number;
-    teamMember: number;
-    dueDate: string;
-    gstValues?: number;
-    tenderFees?: number;
-    emd?: number;
-    organization?: number;
-    status?: number;
-    location?: number;
-    website?: number;
-    remarks?: string;
-    deleteStatus?: "0" | "1";
-    tlStatus?: "0" | "1" | "2" | "3" | number;
-    tlRemarks?: string | null;
-    rfqTo?: string;
-    courierAddress?: string;
-}
-
-export interface UpdateTenderInfoDto extends Partial<CreateTenderInfoDto> { }
-
-export interface TenderInfoWithNames extends TenderInfo {
-    organizationName: string | null;
-    teamMemberName: string | null;
-    teamMemberUsername: string | null;
-    statusName: string | null;
-    itemName: string | null;
-    organizationAcronym: string | null;
-    locationName: string | null;
-    locationState: string | null;
-    websiteName: string | null;
-    websiteLink: string | null;
-};
-
-export interface TenderInfoSheetClient {
+// Tender Info Sheet Types
+export interface TenderClient {
     id?: number;
     clientName: string;
     clientDesignation?: string | null;
@@ -574,330 +476,335 @@ export interface TenderInfoSheetClient {
     clientEmail?: string | null;
 }
 
-export interface TenderInfoSheet {
+// Base Tender Info (matches tenderInfos table)
+export interface TenderInfo {
     id: number;
+    team: number;
+    tenderNo: string;
+    organization: number | null;
+    tenderName: string;
+    item: number;
+    gstValues: string;
+    tenderFees: string;
+    emd: string;
+    teamMember: number;
+    dueDate: Date | string;
+    remarks: string | null;
+    status: number;
+    location: number | null;
+    website: number | null;
+    courierAddress: string | null;
+    deleteStatus: number;
+
+    // Tender approval fields
+    tlRemarks: string | null;
+    rfqTo: string | null;
+    tlStatus: number;
+    tenderFeeMode: string | null;  // ✅ Added
+    emdMode: string | null;        // ✅ Added
+    approvePqrSelection: string | null;
+    approveFinanceDocSelection: string | null;
+    tenderApprovalStatus: string | null;
+    tlRejectionRemarks: string | null;
+    oemNotAllowed: string | null;
+
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+// Tender with joined relation names
+export interface TenderInfoWithNames extends TenderInfo {
+    organizationName?: string | null;
+    organizationAcronym?: string | null;
+    teamMemberName?: string | null;
+    teamMemberUsername?: string | null;
+    statusName?: string | null;
+    itemName?: string | null;
+    locationName?: string | null;
+    locationState?: string | null;
+    websiteName?: string | null;
+    websiteLink?: string | null;
+}
+
+// Create/Update DTOs
+export interface CreateTenderRequest {
+    team: number;
+    tenderNo: string;
+    organization?: number | null;
+    tenderName: string;
+    item: number;
+    gstValues?: string;
+    tenderFees?: string;
+    emd?: string;
+    teamMember: number;
+    dueDate: Date | string;
+    remarks?: string | null;
+    status?: number;
+    location?: number | null;
+    website?: number | null;
+    courierAddress?: string | null;
+}
+
+export interface UpdateTenderRequest {
+    team?: number;
+    tenderNo?: string;
+    organization?: number | null;
+    tenderName?: string;
+    item?: number;
+    gstValues?: string;
+    tenderFees?: string;
+    emd?: string;
+    teamMember?: number;
+    dueDate?: Date | string;
+    remarks?: string | null;
+    status?: number;
+    location?: number | null;
+    website?: number | null;
+    courierAddress?: string | null;
+    tlRemarks?: string | null;
+    rfqTo?: string | null;
+    tlStatus?: number;
+    tenderFeeMode?: string | null;
+    emdMode?: string | null;
+    approvePqrSelection?: string | null;
+    approveFinanceDocSelection?: string | null;
+    tenderApprovalStatus?: string | null;
+    tlRejectionRemarks?: string | null;
+    oemNotAllowed?: string | null;
+}
+
+// Tender Info Sheet Types (keep existing)
+export interface TenderInfoSheet {
+    id?: number;
     tenderId: number;
 
+    // TE Recommendation
     teRecommendation: 'YES' | 'NO';
-    teRejectionReason: number | null;
-    teRejectionRemarks: string | null;
-    teRemark: string | null;
+    teRejectionReason?: number | null;
+    teRejectionRemarks?: string | null;
 
-    processingFeeAmount: number | null;
-    processingFeeModes: string[] | null;
+    // Processing Fee
+    processingFeeRequired?: 'YES' | 'NO' | null;
+    processingFeeAmount?: number | string | null;
+    processingFeeMode?: string | null;  // ✅ Single string (comma-separated)
+    processingFeeModes?: string[] | null; // ✅ Array version for frontend
 
-    tenderFeeAmount: number | null;
-    tenderFeeModes: string[] | null;
+    // Tender Fee
+    tenderFeeRequired?: 'YES' | 'NO' | null;
+    tenderFeeAmount?: number | string | null;
+    tenderFeeMode?: string | null;  // ✅ Single string
+    tenderFeeModes?: string[] | null;
 
-    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdModes: string[] | null;
+    // EMD
+    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdAmount?: number | string | null;
+    emdMode?: string | null;  // ✅ Single string
+    emdModes?: string[] | null;
 
-    reverseAuctionApplicable: 'YES' | 'NO' | null;
-    paymentTermsSupply: number | null;
-    paymentTermsInstallation: number | null;
+    // Auction & Terms
+    reverseAuctionApplicable?: 'YES' | 'NO' | null;
+    paymentTermsSupply?: number | null;
+    paymentTermsInstallation?: number | null;
+    bidValidityDays?: number | null;
+    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
+    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
 
-    pbgForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    pbgPercentage: number | null;
-    pbgDurationMonths: number | null;
+    // Delivery Time
+    deliveryTimeSupply?: number | null;
+    deliveryTimeInstallationInclusive?: boolean;
+    deliveryTimeInstallationDays?: number | null;
+    deliveryTimeInstallation?: number | null;
 
-    sdForm: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    securityDepositPercentage: number | null;
-    sdDurationMonths: number | null;
+    // PBG
+    pbgRequired?: 'YES' | 'NO' | null;
+    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    pbgForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    pbgPercentage?: number | string | null;
+    pbgDurationMonths?: number | null;
 
-    bidValidityDays: number | null;
-    commercialEvaluation: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
-    mafRequired: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
+    // Security Deposit
+    sdRequired?: 'YES' | 'NO' | null;
+    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    sdForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    sdPercentage?: number | string | null;
+    securityDepositPercentage?: number | string | null;
+    sdDurationMonths?: number | null;
 
-    deliveryTimeSupply: number | null;
-    deliveryTimeInstallationInclusive: boolean;
-    deliveryTimeInstallation: number | null;
+    // LD
+    ldRequired?: 'YES' | 'NO' | null;
+    ldPercentagePerWeek?: number | string | null;
+    maxLdPercentage?: number | string | null;
 
-    ldPercentagePerWeek: number | null;
-    maxLdPercentage: number | null;
+    // Physical Docs
+    physicalDocsRequired?: 'YES' | 'NO' | null;
+    physicalDocsDeadline?: string | Date | null;
 
-    physicalDocsRequired: 'YES' | 'NO' | null;
-    physicalDocsDeadline: string | null;
+    // Technical Eligibility
+    techEligibilityAge?: number | null;
+    techEligibilityAgeYears?: number | null;
+    workOrderValue1Required?: 'YES' | 'NO' | null;
+    orderValue1?: number | string | null;
+    wo1Custom?: string | null;
+    workOrderValue2Required?: 'YES' | 'NO' | null;
+    orderValue2?: number | string | null;
+    wo2Custom?: string | null;
+    workOrderValue3Required?: 'YES' | 'NO' | null;
+    orderValue3?: number | string | null;
+    wo3Custom?: string | null;
 
-    techEligibilityAgeYears: number | null;
-    orderValue1: number | null;
-    orderValue2: number | null;
-    orderValue3: number | null;
+    // Financial Requirements
+    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    avgAnnualTurnoverCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    avgAnnualTurnoverValue?: number | string | null;
+    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    workingCapitalCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    workingCapitalValue?: number | string | null;
+    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    solvencyCertificateCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    solvencyCertificateValue?: number | string | null;
+    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    netWorthCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    netWorthValue?: number | string | null;
 
-    avgAnnualTurnoverCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    avgAnnualTurnoverValue: number | null;
+    // Documents
+    technicalWorkOrders?: string[] | null;
+    commercialDocuments?: string[] | null;
 
-    workingCapitalCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    workingCapitalValue: number | null;
+    // Client & Address
+    clientOrganization?: string | null;
+    clients?: TenderClient[];
+    courierAddress?: string | null;
 
-    solvencyCertificateCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    solvencyCertificateValue: number | null;
-
-    netWorthCriteria: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    netWorthValue: number | null;
-
-    clientOrganization: string | null;
-    courierAddress: string | null;
-
-    rejectionRemark: string | null;
-
-    clients: TenderInfoSheetClient[];
-    technicalWorkOrders: string[];
-    commercialDocuments: string[];
-
-    createdAt: string;
-    updatedAt: string;
+    // Final Remark
+    teFinalRemark?: string | null;
+    teRemark?: string | null;
+    rejectionRemark?: string | null;
 }
 
 export interface SaveTenderInfoSheetDto {
     teRecommendation: 'YES' | 'NO';
-    teRejectionReason: number | null;
-    teRejectionRemarks: string | null;
-
-    processingFeeAmount: number | null;
-    processingFeeModes: string[] | null;
-
-    tenderFeeAmount: number | null;
-    tenderFeeModes: string[] | null;
-
-    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdModes: string[] | null;
-
-    reverseAuctionApplicable: 'YES' | 'NO' | null;
-    paymentTermsSupply: number | null;
-    paymentTermsInstallation: number | null;
-
-    bidValidityDays: number | null;
-    commercialEvaluation: string | null;
-    mafRequired: string | null;
-
-    deliveryTimeSupply: number | null;
-    deliveryTimeInstallationInclusive: boolean;
-    deliveryTimeInstallation: number | null;
-
-    pbgForm: string | null;
-    pbgPercentage: number | null;
-    pbgDurationMonths: number | null;
-
-    sdForm: string | null;
-    securityDepositPercentage: number | null;
-    sdDurationMonths: number | null;
-
-    ldPercentagePerWeek: number | null;
-    maxLdPercentage: number | null;
-
-    physicalDocsRequired: 'YES' | 'NO' | null;
-    physicalDocsDeadline: string | null;
-
-    techEligibilityAgeYears: number | null;
-    orderValue1: number | null;
-    orderValue2: number | null;
-    orderValue3: number | null;
-
-    technicalWorkOrders: string[] | null;
-    commercialDocuments: string[] | null;
-
-    avgAnnualTurnoverCriteria: string | null;
-    avgAnnualTurnoverValue: number | null;
-
-    workingCapitalCriteria: string | null;
-    workingCapitalValue: number | null;
-
-    solvencyCertificateCriteria: string | null;
-    solvencyCertificateValue: number | null;
-
-    netWorthCriteria: string | null;
-    netWorthValue: number | null;
-
-    clientOrganization: string | null;
-    courierAddress: string | null;
-
+    teRejectionReason?: number | null;
+    teRejectionRemarks?: string | null;
+    processingFeeRequired?: 'YES' | 'NO' | null;
+    processingFeeAmount?: number | null;
+    processingFeeModes?: string[] | null;
+    tenderFeeRequired?: 'YES' | 'NO' | null;
+    tenderFeeAmount?: number | null;
+    tenderFeeModes?: string[] | null;
+    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdAmount?: number | null;
+    emdModes?: string[] | null;
+    reverseAuctionApplicable?: 'YES' | 'NO' | null;
+    paymentTermsSupply?: number | null;
+    paymentTermsInstallation?: number | null;
+    bidValidityDays?: number | null;
+    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
+    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
+    deliveryTimeSupply?: number | null;
+    deliveryTimeInstallationInclusive?: boolean;
+    deliveryTimeInstallationDays?: number | null;
+    pbgRequired?: 'YES' | 'NO' | null;
+    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    pbgPercentage?: number | null;
+    pbgDurationMonths?: number | null;
+    sdRequired?: 'YES' | 'NO' | null;
+    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
+    sdPercentage?: number | null;
+    sdDurationMonths?: number | null;
+    ldRequired?: 'YES' | 'NO' | null;
+    ldPercentagePerWeek?: number | null;
+    maxLdPercentage?: number | null;
+    physicalDocsRequired?: 'YES' | 'NO' | null;
+    physicalDocsDeadline?: string | Date | null;
+    techEligibilityAge?: number | null;
+    workOrderValue1Required?: 'YES' | 'NO' | null;
+    orderValue1?: number | null;
+    wo1Custom?: string | null;
+    workOrderValue2Required?: 'YES' | 'NO' | null;
+    orderValue2?: number | null;
+    wo2Custom?: string | null;
+    workOrderValue3Required?: 'YES' | 'NO' | null;
+    orderValue3?: number | null;
+    wo3Custom?: string | null;
+    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    avgAnnualTurnoverValue?: number | null;
+    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    workingCapitalValue?: number | null;
+    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    solvencyCertificateValue?: number | null;
+    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
+    netWorthValue?: number | null;
+    technicalWorkOrders?: string[] | null;
+    commercialDocuments?: string[] | null;
+    clientOrganization?: string | null;
     clients: Array<{
         clientName: string;
-        clientDesignation: string | null;
-        clientMobile: string | null;
-        clientEmail: string | null;
+        clientDesignation?: string | null;
+        clientMobile?: string | null;
+        clientEmail?: string | null;
     }>;
-
-    teRemark: string | null;
+    courierAddress?: string | null;
+    teFinalRemark?: string | null;
 }
 
-export interface IncompleteField {
-    id?: number;
-    fieldName: string;
-    comment: string;
-    status?: 'pending' | 'resolved';
-}
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee";
 
-export interface SaveTenderApprovalDto {
-    tlStatus: '0' | '1' | '2' | '3' | number;
-    rfqTo?: number[]; // vendor org IDs
-    tenderFeeMode?: string;
-    emdMode?: string;
-    approvePqrSelection?: '1' | '2';
-    approveFinanceDocSelection?: '1' | '2';
-    tenderStatus?: number; // status ID
-    oemNotAllowed?: string; // vendor org ID
-    tlRejectionRemarks?: string;
-    incompleteFields?: IncompleteField[];
-}
+export type InstrumentType =
+    | "DD"
+    | "FDR"
+    | "BG"
+    | "Cheque"
+    | "Bank Transfer"
+    | "Portal Payment";
 
-export interface TenderApproval {
-    id: number;
-    tenderId: number;
-    tlStatus: '0' | '1' | '2' | '3' | number;
-    rfqTo: number[] | null;
-    tenderFeeMode: string | null;
-    emdMode: string | null;
-    approvePqrSelection: '1' | '2' | null;
-    approveFinanceDocSelection: '1' | '2' | null;
-    tenderStatus: number | null;
-    oemNotAllowed: number | null;
-    tlRejectionRemarks: string | null;
-    incompleteFields?: IncompleteField[];
-    createdAt: string;
-    updatedAt: string;
-}
+export type DashboardRowType = "request" | "missing";
 
-export interface TenderWithRelations extends TenderInfoWithNames {
-    infoSheet?: TenderInfoSheet | null;
-    approval?: TenderApproval | null;
-}
+export type DashboardStatus =
+    | "Not Created"
+    | "Pending"
+    | "Sent"
+    | "Requested"
+    | "Approved"
+    | "Rejected"
+    | "Returned"
+    | "Issued"
+    | "Dispatched"
+    | "Received"
+    | "Cancelled"
+    | "Refunded"
+    | "Encashed"
+    | "Extended";
 
-export interface TenderApprovalRow {
+export interface DashboardRow {
+    id: number | null;
+    type: DashboardRowType;
+    purpose: PaymentPurpose;
+    amountRequired: string;
+    status: DashboardStatus;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    createdAt: string | null; // ISO string from API
     tenderId: number;
     tenderNo: string;
     tenderName: string;
-    item: number;
-    gstValues: number;
-    tenderFees: number;
-    emd: number;
-    teamMember: number;
-    dueDate: string;
-    status: number;
-    teamMemberName: string;
-    itemName: string;
-    statusName: string;
-    tlStatus: string | number;
+    dueDate: string | null; // ISO string from API
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
 }
 
-export type TenderApprovalTabData = {
-    key: '0' | '1' | '2' | '3';
-    name: string;
-    count: number;
-    data: TenderApprovalRow[];
-};
-
-export interface PhysicalDocsDashboardRow {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    courierAddress: string;
-    physicalDocsRequired: string;
-    physicalDocsDeadline: Date;
-    teamMemberName: string;
-    statusName: string;
-    physicalDocs: number | null;
-    courierNo: number | null;
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
 }
 
-export interface PhysicalDocsPerson {
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
+export interface DashboardResponse {
+    data: DashboardRow[];
+    counts: DashboardCounts;
 }
 
-export interface PhysicalDocs {
-    id: number;
-    tenderId: number;
-    courierNo: number;
-    submittedDocs: string | null;
-    persons: PhysicalDocsPerson[];
-}
-
-export interface CreatePhysicalDocsDto {
-    tenderId: number;
-    courierNo: number;
-    submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
-}
-
-export interface UpdatePhysicalDocsDto {
-    id: number;
-    courierNo?: number;
-    submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocsPerson, 'id'>[];
-}
-
-export interface RfqDashboardRow {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    itemName: string;
-    rfqTo: string;
-    teamMemberName: string;
-    statusName: string;
-    dueDate: Date;
-    rfqId: number | null;
-    vendorOrganizationNames: string | null;
-}
-
-export interface Rfq {
-    id: number;
-    tenderId: number;
-    dueDate: Date;
-    docList: string | null;
-    requestedVendor: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    items: RfqItem[];
-    documents: RfqDocument[];
-}
-
-export interface RfqItem {
-    id: number;
-    rfqId: number;
-    requirement: string;
-    unit: string | null;
-    qty: string | null;
-}
-
-export interface RfqDocument {
-    id: number;
-    rfqId: number;
-    docType: string;
-    path: string;
-    metadata: any;
-}
-
-export interface CreateRfqDto {
-    tenderId: number;
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
-    documents?: Array<{
-        docType: string;
-        path: string;
-        metadata?: any;
-    }>;
-}
-
-export interface UpdateRfqDto {
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items?: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
-}
-
-// Type aliases for convenience
-export type RfqDetails = Rfq;
-export type RfqRow = RfqDashboardRow;
+export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";

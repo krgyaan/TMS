@@ -2,13 +2,18 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import type { TenderApprovalPayload } from './dto/tender-approval.dto';
-import { tenderInfos } from 'src/db/tenders.schema';
+import { tenderInfos } from '../../../db/tenders.schema';
 import { eq } from 'drizzle-orm';
-import { tenderInformation } from 'src/db/tender-info-sheet.schema';
-import { users } from 'src/db/users.schema';
-import { statuses } from 'src/db/statuses.schema';
-import { items } from 'src/db/items.schema';
-import { tenderIncompleteFields } from 'src/db/tender-incomplete-fields.schema';
+import { tenderInformation } from '../../../db/tender-info-sheet.schema';
+import { users } from '../../../db/users.schema';
+import { statuses } from '../../../db/statuses.schema';
+import { items } from '../../../db/items.schema';
+import { tenderIncompleteFields } from '../../../db/tender-incomplete-fields.schema';
+import { TenderInfosService } from '../tenders/tenders.service';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 const TABS_NAMES = {
     '0': 'Pending',
@@ -18,6 +23,7 @@ const TABS_NAMES = {
 } as const;
 
 type TabCategory = (typeof TABS_NAMES)[keyof typeof TABS_NAMES];
+
 type TenderRow = {
     tenderId: number;
     tenderNo: string;
@@ -35,14 +41,19 @@ type TenderRow = {
     tlStatus: string | number;
 };
 
+// ============================================================================
+// Service
+// ============================================================================
+
 @Injectable()
 export class TenderApprovalService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService, // Injected
     ) { }
 
     async getAll(): Promise<Record<TabCategory, TenderRow[]>> {
-        const rows = await this.db
+        const rows = (await this.db
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -63,8 +74,11 @@ export class TenderApprovalService {
             .innerJoin(users, eq(tenderInfos.teamMember, users.id))
             .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
             .innerJoin(items, eq(tenderInfos.item, items.id))
-            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .orderBy(tenderInfos.dueDate) as unknown as TenderRow[];
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .orderBy(tenderInfos.dueDate)) as unknown as TenderRow[];
 
         const categorized: Record<TabCategory, TenderRow[]> = {
             Pending: [],
@@ -75,19 +89,26 @@ export class TenderApprovalService {
 
         for (const row of rows) {
             const statusKey = row.tlStatus?.toString();
-            const category = TABS_NAMES[statusKey as keyof typeof TABS_NAMES] ?? 'Incomplete';
+            const category =
+                TABS_NAMES[statusKey as keyof typeof TABS_NAMES] ?? 'Incomplete';
             categorized[category].push(row);
         }
 
         // DEBUG: Category counts
-        console.log('🔍 Categorized:', Object.fromEntries(
-            Object.entries(categorized).map(([k, v]) => [k, v.length])
-        ));
+        console.log(
+            '🔍 Categorized:',
+            Object.fromEntries(
+                Object.entries(categorized).map(([k, v]) => [k, v.length])
+            )
+        );
 
         return categorized;
     }
 
     async getByTenderId(tenderId: number) {
+        // Validate tender exists first
+        await this.tenderInfosService.validateExists(tenderId);
+
         const result = await this.db
             .select({
                 tlStatus: tenderInfos.tlStatus,
@@ -111,7 +132,10 @@ export class TenderApprovalService {
         const data = result[0];
 
         const rfqToArray = data.rfqTo
-            ? data.rfqTo.split(',').map(Number).filter(n => !isNaN(n))
+            ? data.rfqTo
+                .split(',')
+                .map(Number)
+                .filter((n) => !isNaN(n))
             : [];
 
         // Fetch incomplete fields
@@ -132,16 +156,25 @@ export class TenderApprovalService {
         };
     }
 
-    async updateApproval(tenderId: number, payload: TenderApprovalPayload) {
-        const existingTender = await this.db
-            .select({ id: tenderInfos.id })
-            .from(tenderInfos)
-            .where(eq(tenderInfos.id, tenderId))
-            .limit(1);
+    /**
+     * Get approval data with full tender details
+     * Uses shared tender service method
+     */
+    async getByTenderIdWithDetails(tenderId: number) {
+        const [approvalData, tenderDetails] = await Promise.all([
+            this.getByTenderId(tenderId),
+            this.tenderInfosService.getTenderForApproval(tenderId),
+        ]);
 
-        if (!existingTender.length) {
-            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
-        }
+        return {
+            ...approvalData,
+            tender: tenderDetails,
+        };
+    }
+
+    async updateApproval(tenderId: number, payload: TenderApprovalPayload) {
+        // Validate tender exists
+        await this.tenderInfosService.validateExists(tenderId);
 
         const updateData: any = {
             tlStatus: payload.tlStatus,
@@ -162,12 +195,12 @@ export class TenderApprovalService {
             updateData.tenderFeeMode = payload.tenderFeeMode;
             updateData.emdMode = payload.emdMode;
             updateData.approvePqrSelection = payload.approvePqrSelection;
-            updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection;
+            updateData.approveFinanceDocSelection =
+                payload.approveFinanceDocSelection;
 
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;
-        }
-        else if (payload.tlStatus === '2') {
+        } else if (payload.tlStatus === '2') {
             updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
             updateData.oemNotAllowed = payload.oemNotAllowed;
 
@@ -180,8 +213,7 @@ export class TenderApprovalService {
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
-        }
-        else if (payload.tlStatus === '3') {
+        } else if (payload.tlStatus === '3') {
             // Incomplete status - clear approval/rejection fields
             updateData.rfqTo = null;
             updateData.tenderFeeMode = null;
@@ -198,12 +230,14 @@ export class TenderApprovalService {
 
             // Insert new incomplete fields
             if (payload.incompleteFields && payload.incompleteFields.length > 0) {
-                const incompleteFieldsData = payload.incompleteFields.map(field => ({
-                    tenderId,
-                    fieldName: field.fieldName,
-                    comment: field.comment,
-                    status: 'pending' as const,
-                }));
+                const incompleteFieldsData = payload.incompleteFields.map(
+                    (field) => ({
+                        tenderId,
+                        fieldName: field.fieldName,
+                        comment: field.comment,
+                        status: 'pending' as const,
+                    })
+                );
 
                 await this.db
                     .insert(tenderIncompleteFields)
@@ -211,7 +245,7 @@ export class TenderApprovalService {
             }
         }
 
-        const [updated] = await this.db
+        await this.db
             .update(tenderInfos)
             .set(updateData)
             .where(eq(tenderInfos.id, tenderId))

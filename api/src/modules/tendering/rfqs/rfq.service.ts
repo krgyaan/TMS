@@ -1,17 +1,28 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../../db/database.module';
 import type { DbInstance } from '../../../db';
 import { tenderInfos } from '../../../db/tenders.schema';
 import { statuses } from '../../../db/statuses.schema';
 import { users } from '../../../db/users.schema';
-import { NewRfq, rfqs, rfqItems, rfqDocuments, NewRfqItem, NewRfqDocument } from 'src/db/rfqs.schema';
-import { items } from 'src/db/items.schema';
-import { vendorOrganizations } from 'src/db/vendor-organizations.schema';
+import {
+    NewRfq,
+    rfqs,
+    rfqItems,
+    rfqDocuments,
+    NewRfqItem,
+    NewRfqDocument,
+} from '../../../db/rfqs.schema';
+import { items } from '../../../db/items.schema';
+import { vendorOrganizations } from '../../../db/vendor-organizations.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
+import { TenderInfosService } from '../tenders/tenders.service';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type RfqRow = {
-    id: number;
     tenderId: number;
     tenderNo: string;
     tenderName: string;
@@ -19,10 +30,12 @@ type RfqRow = {
     teamMemberName: string;
     status: number;
     statusName: string;
+    itemName: string;
     rfqTo: string;
     dueDate: Date;
     rfqId: number | null;
-}
+    vendorOrganizationNames: string | null;
+};
 
 type RfqDetails = {
     id: number;
@@ -46,41 +59,60 @@ type RfqDetails = {
         path: string;
         metadata: any;
     }>;
-}
+};
+
+// ============================================================================
+// Service
+// ============================================================================
 
 @Injectable()
 export class RfqsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService, // Injected
+    ) { }
 
     async findAll(): Promise<RfqRow[]> {
-        const conditions = [eq(tenderInfos.deleteStatus, 0), eq(tenderInfos.tlStatus, 1), notInArray(tenderInfos.rfqTo, ['0', 'NaN'])];
-        const rows = await this.db.select({
-            tenderId: tenderInfos.id,
-            tenderNo: tenderInfos.tenderNo,
-            tenderName: tenderInfos.tenderName,
-            teamMember: tenderInfos.teamMember,
-            teamMemberName: users.name,
-            status: tenderInfos.status,
-            statusName: statuses.name,
-            item: tenderInfos.item,
-            itemName: items.name,
-            rfqTo: tenderInfos.rfqTo,
-            dueDate: tenderInfos.dueDate,
-            rfqId: rfqs.id,
-            vendorOrganizationNames: sql<string>`(
-                SELECT string_agg(${vendorOrganizations.name}, ', ')
-                FROM ${vendorOrganizations}
-                WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
-            )`,
-        }).from(tenderInfos)
+        const conditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            isNotNull(tenderInfos.rfqTo),
+            ne(tenderInfos.rfqTo, '0'),
+            ne(tenderInfos.rfqTo, ''),
+            TenderInfosService.getExcludeDnbTlStatusCondition(),
+        ];
+
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMember: tenderInfos.teamMember,
+                teamMemberName: users.name,
+                status: tenderInfos.status,
+                statusName: statuses.name,
+                item: tenderInfos.item,
+                itemName: items.name,
+                rfqTo: tenderInfos.rfqTo,
+                dueDate: tenderInfos.dueDate,
+                rfqId: rfqs.id,
+                vendorOrganizationNames: sql<string>`(
+                    SELECT string_agg(${vendorOrganizations.name}, ', ')
+                    FROM ${vendorOrganizations}
+                    WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
+                )`,
+            })
+            .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(rfqs, eq(tenderInfos.id, rfqs.tenderId))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .where(and(...conditions));
 
+        // Sort: pending first, then sent
         const pendingRows = rows.filter((row) => row.rfqId === null);
         const sentRows = rows.filter((row) => row.rfqId !== null);
+
         return [...pendingRows, ...sentRows] as unknown as RfqRow[];
     }
 
@@ -140,7 +172,28 @@ export class RfqsService {
         } as RfqDetails;
     }
 
+    /**
+     * Get RFQ with tender details
+     * Uses shared tender service method
+     */
+    async findByIdWithTender(id: number) {
+        const rfq = await this.findById(id);
+        if (!rfq) {
+            throw new NotFoundException(`RFQ with ID ${id} not found`);
+        }
+
+        const tender = await this.tenderInfosService.getTenderForRfq(rfq.tenderId);
+
+        return {
+            ...rfq,
+            tender,
+        };
+    }
+
     async create(data: CreateRfqDto): Promise<RfqDetails> {
+        // Validate tender exists and is approved
+        await this.tenderInfosService.validateApproved(data.tenderId);
+
         // Create the main RFQ record
         const rfqData: NewRfq = {
             tenderId: data.tenderId,
@@ -154,25 +207,31 @@ export class RfqsService {
         // Insert items if provided
         let createdItems: any[] = [];
         if (data.items && data.items.length > 0) {
-            const itemsData: NewRfqItem[] = data.items.map(item => ({
+            const itemsData: NewRfqItem[] = data.items.map((item) => ({
                 rfqId: newRfq.id,
                 requirement: item.requirement,
                 unit: item.unit || null,
                 qty: item.qty?.toString() || null,
             }));
-            createdItems = await this.db.insert(rfqItems).values(itemsData).returning();
+            createdItems = await this.db
+                .insert(rfqItems)
+                .values(itemsData)
+                .returning();
         }
 
         // Insert documents if provided
         let createdDocuments: any[] = [];
         if (data.documents && data.documents.length > 0) {
-            const documentsData: NewRfqDocument[] = data.documents.map(doc => ({
+            const documentsData: NewRfqDocument[] = data.documents.map((doc) => ({
                 rfqId: newRfq.id,
                 docType: doc.docType,
                 path: doc.path,
                 metadata: doc.metadata || {},
             }));
-            createdDocuments = await this.db.insert(rfqDocuments).values(documentsData).returning();
+            createdDocuments = await this.db
+                .insert(rfqDocuments)
+                .values(documentsData)
+                .returning();
         }
 
         return {
@@ -215,7 +274,7 @@ export class RfqsService {
 
             // Insert new items
             if (data.items.length > 0) {
-                const itemsData: NewRfqItem[] = data.items.map(item => ({
+                const itemsData: NewRfqItem[] = data.items.map((item) => ({
                     rfqId: id,
                     requirement: item.requirement,
                     unit: item.unit || null,
@@ -235,7 +294,10 @@ export class RfqsService {
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db.delete(rfqs).where(eq(rfqs.id, id)).returning();
+        const result = await this.db
+            .delete(rfqs)
+            .where(eq(rfqs.id, id))
+            .returning();
         if (!result[0]) {
             throw new NotFoundException(`RFQ with ID ${id} not found`);
         }

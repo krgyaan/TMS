@@ -54,9 +54,11 @@ const TenderInformationFormSchema = z.object({
     teRejectionReason: z.coerce.number().int().min(1).nullable().optional(),
     teRejectionRemarks: z.string().max(1000).optional(),
 
+    processingFeeRequired: z.enum(['YES', 'NO']).optional(),
     processingFeeAmount: z.coerce.number().nonnegative().optional(),
     processingFeeModes: z.array(z.string()).optional(),
 
+    tenderFeeRequired: z.enum(['YES', 'NO']).optional(),
     tenderFeeAmount: z.coerce.number().nonnegative().optional(),
     tenderFeeModes: z.array(z.string()).optional(),
 
@@ -80,14 +82,17 @@ const TenderInformationFormSchema = z.object({
     deliveryTimeInstallationInclusive: z.boolean().default(false),
     deliveryTimeInstallation: z.coerce.number().int().positive().optional(),
 
+    pbgRequired: z.enum(['YES', 'NO']).optional(),
     pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
     pbgPercentage: z.coerce.number().min(0).max(100).optional(),
     pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
+    sdRequired: z.enum(['YES', 'NO']).optional(),
     sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
     securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
     sdDurationMonths: z.coerce.number().int().positive().optional(),
 
+    ldRequired: z.enum(['YES', 'NO']).optional(),
     ldPercentagePerWeek: z.coerce.number().min(0).max(5).optional(),
     maxLdPercentage: z.coerce.number().int().min(0).max(20).optional(),
 
@@ -95,9 +100,15 @@ const TenderInformationFormSchema = z.object({
     physicalDocsDeadline: z.string().optional(),
 
     techEligibilityAgeYears: z.coerce.number().int().nonnegative().optional(),
+    workOrderValue1Required: z.enum(['YES', 'NO']).optional(),
     orderValue1: z.coerce.number().nonnegative().optional(),
+    wo1Custom: z.string().max(1000).optional(),
+    workOrderValue2Required: z.enum(['YES', 'NO']).optional(),
     orderValue2: z.coerce.number().nonnegative().optional(),
+    wo2Custom: z.string().max(1000).optional(),
+    workOrderValue3Required: z.enum(['YES', 'NO']).optional(),
     orderValue3: z.coerce.number().nonnegative().optional(),
+    wo3Custom: z.string().max(1000).optional(),
 
     technicalWorkOrders: z.array(z.string()).optional(),
     commercialDocuments: z.array(z.string()).optional(),
@@ -132,65 +143,92 @@ const mapInitialDataToForm = (data: TenderInfoSheet | null): FormValues => {
         return buildDefaultValues();
     }
 
+    // Helper to convert string/number to number
+    const toNumber = (val: string | number | null | undefined, defaultValue = 0): number => {
+        if (val === null || val === undefined) return defaultValue;
+        if (typeof val === 'number') return val;
+        const num = parseFloat(String(val));
+        return isNaN(num) ? defaultValue : num;
+    };
+
     return {
         teRecommendation: data.teRecommendation ?? 'YES',
         teRejectionReason: data.teRejectionReason ?? null,
         teRejectionRemarks: data.teRejectionRemarks ?? '',
 
-        processingFeeAmount: data.processingFeeAmount ?? 0,
+        // Processing Fee - map backend to frontend
+        processingFeeRequired: data.processingFeeRequired ?? undefined,
+        processingFeeAmount: toNumber(data.processingFeeAmount),
         processingFeeModes: data.processingFeeModes ?? [],
 
-        tenderFeeAmount: data.tenderFeeAmount ?? 0,
+        // Tender Fee - map backend to frontend
+        tenderFeeRequired: data.tenderFeeRequired ?? undefined,
+        tenderFeeAmount: toNumber(data.tenderFeeAmount),
         tenderFeeModes: data.tenderFeeModes ?? [],
 
         emdRequired: data.emdRequired ?? undefined,
         emdModes: data.emdModes ?? [],
 
         reverseAuctionApplicable: data.reverseAuctionApplicable ?? undefined,
-        paymentTermsSupply: data.paymentTermsSupply ?? 0,
-        paymentTermsInstallation: data.paymentTermsInstallation ?? 0,
+        paymentTermsSupply: toNumber(data.paymentTermsSupply),
+        paymentTermsInstallation: toNumber(data.paymentTermsInstallation),
 
-        bidValidityDays: data.bidValidityDays ?? 0,
+        bidValidityDays: toNumber(data.bidValidityDays),
         commercialEvaluation: data.commercialEvaluation ?? undefined,
         mafRequired: data.mafRequired ?? undefined,
 
-        deliveryTimeSupply: data.deliveryTimeSupply ?? 0,
+        // Delivery Time - map backend field name to frontend
+        deliveryTimeSupply: toNumber(data.deliveryTimeSupply),
         deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallation: data.deliveryTimeInstallation ?? 0,
+        deliveryTimeInstallation: toNumber(data.deliveryTimeInstallationDays ?? data.deliveryTimeInstallation), // Map deliveryTimeInstallationDays to deliveryTimeInstallation
 
-        pbgForm: data.pbgForm ?? undefined,
-        pbgPercentage: data.pbgPercentage ?? 0,
-        pbgDurationMonths: data.pbgDurationMonths ?? 0,
+        // PBG - map backend field name to frontend
+        pbgRequired: data.pbgRequired ?? undefined,
+        pbgForm: data.pbgMode ?? data.pbgForm ?? undefined, // Map pbgMode to pbgForm
+        pbgPercentage: toNumber(data.pbgPercentage),
+        pbgDurationMonths: toNumber(data.pbgDurationMonths),
 
-        sdForm: data.sdForm ?? undefined,
-        securityDepositPercentage: data.securityDepositPercentage ?? 0,
-        sdDurationMonths: data.sdDurationMonths ?? 0,
+        // Security Deposit - map backend field names to frontend
+        sdRequired: data.sdRequired ?? undefined,
+        sdForm: data.sdMode ?? data.sdForm ?? undefined, // Map sdMode to sdForm
+        securityDepositPercentage: toNumber(data.sdPercentage ?? data.securityDepositPercentage), // Map sdPercentage to securityDepositPercentage
+        sdDurationMonths: toNumber(data.sdDurationMonths),
 
-        ldPercentagePerWeek: data.ldPercentagePerWeek ?? 0,
-        maxLdPercentage: data.maxLdPercentage ?? 0,
+        // LD
+        ldRequired: data.ldRequired ?? undefined,
+        ldPercentagePerWeek: toNumber(data.ldPercentagePerWeek),
+        maxLdPercentage: toNumber(data.maxLdPercentage),
 
         physicalDocsRequired: data.physicalDocsRequired ?? undefined,
-        physicalDocsDeadline: data.physicalDocsDeadline ?? '',
+        physicalDocsDeadline: data.physicalDocsDeadline ? (typeof data.physicalDocsDeadline === 'string' ? data.physicalDocsDeadline : data.physicalDocsDeadline.toISOString()) : '',
 
-        techEligibilityAgeYears: data.techEligibilityAgeYears ?? 0,
-        orderValue1: data.orderValue1 ?? 0,
-        orderValue2: data.orderValue2 ?? 0,
-        orderValue3: data.orderValue3 ?? 0,
+        // Technical Eligibility - map backend field name to frontend
+        techEligibilityAgeYears: toNumber(data.techEligibilityAge ?? data.techEligibilityAgeYears), // Map techEligibilityAge to techEligibilityAgeYears
+        workOrderValue1Required: data.workOrderValue1Required ?? undefined,
+        orderValue1: toNumber(data.orderValue1),
+        wo1Custom: data.wo1Custom ?? '',
+        workOrderValue2Required: data.workOrderValue2Required ?? undefined,
+        orderValue2: toNumber(data.orderValue2),
+        wo2Custom: data.wo2Custom ?? '',
+        workOrderValue3Required: data.workOrderValue3Required ?? undefined,
+        orderValue3: toNumber(data.orderValue3),
+        wo3Custom: data.wo3Custom ?? '',
 
         technicalWorkOrders: data.technicalWorkOrders ?? [],
         commercialDocuments: data.commercialDocuments ?? [],
 
-        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverCriteria ?? undefined,
-        avgAnnualTurnoverValue: data.avgAnnualTurnoverValue ?? 0,
+        // Financial Requirements - map backend field names to frontend
+        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType ?? data.avgAnnualTurnoverCriteria ?? undefined, // Map avgAnnualTurnoverType to avgAnnualTurnoverCriteria
+        avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
 
-        workingCapitalCriteria: data.workingCapitalCriteria ?? undefined,
-        workingCapitalValue: data.workingCapitalValue ?? 0,
+        workingCapitalCriteria: data.workingCapitalType ?? data.workingCapitalCriteria ?? undefined, // Map workingCapitalType to workingCapitalCriteria
+        workingCapitalValue: toNumber(data.workingCapitalValue),
 
-        solvencyCertificateCriteria: data.solvencyCertificateCriteria ?? undefined,
-        solvencyCertificateValue: data.solvencyCertificateValue ?? 0,
+        solvencyCertificateCriteria: data.solvencyCertificateType ?? data.solvencyCertificateCriteria ?? undefined, // Map solvencyCertificateType to solvencyCertificateCriteria
+        solvencyCertificateValue: toNumber(data.solvencyCertificateValue),
 
-        netWorthCriteria: data.netWorthCriteria ?? undefined,
-        netWorthValue: data.netWorthValue ?? 0,
+        netWorthCriteria: data.netWorthType ?? data.netWorthCriteria ?? undefined, // Map netWorthType to netWorthCriteria
+        netWorthValue: toNumber(data.netWorthValue),
 
         clientOrganization: data.clientOrganization ?? '',
         courierAddress: data.courierAddress ?? '',
@@ -204,7 +242,8 @@ const mapInitialDataToForm = (data: TenderInfoSheet | null): FormValues => {
             }))
             : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
 
-        teRemark: data.teRemark ?? '',
+        // Final Remark - map backend field name to frontend
+        teRemark: data.teFinalRemark ?? data.teRemark ?? '', // Map teFinalRemark to teRemark
     };
 };
 
@@ -215,11 +254,15 @@ const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
         teRejectionReason: values.teRejectionReason ?? null,
         teRejectionRemarks: values.teRejectionRemarks || null,
 
+        // Processing Fee - map frontend fields to backend
+        processingFeeRequired: values.processingFeeRequired ?? null,
         processingFeeAmount: values.processingFeeAmount ?? null,
         processingFeeModes: values.processingFeeModes && values.processingFeeModes.length > 0
             ? values.processingFeeModes
             : null,
 
+        // Tender Fee - map frontend fields to backend
+        tenderFeeRequired: values.tenderFeeRequired ?? null,
         tenderFeeAmount: values.tenderFeeAmount ?? null,
         tenderFeeModes: values.tenderFeeModes && values.tenderFeeModes.length > 0
             ? values.tenderFeeModes
@@ -238,28 +281,42 @@ const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
         commercialEvaluation: values.commercialEvaluation ?? null,
         mafRequired: values.mafRequired ?? null,
 
+        // Delivery Time - map frontend field name to backend
         deliveryTimeSupply: values.deliveryTimeSupply ?? null,
         deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallation: values.deliveryTimeInstallation ?? null,
+        deliveryTimeInstallationDays: values.deliveryTimeInstallation ?? null, // Map deliveryTimeInstallation to deliveryTimeInstallationDays
 
-        pbgForm: values.pbgForm ?? null,
+        // PBG - map frontend field name to backend
+        pbgRequired: values.pbgRequired ?? null,
+        pbgMode: values.pbgForm ?? null, // Map pbgForm to pbgMode
         pbgPercentage: values.pbgPercentage ?? null,
         pbgDurationMonths: values.pbgDurationMonths ?? null,
 
-        sdForm: values.sdForm ?? null,
-        securityDepositPercentage: values.securityDepositPercentage ?? null,
+        // Security Deposit - map frontend field names to backend
+        sdRequired: values.sdRequired ?? null,
+        sdMode: values.sdForm ?? null, // Map sdForm to sdMode
+        sdPercentage: values.securityDepositPercentage ?? null, // Map securityDepositPercentage to sdPercentage
         sdDurationMonths: values.sdDurationMonths ?? null,
 
+        // LD
+        ldRequired: values.ldRequired ?? null,
         ldPercentagePerWeek: values.ldPercentagePerWeek ?? null,
         maxLdPercentage: values.maxLdPercentage ?? null,
 
         physicalDocsRequired: values.physicalDocsRequired ?? null,
         physicalDocsDeadline: values.physicalDocsDeadline || null,
 
-        techEligibilityAgeYears: values.techEligibilityAgeYears ?? null,
+        // Technical Eligibility - map frontend field name to backend
+        techEligibilityAge: values.techEligibilityAgeYears ?? null, // Map techEligibilityAgeYears to techEligibilityAge
+        workOrderValue1Required: values.workOrderValue1Required ?? null,
         orderValue1: values.orderValue1 ?? null,
+        wo1Custom: values.wo1Custom ?? null,
+        workOrderValue2Required: values.workOrderValue2Required ?? null,
         orderValue2: values.orderValue2 ?? null,
+        wo2Custom: values.wo2Custom ?? null,
+        workOrderValue3Required: values.workOrderValue3Required ?? null,
         orderValue3: values.orderValue3 ?? null,
+        wo3Custom: values.wo3Custom ?? null,
 
         technicalWorkOrders: values.technicalWorkOrders && values.technicalWorkOrders.length > 0
             ? values.technicalWorkOrders
@@ -268,16 +325,17 @@ const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
             ? values.commercialDocuments
             : null,
 
-        avgAnnualTurnoverCriteria: values.avgAnnualTurnoverCriteria ?? null,
+        // Financial Requirements - map frontend field names to backend
+        avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null, // Map avgAnnualTurnoverCriteria to avgAnnualTurnoverType
         avgAnnualTurnoverValue: values.avgAnnualTurnoverValue ?? null,
 
-        workingCapitalCriteria: values.workingCapitalCriteria ?? null,
+        workingCapitalType: values.workingCapitalCriteria ?? null, // Map workingCapitalCriteria to workingCapitalType
         workingCapitalValue: values.workingCapitalValue ?? null,
 
-        solvencyCertificateCriteria: values.solvencyCertificateCriteria ?? null,
+        solvencyCertificateType: values.solvencyCertificateCriteria ?? null, // Map solvencyCertificateCriteria to solvencyCertificateType
         solvencyCertificateValue: values.solvencyCertificateValue ?? null,
 
-        netWorthCriteria: values.netWorthCriteria ?? null,
+        netWorthType: values.netWorthCriteria ?? null, // Map netWorthCriteria to netWorthType
         netWorthValue: values.netWorthValue ?? null,
 
         clientOrganization: values.clientOrganization || null,
@@ -290,7 +348,8 @@ const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
             clientEmail: client.clientEmail || null,
         })),
 
-        teRemark: values.teRemark || null,
+        // Final Remark - map frontend field name to backend
+        teFinalRemark: values.teRemark || null, // Map teRemark to teFinalRemark
     };
 };
 
@@ -309,8 +368,10 @@ const buildDefaultValues = (): FormValues => ({
     teRecommendation: 'YES',
     teRejectionReason: null,
     teRejectionRemarks: '',
+    processingFeeRequired: undefined,
     processingFeeAmount: 0,
     processingFeeModes: [],
+    tenderFeeRequired: undefined,
     tenderFeeAmount: 0,
     tenderFeeModes: [],
     emdRequired: undefined,
@@ -324,20 +385,29 @@ const buildDefaultValues = (): FormValues => ({
     deliveryTimeSupply: 0,
     deliveryTimeInstallationInclusive: false,
     deliveryTimeInstallation: 0,
+    pbgRequired: undefined,
     pbgForm: undefined,
     pbgPercentage: 0,
     pbgDurationMonths: 0,
+    sdRequired: undefined,
     sdForm: undefined,
     securityDepositPercentage: 0,
     sdDurationMonths: 0,
+    ldRequired: undefined,
     ldPercentagePerWeek: 0,
     maxLdPercentage: 0,
     physicalDocsRequired: undefined,
     physicalDocsDeadline: '',
     techEligibilityAgeYears: 0,
+    workOrderValue1Required: undefined,
     orderValue1: 0,
+    wo1Custom: '',
+    workOrderValue2Required: undefined,
     orderValue2: 0,
+    wo2Custom: '',
+    workOrderValue3Required: undefined,
     orderValue3: 0,
+    wo3Custom: '',
     technicalWorkOrders: [],
     commercialDocuments: [],
     avgAnnualTurnoverCriteria: undefined,
@@ -394,7 +464,7 @@ export function TenderInformationForm({
     const incompleteFields = approvalData?.incompleteFields || [];
 
     const getIncompleteFieldComment = (fieldName: string): string | null => {
-        const field = incompleteFields.find(f => f.fieldName === fieldName);
+        const field = incompleteFields.find((f: { fieldName: string; comment?: string }) => f.fieldName === fieldName);
         return field?.comment || null;
     };
 
@@ -514,7 +584,7 @@ export function TenderInformationForm({
                                     Please review and correct the following {incompleteFields.length} field(s) marked below:
                                 </p>
                                 <div className="flex flex-wrap gap-2 mt-2">
-                                    {incompleteFields.map((field, idx) => (
+                                    {incompleteFields.map((field: { fieldName: string; comment?: string }, idx: number) => (
                                         <Badge key={idx} variant="outline" className="border-amber-600">
                                             {infoSheetFieldOptions.find((opt: { value: string }) => opt.value === field.fieldName)?.label || field.fieldName}
                                         </Badge>
