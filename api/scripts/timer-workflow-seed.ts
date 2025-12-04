@@ -103,6 +103,16 @@ const WORKFLOW_TEMPLATES: (NewWorkflowTemplate & { id: number })[] = [
         version: 1,
         metadata: { icon: '📦', color: '#F59E0B', category: 'Shared' },
     },
+    {
+        id: 3,
+        name: 'Operation Workflow',
+        code: 'OPERATION_WF',
+        description: 'Work Order processing from WO receipt to Kickoff Meeting',
+        entityType: 'OPERATION_CONTRACT',
+        isActive: true,
+        version: 1,
+        metadata: { icon: '🏗️', color: '#10B981', category: 'Operations' },
+    },
 ];
 
 // ============================================
@@ -173,7 +183,7 @@ const TENDERING_STEPS: StepDefinition[] = [
         stepKey: 'rfq',
         stepName: 'RFQ',
         stepOrder: 3,
-        description: 'Create and send RFQ to vendors, collect responses',
+        description: 'Create and send RFQ to vendors',
         assignedRole: 'TE',
         timerType: 'FIXED_DURATION',
         defaultDurationHours: 24,
@@ -200,13 +210,42 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 4: Physical Docs (48 hrs) - CONDITIONAL, PARALLEL
+    // STEP 4: RFQ Response (till due_date) - AFTER rfq
+    // Timer runs until tender due_date
+    // ============================================
+    {
+        stepKey: 'rfq_response',
+        stepName: 'RFQ Response',
+        stepOrder: 4,
+        description: 'Collect and track RFQ responses from vendors',
+        assignedRole: 'TE',
+        timerType: 'DEADLINE_BASED',
+        isBusinessDaysOnly: false,
+        warningThreshold: 80,
+        criticalThreshold: 100,
+        canRunInParallel: true,
+        dependsOnSteps: ['rfq'],
+        startTrigger: { type: 'STEP_COMPLETED', stepKey: 'rfq' },
+        endTrigger: { type: 'FORM_SUBMITTED', formKey: 'rfq_response_form' },
+        isOptional: true,
+        allowSkip: true,
+        metadata: {
+            icon: '📥',
+            color: '#10B981',
+            formUrl: '/tendering/rfqs/responses',
+            helpText: 'Track vendor responses until tender due date',
+            deadlineField: 'due_date',
+        },
+    },
+
+    // ============================================
+    // STEP 5: Physical Docs (48 hrs) - CONDITIONAL, PARALLEL
     // Condition: if physical_docs_required == 'Yes'
     // ============================================
     {
         stepKey: 'physical_docs',
         stepName: 'Physical Docs',
-        stepOrder: 4,
+        stepOrder: 5,
         description: 'Prepare and dispatch physical tender documents',
         assignedRole: 'TE',
         timerType: 'FIXED_DURATION',
@@ -234,15 +273,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 5: EMD Request (24 hrs) - CONDITIONAL, PARALLEL
-    // Condition: (emd_required == 'Yes' && emd > 0) OR
-    //            (tender_fees_required == 'Yes' && tender_fees > 0) OR
-    //            (processing_fees_required == 'Yes' && processing_fees > 0)
+    // STEP 6: EMD Request (24 hrs) - CONDITIONAL, PARALLEL
     // ============================================
     {
         stepKey: 'emd_request',
         stepName: 'EMD/Fees Request',
-        stepOrder: 5,
+        stepOrder: 6,
         description: 'Request EMD, Tender Fees, or Processing Fees from accounts',
         assignedRole: 'TE',
         timerType: 'FIXED_DURATION',
@@ -255,10 +291,6 @@ const TENDERING_STEPS: StepDefinition[] = [
         startTrigger: { type: 'STEP_COMPLETED', stepKey: 'tender_approval' },
         endTrigger: { type: 'FORM_SUBMITTED', formKey: 'emd_request_form' },
         conditionalLogic: {
-            // Complex condition - handled in application logic
-            // (emd_required == 'Yes' && emd > 0) ||
-            // (tender_fees_required == 'Yes' && tender_fees > 0) ||
-            // (processing_fees_required == 'Yes' && processing_fees > 0)
             field: 'has_any_fee_required',
             operator: 'equals',
             value: true,
@@ -279,12 +311,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 6: Document Checklist (-72h before due_date) - PARALLEL
+    // STEP 7: Document Checklist (-72h before due_date) - PARALLEL
     // ============================================
     {
         stepKey: 'document_checklist',
         stepName: 'Document Checklist',
-        stepOrder: 6,
+        stepOrder: 7,
         description: 'Complete and submit document checklist',
         assignedRole: 'TE',
         timerType: 'NEGATIVE_COUNTDOWN',
@@ -308,12 +340,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 7: Costing Sheet (-72h before due_date) - PARALLEL
+    // STEP 8: Costing Sheet (-72h before due_date) - PARALLEL
     // ============================================
     {
         stepKey: 'costing_sheet',
         stepName: 'Costing Sheet',
-        stepOrder: 7,
+        stepOrder: 8,
         description: 'Prepare detailed costing/pricing sheets',
         assignedRole: 'TE',
         timerType: 'NEGATIVE_COUNTDOWN',
@@ -337,12 +369,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 8: EMD Payment (till due_date) - AFTER emd_request
+    // STEP 9: EMD Payment (till due_date) - AFTER emd_request
     // ============================================
     {
         stepKey: 'emd_payment',
         stepName: 'EMD Payment',
-        stepOrder: 8,
+        stepOrder: 9,
         description: 'Process EMD payment',
         assignedRole: 'AC',
         timerType: 'DEADLINE_BASED',
@@ -370,12 +402,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 9: Tender Fees Payment (till due_date) - AFTER emd_request
+    // STEP 10: Tender Fees Payment (till due_date) - AFTER emd_request
     // ============================================
     {
         stepKey: 'tender_fees_payment',
         stepName: 'Tender Fees Payment',
-        stepOrder: 9,
+        stepOrder: 10,
         description: 'Process tender fees payment',
         assignedRole: 'AC',
         timerType: 'DEADLINE_BASED',
@@ -403,12 +435,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 10: Processing Fees Payment (till due_date) - AFTER emd_request
+    // STEP 11: Processing Fees Payment (till due_date) - AFTER emd_request
     // ============================================
     {
         stepKey: 'processing_fees_payment',
         stepName: 'Processing Fees Payment',
-        stepOrder: 10,
+        stepOrder: 11,
         description: 'Process processing fees payment',
         assignedRole: 'AC',
         timerType: 'DEADLINE_BASED',
@@ -436,12 +468,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 11: Costing Approval (-48h before due_date) - AFTER costing_sheet
+    // STEP 12: Costing Approval (-48h before due_date) - AFTER costing_sheet
     // ============================================
     {
         stepKey: 'costing_approval',
         stepName: 'Costing Approval',
-        stepOrder: 11,
+        stepOrder: 12,
         description: 'Team Leader approves final pricing',
         assignedRole: 'TL',
         timerType: 'NEGATIVE_COUNTDOWN',
@@ -465,12 +497,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 12: Bid Submission (-24h before due_date) - AFTER costing_approval
+    // STEP 13: Bid Submission (-24h before due_date) - AFTER costing_approval
     // ============================================
     {
         stepKey: 'bid_submission',
         stepName: 'Bid Submission',
-        stepOrder: 12,
+        stepOrder: 13,
         description: 'Final bid submission on portal',
         assignedRole: 'TE',
         timerType: 'NEGATIVE_COUNTDOWN',
@@ -494,12 +526,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 13: TQ Submission (NO TIMER - Manual Start)
+    // STEP 14: TQ Submission (NO TIMER - Manual Start)
     // ============================================
     {
         stepKey: 'tq_submission',
         stepName: 'TQ Submission',
-        stepOrder: 13,
+        stepOrder: 14,
         description: 'Submit Technical Queries',
         assignedRole: 'TE',
         timerType: 'NO_TIMER',
@@ -520,12 +552,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 14: TQ Completion (till tq_deadline) - AFTER tq_submission
+    // STEP 15: TQ Completion (till tq_deadline) - AFTER tq_submission
     // ============================================
     {
         stepKey: 'tq_completion',
         stepName: 'TQ Completion',
-        stepOrder: 14,
+        stepOrder: 15,
         description: 'Complete Technical Query response',
         assignedRole: 'TE',
         timerType: 'DEADLINE_BASED',
@@ -548,12 +580,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 15: RA Submission (NO TIMER)
+    // STEP 16: RA Submission (NO TIMER)
     // ============================================
     {
         stepKey: 'ra_submission',
         stepName: 'RA Submission',
-        stepOrder: 15,
+        stepOrder: 16,
         description: 'Reverse Auction submission',
         assignedRole: 'TL',
         timerType: 'NO_TIMER',
@@ -573,12 +605,12 @@ const TENDERING_STEPS: StepDefinition[] = [
     },
 
     // ============================================
-    // STEP 16: Result Declaration (NO TIMER)
+    // STEP 17: Result Declaration (NO TIMER)
     // ============================================
     {
         stepKey: 'result',
         stepName: 'Result Declaration',
-        stepOrder: 16,
+        stepOrder: 17,
         description: 'Final tender result (Won/Lost)',
         assignedRole: 'TE',
         timerType: 'NO_TIMER',
@@ -624,7 +656,146 @@ const COURIER_STEPS: StepDefinition[] = [
             formUrl: '/shared/courier',
             helpText: 'Timer runs until pickup_date is filled',
             deadlineField: 'pickup_date',
-            completionField: 'pickup_date', // Timer stops when this field is filled
+            completionField: 'pickup_date',
+        },
+    },
+];
+
+// ============================================
+// OPERATION WORKFLOW STEPS (Template ID: 3)
+// ============================================
+
+const OPERATION_STEPS: StepDefinition[] = [
+    // ============================================
+    // STEP 1: WO Details (72 hrs) - STARTS ON WO RECEIPT
+    // ============================================
+    {
+        stepKey: 'wo_details',
+        stepName: 'WO Details',
+        stepOrder: 1,
+        description: 'Fill Work Order details form',
+        assignedRole: 'TE',
+        timerType: 'FIXED_DURATION',
+        defaultDurationHours: 72,
+        isBusinessDaysOnly: true,
+        warningThreshold: 80,
+        criticalThreshold: 100,
+        canRunInParallel: false,
+        startTrigger: { type: 'IMMEDIATE' },
+        endTrigger: { type: 'FORM_SUBMITTED', formKey: 'wo_details_form' },
+        isOptional: false,
+        allowSkip: false,
+        metadata: {
+            icon: '📋',
+            color: '#3B82F6',
+            formUrl: '/operations/wo-details',
+            helpText: 'Complete Work Order details within 72 hours of WO receipt',
+            stopsTimerFor: null, // First step, no previous timer to stop
+        },
+    },
+
+    // ============================================
+    // STEP 2: WO Acceptance (24 hrs) - AFTER wo_details
+    // Completing this step STOPS wo_details timer
+    // ============================================
+    {
+        stepKey: 'wo_acceptance',
+        stepName: 'WO Acceptance',
+        stepOrder: 2,
+        description: 'Team Leader reviews and accepts Work Order',
+        assignedRole: 'TL',
+        timerType: 'FIXED_DURATION',
+        defaultDurationHours: 24,
+        isBusinessDaysOnly: true,
+        warningThreshold: 80,
+        criticalThreshold: 100,
+        canRunInParallel: false,
+        dependsOnSteps: ['wo_details'],
+        startTrigger: { type: 'STEP_COMPLETED', stepKey: 'wo_details' },
+        endTrigger: { type: 'APPROVAL' },
+        isOptional: false,
+        allowSkip: false,
+        metadata: {
+            icon: '✅',
+            color: '#10B981',
+            formUrl: '/operations/wo-acceptance',
+            helpText: 'TL must accept WO within 24 hours. Completing this stops wo_details timer.',
+            stopsTimerFor: 'wo_details', // This step completion stops wo_details timer
+            decisionField: 'wo_amendment_needed', // Field that determines next step
+            decisionOptions: {
+                'NO': 'kickoff_meeting', // If NO amendment, proceed to kickoff
+                'YES': null, // If YES, workflow pauses (amendment needed)
+            },
+        },
+    },
+
+    // ============================================
+    // STEP 3: Kickoff Meeting (72 hrs) - CONDITIONAL AFTER wo_acceptance
+    // Condition: wo_amendment_needed = 'NO'
+    // ============================================
+    {
+        stepKey: 'kickoff_meeting',
+        stepName: 'Kickoff Meeting',
+        stepOrder: 3,
+        description: 'Initiate and conduct Kickoff Meeting with team',
+        assignedRole: 'TL',
+        timerType: 'FIXED_DURATION',
+        defaultDurationHours: 72,
+        isBusinessDaysOnly: true,
+        warningThreshold: 80,
+        criticalThreshold: 100,
+        canRunInParallel: false,
+        dependsOnSteps: ['wo_acceptance'],
+        startTrigger: { type: 'STEP_COMPLETED', stepKey: 'wo_acceptance' },
+        endTrigger: { type: 'FORM_SUBMITTED', formKey: 'kickoff_meeting_form' },
+        conditionalLogic: {
+            field: 'wo_amendment_needed',
+            operator: 'equals',
+            value: 'NO',
+        },
+        isOptional: false,
+        allowSkip: false,
+        metadata: {
+            icon: '🚀',
+            color: '#8B5CF6',
+            formUrl: '/operations/kickoff-meeting',
+            helpText: 'Only initiated if WO Amendment is NOT needed. Complete within 72 hours.',
+            requiresCondition: 'wo_amendment_needed = NO',
+        },
+    },
+
+    // ============================================
+    // STEP 4: WO Amendment (NO TIMER) - CONDITIONAL
+    // Only if wo_amendment_needed = 'YES'
+    // ============================================
+    {
+        stepKey: 'wo_amendment',
+        stepName: 'WO Amendment',
+        stepOrder: 4,
+        description: 'Handle Work Order amendment if required',
+        assignedRole: 'TE',
+        timerType: 'NO_TIMER',
+        isBusinessDaysOnly: true,
+        warningThreshold: 80,
+        criticalThreshold: 100,
+        canRunInParallel: false,
+        dependsOnSteps: ['wo_acceptance'],
+        startTrigger: { type: 'STEP_COMPLETED', stepKey: 'wo_acceptance' },
+        endTrigger: { type: 'FORM_SUBMITTED', formKey: 'wo_amendment_form' },
+        conditionalLogic: {
+            field: 'wo_amendment_needed',
+            operator: 'equals',
+            value: 'YES',
+        },
+        isOptional: true,
+        allowSkip: false,
+        metadata: {
+            icon: '📝',
+            color: '#F59E0B',
+            formUrl: '/operations/wo-amendment',
+            helpText: 'Only if WO Amendment is needed. After amendment, workflow may restart from wo_details.',
+            requiresCondition: 'wo_amendment_needed = YES',
+            nextStepAfterAmendment: 'wo_details', // Restart from wo_details after amendment
         },
     },
 ];
@@ -636,6 +807,7 @@ const COURIER_STEPS: StepDefinition[] = [
 const STEPS_BY_TEMPLATE: Record<number, StepDefinition[]> = {
     1: TENDERING_STEPS,
     2: COURIER_STEPS,
+    3: OPERATION_STEPS,
 };
 
 // ============================================
@@ -707,7 +879,7 @@ async function main() {
     // SEED WORKFLOW STEPS
     // ============================================
 
-    console.log('📝 Seeding workflow steps...');
+    console.log('📝 Seeding workflow steps...\n');
     let stepId = 1;
     let totalSteps = 0;
 
@@ -723,8 +895,24 @@ async function main() {
 
         await db.insert(wfSteps).values(stepsWithIds);
         totalSteps += stepsWithIds.length;
-        console.log(`   📌 ${template.name}: ${stepsWithIds.length} steps`);
+        console.log(`   📌 ${template.name} (${template.code})`);
+        console.log(`      Steps: ${stepsWithIds.length}`);
+
+        // Print step summary
+        for (const step of stepsWithIds) {
+            const timerInfo = step.timerType === 'FIXED_DURATION'
+                ? `${step.defaultDurationHours}h`
+                : step.timerType === 'NEGATIVE_COUNTDOWN'
+                    ? `-${step.hoursBeforeDeadline}h before deadline`
+                    : step.timerType === 'DEADLINE_BASED'
+                        ? 'till deadline'
+                        : 'no timer';
+            const conditional = step.conditionalLogic ? ' (conditional)' : '';
+            console.log(`         ${step.stepOrder}. ${step.stepName} [${timerInfo}]${conditional}`);
+        }
+        console.log('');
     }
+
     console.log(`   ✅ Created ${totalSteps} total workflow steps\n`);
 
     // ============================================
@@ -733,19 +921,54 @@ async function main() {
 
     await pool.end();
 
-    console.log('═'.repeat(60));
+    // ============================================
+    // FINAL SUMMARY
+    // ============================================
+
+    console.log('═'.repeat(70));
     console.log('🎉 Workflow seed completed successfully!');
-    console.log('═'.repeat(60));
+    console.log('═'.repeat(70));
     console.log('\n📊 Summary:');
-    console.log(`   • Working Hours: ${workingHoursData.length}`);
-    console.log(`   • Holidays: ${allHolidays.length}`);
+    console.log(`   • Working Hours: ${workingHoursData.length} configs`);
+    console.log(`   • Holidays: ${allHolidays.length} entries`);
     console.log(`   • Workflow Templates: ${WORKFLOW_TEMPLATES.length}`);
     console.log(`   • Workflow Steps: ${totalSteps}`);
-    console.log('\n📋 Workflows:');
-    for (const template of WORKFLOW_TEMPLATES) {
-        const steps = STEPS_BY_TEMPLATE[template.id];
-        console.log(`   • ${template.name} (${template.code}): ${steps?.length || 0} steps`);
-    }
+
+    console.log('\n📋 Workflows Overview:\n');
+
+    // Tendering Workflow
+    console.log('   1️⃣  TENDERING WORKFLOW (TENDERING_WF)');
+    console.log('       Entity: TENDER');
+    console.log('       Flow:');
+    console.log('       ├── tender_info_sheet (72h) → IMMEDIATE');
+    console.log('       ├── tender_approval (24h) → after tender_info_sheet');
+    console.log('       ├── [PARALLEL after approval]');
+    console.log('       │   ├── rfq (24h) → if rfq_to set');
+    console.log('       │   │   └── rfq_response (till due_date)');
+    console.log('       │   ├── physical_docs (48h) → if required');
+    console.log('       │   ├── emd_request (24h) → if any fees');
+    console.log('       │   │   └── [PARALLEL] emd/tender_fees/processing_fees (till due_date)');
+    console.log('       │   ├── document_checklist (-72h before due)');
+    console.log('       │   └── costing_sheet (-72h before due)');
+    console.log('       │       └── costing_approval (-48h before due)');
+    console.log('       │           └── bid_submission (-24h before due)');
+    console.log('       ├── [MANUAL] tq_submission → tq_completion (till tq_deadline)');
+    console.log('       ├── [MANUAL] ra_submission (no timer)');
+    console.log('       └── [MANUAL] result (no timer)');
+
+    console.log('\n   2️⃣  COURIER WORKFLOW (COURIER_WF)');
+    console.log('       Entity: COURIER');
+    console.log('       Flow:');
+    console.log('       └── courier_dispatch (till pickup_date) → IMMEDIATE');
+
+    console.log('\n   3️⃣  OPERATION WORKFLOW (OPERATION_WF)');
+    console.log('       Entity: OPERATION_CONTRACT');
+    console.log('       Flow:');
+    console.log('       ├── wo_details (72h) → IMMEDIATE (on WO receipt)');
+    console.log('       ├── wo_acceptance (24h) → after wo_details');
+    console.log('       │   [DECISION: wo_amendment_needed]');
+    console.log('       │   ├── IF "NO" → kickoff_meeting (72h)');
+    console.log('       │   └── IF "YES" → wo_amendment (no timer) → restart from wo_details');
     console.log('');
 }
 

@@ -1,0 +1,1 @@
+ALTER TABLE "tender_costing_sheets" RENAME COLUMN "oem_vendor_id" TO "oem_vendor_ids";

@@ -38,6 +38,10 @@ export * from './permissions.schema';
 export * from './role-permissions.schema';
 export * from './user-permissions.schema';
 export * from './workflows.schema';
+export * from './bid-submissions.schema';
+export * from './tender-costing-sheets.schema';
+export * from './tender-document-checklists.schema';
+export * from './tender-queries.schema';
 
 // Relations
 export * from './users.relations';
