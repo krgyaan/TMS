@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { tenderInfos } from '../../../db/tenders.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
-import { items } from '../../../db/items.schema';
-import { tenderInformation } from '../../../db/tender-info-sheet.schema';
-import { TenderInfosService } from '../tenders/tenders.service';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 type ChecklistDashboardRow = {
     tenderId: number;

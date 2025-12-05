@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ChecklistsService } from './checklists.service';
+import { ChecklistsService } from '@/modules/tendering/checklists/checklists.service';
 
 @Controller('checklists')
 export class ChecklistsController {

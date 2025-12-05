@@ -8,7 +8,7 @@ import {
     Post,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { UserProfilesService } from './user-profiles.service';
+import { UserProfilesService } from '@/modules/master/user-profiles/user-profiles.service';
 
 const CreateUserProfileSchema = z.object({
     userId: z.number(),

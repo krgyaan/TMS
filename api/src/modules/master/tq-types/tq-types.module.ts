@@ -1,7 +1,7 @@
 ﻿import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { TqTypesController } from './tq-types.controller';
-import { TqTypesService } from './tq-types.service';
+import { DatabaseModule } from '@db/database.module';
+import { TqTypesController } from '@/modules/master/tq-types/tq-types.controller';
+import { TqTypesService } from '@/modules/master/tq-types/tq-types.service';
 
 @Module({
     imports: [DatabaseModule],

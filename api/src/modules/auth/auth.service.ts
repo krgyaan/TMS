@@ -6,11 +6,11 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import authConfig, { type AuthConfig } from '../../config/auth.config';
-import { UsersService, type UserWithRelations } from '../master/users/users.service';
-import { GoogleService } from '../integrations/google/google.service';
-import { PermissionService } from './services/permission.service';
-import { DataScope } from '../../common/constants/roles.constant';
+import authConfig, { type AuthConfig } from '@config/auth.config';
+import { UsersService, type UserWithRelations } from '@/modules/master/users/users.service';
+import { GoogleService } from '@/modules/integrations/google/google.service';
+import { PermissionService } from '@/modules/auth/services/permission.service';
+import { DataScope } from '@/common/constants/roles.constant';
 
 type SessionWithToken = {
     accessToken: string;

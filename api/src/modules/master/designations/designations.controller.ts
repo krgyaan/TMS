@@ -13,7 +13,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { DesignationsService } from './designations.service';
+import { DesignationsService } from '@/modules/master/designations/designations.service';
 
 const CreateDesignationSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),

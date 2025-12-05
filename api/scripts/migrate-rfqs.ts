@@ -10,7 +10,7 @@ import {
     rfqResponses,
     rfqResponseItems,
     rfqResponseDocuments,
-} from '../src/db/rfqs.schema';
+} from '@db/schemas/tendering/rfqs.schema';
 
 // ============================================================================
 // CONFIGURATION

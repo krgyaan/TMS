@@ -5,9 +5,9 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import type { ValidatedUser } from '../strategies/jwt.strategy';
-import { ROLE_HIERARCHY, type RoleName } from '../../../common/constants/roles.constant';
+import { ROLES_KEY } from '@/modules/auth/decorators/roles.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { ROLE_HIERARCHY, type RoleName } from '@/common/constants/roles.constant';
 
 @Injectable()
 export class RolesGuard implements CanActivate {

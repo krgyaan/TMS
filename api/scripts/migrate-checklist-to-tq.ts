@@ -19,7 +19,7 @@ import {
     tenderQueries,
     tenderQueryItems,
     type BidDocuments,
-} from '../src/db/schema';
+} from '@db/schemas/tendering';
 import { sql } from 'drizzle-orm';
 
 // ============================================================================
@@ -233,10 +233,10 @@ const Parsers = {
         return isNaN(firstId) ? null : firstId;
     },
 
-    mapCostingStatus(status: string | null): 'Pending' | 'Submitted' | 'Approved' | 'Rejected' | 'Redo' {
+        mapCostingStatus(status: string | null): 'Pending' | 'Submitted' | 'Approved' | 'Rejected/Redo' {
         if (!status) return 'Pending';
         if (status === 'Approved') return 'Approved';
-        if (status === 'Rejected/Redo') return 'Redo';
+        if (status === 'Rejected/Redo') return 'Rejected/Redo';
         return 'Pending';
     },
 
@@ -479,7 +479,7 @@ class CostingSheetMigrator {
                 // Approval Workflow
                 status: costingStatus,
                 tlRemarks: tenderInfo?.costingRemarks ?? null,
-                rejectionReason: costingStatus === 'Redo' ? tenderInfo?.costingRemarks : null,
+                rejectionReason: costingStatus === 'Rejected/Redo' ? tenderInfo?.costingRemarks : null,
 
                 // Timestamps
                 submittedAt: Parsers.date(row.created_at),

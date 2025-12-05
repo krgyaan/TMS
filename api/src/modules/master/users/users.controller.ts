@@ -12,7 +12,7 @@ import {
     Post,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { UsersService } from './users.service';
+import { UsersService } from '@/modules/master/users/users.service';
 
 const CreateUserSchema = z.object({
     name: z

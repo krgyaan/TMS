@@ -11,8 +11,8 @@ import {
     HttpStatus,
     NotFoundException,
 } from '@nestjs/common';
-import { PhysicalDocsService } from './physical-docs.service';
-import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from './dto/physical-docs.dto';
+import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
+import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 
 
 @Controller('physical-docs')

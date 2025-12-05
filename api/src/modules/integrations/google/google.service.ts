@@ -7,13 +7,13 @@
 } from '@nestjs/common';
 import { google, oauth2_v2 } from 'googleapis';
 import { and, eq } from 'drizzle-orm';
-import googleConfig, { type GoogleConfig } from '../../../config/google.config';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import googleConfig, { type GoogleConfig } from '@config/google.config';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     oauthAccounts,
     type OauthAccount,
-} from '../../../db/oauth-accounts.schema';
+} from '@db/schemas/auth/oauth-accounts.schema';
 
 type CredentialPayload = {
     access_token: string;

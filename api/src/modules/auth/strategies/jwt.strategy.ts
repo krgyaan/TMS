@@ -6,10 +6,10 @@ import {
     type StrategyOptions,
 } from 'passport-jwt';
 import type { Request } from 'express';
-import authConfig, { type AuthConfig } from '../../../config/auth.config';
-import { UsersService } from '../../master/users/users.service';
-import type { JwtPayload } from '../auth.service';
-import { DataScope } from '../../../common/constants/roles.constant';
+import authConfig, { type AuthConfig } from '@/config/auth.config';
+import { UsersService } from '@/modules/master/users/users.service';
+import type { JwtPayload } from '@/modules/auth/auth.service';
+import { DataScope } from '@/common/constants/roles.constant';
 
 // What gets attached to request.user
 export type ValidatedUser = {

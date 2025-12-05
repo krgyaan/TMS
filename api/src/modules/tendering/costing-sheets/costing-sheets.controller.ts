@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { CostingSheetsService } from './costing-sheets.service';
+import { CostingSheetsService } from '@/modules/tendering/costing-sheets/costing-sheets.service';
 
 @Controller('costing-sheets')
 export class CostingSheetsController {

@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import { eq } from 'drizzle-orm';
 import {
     tenderInformation,
@@ -11,9 +11,9 @@ import {
     type TenderClient,
     type TenderTechnicalDocument,
     type TenderFinancialDocument,
-} from '../../../db/tender-info-sheet.schema';
-import type { TenderInfoSheetPayload } from './dto/info-sheet.dto';
-import { TenderInfosService } from '../tenders/tenders.service';
+} from '@db/schemas/tendering/tender-info-sheet.schema';
+import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 // ============================================================================
 // Types

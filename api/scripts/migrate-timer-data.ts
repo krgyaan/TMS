@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import { sql } from 'drizzle-orm';
-import { createDb, createPool } from '../src/db';
+import { createDb, createPool } from '@db';
 import {
     wfTemplates,
     wfSteps,
     wfInstances,
     wfStepInstances,
     wfTimerEvents,
-} from '../src/db/workflows.schema';
+} from '@db/schemas/workflow/workflows.schema';
 
 // ============================================
 // TYPES

@@ -12,7 +12,7 @@
   Query,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { OrganizationsService } from './organizations.service';
+import { OrganizationsService } from '@/modules/master/organizations/organizations.service';
 
 const CreateOrganizationSchema = z.object({
   name: z

@@ -11,7 +11,7 @@
     Post,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { StatusesService } from './statuses.service';
+import { StatusesService } from '@/modules/master/statuses/statuses.service';
 
 const CreateStatusSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),

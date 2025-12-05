@@ -1,6 +1,5 @@
-import { statuses } from "../db/statuses.schema";
-import { eq } from "drizzle-orm";
-import type { DbInstance } from "../db";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import type { DbInstance } from "@db";
 
 export class StatusCache {
     private static categoryMap: Record<string, number[]> = {};

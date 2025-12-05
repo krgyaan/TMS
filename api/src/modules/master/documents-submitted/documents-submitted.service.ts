@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     documentsSubmitted,
     type DocumentSubmitted,
     type NewDocumentSubmitted,
-} from '../../../db/documents-submitted.schema';
+} from '@db/schemas/master/documents-submitted.schema';
 
 @Injectable()
 export class DocumentsSubmittedService {

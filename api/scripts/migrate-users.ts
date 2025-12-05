@@ -14,11 +14,11 @@ import { eq, sql } from 'drizzle-orm';
 import { Client } from 'pg';
 
 // Import PostgreSQL schemas
-import { users } from '../src/db/users.schema';
-import { userProfiles } from '../src/db/user-profiles.schema';
-import { userRoles } from '../src/db/user-roles.schema';
-import { userPermissions } from '../src/db/user-permissions.schema';
-import { permissions } from '../src/db/permissions.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
+import { userRoles } from '@db/schemas/auth/user-roles.schema';
+import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
+import { permissions } from '@db/schemas/auth/permissions.schema';
 
 // ==================== Configuration ====================
 

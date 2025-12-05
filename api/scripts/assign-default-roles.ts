@@ -1,10 +1,10 @@
 // api/scripts/assign-default-roles.ts
 import 'dotenv/config';
-import { createDb, createPool } from '../src/db';
-import { users } from '../src/db/users.schema';
-import { roles } from '../src/db/roles.schema';
-import { userRoles } from '../src/db/user-roles.schema';
-import { and, eq, isNull, notExists } from 'drizzle-orm';
+import { createDb, createPool } from '@db';
+import { users } from '@db/schemas/auth/users.schema';
+import { roles } from '@db/schemas/auth/roles.schema';
+import { userRoles } from '@db/schemas/auth/user-roles.schema';
+import { and, eq, isNull } from 'drizzle-orm';
 
 /**
  * This script assigns default roles to users who don't have one.

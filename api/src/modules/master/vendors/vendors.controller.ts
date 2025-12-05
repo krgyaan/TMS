@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -11,7 +10,7 @@
     HttpStatus,
   } from '@nestjs/common';
   import { z } from 'zod';
-  import { VendorsService } from './vendors.service';
+  import { VendorsService } from '@/modules/master/vendors/vendors.service';
 
   const CreateVendorSchema = z.object({
     organizationId: z.number().optional(),

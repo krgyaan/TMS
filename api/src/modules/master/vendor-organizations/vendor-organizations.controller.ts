@@ -11,7 +11,7 @@
     HttpStatus,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { VendorOrganizationsService } from './vendor-organizations.service';
+import { VendorOrganizationsService } from '@/modules/master/vendor-organizations/vendor-organizations.service';
 
 const CreateVendorOrganizationSchema = z.object({
     name: z.string().min(1).max(255),

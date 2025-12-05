@@ -9,8 +9,8 @@ import {
     Patch,
     Post,
 } from '@nestjs/common';
-import { TenderInfoSheetsService } from './info-sheets.service';
-import { TenderInfoSheetPayloadSchema } from './dto/info-sheet.dto';
+import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
+import { TenderInfoSheetPayloadSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 
 @Controller('tender-info-sheets')
 export class TenderInfoSheetsController {

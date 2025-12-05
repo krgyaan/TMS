@@ -1,21 +1,21 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { tenderInfos } from '../../../db/tenders.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import {
     physicalDocs,
     physicalDocsPersons,
     type NewPhysicalDocs,
-} from '../../../db/physical-docs.schema';
-import { tenderInformation } from '../../../db/tender-info-sheet.schema';
+} from '@db/schemas/tendering/physical-docs.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type {
     CreatePhysicalDocDto,
     UpdatePhysicalDocDto,
-} from './dto/physical-docs.dto';
-import { TenderInfosService } from '../tenders/tenders.service';
+} from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 // ============================================================================
 // Types

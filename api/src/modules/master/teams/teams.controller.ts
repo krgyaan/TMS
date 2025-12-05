@@ -1,7 +1,6 @@
 import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { TeamsService } from './teams.service';
+import { TeamsService } from '@/modules/master/teams/teams.service';
 
 const CreateTeamSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -60,10 +59,4 @@ export class TeamsController {
         const parsed = UpdateTeamSchema.parse(body);
         return this.teamsService.update(id, parsed);
     }
-
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.teamsService.delete(id);
-    // }
 }

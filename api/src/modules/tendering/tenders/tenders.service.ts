@@ -1,15 +1,15 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, notInArray } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { tenderInfos, type TenderInfo, type NewTenderInfo } from '../../../db/tenders.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
-import { items } from '../../../db/items.schema';
-import { organizations } from '../../../db/organizations.schema';
-import { locations } from '../../../db/locations.schema';
-import { websites } from '../../../db/websites.schema';
-import { StatusCache } from '../../../utils/status-cache';
+import { eq, and, inArray, isNull, notInArray } from 'drizzle-orm';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { tenderInfos, type TenderInfo, type NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { organizations } from '@db/schemas/master/organizations.schema';
+import { locations } from '@db/schemas/master/locations.schema';
+import { websites } from '@db/schemas/master/websites.schema';
+import { StatusCache } from '@/utils/status-cache';
 
 // ============================================================================
 // Types

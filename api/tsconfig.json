@@ -24,6 +24,23 @@
         "typeRoots": [
             "./node_modules/@types",
             "./src/types"
-        ]
+        ],
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ],
+            "@db": [
+                "./src/db"
+            ],
+            "@db/*": [
+                "./src/db/*"
+            ],
+            "@config": [
+                "./src/config"
+            ],
+            "@config/*": [
+                "./src/config/*"
+            ]
+        }
     }
 }

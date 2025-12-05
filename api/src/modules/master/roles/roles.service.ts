@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { roles, type Role, type NewRole } from '../../../db/roles.schema';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { roles, type Role, type NewRole } from '@db/schemas/auth/roles.schema';
 
 @Injectable()
 export class RolesService {

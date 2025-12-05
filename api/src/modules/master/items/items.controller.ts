@@ -11,7 +11,7 @@
   Post,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ItemsService } from './items.service';
+import { ItemsService } from '@/modules/master/items/items.service';
 
 const CreateItemSchema = z.object({
   name: z

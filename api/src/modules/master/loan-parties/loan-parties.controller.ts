@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { LoanPartiesService } from './loan-parties.service';
+import { LoanPartiesService } from '@/modules/master/loan-parties/loan-parties.service';
 
 const CreateLoanPartySchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -66,9 +65,4 @@ export class LoanPartiesController {
         return this.loanPartiesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.loanPartiesService.delete(id);
-    // }
 }

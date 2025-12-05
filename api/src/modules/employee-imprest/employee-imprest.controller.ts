@@ -1,15 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe } from "@nestjs/common";
 
-import { EmployeeImprestService } from "./employee-imprest.service";
+import { EmployeeImprestService } from '@/modules/employee-imprest/employee-imprest.service';
 
-import type { CreateEmployeeImprestDto } from "./zod/create-employee-imprest.schema";
+import type { CreateEmployeeImprestDto } from '@/modules/employee-imprest/zod/create-employee-imprest.schema';
 
-import type { UpdateEmployeeImprestDto } from "./zod/update-employee-imprest.schema";
-import { Public } from "../auth/decorators/public.decorator";
+import type { UpdateEmployeeImprestDto } from '@/modules/employee-imprest/zod/update-employee-imprest.schema';
 
 @Controller("employee-imprest")
 export class EmployeeImprestController {
-    constructor(private readonly service: EmployeeImprestService) {}
+    constructor(private readonly service: EmployeeImprestService) { }
 
     @Post()
     create(@Body() body: CreateEmployeeImprestDto) {

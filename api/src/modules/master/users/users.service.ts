@@ -2,15 +2,15 @@
 import { randomBytes } from 'node:crypto';
 import { hash, verify } from 'argon2';
 import { and, eq, isNull } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { users, type NewUser, type User } from '../../../db/users.schema';
-import { userProfiles } from '../../../db/user-profiles.schema';
-import { userRoles } from '../../../db/user-roles.schema';
-import { roles } from '../../../db/roles.schema';
-import { designations } from '../../../db/designations.schema';
-import { teams } from '../../../db/teams.schema';
-import { RoleName, DataScope, getDataScope, canSwitchTeams } from '../../../common/constants/roles.constant';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { users, type NewUser, type User } from '@db/schemas/auth/users.schema';
+import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
+import { userRoles } from '@db/schemas/auth/user-roles.schema';
+import { roles } from '@db/schemas/auth/roles.schema';
+import { designations } from '@db/schemas/master/designations.schema';
+import { teams } from '@db/schemas/master/teams.schema';
+import { RoleName, DataScope, getDataScope, canSwitchTeams } from '@/common/constants/roles.constant';
 
 export type SafeUser = Pick<
     User,

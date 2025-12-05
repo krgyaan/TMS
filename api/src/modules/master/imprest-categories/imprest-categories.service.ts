@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     imprestCategories,
     type ImprestCategory,
     type NewImprestCategory,
-} from '../../../db/imprest-categories.schema';
+} from '@db/schemas/accounts/imprest-categories.schema';
 
 @Injectable()
 export class ImprestCategoriesService {

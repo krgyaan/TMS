@@ -1,20 +1,20 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
-import { DRIZZLE } from "../../db/database.module";
-import type { DbInstance } from "../../db";
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 
-import { employee_imprests } from "../../db/employee-imprests.schema";
+import { employee_imprests } from '@db/schemas/accounts/employee-imprests.schema';
 
-import { CreateEmployeeImprestDto } from "./zod/create-employee-imprest.schema";
-import { UpdateEmployeeImprestDto } from "./zod/update-employee-imprest.schema";
+import { CreateEmployeeImprestDto } from '@/modules/employee-imprest/zod/create-employee-imprest.schema';
+import { UpdateEmployeeImprestDto } from '@/modules/employee-imprest/zod/update-employee-imprest.schema';
 
 @Injectable()
 export class EmployeeImprestService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
-    ) {}
+    ) { }
 
     async create(data: CreateEmployeeImprestDto) {
         const result = await this.db

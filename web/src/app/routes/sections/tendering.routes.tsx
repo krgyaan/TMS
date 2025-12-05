@@ -3,34 +3,34 @@ import { Routes, Route } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
 // Lazy imports
-const Tendering_Tenders = lazy(() => import('@/modules/tendering/tenders'));
-const Tender_Create = lazy(() => import('@/modules/tendering/tenders/create'));
-const Tender_Edit = lazy(() => import('@/modules/tendering/tenders/edit'));
-const Tender_View = lazy(() => import('@/modules/tendering/tenders/show'));
-const Tendering_TenderApproval = lazy(() => import('@/modules/tendering/tender-approval'));
-const Tendering_TenderApproval_Create = lazy(() => import('@/modules/tendering/tender-approval/create'));
-const Tendering_TenderApproval_Show = lazy(() => import('@/modules/tendering/tender-approval/show'));
-const InfoSheet_Create = lazy(() => import('@/modules/tendering/info-sheet/create'));
-const InfoSheet_Edit = lazy(() => import('@/modules/tendering/info-sheet/edit'));
-const Tendering_PhysicalDocs = lazy(() => import('@/modules/tendering/physical-docs'));
-const Tendering_PhysicalDocs_Create = lazy(() => import('@/modules/tendering/physical-docs/create'));
-const Tendering_PhysicalDocs_Edit = lazy(() => import('@/modules/tendering/physical-docs/edit'));
+const Tendering_Tenders = lazy(() => import('@/modules/tendering/tenders/TenderListPage'));
+const Tender_Create = lazy(() => import('@/modules/tendering/tenders/TenderCreatePage'));
+const Tender_Edit = lazy(() => import('@/modules/tendering/tenders/TenderEditPage'));
+const Tender_View = lazy(() => import('@/modules/tendering/tenders/TenderShowPage'));
+const Tendering_TenderApproval = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalListPage'));
+const Tendering_TenderApproval_Create = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalCreatePage'));
+const Tendering_TenderApproval_Show = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalViewPage'));
+const InfoSheet_Create = lazy(() => import('@/modules/tendering/info-sheet/TenderInfoSheetCreatePage'));
+const InfoSheet_Edit = lazy(() => import('@/modules/tendering/info-sheet/TenderInfoSheetEditPage'));
+const Tendering_PhysicalDocs = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsListPage'));
+const Tendering_PhysicalDocs_Create = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsCreatePage'));
+const Tendering_PhysicalDocs_Edit = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsEditPage'));
 const Tendering_PhysicalDocs_Show = lazy(() => import('@/modules/tendering/physical-docs/show'));
-const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs'));
-const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/create'));
-const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/edit'));
+const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs/RfqListPage'));
+const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/RfqCreatePage'));
+const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/RfqEditPage'));
 const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/show'));
-const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees'));
-const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/create'));
+const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdListPage'));
+const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
 const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/edit'));
-const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/show'));
-const Tendering_DocChecklist = lazy(() => import('@/modules/tendering/checklists'));
-const Tendering_CostingSheets = lazy(() => import('@/modules/tendering/costing-sheets'));
-const Tendering_CostingApproval = lazy(() => import('@/modules/tendering/costing-sheets'));
-const Tendering_BidSubmissions = lazy(() => import('@/modules/tendering/bid-submissions'));
+const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdShowPage'));
+const Tendering_DocChecklist = lazy(() => import('@/modules/tendering/checklists/ChecklistListPage'));
+const Tendering_CostingSheets = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetListPage'));
+const Tendering_CostingApproval = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetListPage'));
+const Tendering_BidSubmissions = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionListPage'));
 const Tendering_TQs = lazy(() => import('@/modules/tendering/tqs'));
-const Tendering_RAs = lazy(() => import('@/modules/tendering/ras'));
-const Tendering_Results = lazy(() => import('@/modules/tendering/results'));
+const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
+const Tendering_Results = lazy(() => import('@/modules/tendering/results/TenderResultListPage'));
 
 export default function TenderingRoutes() {
     return (

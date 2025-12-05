@@ -11,7 +11,7 @@ import {
     Query,
     Req,
 } from '@nestjs/common';
-import { EmdsService } from './emds.service';
+import { EmdsService } from '@/modules/tendering/emds/emds.service';
 import {
     CreatePaymentRequestSchema,
     UpdatePaymentRequestSchema,
@@ -19,7 +19,7 @@ import {
     DashboardQuerySchema,
     type DashboardResponse,
     type DashboardCounts,
-} from './dto/emds.dto';
+} from '@/modules/tendering/emds/dto/emds.dto';
 import type { Request } from 'express';
 
 // Extend Express Request to include user

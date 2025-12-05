@@ -4,7 +4,7 @@ import mysql2 from 'mysql2/promise';
 import { mysqlTable, varchar, bigint, int, timestamp } from 'drizzle-orm/mysql-core';
 import { Client } from 'pg';
 import { sql } from 'drizzle-orm';
-import { physicalDocs, physicalDocsPersons } from '../src/db/schema';
+import { physicalDocs, physicalDocsPersons } from '@db/schemas/tendering/physical-docs.schema';
 
 // ============================================================================
 // CONFIGURATION

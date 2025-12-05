@@ -1,7 +1,7 @@
 ﻿import { Controller, Delete, Get, Param, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { GoogleService } from './google.service';
+import { GoogleService } from '@/modules/integrations/google/google.service';
 
 const AuthUrlQuerySchema = z.object({
     userId: z.coerce.number().int().positive(),

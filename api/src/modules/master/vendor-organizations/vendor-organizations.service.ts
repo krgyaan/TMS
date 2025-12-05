@@ -1,15 +1,15 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     vendorOrganizations,
     type VendorOrganization,
     type NewVendorOrganization,
-} from '../../../db/vendor-organizations.schema';
-import { vendors } from '../../../db/vendors.schema';
-import { vendorGsts } from '../../../db/vendor-gsts.schema';
-import { vendorAccs } from '../../../db/vendor-banks.schema';
+} from '@db/schemas/vendors/vendor-organizations.schema';
+import { vendors } from '@db/schemas/vendors/vendors.schema';
+import { vendorGsts } from '@db/schemas/vendors/vendor-gsts.schema';
+import { vendorAccs } from '@db/schemas/vendors/vendor-banks.schema';
 
 @Injectable()
 export class VendorOrganizationsService {

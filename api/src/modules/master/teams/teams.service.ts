@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { teams, type Team, type NewTeam } from '../../../db/teams.schema';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { teams, type Team, type NewTeam } from '@db/schemas/master/teams.schema';
 
 @Injectable()
 export class TeamsService {

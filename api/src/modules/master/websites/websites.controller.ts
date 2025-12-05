@@ -1,7 +1,6 @@
 import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { WebsitesService } from './websites.service';
+import { WebsitesService } from '@/modules/master/websites/websites.service';
 
 const CreateWebsiteSchema = z.object({
     name: z.string().min(1, 'Name is required').max(255),

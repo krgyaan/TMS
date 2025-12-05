@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     tqTypes,
     type TqType,
     type NewTqType,
-} from '../../../db/tq-types.schema';
+} from '@db/schemas/tendering/tq-types.schema';
 
 @Injectable()
 export class TqTypesService {

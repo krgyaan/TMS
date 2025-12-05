@@ -1,6 +1,6 @@
 import { Controller, Get, Put, Param, Body, ParseIntPipe } from '@nestjs/common';
-import { TenderApprovalService } from './tender-approval.service';
-import type { TenderApprovalPayload } from './dto/tender-approval.dto';
+import { TenderApprovalService } from '@/modules/tendering/tender-approval/tender-approval.service';
+import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 
 @Controller('tender-approvals')
 export class TenderApprovalController {
