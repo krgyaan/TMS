@@ -1,5 +1,5 @@
 // employee-imprest.service.ts
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
 import { DRIZZLE } from "../../db/database.module";
@@ -49,6 +49,38 @@ export class EmployeeImprestService {
         const result = await this.db
             .update(employee_imprests)
             .set({ ...data, updated_at: new Date() })
+            .where(eq(employee_imprests.id, id))
+            .returning();
+
+        return result[0];
+    }
+
+    async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
+        const existing = await this.findOne(id);
+
+        if (!existing) {
+            throw new NotFoundException("Courier not found");
+        }
+
+        if (existing.user_id !== userId) {
+            throw new ForbiddenException("Not authorized");
+        }
+
+        const newDocs = files.map(file => ({
+            url: `/uploads/employee-imprest/${file.filename}`,
+            name: file.originalname,
+            type: file.mimetype.startsWith("image") ? "image" : "file",
+        }));
+
+        const existingDocs = (existing.invoice_proof as any[]) || [];
+        const updatedDocs = [...existingDocs, ...newDocs];
+
+        const result = await this.db
+            .update(employee_imprests)
+            .set({
+                invoice_proof: updatedDocs,
+                updated_at: new Date(),
+            })
             .where(eq(employee_imprests.id, id))
             .returning();
 
