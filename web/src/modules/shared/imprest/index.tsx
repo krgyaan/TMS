@@ -11,6 +11,8 @@ import { Trash, Plus, Loader2 } from "lucide-react";
 import { RowContainerCtrl, type ColDef } from "ag-grid-community";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import { Image, File } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
@@ -137,6 +139,39 @@ const ImprestEmployeeDashboard: React.FC = () => {
         [handleDelete]
     );
 
+    const exportExcel = () => {
+        if (!rows || rows.length === 0) return;
+
+        // Transform rows into plain JSON for Excel
+        const excelData = rows.map(r => ({
+            Date: r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB") : "-",
+            "Party Name": r.party_name,
+            "Project Name": r.project_name,
+            Amount: r.amount,
+            Category: r.category,
+            Remarks: r.remark,
+            Status: r.approval_status === 1 ? "Approved" : "Pending",
+            "Proof Count": r.invoice_proof?.length ?? 0,
+        }));
+
+        // Convert JSON → worksheet
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Imprest Records");
+
+        // Generate Excel buffer
+        const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+
+        // Download
+        const fileBlob = new Blob([excelBuffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        saveAs(fileBlob, `Imprest_Records_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
     /**
      * Column definitions
      */
@@ -245,7 +280,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <Button variant="outline" onClick={() => navigate(paths.shared.ImprestVoucher)}>
                             Imprest Voucher
                         </Button>
-                        <Button variant="secondary">Download Excel</Button>
+                        <Button variant="secondary" onClick={() => exportExcel()}>
+                            Download Excel
+                        </Button>
                     </div>
                 </CardHeader>
 

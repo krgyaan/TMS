@@ -34,7 +34,44 @@ const ImprestPaymentHistory: React.FC = () => {
     /**
      * Query Hooks (React Query)
      */
-    const { data: rows = [], isLoading, error } = useImprestList();
+    // const { data: rows = [], isLoading, error } = useImprestList();
+
+    const isLoading = false;
+    const error = null;
+
+    const rows: ImprestRow[] = [
+        {
+            id: 1,
+            sr_no: 1,
+            team_member_name: "John Doe",
+            created_at: "2025-01-01",
+            amount: 1200,
+            project_name: "Project Alpha",
+            category: "Travel",
+            remark: "Cab to airport",
+            approval_status: 1,
+            invoice_proof: [
+                {
+                    url: "https://picsum.photos/400",
+                    type: "image",
+                    name: "receipt1.jpg",
+                },
+            ],
+        },
+        {
+            id: 2,
+            sr_no: 2,
+            team_member_name: "Jane Smith",
+            created_at: "2025-01-03",
+            amount: 2400,
+            project_name: "Beta Build",
+            category: "Food",
+            remark: "Client lunch",
+            approval_status: 0,
+            invoice_proof: [],
+        },
+    ];
+
     const deleteMutation = useDeleteImprest();
     const updateMutation = useUpdateImprest();
     const uploadProofsMutation = useUploadImprestProofs();
@@ -81,41 +118,6 @@ const ImprestPaymentHistory: React.FC = () => {
         },
         [updateMutation]
     );
-
-    /**
-     * Proof upload modal
-     */
-    const openAddProof = (rowId: number) => {
-        setCurrentProofRowId(rowId);
-        setAddProofOpen(true);
-    };
-
-    const submitAddProof = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!currentProofRowId || filesToUpload.length === 0) return;
-
-        uploadProofsMutation.mutate({ id: currentProofRowId, files: filesToUpload }, { onSuccess: () => setAddProofOpen(false) });
-    };
-
-    const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files ? Array.from(e.target.files) : [];
-        setFilesToUpload(f);
-    };
-
-    /**
-     * Lightbox
-     */
-
-    const openLightboxForRow = (row: ImprestRow, startIndex = 0) => {
-        const slides = (row.invoice_proof ?? []).map(p => ({
-            src: p.url,
-            type: p.type, // "image" or "file"
-            name: p.name,
-        }));
-
-        setLightboxSlides(slides);
-        setLightboxOpen(true);
-    };
 
     /**
      * AG Grid Action Items

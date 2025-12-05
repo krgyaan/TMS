@@ -227,7 +227,7 @@ export const paths = {
 
         imprest: "/shared/imprests",
         imprestCreate: "/shared/imprests/create",
-        ImprestPaymentHistory: `/shared/imprests/payment-history/${id}`,
-        ImprestVoucher: `/shared/imprests/payment-voucher/${id}`,
+        ImprestPaymentHistory: "/shared/imprests/payment-history",
+        ImprestVoucher: "/shared/imprests/voucher",
     },
 };

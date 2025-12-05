@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req } from "@nestjs/common";
 import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
@@ -32,8 +32,8 @@ export class EmployeeImprestController {
     }
 
     @Get()
-    getMyImprests(@CurrentUser("id") userId: number) {
-        return this.service.findAllByUser(userId);
+    getMyImprests(@Req() req) {
+        return this.service.findAllByUser(req.user.id);
     }
 
     @Get("user/:userId")
