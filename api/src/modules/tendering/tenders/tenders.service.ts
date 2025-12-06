@@ -116,7 +116,7 @@ export class TenderInfosService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
     static getExcludeDnbTlStatusCondition() {
-        const statusIds = ['dnb', 'lost']
+        const statusIds = ['dnb']
             .flatMap((cat) => StatusCache.getIds(cat))
             .filter(Boolean);
 

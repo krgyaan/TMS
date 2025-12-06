@@ -15,6 +15,7 @@ export type ChecklistDashboardRow = {
 export const checklistsService = {
     getAll: async (): Promise<ChecklistDashboardRow[]> => {
         const response = await axiosInstance.get<ChecklistDashboardRow[]>('/checklists');
+        // console.log(response.data);
         return response.data;
     },
 };

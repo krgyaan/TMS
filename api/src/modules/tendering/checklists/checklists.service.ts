@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -7,6 +7,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 type ChecklistDashboardRow = {
@@ -18,7 +19,7 @@ type ChecklistDashboardRow = {
     statusName: string | null;
     dueDate: Date | null;
     gstValues: number;
-    checklistSubmitted: boolean; // Placeholder - can be enhanced when checklist tracking is added
+    checklistSubmitted: boolean;
 }
 
 @Injectable()
@@ -36,30 +37,42 @@ export class ChecklistsService {
                 statusName: statuses.name,
                 dueDate: tenderInfos.dueDate,
                 gstValues: tenderInfos.gstValues,
+                hasChecklist: tenderDocumentChecklists.id,
             })
             .from(tenderInfos)
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(
+                tenderDocumentChecklists,
+                sql`${tenderDocumentChecklists.tenderId}::int = ${tenderInfos.id}`
+            )
             .where(and(
                 eq(tenderInfos.tlStatus, 1),
                 eq(tenderInfos.deleteStatus, 0),
                 TenderInfosService.getExcludeDnbTlStatusCondition()
             ));
 
-        // For now, all tenders are marked as not submitted (pending)
-        // This can be enhanced when checklist submission tracking is implemented
-        return rows.map((row) => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            teamMemberName: row.teamMemberName,
-            itemName: row.itemName,
-            statusName: row.statusName,
-            dueDate: row.dueDate,
-            gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            checklistSubmitted: false, // Placeholder - update when checklist tracking is added
-        }));
+        // Remove duplicates (tender can have multiple checklist documents)
+        const uniqueTenders = new Map<number, ChecklistDashboardRow>();
+
+        rows.forEach((row) => {
+            if (!uniqueTenders.has(row.tenderId)) {
+                uniqueTenders.set(row.tenderId, {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    teamMemberName: row.teamMemberName,
+                    itemName: row.itemName,
+                    statusName: row.statusName,
+                    dueDate: row.dueDate,
+                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
+                    checklistSubmitted: row.hasChecklist !== null,
+                });
+            }
+        });
+
+        return Array.from(uniqueTenders.values());
     }
 }

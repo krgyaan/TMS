@@ -7,6 +7,7 @@ export class ChecklistsController {
 
     @Get()
     findAll() {
+        console.log('findAll');
         return this.checklistsService.findAll();
     }
 }
