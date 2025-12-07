@@ -808,3 +808,42 @@ export interface DashboardResponse {
 }
 
 export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
+
+export interface TenderDocumentChecklist {
+    id: number;
+    tenderId: number;
+    selectedDocuments: string[] | null;
+    extraDocuments: ExtraDocument[] | null;
+    submittedBy: number | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+export interface ExtraDocument {
+    name: string;
+    path?: string;
+}
+
+export interface CreateDocumentChecklistDto {
+    tenderId: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export interface UpdateDocumentChecklistDto {
+    id: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export type TenderDocumentChecklistDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    gstValues: number;
+    checklistSubmitted: boolean;
+};

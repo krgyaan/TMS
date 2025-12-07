@@ -42,7 +42,7 @@ import { TenderApprovalModule } from '@/modules/tendering/tender-approval/tender
 import { PhysicalDocsModule } from '@/modules/tendering/physical-docs/physical-docs.module';
 import { RfqsModule } from '@/modules/tendering/rfqs/rfq.module';
 import { EmdsModule } from '@/modules/tendering/emds/emds.module';
-import { ChecklistsModule } from '@/modules/tendering/checklists/checklists.module';
+import { DocumentChecklistsModule } from '@/modules/tendering/checklists/document-checklists.module';
 import { CostingSheetsModule } from '@/modules/tendering/costing-sheets/costing-sheets.module';
 import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-imprest.module';
 
@@ -94,7 +94,7 @@ import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-impre
         PhysicalDocsModule,
         RfqsModule,
         EmdsModule,
-        ChecklistsModule,
+        DocumentChecklistsModule,
         CostingSheetsModule,
     ],
     controllers: [AppController],

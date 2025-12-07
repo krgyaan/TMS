@@ -24,7 +24,9 @@ const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/Emd
 const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
 const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/edit'));
 const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdShowPage'));
-const Tendering_DocChecklist = lazy(() => import('@/modules/tendering/checklists/ChecklistListPage'));
+const Tendering_DocumentChecklist = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistListPage'));
+const Tendering_DocumentChecklist_Create = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistCreatePage'));
+const Tendering_DocumentChecklist_Edit = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistEditPage'));
 const Tendering_CostingSheets = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetListPage'));
 const Tendering_CostingApproval = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetListPage'));
 const Tendering_BidSubmissions = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionListPage'));
@@ -56,7 +58,9 @@ export default function TenderingRoutes() {
             <Route path="emds-tenderfees/create/:tenderId" element={<RouteWrapper><Tendering_EMD_Create /></RouteWrapper>} />
             <Route path="emds-tenderfees/:id/edit" element={<RouteWrapper><Tendering_EMD_Edit /></RouteWrapper>} />
             <Route path="emds-tenderfees/:id" element={<RouteWrapper><Tendering_EMD_Show /></RouteWrapper>} />
-            <Route path="checklists" element={<RouteWrapper><Tendering_DocChecklist /></RouteWrapper>} />
+            <Route path="document-checklists" element={<RouteWrapper><Tendering_DocumentChecklist /></RouteWrapper>} />
+            <Route path="document-checklists/create/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Create /></RouteWrapper>} />
+            <Route path="document-checklists/edit/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Edit /></RouteWrapper>} />
             <Route path="costing-sheets" element={<RouteWrapper><Tendering_CostingSheets /></RouteWrapper>} />
             <Route path="costing-approval" element={<RouteWrapper><Tendering_CostingApproval /></RouteWrapper>} />
             <Route path="bid-submissions" element={<RouteWrapper><Tendering_BidSubmissions /></RouteWrapper>} />

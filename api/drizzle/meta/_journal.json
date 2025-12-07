@@ -225,6 +225,13 @@
       "when": 1764852911678,
       "tag": "0047_majestic_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1765121462933,
+      "tag": "0048_tearful_rattler",
+      "breakpoints": true
     }
   ]
 }

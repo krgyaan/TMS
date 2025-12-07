@@ -9,29 +9,45 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2 } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Pencil, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useChecklists, type ChecklistDashboardRow } from '@/hooks/api/useChecklists';
+import { useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
+import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
 
 const Checklists = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'submitted'>('pending');
     const navigate = useNavigate();
 
-    const { data: tabsData, isLoading: loading, error } = useChecklists();
+    const { data: tabsData, isLoading: loading, error } = useDocumentChecklists();
+    console.log(tabsData);
 
-    const checklistActions: ActionItem<ChecklistDashboardRow>[] = [
+    const checklistActions: ActionItem<TenderDocumentChecklistDashboardRow>[] = [
+        {
+            label: 'Create',
+            onClick: (row: TenderDocumentChecklistDashboardRow) => {
+                navigate(paths.tendering.documentChecklistCreate(row.tenderId));
+            },
+            icon: <Plus className="h-4 w-4" />,
+        },
+        {
+            label: 'Edit',
+            onClick: (row: TenderDocumentChecklistDashboardRow) => {
+                navigate(paths.tendering.documentChecklistEdit(row.tenderId));
+            },
+            icon: <Pencil className="h-4 w-4" />,
+        },
         {
             label: 'View',
-            onClick: (row: ChecklistDashboardRow) => {
-                navigate(paths.tendering.tenderView(row.tenderId));
+            onClick: (row: TenderDocumentChecklistDashboardRow) => {
+                navigate(paths.tendering.documentChecklistView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
     ];
 
-    const tabsConfig = useMemo<{ key: 'pending' | 'submitted'; name: string; count: number; data: ChecklistDashboardRow[] }[]>(() => {
+    const tabsConfig = useMemo<{ key: 'pending' | 'submitted'; name: string; count: number; data: TenderDocumentChecklistDashboardRow[] }[]>(() => {
         if (!tabsData || typeof tabsData !== 'object' || !Array.isArray(tabsData)) return [];
 
         return [
@@ -50,7 +66,7 @@ const Checklists = () => {
         ];
     }, [tabsData]);
 
-    const colDefs = useMemo<ColDef<ChecklistDashboardRow>[]>(() => [
+    const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRow>[]>(() => [
         {
             field: 'tenderNo',
             headerName: 'Tender No',
@@ -175,6 +191,7 @@ const Checklists = () => {
             </Card>
         );
     }
+
 
     return (
         <Card>
