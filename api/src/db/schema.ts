@@ -35,3 +35,17 @@ export * from "./physical-docs.schema";
 export * from "./rfqs.schema";
 export * from "./emds.schema";
 export * from "./couriers.schema";
+
+export * from "./enums.schema";
+
+// --------------------
+// NEW FOLLOW-UP MODULE SCHEMAS
+// --------------------
+export * from "./followup-categories.schema";
+export * from "./follow-ups.schema";
+export * from "./client-directory.schema";
+
+// --------------------
+// NEW FOLLOW-UP MODULE RELATIONS
+// --------------------
+export * from "./follow-ups.relations";
