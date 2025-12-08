@@ -938,3 +938,36 @@ export type BidSubmission = {
     createdAt: Date;
     updatedAt: Date;
 };
+
+export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+
+export type TenderQuery = {
+    id: number;
+    tenderId: number;
+    tqSubmissionDeadline: Date | null;
+    tqDocumentReceived: string | null;
+    receivedBy: number | null;
+    receivedAt: Date | null;
+    repliedDatetime: Date | null;
+    repliedDocument: string | null;
+    proofOfSubmission: string | null;
+    repliedBy: number | null;
+    repliedAt: Date | null;
+    missedReason: string | null;
+    preventionMeasures: string | null;
+    tmsImprovements: string | null;
+    status: TqStatus;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TenderQueryItem = {
+    id: number;
+    tenderQueryId: number;
+    srNo: number;
+    tqTypeId: number;
+    queryDescription: string;
+    response: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};

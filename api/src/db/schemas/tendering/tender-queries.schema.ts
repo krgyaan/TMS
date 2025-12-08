@@ -24,13 +24,13 @@ export const tenderQueries = pgTable('tender_queries', {
     tenderId: bigint('tender_id', { mode: 'number' }).notNull().references(() => tenderInfos.id, { onDelete: 'cascade' }),
 
     // TQ Received Info
-    tqSubmissionDeadline: timestamp('tq_submission_deadline', { withTimezone: true }).notNull(),
+    tqSubmissionDeadline: timestamp('tq_submission_deadline', { withTimezone: true }),
     tqDocumentReceived: varchar('tq_document_received', { length: 500 }),
     receivedBy: bigint('received_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
     receivedAt: timestamp('received_at', { withTimezone: true }),
 
     // TQ Status Flow
-    status: tqStatusEnum('status').default('Received'),
+    status: varchar('status', { length: 50 }).notNull().default('TQ awaited'),
 
     // TQ Replied Info
     repliedDatetime: timestamp('replied_datetime', { withTimezone: true }),

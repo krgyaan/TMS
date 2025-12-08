@@ -41,7 +41,16 @@ const BidSubmitPage = lazy(() => import('@/modules/tendering/bid-submissions/Bid
 const BidEditPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditPage'));
 const BidMarkMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidMarkMissedPage'));
 const BidEditMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditMissedPage'));
-const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionViewPage')); const Tendering_TQs = lazy(() => import('@/modules/tendering/tqs'));
+const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionViewPage'));
+const TqManagementListPage = lazy(() => import('@/modules/tendering/tq-management/TqManagementListPage'));
+const TqReceivedPage = lazy(() => import('@/modules/tendering/tq-management/TqReceivedPage'));
+const TqEditReceivedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditReceivedPage'));
+const TqRepliedPage = lazy(() => import('@/modules/tendering/tq-management/TqRepliedPage'));
+const TqEditRepliedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditRepliedPage'));
+const TqMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqMissedPage'));
+const TqEditMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditMissedPage'));
+const TqViewPage = lazy(() => import('@/modules/tendering/tq-management/TqViewPage'));
+const TqViewAllPage = lazy(() => import('@/modules/tendering/tq-management/TqViewAllPage'));
 const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
 const Tendering_Results = lazy(() => import('@/modules/tendering/results/TenderResultListPage'));
 
@@ -87,7 +96,15 @@ export default function TenderingRoutes() {
             <Route path="bid-submissions/mark-missed/:tenderId" element={<RouteWrapper><BidMarkMissedPage /></RouteWrapper>} />
             <Route path="bid-submissions/edit-missed/:id" element={<RouteWrapper><BidEditMissedPage /></RouteWrapper>} />
             <Route path="bid-submissions/view/:id" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
-            <Route path="tqs" element={<RouteWrapper><Tendering_TQs /></RouteWrapper>} />
+            <Route path="tq-management" element={<RouteWrapper><TqManagementListPage /></RouteWrapper>} />
+            <Route path="tq-management/received/:tenderId" element={<RouteWrapper><TqReceivedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-received/:id" element={<RouteWrapper><TqEditReceivedPage /></RouteWrapper>} />
+            <Route path="tq-management/replied/:id" element={<RouteWrapper><TqRepliedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-replied/:id" element={<RouteWrapper><TqEditRepliedPage /></RouteWrapper>} />
+            <Route path="tq-management/missed/:id" element={<RouteWrapper><TqMissedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-missed/:id" element={<RouteWrapper><TqEditMissedPage /></RouteWrapper>} />
+            <Route path="tq-management/view/:id" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
+            <Route path="tq-management/view-all/:tenderId" element={<RouteWrapper><TqViewAllPage /></RouteWrapper>} />
             <Route path="ras" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
         </Routes>

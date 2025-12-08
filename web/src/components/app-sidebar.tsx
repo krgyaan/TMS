@@ -98,7 +98,7 @@ const data = {
                 },
                 {
                     title: "TQs",
-                    url: paths.tendering.tqs,
+                    url: paths.tendering.tqManagement,
                 },
                 {
                     title: "RA",

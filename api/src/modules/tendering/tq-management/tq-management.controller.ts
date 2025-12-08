@@ -1,0 +1,93 @@
+import {
+    Controller,
+    Get,
+    Post,
+    Patch,
+    Body,
+    Param,
+    ParseIntPipe,
+    Request
+} from '@nestjs/common';
+import { TqManagementService } from '@/modules/tendering/tq-management/tq-management.service';
+import {
+    CreateTqReceivedDto,
+    UpdateTqRepliedDto,
+    UpdateTqMissedDto,
+    MarkAsNoTqDto,
+    UpdateTqReceivedDto
+} from './dto/tq-management.dto';
+
+@Controller('tq-management')
+export class TqManagementController {
+    constructor(private readonly tqManagementService: TqManagementService) { }
+
+    @Get()
+    findAll() {
+        return this.tqManagementService.findAll();
+    }
+
+    @Get(':id')
+    findById(@Param('id', ParseIntPipe) id: number) {
+        return this.tqManagementService.findById(id);
+    }
+
+    @Get('tender/:tenderId')
+    findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.tqManagementService.findByTenderId(tenderId);
+    }
+
+    @Get(':id/items')
+    getTqItems(@Param('id', ParseIntPipe) id: number) {
+        return this.tqManagementService.getTqItems(id);
+    }
+
+    @Post('received')
+    createTqReceived(@Body() dto: CreateTqReceivedDto, @Request() req: any) {
+        return this.tqManagementService.createTqReceived({
+            tenderId: dto.tenderId,
+            tqSubmissionDeadline: new Date(dto.tqSubmissionDeadline),
+            tqDocumentReceived: dto.tqDocumentReceived,
+            receivedBy: req.user?.id || 1,
+            tqItems: dto.tqItems,
+        });
+    }
+
+    @Patch(':id/replied')
+    updateTqReplied(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateTqRepliedDto,
+        @Request() req: any
+    ) {
+        return this.tqManagementService.updateTqReplied(id, {
+            repliedDatetime: new Date(dto.repliedDatetime),
+            repliedDocument: dto.repliedDocument,
+            proofOfSubmission: dto.proofOfSubmission,
+            repliedBy: req.user?.id || 1,
+        });
+    }
+
+    @Patch(':id/missed')
+    updateTqMissed(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateTqMissedDto
+    ) {
+        return this.tqManagementService.updateTqMissed(id, dto);
+    }
+
+    @Post('no-tq')
+    markAsNoTq(@Body() dto: MarkAsNoTqDto, @Request() req: any) {
+        return this.tqManagementService.markAsNoTq(dto.tenderId, req.user?.id || 1);
+    }
+
+    @Patch(':id/received')
+    updateTqReceived(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateTqReceivedDto
+    ) {
+        return this.tqManagementService.updateTqReceived(id, {
+            tqSubmissionDeadline: new Date(dto.tqSubmissionDeadline),
+            tqDocumentReceived: dto.tqDocumentReceived,
+            tqItems: dto.tqItems,
+        });
+    }
+}

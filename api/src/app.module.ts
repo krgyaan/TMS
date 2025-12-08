@@ -47,6 +47,7 @@ import { CostingSheetsModule } from '@/modules/tendering/costing-sheets/costing-
 import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-imprest.module';
 import { CostingApprovalsModule } from '@/modules/tendering/costing-approvals/costing-approvals.module';
 import { BidSubmissionsModule } from '@/modules/tendering/bid-submissions/bid-submissions.module';
+import { TqManagementModule } from '@/modules/tendering/tq-management/tq-management.module';
 
 @Module({
     imports: [
@@ -100,6 +101,7 @@ import { BidSubmissionsModule } from '@/modules/tendering/bid-submissions/bid-su
         CostingSheetsModule,
         CostingApprovalsModule,
         BidSubmissionsModule,
+        TqManagementModule,
     ],
     controllers: [AppController],
     providers: [
