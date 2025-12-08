@@ -344,7 +344,7 @@ const data = {
             items: [
                 {
                     title: "Follow Ups",
-                    url: paths.shared.followUps,
+                    url: paths.shared.followUp,
                 },
                 {
                     title: "Couriers",
