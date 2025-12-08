@@ -214,10 +214,10 @@ export const paths = {
 
     // ==================== SHARED ====================
     shared: {
-        followUps: "/shared/follow-ups",
-        followUpsCreate: "/shared/follow-ups/create",
-        followUpsEdit: "/shared/follow-up/edit",
-        followUpsShow: "/shared/follow-up/show",
+        followUp: "/shared/follow-ups",
+        followUpCreate: "/shared/follow-up/create",
+        followUpEdit: (id: number) => `/shared/follow-up/edit/${id}`,
+        followUpShow: (id: number) => `/shared/follow-up/show/${id}`,
 
         couriers: "/shared/couriers",
         courierDispatch: "/shared/couriers/dispatch",

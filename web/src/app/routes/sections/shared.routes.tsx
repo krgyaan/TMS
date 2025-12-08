@@ -4,10 +4,10 @@ import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 // Follow-ups
-const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up"));
-const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-up/create"));
-const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/edit"));
-const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/show"));
+const Shared_FollowUps = lazy(() => import("@/modules/shared/follow-up/FollowUpPage"));
+const FollowUpCreatePage = lazy(() => import("@/modules/shared/follow-up/FollowUpCreatePage"));
+const FollowUpEditPage = lazy(() => import("@/modules/shared/follow-up/FollowUpEditPage"));
+const FollowUpShowPage = lazy(() => import("@/modules/shared/follow-up/FollowUpViewPage"));
 
 // Courier
 const Shared_Courier = lazy(() => import("@/modules/shared/courier"));
@@ -35,9 +35,9 @@ export default function SharedRoutes() {
                     </RouteWrapper>
                 }
             />
-            <Route path="follow-ups/create" element={<FollowUpCreatePage />} />
-            <Route path="follow-ups/edit/:id" element={<FollowUpEditPage />} />
-            <Route path="follow-ups/show/:id" element={<FollowUpShowPage />} />
+            <Route path="follow-up/create" element={<FollowUpCreatePage />} />
+            <Route path="follow-up/edit/:id" element={<FollowUpEditPage />} />
+            <Route path="follow-up/show/:id" element={<FollowUpShowPage />} />
             {/* Courier Routes */}
             <Route
                 path="couriers"
