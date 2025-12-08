@@ -14,6 +14,7 @@ import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useRfqs, useDeleteRfq } from '@/hooks/api/useRfqs';
+import { tenderNameCol } from '@/components/data-grid';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
@@ -68,24 +69,12 @@ const Rfqs = () => {
     }, [tabsData]);
 
     const colDefs = useMemo<ColDef<RfqDashboardRow>[]>(() => [
-        {
-            field: 'tenderNo',
-            headerName: 'Tender No',
-            flex: 1,
-            minWidth: 120,
-            sortable: true,
+        tenderNameCol<RfqDashboardRow>('tenderNo', {
+            headerName: 'Tender Details',
             filter: true,
-            valueGetter: (params: any) => params.data?.tenderNo || '—',
-        },
-        {
-            field: 'tenderName',
-            headerName: 'Tender Name',
             flex: 2,
-            minWidth: 200,
-            sortable: true,
-            filter: true,
-            valueGetter: (params: any) => params.data?.tenderName || '—',
-        },
+            minWidth: 250,
+        }),
         {
             field: 'dueDate',
             headerName: 'Due Date',

@@ -69,8 +69,7 @@ const DataTable = <T extends Record<string, any>>({
             sortable: enableSorting,
             filter: enableFiltering,
             resizable: enableColumnResizing,
-            flex: 1,
-            minWidth: 100,
+            minWidth: 80,
         },
 
         // Row selection (new object-based API)

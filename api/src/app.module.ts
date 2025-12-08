@@ -45,6 +45,7 @@ import { EmdsModule } from '@/modules/tendering/emds/emds.module';
 import { DocumentChecklistsModule } from '@/modules/tendering/checklists/document-checklists.module';
 import { CostingSheetsModule } from '@/modules/tendering/costing-sheets/costing-sheets.module';
 import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-imprest.module';
+import { CostingApprovalsModule } from '@/modules/tendering/costing-approvals/costing-approvals.module';
 
 @Module({
     imports: [
@@ -96,6 +97,7 @@ import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-impre
         EmdsModule,
         DocumentChecklistsModule,
         CostingSheetsModule,
+        CostingApprovalsModule,
     ],
     controllers: [AppController],
     providers: [

@@ -16,6 +16,7 @@ import { AlertCircle, Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
+import { tenderNameCol } from "@/components/data-grid/columns";
 
 const TendersPage = () => {
     const { data: statuses, isLoading: statusesLoading, error: statusesError } = useStatuses();
@@ -102,16 +103,12 @@ const TendersPage = () => {
     ];
 
     const [colDefs] = useState<ColDef<TenderInfoWithNames>[]>([
-        {
-            field: "tenderNo",
-            headerName: "Tender No",
-            width: 200,
-        },
-        {
-            field: "tenderName",
-            headerName: "Tender Name",
+        tenderNameCol<TenderInfoWithNames>('tenderNo', {
+            headerName: 'Tender Details',
+            filter: true,
             flex: 2,
-        },
+            minWidth: 250,
+        }),
         {
             field: "organizationAcronym",
             headerName: "Org.",

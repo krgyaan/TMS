@@ -847,3 +847,71 @@ export type TenderDocumentChecklistDashboardRow = {
     gstValues: number;
     checklistSubmitted: boolean;
 };
+
+export type CostingSheetStatus = 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+
+export type TenderCostingSheet = {
+    id: number;
+    tenderId: number;
+    submittedBy: number | null;
+    approvedBy: number | null;
+    googleSheetUrl: string | null;
+    sheetTitle: string | null;
+
+    // Submitted values (TE)
+    submittedFinalPrice: string | null;
+    submittedReceiptPrice: string | null;
+    submittedBudgetPrice: string | null;
+    submittedGrossMargin: string | null;
+    teRemarks: string | null;
+
+    // Approved values (TL)
+    finalPrice: string | null;
+    receiptPrice: string | null;
+    budgetPrice: string | null;
+    grossMargin: string | null;
+    oemVendorIds: number[] | null;
+    tlRemarks: string | null;
+
+    status: CostingSheetStatus;
+    rejectionReason: string | null;
+
+    submittedAt: Date | null;
+    approvedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type CostingSheetDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    costingStatus: 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+    submittedFinalPrice: string | null;
+    submittedBudgetPrice: string | null;
+    googleSheetUrl: string | null;
+    costingSheetId: number | null;
+};
+
+export type SubmitCostingSheetDto = {
+    tenderId: number;
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};
+
+export type UpdateCostingSheetDto = {
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};

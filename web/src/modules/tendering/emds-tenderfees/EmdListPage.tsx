@@ -15,6 +15,7 @@ import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { DashboardRow } from "@/services/api/emds.service";
+import { tenderNameCol } from "@/components/data-grid";
 
 // Tab configuration with status mappings
 const TABS = [
@@ -107,28 +108,11 @@ const EmdsAndTenderFeesPage = () => {
 
     // Column definitions
     const colDefs = useMemo<ColDef<DashboardRow>[]>(() => [
-        {
-            field: 'tenderNo',
-            headerName: 'Tender No',
-            width: 150,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => (
-                <span className="font-medium hover:underline cursor-pointer"
-                    onClick={() => navigate(paths.tendering.tenderView(params.data!.tenderId))}>
-                    {params.value}
-                </span>
-            ),
-        },
-        {
-            field: 'tenderName',
-            headerName: 'Tender Name',
-            flex: 2,
-            minWidth: 200,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => (
-                <span className="truncate" title={params.value}>
-                    {params.value || <span className="text-gray-400">—</span>}
-                </span>
-            ),
-        },
+        tenderNameCol<DashboardRow>('tenderNo', {
+            headerName: 'Tender Details',
+            filter: true,
+            minWidth: 250,
+        }),
         {
             field: 'purpose',
             headerName: 'Payment Type',
@@ -348,7 +332,7 @@ const EmdsAndTenderFeesPage = () => {
                         suppressRowClickSelection: true,
                     }}
                     enablePagination={true}
-                    height="calc(100vh - 350px)"
+                    height="auto"
                 />
             </CardContent>
         </Card>

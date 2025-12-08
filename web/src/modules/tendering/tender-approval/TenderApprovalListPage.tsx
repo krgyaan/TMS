@@ -8,13 +8,14 @@ import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useAllTenders } from '@/hooks/api/useTenderApprovals';
-import type { TenderApproval, TenderApprovalRow } from '@/types/api.types';
+import type { TenderApprovalRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
+import { tenderNameCol } from '@/components/data-grid';
 
 const TABS_NAMES = {
     '0': 'Pending',
@@ -30,7 +31,7 @@ type TabConfig = {
     data: TenderApprovalRow[];
 };
 
-const TenderApproval = () => {
+const TenderApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | '3'>('0');
     const navigate = useNavigate();
 
@@ -83,22 +84,11 @@ const TenderApproval = () => {
     }, [tabsData]);
 
     const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
-        {
-            field: 'tenderNo',
-            headerName: 'Tender No',
-            flex: 1,
-            minWidth: 120,
-            sortable: true,
+        tenderNameCol<TenderApprovalRow>('tenderNo', {
+            headerName: 'Tender Details',
             filter: true,
-        },
-        {
-            field: 'tenderName',
-            headerName: 'Tender Name',
-            flex: 2,
-            minWidth: 200,
-            sortable: true,
-            filter: true,
-        },
+            minWidth: 250,
+        }),
         {
             field: 'teamMemberName',
             headerName: 'Member',
@@ -309,4 +299,4 @@ const TenderApproval = () => {
     );
 };
 
-export default TenderApproval;
+export default TenderApprovalListPage;

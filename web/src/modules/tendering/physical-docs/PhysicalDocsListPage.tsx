@@ -14,6 +14,7 @@ import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, useDeletePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { tenderNameCol } from '@/components/data-grid';
 
 const PhysicalDocs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
@@ -68,24 +69,11 @@ const PhysicalDocs = () => {
     }, [tabsData]);
 
     const colDefs = useMemo<ColDef<PhysicalDocsDashboardRow>[]>(() => [
-        {
-            field: 'tenderNo',
-            headerName: 'Tender No',
-            flex: 1,
-            minWidth: 120,
-            sortable: true,
+        tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
+            headerName: 'Tender Details',
             filter: true,
-            valueGetter: (params: any) => params.data?.tenderNo || '—',
-        },
-        {
-            field: 'tenderName',
-            headerName: 'Tender Name',
-            flex: 2,
-            minWidth: 200,
-            sortable: true,
-            filter: true,
-            valueGetter: (params: any) => params.data?.tenderName || '—',
-        },
+            minWidth: 250,
+        }),
         {
             field: 'physicalDocsDeadline',
             headerName: 'Physical Docs Deadline',

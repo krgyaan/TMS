@@ -15,6 +15,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
 import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import { tenderNameCol } from '@/components/data-grid';
 
 const Checklists = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'submitted'>('pending');
@@ -67,24 +68,11 @@ const Checklists = () => {
     }, [tabsData]);
 
     const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRow>[]>(() => [
-        {
-            field: 'tenderNo',
-            headerName: 'Tender No',
-            flex: 1,
-            minWidth: 120,
-            sortable: true,
+        tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {
+            headerName: 'Tender Details',
             filter: true,
-            valueGetter: (params: any) => params.data?.tenderNo || '—',
-        },
-        {
-            field: 'tenderName',
-            headerName: 'Tender Name',
-            flex: 2,
-            minWidth: 200,
-            sortable: true,
-            filter: true,
-            valueGetter: (params: any) => params.data?.tenderName || '—',
-        },
+            minWidth: 250,
+        }),
         {
             field: 'teamMemberName',
             headerName: 'Member',

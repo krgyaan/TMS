@@ -1,5 +1,3 @@
-// pages/CostingSheets.tsx
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
@@ -11,112 +9,115 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useCostingSheets, type CostingSheetDashboardRow } from '@/hooks/api/useCostingSheets';
+import { useCostingApprovals, type CostingApprovalDashboardRow } from '@/hooks/api/useCostingApprovals';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'submitted' | 'rejected';
+type TabKey = 'pending' | 'approved' | 'rejected';
 
-const CostingSheets = () => {
+const CostingApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
     const navigate = useNavigate();
 
-    const { data: costingSheetsData, isLoading: loading, error } = useCostingSheets();
+    const { data: costingApprovalsData, isLoading: loading, error } = useCostingApprovals();
+    console.log("Costing Approvals Data:", costingApprovalsData);
 
-    const costingSheetActions: ActionItem<CostingSheetDashboardRow>[] = useMemo(() => [
+    const costingApprovalActions: ActionItem<CostingApprovalDashboardRow>[] = useMemo(() => [
         {
-            label: 'Create Costing Sheet',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.costingSheetSubmit(row.tenderId));
+            label: 'Approve Costing',
+            onClick: (row: CostingApprovalDashboardRow) => {
+                navigate(paths.tendering.costingApprove(row.costingSheetId!));
             },
-            icon: <Plus className="h-4 w-4" />,
-            visible: (row) => row.googleSheetUrl ? false : true,
-        },
-        {
-            label: 'Submit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.costingSheetSubmit(row.tenderId));
-            },
-            icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.googleSheetUrl ? true : false,
-        },
-        {
-            label: 'Edit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.costingSheetEdit(row.tenderId));
-            },
-            icon: <Edit className="h-4 w-4" />,
+            icon: <CheckCircle className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Submitted',
         },
         {
-            label: 'Re-submit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.costingSheetResubmit(row.tenderId));
+            label: 'Reject Costing',
+            onClick: (row: CostingApprovalDashboardRow) => {
+                navigate(paths.tendering.costingReject(row.costingSheetId!));
             },
-            icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Rejected/Redo',
+            icon: <XCircle className="h-4 w-4" />,
+            visible: (row) => row.costingStatus === 'Submitted',
         },
         {
-            label: 'View Tender',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.tenderView(row.tenderId));
+            label: 'Edit Approval',
+            onClick: (row: CostingApprovalDashboardRow) => {
+                navigate(paths.tendering.costingEditApproval(row.costingSheetId!));
+            },
+            icon: <Edit className="h-4 w-4" />,
+            visible: (row) => row.costingStatus === 'Approved',
+        },
+        {
+            label: 'View Details',
+            onClick: (row: CostingApprovalDashboardRow) => {
+                navigate(paths.tendering.costingApprovalView(row.costingSheetId!));
             },
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);
 
     const tabsConfig = useMemo(() => {
-        if (!costingSheetsData) return [];
+        if (!costingApprovalsData) return [];
 
         return [
             {
                 key: 'pending' as TabKey,
-                name: 'Pending',
-                count: costingSheetsData.filter((item) =>
-                    item.costingStatus === 'Pending' || item.costingStatus === 'Created'
+                name: 'Pending Approval',
+                count: costingApprovalsData.filter((item) =>
+                    item.costingStatus === 'Submitted'
                 ).length,
-                data: costingSheetsData.filter((item) =>
-                    item.costingStatus === 'Pending' || item.costingStatus === 'Created'
+                data: costingApprovalsData.filter((item) =>
+                    item.costingStatus === 'Submitted'
                 ),
             },
             {
-                key: 'submitted' as TabKey,
-                name: 'Submitted',
-                count: costingSheetsData.filter((item) =>
-                    item.costingStatus === 'Submitted' || item.costingStatus === 'Approved'
+                key: 'approved' as TabKey,
+                name: 'Approved',
+                count: costingApprovalsData.filter((item) =>
+                    item.costingStatus === 'Approved'
                 ).length,
-                data: costingSheetsData.filter((item) =>
-                    item.costingStatus === 'Submitted' || item.costingStatus === 'Approved'
+                data: costingApprovalsData.filter((item) =>
+                    item.costingStatus === 'Approved'
                 ),
             },
             {
                 key: 'rejected' as TabKey,
-                name: 'Rejected/Redo',
-                count: costingSheetsData.filter((item) =>
+                name: 'Rejected',
+                count: costingApprovalsData.filter((item) =>
                     item.costingStatus === 'Rejected/Redo'
                 ).length,
-                data: costingSheetsData.filter((item) =>
+                data: costingApprovalsData.filter((item) =>
                     item.costingStatus === 'Rejected/Redo'
                 ),
             },
         ];
-    }, [costingSheetsData]);
+    }, [costingApprovalsData]);
 
-    const colDefs = useMemo<ColDef<CostingSheetDashboardRow>[]>(() => [
-        tenderNameCol<CostingSheetDashboardRow>('tenderNo', {
-            headerName: 'Tender Details',
+    const colDefs = useMemo<ColDef<CostingApprovalDashboardRow>[]>(() => [
+        tenderNameCol<CostingApprovalDashboardRow>('tenderNo', {
+            headerName: 'Tender',
             filter: true,
+            flex: 2,
             minWidth: 250,
         }),
         {
-            field: 'teamMemberName',
-            headerName: 'Member',
+            field: 'teamMember',
+            headerName: 'Team Member',
             flex: 1.5,
             minWidth: 150,
-            valueGetter: (params: any) => params.data?.teamMemberName || '—',
+            valueGetter: (params: any) => params.data?.teamMember || '—',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'submittedAt',
+            headerName: 'Submitted Date',
+            flex: 1.5,
+            minWidth: 150,
+            valueGetter: (params: any) => params.data?.submittedAt ? formatDateTime(params.data.submittedAt) : '—',
             sortable: true,
             filter: true,
         },
@@ -156,21 +157,8 @@ const CostingSheets = () => {
             filter: true,
         },
         {
-            field: 'costingStatus',
-            headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
-            sortable: true,
-            filter: true,
-            cellRenderer: (params: any) => {
-                const status = params.value;
-                if (!status) return '—';
-                return status;
-            },
-        },
-        {
             field: 'submittedFinalPrice',
-            headerName: 'Final Price',
+            headerName: 'TE Final Price',
             flex: 1,
             minWidth: 130,
             valueGetter: (params: any) => {
@@ -183,7 +171,7 @@ const CostingSheets = () => {
         },
         {
             field: 'submittedBudgetPrice',
-            headerName: 'Budget',
+            headerName: 'TE Budget',
             flex: 1,
             minWidth: 130,
             valueGetter: (params: any) => {
@@ -193,6 +181,23 @@ const CostingSheets = () => {
             },
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'costingStatus',
+            headerName: 'Status',
+            flex: 1,
+            minWidth: 120,
+            sortable: true,
+            filter: true,
+            cellRenderer: (params: any) => {
+                const status = params.value;
+                if (!status) return '—';
+                return (
+                    <Badge variant={status === 'Submitted' ? 'default' : status === 'Approved' ? 'secondary' : 'destructive'}>
+                        {status}
+                    </Badge>
+                );
+            },
         },
         {
             field: 'googleSheetUrl',
@@ -219,12 +224,12 @@ const CostingSheets = () => {
         {
             headerName: 'Actions',
             filter: false,
-            cellRenderer: createActionColumnRenderer(costingSheetActions),
+            cellRenderer: createActionColumnRenderer(costingApprovalActions),
             sortable: false,
             pinned: 'right',
-            width: 50,
+            width: 120,
         },
-    ], [costingSheetActions]);
+    ], [costingApprovalActions]);
 
     if (loading) {
         return (
@@ -251,13 +256,13 @@ const CostingSheets = () => {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Costing Sheets</CardTitle>
+                    <CardTitle>Costing Approvals</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Failed to load costing sheets. Please try again later.
+                            Failed to load costing approvals. Please try again later.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -270,9 +275,9 @@ const CostingSheets = () => {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Costing Sheets</CardTitle>
+                        <CardTitle>Costing Approvals (TL)</CardTitle>
                         <CardDescription className="mt-2">
-                            Manage costing sheets for approved tenders.
+                            Review and approve costing sheets submitted by your team.
                         </CardDescription>
                     </div>
                 </div>
@@ -305,9 +310,9 @@ const CostingSheets = () => {
                                     <FileX2 className="h-12 w-12 mb-4" />
                                     <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
                                     <p className="text-sm mt-2">
-                                        {tab.key === 'pending' && 'Tenders requiring costing submission will appear here'}
-                                        {tab.key === 'submitted' && 'Submitted costing sheets will be shown here'}
-                                        {tab.key === 'rejected' && 'Rejected costing sheets requiring re-submission will appear here'}
+                                        {tab.key === 'pending' && 'Submitted costing sheets will appear here for approval'}
+                                        {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
+                                        {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
                                     </p>
                                 </div>
                             ) : (
@@ -338,4 +343,4 @@ const CostingSheets = () => {
     );
 };
 
-export default CostingSheets;
+export default CostingApprovalListPage;
