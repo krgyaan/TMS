@@ -46,14 +46,8 @@ import { CourierModule } from "./modules/courier/courier.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
 import { existsSync } from "fs";
-
-const uploadsPath = join(process.cwd(), "uploads");
-console.log("=== STATIC FILES DEBUG ===");
-console.log("Current working directory:", process.cwd());
-console.log("Uploads path:", uploadsPath);
-console.log("Uploads folder exists:", existsSync(uploadsPath));
-console.log("Couriers folder exists:", existsSync(join(uploadsPath, "couriers")));
-console.log("==========================");
+import { MailerModule } from "./mailer/mailer.module";
+import { FollowUpModule } from './modules/follow-up/follow-up.module';
 
 @Module({
     imports: [
@@ -111,6 +105,8 @@ console.log("==========================");
         PhysicalDocsModule,
         RfqsModule,
         CourierModule,
+        MailerModule,
+        FollowUpModule,
     ],
     controllers: [AppController],
     providers: [
