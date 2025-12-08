@@ -46,6 +46,7 @@ import { DocumentChecklistsModule } from '@/modules/tendering/checklists/documen
 import { CostingSheetsModule } from '@/modules/tendering/costing-sheets/costing-sheets.module';
 import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-imprest.module';
 import { CostingApprovalsModule } from '@/modules/tendering/costing-approvals/costing-approvals.module';
+import { BidSubmissionsModule } from '@/modules/tendering/bid-submissions/bid-submissions.module';
 
 @Module({
     imports: [
@@ -98,6 +99,7 @@ import { CostingApprovalsModule } from '@/modules/tendering/costing-approvals/co
         DocumentChecklistsModule,
         CostingSheetsModule,
         CostingApprovalsModule,
+        BidSubmissionsModule,
     ],
     controllers: [AppController],
     providers: [

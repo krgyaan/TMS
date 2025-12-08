@@ -915,3 +915,26 @@ export type UpdateCostingSheetDto = {
     submittedGrossMargin: string;
     teRemarks: string;
 };
+
+export type BidSubmissionStatus = 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+
+export type BidDocuments = {
+    submittedDocs: string[];
+    submissionProof: string | null;
+    finalPriceSs: string | null;
+};
+
+export type BidSubmission = {
+    id: number;
+    tenderId: number;
+    status: BidSubmissionStatus;
+    submissionDatetime: Date | null;
+    finalBiddingPrice: string | null;
+    documents: BidDocuments | null;
+    submittedBy: number | null;
+    reasonForMissing: string | null;
+    preventionMeasures: string | null;
+    tmsImprovements: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};

@@ -8,22 +8,20 @@ import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { users } from '@/db/schemas/auth/users.schema';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
     tenderNo: string;
     tenderName: string;
     teamMember: number | null;
+    teamMemberName: string | null;
     itemName: string | null;
     statusName: string | null;
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
-    costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
-    submittedFinalPrice: string | null;
-    submittedBudgetPrice: string | null;
-    submittedBy: number | null;
-    submittedAt: Date | null;
+    costingStatus: 'Pending' | 'Approved' | 'Rejected/Redo';
     googleSheetUrl: string | null;
     costingSheetId: number | null;
 }
@@ -43,6 +41,7 @@ export class CostingApprovalsService {
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 teamMember: tenderInfos.teamMember,
+                teamMemberName: users.name,
                 itemName: items.name,
                 statusName: statuses.name,
                 dueDate: tenderInfos.dueDate,
@@ -51,10 +50,6 @@ export class CostingApprovalsService {
                 // Costing sheet data
                 costingSheetId: tenderCostingSheets.id,
                 costingStatus: tenderCostingSheets.status,
-                submittedFinalPrice: tenderCostingSheets.submittedFinalPrice,
-                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
-                submittedBy: tenderCostingSheets.submittedBy,
-                submittedAt: tenderCostingSheets.submittedAt,
                 googleSheetUrl: tenderCostingSheets.googleSheetUrl,
             })
             .from(tenderInfos)
@@ -62,12 +57,13 @@ export class CostingApprovalsService {
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .where(and(
                 eq(tenderInfos.tlStatus, 1),
                 eq(tenderInfos.deleteStatus, 0),
                 TenderInfosService.getExcludeDnbTlStatusCondition(),
                 // Only show costing sheets that are submitted, approved, or rejected
-                inArray(tenderCostingSheets.status, ['Submitted', 'Approved', 'Rejected/Redo'])
+                inArray(tenderCostingSheets.status, ['Pending', 'Approved', 'Rejected/Redo'])
             ));
 
         // console.log("Rows:", rows);
@@ -77,16 +73,13 @@ export class CostingApprovalsService {
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
             teamMember: row.teamMember,
+            teamMemberName: row.teamMemberName,
             itemName: row.itemName,
             statusName: row.statusName,
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            costingStatus: row.costingStatus as 'Submitted' | 'Approved' | 'Rejected/Redo',
-            submittedFinalPrice: row.submittedFinalPrice,
-            submittedBudgetPrice: row.submittedBudgetPrice,
-            submittedBy: row.submittedBy,
-            submittedAt: row.submittedAt,
+            costingStatus: row.costingStatus as 'Pending' | 'Approved' | 'Rejected/Redo',
             googleSheetUrl: row.googleSheetUrl,
             costingSheetId: row.costingSheetId,
         }));

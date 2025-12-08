@@ -6,16 +6,15 @@ export type CostingApprovalDashboardRow = {
     tenderNo: string;
     tenderName: string;
     teamMember: number | null;
+    teamMemberName: string | null;
     itemName: string | null;
     statusName: string | null;
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
-    costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    costingStatus: 'Pending' | 'Approved' | 'Rejected/Redo';
     submittedFinalPrice: string | null;
     submittedBudgetPrice: string | null;
-    submittedBy: number | null;
-    submittedAt: Date | null;
     googleSheetUrl: string | null;
     costingSheetId: number | null;
 };

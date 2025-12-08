@@ -32,7 +32,7 @@ const CostingApprovalListPage = () => {
                 navigate(paths.tendering.costingApprove(row.costingSheetId!));
             },
             icon: <CheckCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Submitted',
+            visible: (row) => row.costingStatus === 'Pending',
         },
         {
             label: 'Reject Costing',
@@ -40,7 +40,7 @@ const CostingApprovalListPage = () => {
                 navigate(paths.tendering.costingReject(row.costingSheetId!));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Submitted',
+            visible: (row) => row.costingStatus === 'Pending',
         },
         {
             label: 'Edit Approval',
@@ -67,10 +67,10 @@ const CostingApprovalListPage = () => {
                 key: 'pending' as TabKey,
                 name: 'Pending Approval',
                 count: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Submitted'
+                    item.costingStatus === 'Pending'
                 ).length,
                 data: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Submitted'
+                    item.costingStatus === 'Pending'
                 ),
             },
             {
@@ -104,20 +104,11 @@ const CostingApprovalListPage = () => {
             minWidth: 250,
         }),
         {
-            field: 'teamMember',
+            field: 'teamMemberName',
             headerName: 'Team Member',
             flex: 1.5,
             minWidth: 150,
-            valueGetter: (params: any) => params.data?.teamMember || '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'submittedAt',
-            headerName: 'Submitted Date',
-            flex: 1.5,
-            minWidth: 150,
-            valueGetter: (params: any) => params.data?.submittedAt ? formatDateTime(params.data.submittedAt) : '—',
+            valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
         },

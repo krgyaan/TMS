@@ -36,8 +36,12 @@ const CostingApprovePage = lazy(() => import('@/modules/tendering/costing-approv
 const CostingRejectPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingRejectPage'));
 const CostingEditApprovalPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingEditApprovalPage'));
 const CostingApprovalViewPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovalViewPage'));
-const Tendering_BidSubmissions = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionListPage'));
-const Tendering_TQs = lazy(() => import('@/modules/tendering/tqs'));
+const BidSubmissionListPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionListPage'));
+const BidSubmitPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmitPage'));
+const BidEditPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditPage'));
+const BidMarkMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidMarkMissedPage'));
+const BidEditMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditMissedPage'));
+const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionViewPage')); const Tendering_TQs = lazy(() => import('@/modules/tendering/tqs'));
 const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
 const Tendering_Results = lazy(() => import('@/modules/tendering/results/TenderResultListPage'));
 
@@ -77,7 +81,12 @@ export default function TenderingRoutes() {
             <Route path="costing-approvals/approve/:id" element={<RouteWrapper><CostingApprovePage /></RouteWrapper>} />
             <Route path="costing-approvals/reject/:id" element={<RouteWrapper><CostingRejectPage /></RouteWrapper>} />
             <Route path="costing-approvals/edit/:id" element={<RouteWrapper><CostingEditApprovalPage /></RouteWrapper>} />
-            <Route path="bid-submissions" element={<RouteWrapper><Tendering_BidSubmissions /></RouteWrapper>} />
+            <Route path="bid-submissions" element={<RouteWrapper><BidSubmissionListPage /></RouteWrapper>} />
+            <Route path="bid-submissions/submit/:tenderId" element={<RouteWrapper><BidSubmitPage /></RouteWrapper>} />
+            <Route path="bid-submissions/edit/:id" element={<RouteWrapper><BidEditPage /></RouteWrapper>} />
+            <Route path="bid-submissions/mark-missed/:tenderId" element={<RouteWrapper><BidMarkMissedPage /></RouteWrapper>} />
+            <Route path="bid-submissions/edit-missed/:id" element={<RouteWrapper><BidEditMissedPage /></RouteWrapper>} />
+            <Route path="bid-submissions/view/:id" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
             <Route path="tqs" element={<RouteWrapper><Tendering_TQs /></RouteWrapper>} />
             <Route path="ras" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
