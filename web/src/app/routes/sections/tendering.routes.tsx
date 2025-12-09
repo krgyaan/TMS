@@ -52,7 +52,14 @@ const TqEditMissedPage = lazy(() => import('@/modules/tendering/tq-management/Tq
 const TqViewPage = lazy(() => import('@/modules/tendering/tq-management/TqViewPage'));
 const TqViewAllPage = lazy(() => import('@/modules/tendering/tq-management/TqViewAllPage'));
 const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
+const Tendering_RA_Show = lazy(() => import('@/modules/tendering/ras/RaShowPage'));
+const Tendering_RA_Edit = lazy(() => import('@/modules/tendering/ras/RaEditPage'));
+const Tendering_RA_Schedule = lazy(() => import('@/modules/tendering/ras/RaSchedulePage'));
+const Tendering_RA_UploadResult = lazy(() => import('@/modules/tendering/ras/RaUploadResultPage'));
 const Tendering_Results = lazy(() => import('@/modules/tendering/results/TenderResultListPage'));
+const Tendering_Result_Show = lazy(() => import('@/modules/tendering/results/TenderResultShowPage'));
+const Tendering_Result_Edit = lazy(() => import('@/modules/tendering/results/TenderResultEditPage'));
+const Tendering_Result_Upload = lazy(() => import('@/modules/tendering/results/TenderResultUploadPage'));
 
 export default function TenderingRoutes() {
     return (
@@ -105,8 +112,15 @@ export default function TenderingRoutes() {
             <Route path="tq-management/edit-missed/:id" element={<RouteWrapper><TqEditMissedPage /></RouteWrapper>} />
             <Route path="tq-management/view/:id" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
             <Route path="tq-management/view-all/:tenderId" element={<RouteWrapper><TqViewAllPage /></RouteWrapper>} />
-            <Route path="ras" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
+            <Route path="reverse-auctions" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
+            <Route path="ras/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />
+            <Route path="reverse-auctions/upload-result/:raId" element={<RouteWrapper><Tendering_RA_UploadResult /></RouteWrapper>} />
+            <Route path="reverse-auctions/:id" element={<RouteWrapper><Tendering_RA_Show /></RouteWrapper>} />
+            <Route path="reverse-auctions/:id/edit" element={<RouteWrapper><Tendering_RA_Edit /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
+            <Route path="results/upload/:tenderId" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
+            <Route path="results/:id" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
+            <Route path="results/:id/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
         </Routes>
     );
 }

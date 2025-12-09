@@ -66,8 +66,15 @@ export const paths = {
         tqEditMissed: (tqId: number) => `/tendering/tq-management/edit-missed/${tqId}`,
         tqView: (tqId: number) => `/tendering/tq-management/view/${tqId}`,
         tqViewAll: (tenderId: number) => `/tendering/tq-management/view-all/${tenderId}`,
-        ras: '/tendering/ras',
+        ras: '/tendering/reverse-auctions',
+        rasSchedule: (tenderId: number) => `/tendering/reverse-auctions/schedule/${tenderId}`,
+        rasUploadResult: (raId: number) => `/tendering/reverse-auctions/upload-result/${raId}`,
+        rasShow: (id: number) => `/tendering/reverse-auctions/${id}`,
+        rasEdit: (id: number) => `/tendering/reverse-auctions/${id}/edit`,
         results: '/tendering/results',
+        resultsUpload: (tenderId: number) => `/tendering/results/upload/${tenderId}`,
+        resultsShow: (id: number) => `/tendering/results/${id}`,
+        resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
     },
 
     // ==================== OPERATIONS ====================
