@@ -176,6 +176,7 @@ const CourierViewPage: React.FC = () => {
     const courierId = id ? parseInt(id) : 0;
 
     const { data: courier, isLoading, isError, error } = useCourier(courierId);
+    console.log(courier);
 
     // Loading State -----------------------------------------
     if (isLoading) {
@@ -188,8 +189,8 @@ const CourierViewPage: React.FC = () => {
                         <Truck className="h-10 w-10 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-bounce" />
                     </div>
                     <div className="space-y-3">
-                        <h3 className="text-xl font-semibold tracking-tight">Loading Shipment Details</h3>
-                        <p className="text-muted-foreground">Preparing your courier information...</p>
+                        <h3 className="text-xl font-semibold tracking-tight">Loading Courier Details</h3>
+                        <p className="text-muted-foreground">Getting your courier information...</p>
                     </div>
                 </div>
             </div>
@@ -207,8 +208,8 @@ const CourierViewPage: React.FC = () => {
                                 <AlertCircle className="h-8 w-8 text-destructive" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-semibold tracking-tight">Shipment Not Found</h3>
-                                <p className="text-muted-foreground mt-2">{(error as any)?.response?.data?.message || "Unable to locate this courier shipment"}</p>
+                                <h3 className="text-xl font-semibold tracking-tight">Courier Not Found</h3>
+                                <p className="text-muted-foreground mt-2">{(error as any)?.response?.data?.message || "Unable to load Courier Details"}</p>
                             </div>
                         </div>
                         <Button onClick={() => navigate(paths.shared.couriers)} className="gap-2 w-full">
