@@ -1,14 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule } from '@/app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
-import { DRIZZLE } from './db/database.module';
-import { StatusCache } from './utils/status-cache';
-import type { DbInstance } from './db';
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
-import { ConfigService } from "@nestjs/config";
-import cookieParser from "cookie-parser";
+import { DRIZZLE } from '@db/database.module';
+import { StatusCache } from '@/utils/status-cache';
+import type { DbInstance } from '@db';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -34,7 +30,7 @@ async function bootstrap() {
     ];
 
     app.enableCors({
-        origin: true,
+        origin: allowedOrigins,
         credentials: true,
     });
     await app.listen(appCfg?.port ?? 3000);

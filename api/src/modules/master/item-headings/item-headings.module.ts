@@ -1,7 +1,7 @@
 ﻿import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { ItemHeadingsController } from './item-headings.controller';
-import { ItemHeadingsService } from './item-headings.service';
+import { DatabaseModule } from '@db/database.module';
+import { ItemHeadingsController } from '@/modules/master/item-headings/item-headings.controller';
+import { ItemHeadingsService } from '@/modules/master/item-headings/item-headings.service';
 
 @Module({
   imports: [DatabaseModule],

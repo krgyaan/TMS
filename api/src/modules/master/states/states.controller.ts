@@ -1,7 +1,6 @@
 import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { StatesService } from './states.service';
+import { StatesService } from '@/modules/master/states/states.service';
 
 const CreateStateSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -61,9 +60,4 @@ export class StatesController {
         return this.statesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.statesService.delete(id);
-    // }
 }

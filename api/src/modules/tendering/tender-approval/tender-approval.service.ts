@@ -1,15 +1,15 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import type { TenderApprovalPayload } from './dto/tender-approval.dto';
-import { tenderInfos } from '../../../db/tenders.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { eq } from 'drizzle-orm';
-import { tenderInformation } from '../../../db/tender-info-sheet.schema';
-import { users } from '../../../db/users.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { items } from '../../../db/items.schema';
-import { tenderIncompleteFields } from '../../../db/tender-incomplete-fields.schema';
-import { TenderInfosService } from '../tenders/tenders.service';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 // ============================================================================
 // Types

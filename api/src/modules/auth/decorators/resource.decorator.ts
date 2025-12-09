@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { RESOURCE_CONFIG_KEY, type ResourceConfig } from '../guards/resource-access.guard';
+import { RESOURCE_CONFIG_KEY, type ResourceConfig } from '@/modules/auth/guards/resource-access.guard';
 
 /**
  * Configure resource access checking for data scope

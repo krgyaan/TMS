@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { EmployeeImprestController } from './employee-imprest.controller';
-import { EmployeeImprestService } from './employee-imprest.service';
-import { DatabaseModule } from '../../db/database.module';
+import { EmployeeImprestController } from '@/modules/employee-imprest/employee-imprest.controller';
+import { EmployeeImprestService } from '@/modules/employee-imprest/employee-imprest.service';
+import { DatabaseModule } from '@db/database.module';
 
 @Module({
   imports: [DatabaseModule],

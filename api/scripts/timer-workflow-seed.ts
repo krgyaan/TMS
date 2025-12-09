@@ -1,7 +1,7 @@
 // src/db/seeds/workflow.seed.ts
 import 'dotenv/config';
 import { sql } from 'drizzle-orm';
-import { createDb, createPool } from '../src/db/index';
+import { createDb, createPool } from '@db';
 import {
     wfTemplates,
     wfSteps,
@@ -12,7 +12,7 @@ import {
     wfWorkingHoursConfig,
     type NewWorkflowTemplate,
     type NewWorkflowStep,
-} from '../src/db/workflows.schema';
+} from '@db/schemas/workflow/workflows.schema';
 
 // ============================================
 // TYPES

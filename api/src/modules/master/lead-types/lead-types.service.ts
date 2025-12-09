@@ -1,12 +1,12 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     leadTypes,
     type LeadType,
     type NewLeadType,
-} from '../../../db/lead-types.schema';
+} from '@db/schemas/crm/lead-types.schema';
 
 @Injectable()
 export class LeadTypesService {

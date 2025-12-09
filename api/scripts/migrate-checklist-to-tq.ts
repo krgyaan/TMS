@@ -19,7 +19,7 @@ import {
     tenderQueries,
     tenderQueryItems,
     type BidDocuments,
-} from '../src/db/schema';
+} from '@db/schemas/tendering';
 import { sql } from 'drizzle-orm';
 
 // ============================================================================
@@ -233,10 +233,10 @@ const Parsers = {
         return isNaN(firstId) ? null : firstId;
     },
 
-    mapCostingStatus(status: string | null): 'Pending' | 'Submitted' | 'Approved' | 'Rejected' | 'Redo' {
+    mapCostingStatus(status: string | null): 'Pending' | 'Submitted' | 'Approved' | 'Rejected/Redo' {
         if (!status) return 'Pending';
         if (status === 'Approved') return 'Approved';
-        if (status === 'Rejected/Redo') return 'Redo';
+        if (status === 'Rejected/Redo') return 'Rejected/Redo';
         return 'Pending';
     },
 
@@ -298,47 +298,117 @@ class DocumentChecklistMigrator {
     constructor(private ctx: MigrationContext) { }
 
     async migrate(): Promise<void> {
-        console.log('Migrating tender_document_checklists...');
+        console.log('Migrating tender_document_checklists (aggregating to new schema)...');
 
         const rows = await this.ctx.mysqlDb.select().from(mysqlTenderDocumentChecklists);
 
+        // Group documents by tender_id
+        const groupedData = new Map<number, {
+            tenderId: number;
+            selectedDocuments: string[];
+            extraDocuments: { name: string; path: string }[];
+            submittedBy: number | null;
+            createdAt: Date;
+            updatedAt: Date;
+        }>();
+
+        console.log(`  Processing ${rows.length} document checklist records...`);
+
+        // First pass: Group all documents by tender
         for (const row of rows) {
-            await this.migrateRow(row);
-        }
-
-        this.logStats();
-    }
-
-    private async migrateRow(row: typeof mysqlTenderDocumentChecklists.$inferSelect): Promise<void> {
-        try {
             const tenderId = Number(row.tender_id);
 
             // Validate tender exists
             if (!this.ctx.tenderIds.has(tenderId)) {
                 console.warn(`  ⚠ Tender ID ${tenderId} not found, skipping document checklist ${row.id}`);
                 this.ctx.stats.documentChecklists.skipped++;
-                return;
+                continue;
             }
 
+            // Initialize tender entry if not exists
+            if (!groupedData.has(tenderId)) {
+                groupedData.set(tenderId, {
+                    tenderId: tenderId,
+                    selectedDocuments: [],
+                    extraDocuments: [],
+                    submittedBy: null,
+                    createdAt: Parsers.date(row.created_at) ?? new Date(),
+                    updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+                });
+            }
+
+            const tenderData = groupedData.get(tenderId)!;
+
+            // Add document name to selectedDocuments array
+            if (row.document_name && row.document_name.trim() !== '') {
+                tenderData.selectedDocuments.push(row.document_name.trim());
+            }
+
+            // Add to extraDocuments if document_path exists
+            if (row.document_path && row.document_path.trim() !== '') {
+                // Extract filename from path
+                const pathParts = row.document_path.split('/');
+                const filename = pathParts[pathParts.length - 1] || row.document_path;
+
+                tenderData.extraDocuments.push({
+                    name: filename,
+                    path: row.document_path.trim(),
+                });
+            }
+
+            // Keep the latest updatedAt
+            const rowUpdatedAt = Parsers.date(row.updated_at);
+            if (rowUpdatedAt && rowUpdatedAt > tenderData.updatedAt) {
+                tenderData.updatedAt = rowUpdatedAt;
+            }
+
+            // Keep the earliest createdAt
+            const rowCreatedAt = Parsers.date(row.created_at);
+            if (rowCreatedAt && rowCreatedAt < tenderData.createdAt) {
+                tenderData.createdAt = rowCreatedAt;
+            }
+        }
+
+        console.log(`  Aggregated into ${groupedData.size} tender entries`);
+
+        // Second pass: Insert aggregated data into PostgreSQL
+        for (const [tenderId, data] of groupedData.entries()) {
+            await this.insertAggregatedRow(tenderId, data);
+        }
+
+        this.logStats();
+    }
+
+    private async insertAggregatedRow(
+        tenderId: number,
+        data: {
+            selectedDocuments: string[];
+            extraDocuments: { name: string; path: string }[];
+            submittedBy: number | null;
+            createdAt: Date;
+            updatedAt: Date;
+        }
+    ): Promise<void> {
+        try {
             await this.ctx.pgDb.insert(tenderDocumentChecklists).values({
-                id: row.id,
                 tenderId: tenderId,
-                documentName: Parsers.string(row.document_name, 255),
-                documentPath: Parsers.string(row.document_path, 500),
-                createdAt: Parsers.date(row.created_at) ?? new Date(),
-                updatedAt: Parsers.date(row.updated_at) ?? new Date(),
+                selectedDocuments: data.selectedDocuments.length > 0 ? data.selectedDocuments : null,
+                extraDocuments: data.extraDocuments.length > 0 ? data.extraDocuments : null,
+                submittedBy: data.submittedBy,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt,
             });
 
             this.ctx.stats.documentChecklists.success++;
         } catch (err) {
-            console.error(`  ✗ Error migrating document_checklist id=${row.id}:`, err);
+            console.error(`  ✗ Error migrating checklist for tender ${tenderId}:`, err);
             this.ctx.stats.documentChecklists.errors++;
         }
     }
 
     private logStats(): void {
         const { success, errors, skipped } = this.ctx.stats.documentChecklists;
-        console.log(`  ✓ Migrated: ${success} | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
+        console.log(`  ✓ Migrated: ${success} tenders | ✗ Errors: ${errors} | ⚠ Skipped: ${skipped}`);
     }
 }
 
@@ -479,7 +549,7 @@ class CostingSheetMigrator {
                 // Approval Workflow
                 status: costingStatus,
                 tlRemarks: tenderInfo?.costingRemarks ?? null,
-                rejectionReason: costingStatus === 'Redo' ? tenderInfo?.costingRemarks : null,
+                rejectionReason: costingStatus === 'Rejected/Redo' ? tenderInfo?.costingRemarks : null,
 
                 // Timestamps
                 submittedAt: Parsers.date(row.created_at),
@@ -829,18 +899,18 @@ class MigrationOrchestrator {
                 name: 'Migrate tender_document_checklists',
                 fn: () => new DocumentChecklistMigrator(this.ctx).migrate(),
             },
-            {
-                name: 'Migrate bid_submissions',
-                fn: () => new BidSubmissionMigrator(this.ctx).migrate(),
-            },
-            {
-                name: 'Migrate tender_costing_sheets',
-                fn: () => new CostingSheetMigrator(this.ctx).migrate(),
-            },
-            {
-                name: 'Migrate TQ (tender_queries + tender_query_items)',
-                fn: () => new TenderQueryMigrator(this.ctx).migrate(),
-            },
+            // {
+            //     name: 'Migrate bid_submissions',
+            //     fn: () => new BidSubmissionMigrator(this.ctx).migrate(),
+            // },
+            // {
+            //     name: 'Migrate tender_costing_sheets',
+            //     fn: () => new CostingSheetMigrator(this.ctx).migrate(),
+            // },
+            // {
+            //     name: 'Migrate TQ (tender_queries + tender_query_items)',
+            //     fn: () => new TenderQueryMigrator(this.ctx).migrate(),
+            // },
             {
                 name: 'Reset PostgreSQL sequences',
                 fn: () => new SequenceResetter(this.ctx).reset(),
@@ -866,11 +936,11 @@ class MigrationOrchestrator {
         console.log('  Table                        Success    Errors    Skipped');
         console.log('  ───────────────────────────────────────────────────────────');
         console.log(`  tender_document_checklists   ${this.pad(stats.documentChecklists.success)}       ${this.pad(stats.documentChecklists.errors)}       ${stats.documentChecklists.skipped}`);
-        console.log(`  bid_submissions              ${this.pad(stats.bidSubmissions.success)}       ${this.pad(stats.bidSubmissions.errors)}       ${stats.bidSubmissions.skipped}`);
-        console.log(`  tender_costing_sheets        ${this.pad(stats.costingSheets.success)}       ${this.pad(stats.costingSheets.errors)}       ${stats.costingSheets.skipped}`);
-        console.log(`  tender_queries               ${this.pad(stats.tenderQueries.success)}       ${this.pad(stats.tenderQueries.errors)}       ${stats.tenderQueries.skipped}`);
-        console.log(`  tender_query_items           ${this.pad(stats.tenderQueryItems.success)}       ${this.pad(stats.tenderQueryItems.errors)}       -`);
-        console.log(`  tq_replies matched           ${this.pad(stats.tqRepliesMatched.success)}       ${this.pad(stats.tqRepliesMatched.errors)}       ${stats.tqRepliesMatched.unmatched}`);
+        // console.log(`  bid_submissions              ${this.pad(stats.bidSubmissions.success)}       ${this.pad(stats.bidSubmissions.errors)}       ${stats.bidSubmissions.skipped}`);
+        // console.log(`  tender_costing_sheets        ${this.pad(stats.costingSheets.success)}       ${this.pad(stats.costingSheets.errors)}       ${stats.costingSheets.skipped}`);
+        // console.log(`  tender_queries               ${this.pad(stats.tenderQueries.success)}       ${this.pad(stats.tenderQueries.errors)}       ${stats.tenderQueries.skipped}`);
+        // console.log(`  tender_query_items           ${this.pad(stats.tenderQueryItems.success)}       ${this.pad(stats.tenderQueryItems.errors)}       -`);
+        // console.log(`  tq_replies matched           ${this.pad(stats.tqRepliesMatched.success)}       ${this.pad(stats.tqRepliesMatched.errors)}       ${stats.tqRepliesMatched.unmatched}`);
         console.log('  ───────────────────────────────────────────────────────────');
         console.log(`  Tender IDs in scope:         ${tenderIds.size}`);
         console.log('');

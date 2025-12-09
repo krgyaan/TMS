@@ -10,7 +10,7 @@ import {
     tenderClients,
     tenderTechnicalDocuments,
     tenderFinancialDocuments,
-} from '../src/db/schema';
+} from '@db/schemas/tendering';
 
 // ============================================================================
 // CONFIGURATION

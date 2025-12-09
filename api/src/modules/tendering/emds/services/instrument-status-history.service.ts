@@ -1,17 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
-import { DRIZZLE } from '../../../../db/database.module';
-import type { DbInstance } from '../../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     instrumentStatusHistory,
     paymentInstruments,
     type NewInstrumentStatusHistory,
-} from '../../../../db/emds.schema';
+} from '@db/schemas/tendering/emds.schema';
 import {
     getStageFromStatus,
-    isRejectedStatus,
     type InstrumentType,
-} from '../constants/emd-statuses';
+} from '@/modules/tendering/emds/constants/emd-statuses';
 
 export interface StatusChangeContext {
     userId?: number;

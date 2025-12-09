@@ -13,7 +13,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { LeadTypesService } from './lead-types.service';
+import { LeadTypesService } from '@/modules/master/lead-types/lead-types.service';
 
 const CreateLeadTypeSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),

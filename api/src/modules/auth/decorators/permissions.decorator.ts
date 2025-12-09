@@ -3,7 +3,7 @@ import {
     PERMISSIONS_KEY,
     PERMISSION_MODE_KEY,
     type PermissionRequirement,
-} from '../guards/permission.guard';
+} from '@/modules/auth/guards/permission.guard';
 
 /**
  * Require specific permissions to access a route

@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ItemHeadingsService } from './item-headings.service';
+import { ItemHeadingsService } from '@/modules/master/item-headings/item-headings.service';
 
 @Controller('item-headings')
 export class ItemHeadingsController {

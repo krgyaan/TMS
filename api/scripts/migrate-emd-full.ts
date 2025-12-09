@@ -13,7 +13,7 @@ import {
     instrumentBgDetails,
     instrumentChequeDetails,
     instrumentTransferDetails,
-} from '../src/db/emds.schema';
+} from '@db/schemas/tendering/emds.schema';
 
 // ============================================================================
 // CONFIGURATION

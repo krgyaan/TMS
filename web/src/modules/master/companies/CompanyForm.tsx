@@ -404,5 +404,3 @@ export const CompanyDetailsForm = forwardRef<CompanyFormHandle, CompanyFormProps
 CompanyDetailsForm.displayName = "CompanyDetailsForm";
 
 export default CompanyDetailsForm;
-
-

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { RfqsService } from './rfq.service';
-import { RfqsController } from './rfq.controller';
-import { TendersModule } from '../tenders/tenders.module';
+import { DatabaseModule } from '@db/database.module';
+import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
+import { RfqsController } from '@/modules/tendering/rfqs/rfq.controller';
+import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 
 @Module({
     imports: [DatabaseModule, TendersModule],

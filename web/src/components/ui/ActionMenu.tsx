@@ -13,6 +13,7 @@ export type ActionItem<T = any> = {
     icon?: React.ReactNode;
     onClick: (rowData: T) => void;
     className?: string;
+    visible?: (rowData: T) => boolean;
 };
 
 type Props<T> = {
@@ -31,11 +32,12 @@ export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => 
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={4} className="w-40 cursor-pointer">
-                {actions.map((action, idx) => (
+                {actions.filter((action) => action.visible ? action.visible(rowData) : true).map((action, idx) => (
                     <DropdownMenuItem
                         key={`${action.label}-${idx}`}
                         className={cn("flex items-center gap-2 cursor-pointer", action.className)}
                         onClick={() => action.onClick(rowData)}
+                        disabled={action.visible ? !action.visible(rowData) : false}
                     >
                         {action.icon ? <span className="text-muted-foreground">{action.icon}</span> : null}
                         {action.label}

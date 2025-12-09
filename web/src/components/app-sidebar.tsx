@@ -90,7 +90,7 @@ const data = {
                 },
                 {
                     title: "Costing Approval",
-                    url: paths.tendering.costingApproval,
+                    url: paths.tendering.costingApprovals,
                 },
                 {
                     title: "Bid Submissions",
@@ -98,7 +98,7 @@ const data = {
                 },
                 {
                     title: "TQs",
-                    url: paths.tendering.tqs,
+                    url: paths.tendering.tqManagement,
                 },
                 {
                     title: "RA",

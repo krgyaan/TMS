@@ -1,7 +1,7 @@
 import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
-import { DRIZZLE } from '../../../../db/database.module';
-import type { DbInstance } from '../../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     paymentInstruments,
     instrumentDdDetails,
@@ -10,11 +10,11 @@ import {
     instrumentChequeDetails,
     instrumentTransferDetails,
     type PaymentInstrument,
-} from '../../../../db/emds.schema';
+} from '@db/schemas/tendering/emds.schema';
 import {
     InstrumentStatusHistoryService,
     type StatusChangeContext,
-} from './instrument-status-history.service';
+} from '@/modules/tendering/emds/services/instrument-status-history.service';
 import {
     getStagesForInstrument,
     getStageFromStatus,
@@ -28,7 +28,7 @@ import {
     CHEQUE_STATUSES,
     BT_STATUSES,
     PORTAL_STATUSES,
-} from '../constants/emd-statuses';
+} from '@/modules/tendering/emds/constants/emd-statuses';
 
 export interface StageFormData {
     [key: string]: unknown;

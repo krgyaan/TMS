@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     statuses,
     type NewStatus,
     type Status,
-} from '../../../db/statuses.schema';
+} from '@db/schemas/master/statuses.schema';
 
 @Injectable()
 export class StatusesService {

@@ -1,12 +1,12 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     userProfiles,
     type NewUserProfile,
     type UserProfile,
-} from '../../../db/user-profiles.schema';
+} from '@db/schemas/auth/user-profiles.schema';
 
 @Injectable()
 export class UserProfilesService {

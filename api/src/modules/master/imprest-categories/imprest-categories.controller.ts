@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ImprestCategoriesService } from './imprest-categories.service';
+import { ImprestCategoriesService } from '@/modules/master/imprest-categories/imprest-categories.service';
 
 const CreateImprestCategorySchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -70,9 +69,4 @@ export class ImprestCategoriesController {
         return this.imprestCategoriesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.imprestCategoriesService.delete(id);
-    // }
 }

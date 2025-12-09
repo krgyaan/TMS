@@ -1,4 +1,4 @@
-import { DataScope } from '../../../common/constants/roles.constant';
+import { DataScope } from '@/common/constants/roles.constant';
 
 export interface TeamContext {
     userId: number;

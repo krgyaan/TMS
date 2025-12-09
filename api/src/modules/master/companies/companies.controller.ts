@@ -9,7 +9,7 @@ import {
     Put,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { CompaniesService } from './companies.service';
+import { CompaniesService } from '@/modules/master/companies/companies.service';
 
 const DocumentSchema = z.object({
     name: z.string().min(1),

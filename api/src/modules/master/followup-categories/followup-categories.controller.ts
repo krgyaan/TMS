@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { FollowupCategoriesService } from './followup-categories.service';
+import { FollowupCategoriesService } from '@/modules/master/followup-categories/followup-categories.service';
 
 const CreateFollowupCategorySchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -69,9 +68,4 @@ export class FollowupCategoriesController {
         return this.followupCategoriesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.followupCategoriesService.delete(id);
-    // }
 }

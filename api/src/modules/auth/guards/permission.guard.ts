@@ -5,9 +5,9 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { ValidatedUser } from '../strategies/jwt.strategy';
-import { PermissionService } from '../services/permission.service';
-import { RoleName } from '../../../common/constants/roles.constant';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { PermissionService } from '@/modules/auth/services/permission.service';
+import { RoleName } from '@/common/constants/roles.constant';
 
 export const PERMISSIONS_KEY = 'permissions';
 export const PERMISSION_MODE_KEY = 'permissionMode';

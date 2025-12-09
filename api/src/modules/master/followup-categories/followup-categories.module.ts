@@ -1,7 +1,7 @@
 ﻿import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { FollowupCategoriesController } from './followup-categories.controller';
-import { FollowupCategoriesService } from './followup-categories.service';
+import { DatabaseModule } from '@db/database.module';
+import { FollowupCategoriesController } from '@/modules/master/followup-categories/followup-categories.controller';
+import { FollowupCategoriesService } from '@/modules/master/followup-categories/followup-categories.service';
 
 @Module({
     imports: [DatabaseModule],

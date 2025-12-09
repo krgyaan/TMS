@@ -808,3 +808,324 @@ export interface DashboardResponse {
 }
 
 export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
+
+export interface TenderDocumentChecklist {
+    id: number;
+    tenderId: number;
+    selectedDocuments: string[] | null;
+    extraDocuments: ExtraDocument[] | null;
+    submittedBy: number | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+export interface ExtraDocument {
+    name: string;
+    path?: string;
+}
+
+export interface CreateDocumentChecklistDto {
+    tenderId: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export interface UpdateDocumentChecklistDto {
+    id: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export type TenderDocumentChecklistDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    gstValues: number;
+    checklistSubmitted: boolean;
+};
+
+export type CostingSheetStatus = 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+
+export type TenderCostingSheet = {
+    id: number;
+    tenderId: number;
+    submittedBy: number | null;
+    approvedBy: number | null;
+    googleSheetUrl: string | null;
+    sheetTitle: string | null;
+
+    // Submitted values (TE)
+    submittedFinalPrice: string | null;
+    submittedReceiptPrice: string | null;
+    submittedBudgetPrice: string | null;
+    submittedGrossMargin: string | null;
+    teRemarks: string | null;
+
+    // Approved values (TL)
+    finalPrice: string | null;
+    receiptPrice: string | null;
+    budgetPrice: string | null;
+    grossMargin: string | null;
+    oemVendorIds: number[] | null;
+    tlRemarks: string | null;
+
+    status: CostingSheetStatus;
+    rejectionReason: string | null;
+
+    submittedAt: Date | null;
+    approvedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type CostingSheetDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    costingStatus: 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+    submittedFinalPrice: string | null;
+    submittedBudgetPrice: string | null;
+    googleSheetUrl: string | null;
+    costingSheetId: number | null;
+};
+
+export type SubmitCostingSheetDto = {
+    tenderId: number;
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};
+
+export type UpdateCostingSheetDto = {
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};
+
+export type BidSubmissionStatus = 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+
+export type BidDocuments = {
+    submittedDocs: string[];
+    submissionProof: string | null;
+    finalPriceSs: string | null;
+};
+
+export type BidSubmission = {
+    id: number;
+    tenderId: number;
+    status: BidSubmissionStatus;
+    submissionDatetime: Date | null;
+    finalBiddingPrice: string | null;
+    documents: BidDocuments | null;
+    submittedBy: number | null;
+    reasonForMissing: string | null;
+    preventionMeasures: string | null;
+    tmsImprovements: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+
+export type TenderQuery = {
+    id: number;
+    tenderId: number;
+    tqSubmissionDeadline: Date | null;
+    tqDocumentReceived: string | null;
+    receivedBy: number | null;
+    receivedAt: Date | null;
+    repliedDatetime: Date | null;
+    repliedDocument: string | null;
+    proofOfSubmission: string | null;
+    repliedBy: number | null;
+    repliedAt: Date | null;
+    missedReason: string | null;
+    preventionMeasures: string | null;
+    tmsImprovements: string | null;
+    status: TqStatus;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TenderQueryItem = {
+    id: number;
+    tenderQueryId: number;
+    srNo: number;
+    tqTypeId: number;
+    queryDescription: string;
+    response: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TenderResult = {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamExecutiveName: string | null;
+    tenderValue: string | null;
+    itemName: string | null;
+    status: string;
+    reverseAuctionId: number | null;
+    raApplicable: boolean;
+    technicallyQualified: string | null;
+    disqualificationReason: string | null;
+    qualifiedPartiesCount: string | null;
+    qualifiedPartiesNames: string[] | null;
+    result: string | null;
+    l1Price: string | null;
+    l2Price: string | null;
+    ourPrice: string | null;
+    qualifiedPartiesScreenshot: string | null;
+    finalResultScreenshot: string | null;
+    resultUploadedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type UploadResultDto = {
+    technicallyQualified: 'Yes' | 'No';
+    disqualificationReason?: string;
+    qualifiedPartiesCount?: string;
+    qualifiedPartiesNames?: string[];
+    result?: 'Won' | 'Lost';
+    l1Price?: string;
+    l2Price?: string;
+    ourPrice?: string;
+    qualifiedPartiesScreenshot?: string;
+    finalResultScreenshot?: string;
+};
+
+export type ReverseAuction = {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    tenderValue: string | null;
+    itemName: string | null;
+    bidSubmissionDate: Date | null;
+    status: string;
+    technicallyQualified: string | null;
+    disqualificationReason: string | null;
+    qualifiedPartiesCount: string | null;
+    qualifiedPartiesNames: string[] | null;
+    raStartTime: Date | null;
+    raEndTime: Date | null;
+    scheduledAt: Date | null;
+    raResult: string | null;
+    veL1AtStart: string | null;
+    raStartPrice: string | null;
+    raClosePrice: string | null;
+    raCloseTime: Date | null;
+    screenshotQualifiedParties: string | null;
+    screenshotDecrements: string | null;
+    finalResultScreenshot: string | null;
+    resultUploadedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type ScheduleRaDto = {
+    technicallyQualified: 'Yes' | 'No';
+    disqualificationReason?: string;
+    qualifiedPartiesCount?: string;
+    qualifiedPartiesNames?: string[];
+    raStartTime?: string;
+    raEndTime?: string;
+};
+
+export type UploadRaResultDto = {
+    raResult: 'Won' | 'Lost' | 'H1 Elimination';
+    veL1AtStart: 'Yes' | 'No';
+    raStartPrice?: string;
+    raClosePrice?: string;
+    raCloseTime?: string;
+    screenshotQualifiedParties?: string;
+    screenshotDecrements?: string;
+    finalResultScreenshot?: string;
+};
+
+export type RaDashboardType = 'under-evaluation' | 'scheduled' | 'completed';
+
+export interface RaDashboardRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    bidSubmissionDate: Date | null;
+    tenderValue: string | null;
+    itemName: string | null;
+    tenderStatus: string | null;
+    raStatus: string;
+    raStartTime: Date | null;
+    raEndTime: Date | null;
+    technicallyQualified: string | null;
+    result: string | null;
+}
+
+export interface RaDashboardCounts {
+    underEvaluation: number;
+    scheduled: number;
+    completed: number;
+    total: number;
+}
+
+export interface RaDashboardResponse {
+    data: RaDashboardRow[];
+    counts: RaDashboardCounts;
+}
+
+export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
+
+export interface EmdDetails {
+    amount: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    displayText: string;
+}
+
+export interface ResultDashboardRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamExecutiveName: string | null;
+    bidSubmissionDate: Date | null;
+    tenderValue: string | null;
+    finalPrice: string | null;
+    itemName: string | null;
+    tenderStatus: string | null;
+    resultStatus: string;
+    raApplicable: boolean;
+    reverseAuctionId: number | null;
+    emdDetails: EmdDetails | null;
+}
+
+export interface ResultDashboardCounts {
+    pending: number;
+    won: number;
+    lost: number;
+    total: number;
+}
+
+export interface ResultDashboardResponse {
+    data: ResultDashboardRow[];
+    counts: ResultDashboardCounts;
+}

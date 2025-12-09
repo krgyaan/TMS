@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { tenderInfos } from '../../../db/tenders.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import {
     NewRfq,
     rfqs,
@@ -12,11 +12,11 @@ import {
     rfqDocuments,
     NewRfqItem,
     NewRfqDocument,
-} from '../../../db/rfqs.schema';
-import { items } from '../../../db/items.schema';
-import { vendorOrganizations } from '../../../db/vendor-organizations.schema';
+} from '@db/schemas/tendering/rfqs.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
-import { TenderInfosService } from '../tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 
 // ============================================================================
 // Types
@@ -79,7 +79,7 @@ export class RfqsService {
             isNotNull(tenderInfos.rfqTo),
             ne(tenderInfos.rfqTo, '0'),
             ne(tenderInfos.rfqTo, ''),
-            TenderInfosService.getExcludeDnbTlStatusCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         const rows = await this.db

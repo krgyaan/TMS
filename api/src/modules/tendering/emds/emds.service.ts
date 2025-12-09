@@ -5,26 +5,25 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { eq, and, inArray, or } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     paymentRequests,
     paymentInstruments,
     instrumentDdDetails,
     instrumentFdrDetails,
     instrumentBgDetails,
-    instrumentChequeDetails,
     instrumentTransferDetails,
     type PaymentRequest,
     type PaymentInstrument,
-} from '../../../db/emds.schema';
-import { tenderInfos } from '../../../db/tenders.schema';
-import { tenderInformation } from '../../../db/tender-info-sheet.schema';
-import { users } from '../../../db/users.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { TenderInfosService } from '../tenders/tenders.service';
-import { InstrumentStatusService } from './services/instrument-status.service';
-import { InstrumentStatusHistoryService } from './services/instrument-status-history.service';
+} from '@db/schemas/tendering/emds.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
+import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
 import type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
@@ -34,7 +33,7 @@ import type {
     DashboardCounts,
     PaymentPurpose,
     InstrumentType,
-} from './dto/emds.dto';
+} from '@/modules/tendering/emds/dto/emds.dto';
 import {
     DD_STATUSES,
     FDR_STATUSES,
@@ -42,7 +41,7 @@ import {
     CHEQUE_STATUSES,
     BT_STATUSES,
     PORTAL_STATUSES,
-} from './constants/emd-statuses';
+} from '@/modules/tendering/emds/constants/emd-statuses';
 
 // ============================================================================
 // Helpers
@@ -350,7 +349,7 @@ export class EmdsService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeDnbTlStatusCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     userCondition
                 )
             );

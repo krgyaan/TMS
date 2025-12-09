@@ -1,12 +1,12 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     designations,
     type Designation,
     type NewDesignation,
-} from '../../../db/designations.schema';
+} from '@db/schemas/master/designations.schema';
 
 @Injectable()
 export class DesignationsService {

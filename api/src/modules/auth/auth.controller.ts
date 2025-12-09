@@ -10,20 +10,10 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { AuthService } from './auth.service';
-import { Public } from './decorators/public.decorator';
-import { CurrentUser } from './decorators/current-user.decorator';
-import type { ValidatedUser } from './strategies/jwt.strategy';
-﻿import { Buffer } from "node:buffer";
-import { Body, Controller, Get, Post, Query, Res, UseGuards, Inject } from "@nestjs/common";
-import type { Response } from "express";
-import { z } from "zod";
-import { AuthService } from "./auth.service";
-import { JwtAuthGuard } from "./guards/jwt-auth.guard";
-import { CurrentUser } from "./decorators/current-user.decorator";
-import { Public } from "./decorators/public.decorator";
-import type { SafeUser } from "../master/users/users.service";
-import authConfig, { type AuthConfig } from "../../config/auth.config";
+import { AuthService } from '@/modules/auth/auth.service';
+import { Public } from '@/modules/auth/decorators/public.decorator';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 const LoginSchema = z.object({
     email: z.string().email(),
@@ -35,7 +25,7 @@ const GoogleCallbackSchema = z.object({
     state: z.string().optional(),
 });
 
-@Controller("auth")
+@Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) { }
 
@@ -46,20 +36,10 @@ export class AuthController {
         @Body() body: unknown,
         @Res({ passthrough: true }) res: Response,
     ) {
-    constructor(
-        private readonly authService: AuthService,
-        @Inject(authConfig.KEY) private readonly config: AuthConfig
-    ) {}
-
-    @Post("login")
-    @Public()
-    async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
         const { email, password } = LoginSchema.parse(body);
+        const session = await this.authService.loginWithPassword(email, password);
 
         this.setAuthCookie(res, session.accessToken);
-        const session = await this.authService.loginWithPassword(email, password);
-        // Set httpOnly cookie
-        res.cookie(this.config.cookie.name, session.accessToken, this.config.cookie);
 
         return { user: session.user };
     }
@@ -75,8 +55,6 @@ export class AuthController {
 
     @Post('logout')
     @HttpCode(HttpStatus.OK)
-    @Post("logout")
-    @UseGuards(JwtAuthGuard)
     async logout(@Res({ passthrough: true }) res: Response) {
         res.clearCookie('access_token', {
             httpOnly: true,

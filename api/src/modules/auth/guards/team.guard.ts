@@ -5,8 +5,8 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { ValidatedUser } from '../strategies/jwt.strategy';
-import { DataScope } from '../../../common/constants/roles.constant';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { DataScope } from '@/common/constants/roles.constant';
 
 export const TEAM_KEY = 'requiredTeam';
 export const BYPASS_TEAM_CHECK_KEY = 'bypassTeamCheck';

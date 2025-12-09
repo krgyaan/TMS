@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     tenderStatusHistory,
     type NewTenderStatusHistory,
-} from '../../../db/tender-status-history.schema';
-import { statuses } from '../../../db/statuses.schema';
-import { users } from '../../../db/users.schema';
+} from '@db/schemas/tendering/tender-status-history.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
 
 export type TenderStatusHistoryWithNames = {
     id: number;

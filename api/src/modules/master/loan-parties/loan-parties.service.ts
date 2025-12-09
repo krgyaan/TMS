@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     loanParties,
     type LoanParty,
     type NewLoanParty,
-} from '../../../db/loan-parties.schema';
+} from '@db/schemas/accounts/loan-parties.schema';
 
 @Injectable()
 export class LoanPartiesService {

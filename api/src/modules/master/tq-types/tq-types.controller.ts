@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { TqTypesService } from './tq-types.service';
+import { TqTypesService } from '@/modules/master/tq-types/tq-types.service';
 
 const CreateTqTypeSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
@@ -65,9 +64,4 @@ export class TqTypesController {
         return this.tqTypesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.tqTypesService.delete(id);
-    // }
 }

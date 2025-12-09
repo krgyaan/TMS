@@ -1,12 +1,12 @@
 ﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, like } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
 import {
     followupCategories,
     type FollowupCategory,
     type NewFollowupCategory,
-} from '../../../db/followup-categories.schema';
+} from '@db/schemas/crm/followup-categories.schema';
 
 @Injectable()
 export class FollowupCategoriesService {

@@ -1,7 +1,6 @@
 ﻿import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -13,7 +12,7 @@
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { IndustriesService } from './industries.service';
+import { IndustriesService } from '@/modules/master/industries/industries.service';
 
 const CreateIndustrySchema = z.object({
     name: z.string().min(1, 'Name is required').max(255),
@@ -61,9 +60,4 @@ export class IndustriesController {
         return this.industriesService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.industriesService.delete(id);
-    // }
 }

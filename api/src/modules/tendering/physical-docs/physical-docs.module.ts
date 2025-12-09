@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { PhysicalDocsController } from './physical-docs.controller';
-import { PhysicalDocsService } from './physical-docs.service';
-import { TendersModule } from '../tenders/tenders.module';
+import { DatabaseModule } from '@db/database.module';
+import { PhysicalDocsController } from '@/modules/tendering/physical-docs/physical-docs.controller';
+import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
+import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 
 @Module({
     imports: [DatabaseModule, TendersModule],

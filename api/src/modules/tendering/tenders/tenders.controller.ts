@@ -14,8 +14,8 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { TenderInfosService } from './tenders.service';
-import { NewTenderInfo } from 'src/db/tenders.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 
 // Reusable decimal field transformer
 const decimalField = (message: string, required = true) => {

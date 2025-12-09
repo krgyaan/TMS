@@ -1,11 +1,11 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
-import { DRIZZLE } from '../../../db/database.module';
-import type { DbInstance } from '../../../db';
-import { permissions } from '../../../db/permissions.schema';
-import { rolePermissions } from '../../../db/role-permissions.schema';
-import { userPermissions } from '../../../db/user-permissions.schema';
-import { DataScope, RoleName } from '../../../common/constants/roles.constant';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { permissions } from '@db/schemas/auth/permissions.schema';
+import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
+import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
+import { DataScope, RoleName } from '@/common/constants/roles.constant';
 
 export type PermissionCheck = {
     module: string;

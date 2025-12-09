@@ -3,19 +3,19 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import authConfig, { type AuthConfig } from '../../config/auth.config';
-import { UsersModule } from '../master/users/users.module';
-import { GoogleIntegrationModule } from '../integrations/google/google.module';
-import { DatabaseModule } from '../../db/database.module';
+import authConfig, { type AuthConfig } from '@/config/auth.config';
+import { UsersModule } from '@/modules/master/users/users.module';
+import { GoogleIntegrationModule } from '@/modules/integrations/google/google.module';
+import { DatabaseModule } from '@db/database.module';
 
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
-import { PermissionService } from './services/permission.service';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { PermissionGuard } from './guards/permission.guard';
-import { ResourceAccessGuard } from './guards/resource-access.guard';
+import { AuthService } from '@/modules/auth/auth.service';
+import { AuthController } from '@/modules/auth/auth.controller';
+import { PermissionService } from '@/modules/auth/services/permission.service';
+import { JwtStrategy } from '@/modules/auth/strategies/jwt.strategy';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/modules/auth/guards/roles.guard';
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
+import { ResourceAccessGuard } from '@/modules/auth/guards/resource-access.guard';
 
 @Global()
 @Module({

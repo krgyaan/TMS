@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { z } from 'zod';
-import { OauthAccountsService } from './oauth-accounts.service';
+import { OauthAccountsService } from '@/modules/master/oauth-accounts/oauth-accounts.service';
 
 const CreateOauthAccountSchema = z.object({
   userId: z.number(),

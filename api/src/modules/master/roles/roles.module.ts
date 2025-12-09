@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../../db/database.module';
-import { RolesController } from './roles.controller';
-import { RolesService } from './roles.service';
+import { DatabaseModule } from '@db/database.module';
+import { RolesController } from '@/modules/master/roles/roles.controller';
+import { RolesService } from '@/modules/master/roles/roles.service';
 
 @Module({
     imports: [DatabaseModule],

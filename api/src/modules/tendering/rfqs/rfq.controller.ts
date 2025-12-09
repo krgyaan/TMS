@@ -11,8 +11,8 @@ import {
     HttpStatus,
     NotFoundException,
 } from '@nestjs/common';
-import { RfqsService } from './rfq.service';
-import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
+import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
+import { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 
 
 @Controller('rfqs')
