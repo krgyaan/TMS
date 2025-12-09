@@ -22,6 +22,20 @@
       "when": 1764584174926,
       "tag": "0002_left_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1764932213567,
+      "tag": "0003_fine_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1765173984688,
+      "tag": "0004_overjoyed_thing",
+      "breakpoints": true
     }
   ]
 }
