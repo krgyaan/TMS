@@ -59,9 +59,9 @@ export class CostingApprovalsService {
             .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .where(and(
-                eq(tenderInfos.tlStatus, 1),
-                eq(tenderInfos.deleteStatus, 0),
-                TenderInfosService.getExcludeDnbTlStatusCondition(),
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                 // Only show costing sheets that are submitted, approved, or rejected
                 inArray(tenderCostingSheets.status, ['Pending', 'Approved', 'Rejected/Redo'])
             ));

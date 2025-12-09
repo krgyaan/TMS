@@ -18,14 +18,6 @@ export * from './physical-docs.relations';
 export * from './tender-info-sheet.schema';
 export * from './tender-info-sheet.relations';
 
-// Tender Queries
-export * from './tender-queries.schema';
-export * from './tq-types.schema';
-export * from './tq-types.relations';
-
-// Tender Results
-export * from './tender-results.schema';
-
 // Tender Costing
 export * from './tender-costing-sheets.schema';
 
@@ -42,3 +34,12 @@ export * from './tender-incomplete-fields.relations';
 
 // Bid Submissions
 export * from './bid-submissions.schema';
+
+// Tender Queries
+export * from './tender-queries.schema';
+
+// Reverse Auctions
+export * from './reverse-auction.schema';
+
+// Tender Results
+export * from './tender-result.schema';

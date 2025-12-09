@@ -79,7 +79,7 @@ export class RfqsService {
             isNotNull(tenderInfos.rfqTo),
             ne(tenderInfos.rfqTo, '0'),
             ne(tenderInfos.rfqTo, ''),
-            TenderInfosService.getExcludeDnbTlStatusCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         const rows = await this.db

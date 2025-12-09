@@ -349,7 +349,7 @@ export class EmdsService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeDnbTlStatusCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     userCondition
                 )
             );

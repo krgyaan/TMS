@@ -58,9 +58,9 @@ export class CostingSheetsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .where(and(
-                eq(tenderInfos.tlStatus, 1),
-                eq(tenderInfos.deleteStatus, 0),
-                TenderInfosService.getExcludeDnbTlStatusCondition()
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
             ));
 
         return rows.map((row) => ({

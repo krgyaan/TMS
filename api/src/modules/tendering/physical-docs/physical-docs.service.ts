@@ -86,9 +86,10 @@ export class PhysicalDocsService {
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(
                 and(
+                    TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
                     eq(tenderInformation.physicalDocsRequired, 'Yes'),
-                    TenderInfosService.getExcludeDnbTlStatusCondition()
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
                 )
             );
 

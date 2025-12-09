@@ -10,10 +10,7 @@ import { organizations } from '@db/schemas/master/organizations.schema';
 import { locations } from '@db/schemas/master/locations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { StatusCache } from '@/utils/status-cache';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -33,9 +30,6 @@ export type TenderInfoWithNames = TenderInfo & {
     websiteLink: string | null;
 };
 
-/**
- * Minimal tender reference for display in child modules
- */
 export type TenderReference = {
     id: number;
     tenderNo: string;
@@ -47,9 +41,6 @@ export type TenderReference = {
     dueDate: Date;
 };
 
-/**
- * Tender data needed for EMD/Payment operations
- */
 export type TenderForPayment = {
     id: number;
     tenderNo: string;
@@ -62,9 +53,6 @@ export type TenderForPayment = {
     teamMemberName: string | null;
 };
 
-/**
- * Tender data needed for RFQ operations
- */
 export type TenderForRfq = {
     id: number;
     tenderNo: string;
@@ -78,9 +66,6 @@ export type TenderForRfq = {
     dueDate: Date;
 };
 
-/**
- * Tender data needed for Physical Docs operations
- */
 export type TenderForPhysicalDocs = {
     id: number;
     tenderNo: string;
@@ -91,9 +76,6 @@ export type TenderForPhysicalDocs = {
     dueDate: Date;
 };
 
-/**
- * Tender data needed for Approval operations
- */
 export type TenderForApproval = {
     id: number;
     tenderNo: string;
@@ -115,12 +97,20 @@ export type TenderForApproval = {
 export class TenderInfosService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    static getExcludeDnbTlStatusCondition() {
-        const statusIds = ['dnb', 'lost']
+    static getExcludeStatusCondition(categories: string[]) {
+        const statusIds = categories
             .flatMap((cat) => StatusCache.getIds(cat))
             .filter(Boolean);
 
         return notInArray(tenderInfos.status, statusIds);
+    }
+
+    static getIncludeStatusCondition(categories: string[]) {
+        const statusIds = categories
+            .flatMap((cat) => StatusCache.getIds(cat))
+            .filter(Boolean);
+
+        return inArray(tenderInfos.status, statusIds);
     }
 
     static getActiveCondition() {
@@ -129,6 +119,18 @@ export class TenderInfosService {
 
     static getApprovedCondition() {
         return eq(tenderInfos.tlStatus, 1);
+    }
+
+    static getRaApplicableCondition() {
+        return eq(tenderInformation.reverseAuctionApplicable, 'Yes');
+    }
+
+    static getBaseFilters() {
+        return and(
+            this.getActiveCondition(),
+            this.getApprovedCondition(),
+            this.getExcludeStatusCondition(['dnb'])
+        );
     }
 
     private mapJoinedRow = (row: {

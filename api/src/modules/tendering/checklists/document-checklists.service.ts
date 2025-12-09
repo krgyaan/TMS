@@ -49,7 +49,7 @@ export class DocumentChecklistsService {
             .where(and(
                 TenderInfosService.getActiveCondition(),
                 TenderInfosService.getApprovedCondition(),
-                TenderInfosService.getExcludeDnbTlStatusCondition()
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
             ));
 
         return rows.map((row) => ({

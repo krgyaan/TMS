@@ -48,6 +48,8 @@ import { EmployeeImprestModule } from '@/modules/employee-imprest/employee-impre
 import { CostingApprovalsModule } from '@/modules/tendering/costing-approvals/costing-approvals.module';
 import { BidSubmissionsModule } from '@/modules/tendering/bid-submissions/bid-submissions.module';
 import { TqManagementModule } from '@/modules/tendering/tq-management/tq-management.module';
+import { ReverseAuctionModule } from '@/modules/tendering/reverse-auction/reverse-auction.module';
+import { TenderResultModule } from '@/modules/tendering/tender-result/tender-result.module';
 
 @Module({
     imports: [
@@ -102,6 +104,8 @@ import { TqManagementModule } from '@/modules/tendering/tq-management/tq-managem
         CostingApprovalsModule,
         BidSubmissionsModule,
         TqManagementModule,
+        ReverseAuctionModule,
+        TenderResultModule,
     ],
     controllers: [AppController],
     providers: [

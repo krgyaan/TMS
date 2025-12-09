@@ -59,9 +59,9 @@ export class TqManagementService {
             // LEFT JOIN tender queries to check if TQ exists
             .leftJoin(tenderQueries, eq(tenderQueries.tenderId, tenderInfos.id))
             .where(and(
-                eq(tenderInfos.tlStatus, 1),
-                eq(tenderInfos.deleteStatus, 0),
-                TenderInfosService.getExcludeDnbTlStatusCondition(),
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                 // Show if has TQ OR has submitted bid
                 or(
                     isNotNull(tenderQueries.id),
