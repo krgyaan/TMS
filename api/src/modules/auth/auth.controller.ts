@@ -68,6 +68,7 @@ export class AuthController {
     @Public()
     @Get('google/url')
     async googleUrl() {
+        console.log("google login called!");
         return this.authService.generateGoogleLoginUrl();
     }
 

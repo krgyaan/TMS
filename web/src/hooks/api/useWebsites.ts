@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { websitesService } from '@/services/api';
-import type { CreateWebsiteDto, UpdateWebsiteDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { websitesService } from "@/services";
+import type { CreateWebsiteDto, UpdateWebsiteDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const websitesKey = {
-    all: ['websites'] as const,
-    lists: () => [...websitesKey.all, 'list'] as const,
+    all: ["websites"] as const,
+    lists: () => [...websitesKey.all, "list"] as const,
     list: (filters?: any) => [...websitesKey.lists(), { filters }] as const,
-    details: () => [...websitesKey.all, 'detail'] as const,
+    details: () => [...websitesKey.all, "detail"] as const,
     detail: (id: number) => [...websitesKey.details(), id] as const,
 };
 
@@ -32,7 +32,7 @@ export const useWebsite = (id: number | null) => {
 // Search websites
 export const useWebsiteSearch = (query: string) => {
     return useQuery({
-        queryKey: [...websitesKey.all, 'search', query],
+        queryKey: [...websitesKey.all, "search", query],
         // queryFn: () => websitesService.search(query),
         enabled: query.length > 0,
     });
@@ -46,9 +46,9 @@ export const useCreateWebsite = () => {
         mutationFn: (data: CreateWebsiteDto) => websitesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: websitesKey.lists() });
-            toast.success('Website created successfully');
+            toast.success("Website created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -59,14 +59,13 @@ export const useUpdateWebsite = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateWebsiteDto }) =>
-            websitesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateWebsiteDto }) => websitesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: websitesKey.lists() });
             queryClient.invalidateQueries({ queryKey: websitesKey.detail(variables.id) });
-            toast.success('Website updated successfully');
+            toast.success("Website updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

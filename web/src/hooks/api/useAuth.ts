@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authService } from '@/services/api';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-import { setStoredUser, clearAuthSession, getStoredUser } from '@/lib/auth';
-import type { AuthUser } from '@/types/auth.types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authService } from "@/services/api";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+import { setStoredUser, clearAuthSession, getStoredUser } from "@/lib/auth";
+import type { AuthUser } from "@/types/auth.types";
 
 export const authKeys = {
-    currentUser: ['auth', 'currentUser'] as const,
-    googleUrl: ['auth', 'googleUrl'] as const,
+    currentUser: ["auth", "currentUser"] as const,
+    googleUrl: ["auth", "googleUrl"] as const,
 };
 
 export const useCurrentUser = () => {
@@ -36,25 +36,24 @@ export const useLogin = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ email, password }: { email: string; password: string }) =>
-            authService.login(email, password),
-        onSuccess: (data) => {
+        mutationFn: ({ email, password }: { email: string; password: string }) => authService.login(email, password),
+        onSuccess: data => {
             const user = data.user;
 
             setStoredUser(user);
             queryClient.setQueryData(authKeys.currentUser, user);
 
-            console.log('✅ Login successful');
-            console.log('   User:', user.name);
-            console.log('   Role:', user.role?.name ?? 'No role');
-            console.log('   Team:', user.team?.name ?? 'No team');
-            console.log('   Data Scope:', user.role?.dataScope ?? 'self');
+            console.log("✅ Login successful");
+            console.log("   User:", user.name);
+            console.log("   Role:", user.role?.name ?? "No role");
+            console.log("   Team:", user.team?.name ?? "No team");
+            console.log("   Data Scope:", user.role?.dataScope ?? "self");
 
             toast.success(`Welcome back, ${user.name}!`);
-            navigate('/', { replace: true });
+            navigate("/", { replace: true });
         },
-        onError: (error) => {
-            console.error('❌ Login failed:', error);
+        onError: error => {
+            console.error("❌ Login failed:", error);
             toast.error(handleQueryError(error));
         },
     });
@@ -80,9 +79,9 @@ export const useGoogleLogin = () => {
             }
             return result.data;
         },
-        onError: (error) => {
-            console.error('❌ Failed to get Google auth URL:', error);
-            toast.error('Failed to initiate Google sign-in');
+        onError: error => {
+            console.error("❌ Failed to get Google auth URL:", error);
+            toast.error("Failed to initiate Google sign-in");
         },
     });
 };
@@ -96,14 +95,14 @@ export const useLogout = () => {
         onSuccess: () => {
             clearAuthSession();
             queryClient.clear();
-            toast.success('Logged out successfully');
-            navigate('/login', { replace: true });
+            toast.success("Logged out successfully");
+            navigate("/login", { replace: true });
         },
-        onError: (error) => {
-            console.error('❌ Logout failed:', error);
+        onError: error => {
+            console.error("❌ Logout failed:", error);
             clearAuthSession();
             queryClient.clear();
-            navigate('/login', { replace: true });
+            navigate("/login", { replace: true });
         },
     });
 };
@@ -113,13 +112,13 @@ export const useRefreshSession = () => {
 
     return useMutation({
         mutationFn: () => authService.refreshSession(),
-        onSuccess: (data) => {
+        onSuccess: data => {
             setStoredUser(data.user);
             queryClient.setQueryData(authKeys.currentUser, data.user);
-            console.log('✅ Session refreshed');
+            console.log("✅ Session refreshed");
         },
-        onError: (error) => {
-            console.error('❌ Session refresh failed:', error);
+        onError: error => {
+            console.error("❌ Session refresh failed:", error);
         },
     });
 };

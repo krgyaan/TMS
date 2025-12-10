@@ -1,15 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenderInfosService } from '@/services/api';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
-import { useTeamFilter } from '@/hooks/useTeamFilter';
-import type { CreateTenderRequest, UpdateTenderRequest } from '@/types/api.types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { tenderInfosService } from "@/services/api";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
+import type { CreateTenderRequest, UpdateTenderRequest } from "@/types/api.types";
 
 export const tendersKey = {
-    all: ['tenders'] as const,
-    lists: () => [...tendersKey.all, 'list'] as const,
+    all: ["tenders"] as const,
+    lists: () => [...tendersKey.all, "list"] as const,
     list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
-    details: () => [...tendersKey.all, 'detail'] as const,
+    details: () => [...tendersKey.all, "detail"] as const,
     detail: (id: number) => [...tendersKey.details(), id] as const,
 };
 
@@ -18,8 +18,8 @@ export const useTenders = (activeTab?: string, statusIds: number[] = []) => {
 
     // Build combined filters
     const filters = {
-        ...(activeTab === 'unallocated' ? { unallocated: true } : {}),
-        ...(activeTab !== 'unallocated' && statusIds.length > 0 ? { statusIds } : {}),
+        ...(activeTab === "unallocated" ? { unallocated: true } : {}),
+        ...(activeTab !== "unallocated" && statusIds.length > 0 ? { statusIds } : {}),
         ...teamParams,
     };
 
@@ -53,9 +53,9 @@ export const useCreateTender = () => {
         mutationFn: (data: CreateTenderRequest) => tenderInfosService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
-            toast.success('Tender created successfully');
+            toast.success("Tender created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -65,14 +65,13 @@ export const useUpdateTender = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateTenderRequest }) =>
-            tenderInfosService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateTenderRequest }) => tenderInfosService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
-            toast.success('Tender updated successfully');
+            toast.success("Tender updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -85,9 +84,9 @@ export const useDeleteTender = () => {
         mutationFn: (id: number) => tenderInfosService.remove(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
-            toast.success('Tender deleted successfully');
+            toast.success("Tender deleted successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

@@ -1,17 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { documentsSubmittedService } from '@/services/api';
-import type {
-    CreateDocumentSubmittedDto,
-    UpdateDocumentSubmittedDto,
-} from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { documentsSubmittedService } from "@/services";
+import type { CreateDocumentSubmittedDto, UpdateDocumentSubmittedDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const documentsSubmittedKey = {
-    all: ['documentsSubmitted'] as const,
-    lists: () => [...documentsSubmittedKey.all, 'list'] as const,
+    all: ["documentsSubmitted"] as const,
+    lists: () => [...documentsSubmittedKey.all, "list"] as const,
     list: (filters?: any) => [...documentsSubmittedKey.lists(), { filters }] as const,
-    details: () => [...documentsSubmittedKey.all, 'detail'] as const,
+    details: () => [...documentsSubmittedKey.all, "detail"] as const,
     detail: (id: number) => [...documentsSubmittedKey.details(), id] as const,
 };
 
@@ -35,7 +32,7 @@ export const useDocumentSubmitted = (id: number | null) => {
 // Search documents submitted
 export const useDocumentSubmittedSearch = (query: string) => {
     return useQuery({
-        queryKey: [...documentsSubmittedKey.all, 'search', query],
+        queryKey: [...documentsSubmittedKey.all, "search", query],
         // queryFn: () => documentsSubmittedService.search(query),
         enabled: query.length > 0,
     });
@@ -46,13 +43,12 @@ export const useCreateDocumentSubmitted = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateDocumentSubmittedDto) =>
-            documentsSubmittedService.create(data),
+        mutationFn: (data: CreateDocumentSubmittedDto) => documentsSubmittedService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: documentsSubmittedKey.lists() });
-            toast.success('Document type created successfully');
+            toast.success("Document type created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -63,16 +59,15 @@ export const useUpdateDocumentSubmitted = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateDocumentSubmittedDto }) =>
-            documentsSubmittedService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateDocumentSubmittedDto }) => documentsSubmittedService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: documentsSubmittedKey.lists() });
             queryClient.invalidateQueries({
                 queryKey: documentsSubmittedKey.detail(variables.id),
             });
-            toast.success('Document type updated successfully');
+            toast.success("Document type updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

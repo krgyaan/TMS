@@ -1,1 +1,0 @@
-ALTER TABLE "employee_imprests" RENAME COLUMN "name_id" TO "user_id";

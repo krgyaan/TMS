@@ -1,16 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorsService } from '@/services/api';
-import type { CreateVendorDto, UpdateVendorDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { vendorsService } from "@/services";
+import type { CreateVendorDto, UpdateVendorDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const vendorsKey = {
-    all: ['vendors'] as const,
-    lists: () => [...vendorsKey.all, 'list'] as const,
+    all: ["vendors"] as const,
+    lists: () => [...vendorsKey.all, "list"] as const,
     list: (filters?: any) => [...vendorsKey.lists(), { filters }] as const,
-    details: () => [...vendorsKey.all, 'detail'] as const,
+    details: () => [...vendorsKey.all, "detail"] as const,
     detail: (id: number) => [...vendorsKey.details(), id] as const,
-    withRelations: (id: number) => [...vendorsKey.detail(id), 'relations'] as const,
+    withRelations: (id: number) => [...vendorsKey.detail(id), "relations"] as const,
 };
 
 export const useVendors = () => {
@@ -38,7 +38,7 @@ export const useVendorWithRelations = (id: number | null) => {
 
 export const useVendorsByOrganization = (organizationId: number | null) => {
     return useQuery({
-        queryKey: [...vendorsKey.all, 'organization', organizationId],
+        queryKey: [...vendorsKey.all, "organization", organizationId],
         queryFn: () => vendorsService.getByOrganization(organizationId!),
         enabled: !!organizationId,
     });
@@ -51,9 +51,9 @@ export const useCreateVendor = () => {
         mutationFn: (data: CreateVendorDto) => vendorsService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
-            toast.success('Vendor created successfully');
+            toast.success("Vendor created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -63,14 +63,13 @@ export const useUpdateVendor = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateVendorDto }) =>
-            vendorsService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateVendorDto }) => vendorsService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
             queryClient.invalidateQueries({ queryKey: vendorsKey.detail(variables.id) });
-            toast.success('Vendor updated successfully');
+            toast.success("Vendor updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

@@ -1,3 +1,4 @@
+// pages/courier/CourierDashboard.tsx
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,252 +7,382 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import DataTable from "@/components/ui/data-table"; // your AG Grid wrapper
+import { Badge } from "@/components/ui/badge";
+import DataTable from "@/components/ui/data-table";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { RefreshCw, FileEdit, Eye, Trash } from "lucide-react";
+import { RefreshCw, FileEdit, Eye, Trash, Loader2, Plus } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
 
-// -----------------------------
-// Dummy Data — mirrors Blade columns
-// -----------------------------
-const dummyCouriers = {
-    pending: [
-        {
-            id: 1001,
-            request_no: "CR-1001",
-            created_at: "2025-01-10 10:20",
-            to_name: "Ravi Kumar",
-            courier_from: { name: "Head Office" },
-            del_date: "2025-01-20",
-            timer: "2 days left",
-            courier_provider: "BlueDart",
-            pickup_date: "2025-01-11 09:00",
-            docket_no: "BD-4551",
-            delivery_date: null,
-            status: "pending",
-        },
-        {
-            id: 1002,
-            request_no: "CR-1002",
-            created_at: "2025-01-12 11:15",
-            to_name: "Sunita Sharma",
-            courier_from: { name: "Branch A" },
-            del_date: "2025-01-22",
-            timer: "4 days left",
-            courier_provider: "DHL",
-            pickup_date: "2025-01-13 14:30",
-            docket_no: "DH-9912",
-            delivery_date: null,
-            status: "pending",
-        },
-    ],
-    dispatched: [],
-    not_delivered: [],
-    delivered: [
-        {
-            id: 1011,
-            request_no: "CR-1011",
-            created_at: "2024-12-20 09:05",
-            to_name: "Aman Gupta",
-            courier_from: { name: "HO" },
-            del_date: "2024-12-28",
-            timer: "delivered",
-            courier_provider: "FedEx",
-            pickup_date: "2024-12-21 08:00",
-            docket_no: "FX-3344",
-            delivery_date: "2024-12-27 13:00",
-            status: "delivered",
-        },
-    ],
-    rejected: [],
+// API & Hooks
+import { useCourierDashboard, useUpdateCourierStatus, useDeleteCourier, useUploadDeliveryPod } from "@/modules/shared/courier/courier.hooks";
+import { COURIER_STATUS, COURIER_STATUS_LABELS, type Courier } from "@/modules/shared/courier/courier.types";
+
+// Helper: Calculate timer (days remaining)
+const calculateTimer = (delDate: string | null, status: number): string => {
+    if (status === COURIER_STATUS.DELIVERED) return "Delivered";
+    if (status === COURIER_STATUS.REJECTED) return "Rejected";
+    if (!delDate) return "-";
+
+    const now = new Date();
+    const delivery = new Date(delDate);
+    const diffTime = delivery.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
+    if (diffDays === 0) return "Due today";
+    return `${diffDays} day${diffDays > 1 ? "s" : ""} left`;
 };
 
-// -----------------------------
-// Type definitions
-// -----------------------------
-type CourierRow = {
-    id: number;
-    request_no: string;
-    created_at: string;
-    to_name: string;
-    courier_from: { name: string } | null;
-    del_date: string | null;
-    timer: string;
-    courier_provider: string | null;
-    pickup_date: string | null;
-    docket_no: string | null;
-    delivery_date: string | null;
-    status: string;
+// Helper: Format date
+const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+};
+
+const formatDateTime = (dateStr: string | null): string => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+};
+
+// Generate request number
+const getRequestNo = (id: number, createdAt: string): string => {
+    const date = new Date(createdAt);
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    return `CR-${year}${month}-${id.toString().padStart(4, "0")}`;
 };
 
 const CourierDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>("pending");
 
-    // Modal state for status update
-    const [statusModalOpen, setStatusModalOpen] = useState(false);
-    const [selectedId, setSelectedId] = useState<number | null>(null);
-    const [selectedStatus, setSelectedStatus] = useState<string>("");
+    // API hooks
+    const { data: dashboardData, isLoading, isError } = useCourierDashboard();
+    const updateStatusMutation = useUpdateCourierStatus();
+    const deleteMutation = useDeleteCourier();
+    const uploadPodMutation = useUploadDeliveryPod();
 
-    // Delivery-specific fields (appear when status === '4' i.e., Delivered)
-    const [deliveryDate, setDeliveryDate] = useState<string | null>(null);
+    // Modal state
+    const [statusModalOpen, setStatusModalOpen] = useState(false);
+    const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
+    const [newStatus, setNewStatus] = useState<string>("");
+
+    // Delivery fields (for Delivered status)
+    const [deliveryDate, setDeliveryDate] = useState<string>("");
     const [deliveryPod, setDeliveryPod] = useState<File | null>(null);
     const [withinTime, setWithinTime] = useState<string>("1");
 
-    // Actions (same style as followups reference)
-    const courierActions = [
-        {
-            label: "Status",
-            icon: <FileEdit className="h-4 w-4" />,
-            className: "text-blue-600",
-            onClick: (row: CourierRow) => {
-                openStatusModal(row.id, row.status);
-            },
-        },
-        {
-            label: "Dispatch",
-            icon: <RefreshCw className="h-4 w-4" />,
-            onClick: (row: CourierRow) => {
-                // Equivalent to: route('courier.despatch', $courier->id)
-                navigate(paths.shared.courierDispatch);
-            },
-        },
-        {
-            label: "Delete",
-            icon: <Trash className="h-4 w-4" />,
-            className: "text-red-600",
-            onClick: (row: CourierRow) => {
-                if (window.confirm("Are you sure you want to delete this courier?")) {
-                    console.log("Deleting courier:", row.id);
-                    // TODO: call API to delete
-                }
-            },
-        },
-        {
-            label: "View",
-            icon: <Eye className="h-4 w-4" />,
-            onClick: (row: CourierRow) => {
-                navigate(`/courier/show/${row.id}`);
-            },
-        },
-    ];
+    // Open status modal
+    const openStatusModal = useCallback((courier: Courier) => {
+        setSelectedCourier(courier);
+        setNewStatus(courier.status.toString());
+        setDeliveryDate("");
+        setDeliveryPod(null);
+        setWithinTime("1");
+        setStatusModalOpen(true);
+    }, []);
 
+    // Handle status submit
+    const handleSubmitStatus = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        if (!selectedCourier) return;
+
+        const statusNum = parseInt(newStatus);
+
+        try {
+            // Update status
+            await updateStatusMutation.mutateAsync({
+                id: selectedCourier.id,
+                data: {
+                    status: statusNum,
+                    delivery_date: statusNum === COURIER_STATUS.DELIVERED ? deliveryDate : undefined,
+                    within_time: statusNum === COURIER_STATUS.DELIVERED ? withinTime === "1" : undefined,
+                },
+            });
+
+            // Upload POD if delivered and file selected
+            if (statusNum === COURIER_STATUS.DELIVERED && deliveryPod) {
+                await uploadPodMutation.mutateAsync({
+                    id: selectedCourier.id,
+                    file: deliveryPod,
+                });
+            }
+
+            setStatusModalOpen(false);
+        } catch (error) {
+            // Error handled by mutation
+        }
+    };
+
+    // Handle delete
+    const handleDelete = useCallback(
+        (courier: Courier) => {
+            if (window.confirm(`Are you sure you want to delete courier ${getRequestNo(courier.id, courier.created_at)}?`)) {
+                deleteMutation.mutate(courier.id);
+            }
+        },
+        [deleteMutation]
+    );
+
+    // Handle POD file change
+    const handlePodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        setDeliveryPod(file);
+    };
+
+    // Action items
+    const courierActions = useMemo(
+        () => [
+            {
+                label: "Status",
+                icon: <FileEdit className="h-4 w-4" />,
+                className: "text-blue-600",
+                onClick: (row: Courier) => openStatusModal(row),
+            },
+            {
+                label: "Dispatch",
+                icon: <RefreshCw className="h-4 w-4" />,
+                onClick: (row: Courier) => navigate(`${paths.shared.courierDispatch}/${row.id}`),
+            },
+            {
+                label: "View",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row: Courier) => navigate(paths.shared.courierView(row.id)),
+            },
+            {
+                label: "Delete",
+                icon: <Trash className="h-4 w-4" />,
+                className: "text-red-600",
+                onClick: handleDelete,
+            },
+        ],
+        [openStatusModal, handleDelete, navigate]
+    );
+
+    // Columns
     const columns: ColDef[] = useMemo(
         () => [
-            { field: "request_no", headerName: "Request No", width: 140 },
-            { field: "created_at", headerName: "Request Date", width: 160 },
-            { field: "to_name", headerName: "To (Name)", width: 180 },
             {
-                field: "courier_from.name",
-                headerName: "From (Name)",
-                width: 160,
-                valueGetter: (p: any) => p.data?.courier_from?.name ?? "-",
+                headerName: "Request No",
+                width: 150,
+                valueGetter: (p: any) => (p.data ? getRequestNo(p.data.id, p.data.created_at) : "-"),
             },
-            { field: "del_date", headerName: "Expected Delivery Date", width: 150 },
-            { field: "timer", headerName: "Timer", width: 120, sortable: false, filter: false },
-            { field: "courier_provider", headerName: "Courier Provider", width: 160 },
-            { field: "pickup_date", headerName: "Pickup Date & Time", width: 180 },
-            { field: "docket_no", headerName: "Docket No", width: 140 },
-            { field: "delivery_date", headerName: "Delivery Date & Time", width: 180 },
+            {
+                field: "created_at",
+                headerName: "Request Date",
+                width: 140,
+                valueGetter: (p: any) => formatDate(p.data?.created_at),
+            },
+            { field: "to_name", headerName: "To (Name)", width: 160 },
+            { field: "to_org", headerName: "Organization", width: 160 },
+            {
+                field: "del_date",
+                headerName: "Expected Delivery",
+                width: 140,
+                valueGetter: (p: any) => formatDate(p.data?.del_date),
+            },
+            {
+                headerName: "Timer",
+                width: 130,
+                sortable: false,
+                filter: false,
+                cellRenderer: (p: any) => {
+                    const timer = calculateTimer(p.data?.del_date, p.data?.status);
+                    const isOverdue = timer.includes("overdue");
+                    const isDueToday = timer === "Due today";
+
+                    return (
+                        // <Badge variant={isOverdue ? "destructive" : isDueToday ? "warning" : "secondary"} className="text-xs">
+                        //     {timer}
+                        // </Badge>
+                        <span>-</span>
+                    );
+                },
+            },
+            {
+                field: "courier_provider",
+                headerName: "Provider",
+                width: 130,
+                valueGetter: (p: any) => p.data?.courier_provider ?? "-",
+            },
+            {
+                field: "pickup_date",
+                headerName: "Pickup Date",
+                width: 150,
+                valueGetter: (p: any) => formatDateTime(p.data?.pickup_date),
+            },
+            {
+                field: "docket_no",
+                headerName: "Docket No",
+                width: 130,
+                valueGetter: (p: any) => p.data?.docket_no ?? "-",
+            },
+            {
+                field: "delivery_date",
+                headerName: "Delivery Date",
+                width: 150,
+                valueGetter: (p: any) => formatDateTime(p.data?.delivery_date),
+            },
             {
                 headerName: "Action",
                 filter: false,
                 sortable: false,
                 cellRenderer: createActionColumnRenderer(courierActions),
-                width: 80,
+                width: 100,
             },
         ],
         [courierActions]
     );
 
-    // Open modal
-    const openStatusModal = useCallback((id: number, status: string) => {
-        setSelectedId(id);
-        setSelectedStatus(status);
-        setStatusModalOpen(true);
-    }, []);
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading couriers...</span>
+            </div>
+        );
+    }
 
-    // Handle file input
-    const handlePodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files && e.target.files[0];
-        setDeliveryPod(f ?? null);
-    };
+    // Error state
+    if (isError) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <p className="text-red-600">Failed to load courier data</p>
+                    <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+                        Retry
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
-    // Submit status change (dummy)
-    const handleSubmitStatus = (e?: React.FormEvent) => {
-        e?.preventDefault();
-        console.log({ selectedId, selectedStatus, deliveryDate, deliveryPod, withinTime });
-        // TODO: call API to update status
-        setStatusModalOpen(false);
-        // reset delivery fields
-        setDeliveryDate(null);
-        setDeliveryPod(null);
-        setWithinTime("1");
-    };
-
-    // Provide data per tab
-    const getDataForTab = (tab: string): CourierRow[] => {
-        switch (tab) {
-            case "pending":
-                return dummyCouriers.pending as unknown as CourierRow[];
-            case "dispatched":
-                return dummyCouriers.dispatched as unknown as CourierRow[];
-            case "not_delivered":
-                return dummyCouriers.not_delivered as unknown as CourierRow[];
-            case "delivered":
-                return dummyCouriers.delivered as unknown as CourierRow[];
-            case "rejected":
-                return dummyCouriers.rejected as unknown as CourierRow[];
-            default:
-                return [];
-        }
+    const counts = dashboardData?.counts ?? {
+        pending: 0,
+        dispatched: 0,
+        not_delivered: 0,
+        delivered: 0,
+        rejected: 0,
     };
 
     return (
         <Card>
-            <CardHeader className="flex items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                     <CardTitle>Courier Dashboard</CardTitle>
                     <CardDescription>Manage courier requests and statuses</CardDescription>
                 </div>
-                <Button onClick={() => navigate(paths.shared.courierCreate)}>Create Courier</Button>
+                <Button onClick={() => navigate(paths.shared.courierCreate)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Courier
+                </Button>
             </CardHeader>
 
             <CardContent>
                 <Tabs defaultValue="pending" onValueChange={setActiveTab}>
                     <TabsList className="mx-auto flex justify-center mb-4">
-                        <TabsTrigger value="pending">Pending</TabsTrigger>
-                        <TabsTrigger value="dispatched">Dispatched</TabsTrigger>
-                        <TabsTrigger value="not_delivered">Not Delivered</TabsTrigger>
-                        <TabsTrigger value="delivered">Delivered</TabsTrigger>
-                        <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                        <TabsTrigger value="pending">
+                            Pending
+                            <Badge variant="secondary" className="ml-2">
+                                {counts.pending}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="dispatched">
+                            Dispatched
+                            <Badge variant="secondary" className="ml-2">
+                                {counts.dispatched}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="not_delivered">
+                            Not Delivered
+                            <Badge variant="secondary" className="ml-2">
+                                {counts.not_delivered}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="delivered">
+                            Delivered
+                            <Badge variant="secondary" className="ml-2">
+                                {counts.delivered}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="rejected">
+                            Rejected
+                            <Badge variant="secondary" className="ml-2">
+                                {counts.rejected}
+                            </Badge>
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="pending">
                         <DataTable
-                            data={getDataForTab("pending")}
+                            data={dashboardData?.pending ?? []}
                             loading={false}
                             columnDefs={columns}
-                            gridOptions={{ defaultColDef: { filter: true, sortable: true }, pagination: true }}
+                            gridOptions={{
+                                defaultColDef: { filter: true, sortable: true },
+                                pagination: true,
+                            }}
                         />
                     </TabsContent>
 
                     <TabsContent value="dispatched">
-                        <DataTable data={getDataForTab("dispatched")} loading={false} columnDefs={columns} />
+                        <DataTable
+                            data={dashboardData?.dispatched ?? []}
+                            loading={false}
+                            columnDefs={columns}
+                            gridOptions={{
+                                defaultColDef: { filter: true, sortable: true },
+                                pagination: true,
+                            }}
+                        />
                     </TabsContent>
 
                     <TabsContent value="not_delivered">
-                        <DataTable data={getDataForTab("not_delivered")} loading={false} columnDefs={columns} />
+                        <DataTable
+                            data={dashboardData?.not_delivered ?? []}
+                            loading={false}
+                            columnDefs={columns}
+                            gridOptions={{
+                                defaultColDef: { filter: true, sortable: true },
+                                pagination: true,
+                            }}
+                        />
                     </TabsContent>
 
                     <TabsContent value="delivered">
-                        <DataTable data={getDataForTab("delivered")} loading={false} columnDefs={columns} />
+                        <DataTable
+                            data={dashboardData?.delivered ?? []}
+                            loading={false}
+                            columnDefs={columns}
+                            gridOptions={{
+                                defaultColDef: { filter: true, sortable: true },
+                                pagination: true,
+                            }}
+                        />
                     </TabsContent>
 
                     <TabsContent value="rejected">
-                        <DataTable data={getDataForTab("rejected")} loading={false} columnDefs={columns} />
+                        <DataTable
+                            data={dashboardData?.rejected ?? []}
+                            loading={false}
+                            columnDefs={columns}
+                            gridOptions={{
+                                defaultColDef: { filter: true, sortable: true },
+                                pagination: true,
+                            }}
+                        />
                     </TabsContent>
                 </Tabs>
             </CardContent>
@@ -260,46 +391,49 @@ const CourierDashboard: React.FC = () => {
             <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Change Status</DialogTitle>
+                        <DialogTitle>
+                            Change Status
+                            {selectedCourier && (
+                                <span className="text-sm font-normal text-muted-foreground ml-2">({getRequestNo(selectedCourier.id, selectedCourier.created_at)})</span>
+                            )}
+                        </DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={handleSubmitStatus} className="grid gap-4">
-                        <input type="hidden" name="id" value={selectedId ?? ""} />
-
                         <div className="grid gap-2">
                             <label className="text-sm font-medium">Status</label>
-                            <Select onValueChange={val => setSelectedStatus(val)}>
+                            <Select value={newStatus} onValueChange={setNewStatus}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="1">Pending</SelectItem>
-                                    <SelectItem value="2">Dispatched</SelectItem>
-                                    <SelectItem value="3">Not Delivered</SelectItem>
-                                    <SelectItem value="4">Delivered</SelectItem>
-                                    <SelectItem value="5">Rejected</SelectItem>
+                                    {Object.entries(COURIER_STATUS).map(([key, value]) => (
+                                        <SelectItem key={value} value={value.toString()}>
+                                            {COURIER_STATUS_LABELS[value]}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {/* Delivery fields — shown only when status === '4' */}
-                        {selectedStatus === "4" && (
-                            <div className="delivery grid gap-3">
+                        {/* Delivery fields - shown only when status === DELIVERED */}
+                        {newStatus === COURIER_STATUS.DELIVERED.toString() && (
+                            <div className="grid gap-3 pt-2 border-t">
                                 <div className="grid gap-2">
                                     <label className="text-sm font-medium">Delivery Date & Time</label>
-                                    <Input type="datetime-local" value={deliveryDate ?? ""} onChange={e => setDeliveryDate(e.target.value)} />
+                                    <Input type="datetime-local" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} required />
                                 </div>
 
                                 <div className="grid gap-2">
                                     <label className="text-sm font-medium">Delivery POD Upload</label>
-                                    <Input type="file" onChange={handlePodChange} />
+                                    <Input type="file" accept="image/*,.pdf" onChange={handlePodChange} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <label className="text-sm font-medium">Delivery within Expected Time</label>
-                                    <Select onValueChange={val => setWithinTime(val)}>
+                                    <label className="text-sm font-medium">Delivered within Expected Time?</label>
+                                    <Select value={withinTime} onValueChange={setWithinTime}>
                                         <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select" />
+                                            <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="1">Yes</SelectItem>
@@ -311,10 +445,19 @@ const CourierDashboard: React.FC = () => {
                         )}
 
                         <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="outline" onClick={() => setStatusModalOpen(false)} type="button">
-                                Close
+                            <Button type="button" variant="outline" onClick={() => setStatusModalOpen(false)} disabled={updateStatusMutation.isPending}>
+                                Cancel
                             </Button>
-                            <Button type="submit">Save changes</Button>
+                            <Button type="submit" disabled={updateStatusMutation.isPending || uploadPodMutation.isPending}>
+                                {updateStatusMutation.isPending ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </Button>
                         </div>
                     </form>
                 </DialogContent>

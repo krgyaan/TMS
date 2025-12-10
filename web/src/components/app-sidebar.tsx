@@ -1,21 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
-import {
-    AudioWaveform,
-    Command,
-    GalleryVerticalEnd,
-    FileSearch,
-    Wrench,
-    Headset,
-    BarChart3,
-    Banknote,
-    Users,
-    Gauge,
-    Settings,
-    Share2,
-    LayoutDashboard,
-} from "lucide-react";
+import { AudioWaveform, Command, GalleryVerticalEnd, FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -358,7 +344,7 @@ const data = {
             items: [
                 {
                     title: "Follow Ups",
-                    url: paths.shared.followUps,
+                    url: paths.shared.followUp,
                 },
                 {
                     title: "Couriers",
@@ -366,7 +352,7 @@ const data = {
                 },
                 {
                     title: "Imprests",
-                    url: paths.shared.imprests,
+                    url: paths.shared.imprest,
                 },
             ],
         },
