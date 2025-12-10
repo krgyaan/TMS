@@ -3,13 +3,21 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+
+export type TenderApprovalFilters = {
+    tlStatus?: '0' | '1' | '2' | '3';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 // ============================================================================
 // Types
@@ -52,7 +60,56 @@ export class TenderApprovalService {
         private readonly tenderInfosService: TenderInfosService, // Injected
     ) { }
 
-    async getAll(): Promise<Record<TabCategory, TenderRow[]>> {
+    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow> | Record<TabCategory, TenderRow[]>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const conditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+        ];
+
+        // Filter by tlStatus if provided
+        if (filters?.tlStatus !== undefined) {
+            conditions.push(eq(tenderInfos.tlStatus, filters.tlStatus));
+        }
+
+        // Build orderBy clause based on sortBy
+        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    break;
+                case 'itemName':
+                    orderByClause = sortOrder(items.name);
+                    break;
+                case 'statusName':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                case 'tlStatus':
+                    orderByClause = sortOrder(tenderInfos.tlStatus);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        }
+
         const rows = (await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -78,8 +135,27 @@ export class TenderApprovalService {
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
-            .orderBy(tenderInfos.dueDate)) as unknown as TenderRow[];
+            .where(and(...conditions))
+            .orderBy(orderByClause)) as unknown as TenderRow[];
 
+        // If filters are provided, return PaginatedResult
+        if (filters?.tlStatus !== undefined || filters?.page !== undefined) {
+            // Count total matching rows
+            const totalRows = rows.length;
+            const paginatedData = rows.slice(offset, offset + limit);
+
+            return {
+                data: paginatedData,
+                meta: {
+                    total: totalRows,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(totalRows / limit),
+                },
+            };
+        }
+
+        // Otherwise, return categorized data (for backward compatibility)
         const categorized: Record<TabCategory, TenderRow[]> = {
             Pending: [],
             Approved: [],
@@ -100,14 +176,6 @@ export class TenderApprovalService {
         );
         categorized.Rejected.sort((a, b) =>
             new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-        );
-
-        // DEBUG: Category counts
-        console.log(
-            '🔍 Categorized:',
-            Object.fromEntries(
-                Object.entries(categorized).map(([k, v]) => [k, v.length])
-            )
         );
 
         return categorized;

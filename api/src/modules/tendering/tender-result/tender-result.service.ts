@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, asc, or, isNull, inArray, ne } from 'drizzle-orm';
+import { eq, and, asc, desc, or, isNull, inArray, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -15,10 +15,18 @@ import {
     paymentRequests,
     paymentInstruments,
 } from '@db/schemas/tendering/emds.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost';
+
+export type ResultDashboardFilters = {
+    type?: ResultDashboardType;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 export type ResultDashboardRow = {
     id: number | null;
@@ -46,8 +54,7 @@ export type EmdDetails = {
     displayText: string;
 };
 
-export type ResultDashboardResponse = {
-    data: ResultDashboardRow[];
+export type ResultDashboardResponse = PaginatedResult<ResultDashboardRow> & {
     counts: ResultDashboardCounts;
 };
 
@@ -73,13 +80,17 @@ const RA_COMPLETED_STATUSES = ['Won', 'Lost', 'Lost - H1 Elimination', 'Disquali
 export class TenderResultService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    async getDashboardData(type?: ResultDashboardType): Promise<ResultDashboardResponse> {
-        const allData = await this.findAllFromTenders();
+    async getDashboardData(filters?: ResultDashboardFilters): Promise<ResultDashboardResponse> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const allData = await this.findAllFromTenders(filters);
         const counts = this.calculateCounts(allData);
 
         let filteredData: ResultDashboardRow[];
 
-        switch (type) {
+        switch (filters?.type) {
             case 'pending':
                 filteredData = allData.filter(
                     (r) => r.resultStatus === RESULT_STATUS.RESULT_AWAITED ||
@@ -100,7 +111,77 @@ export class TenderResultService {
                 filteredData = allData;
         }
 
-        return { data: filteredData, counts };
+        // Apply sorting
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
+            filteredData.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (filters.sortBy) {
+                    case 'tenderNo':
+                        aVal = a.tenderNo;
+                        bVal = b.tenderNo;
+                        break;
+                    case 'tenderName':
+                        aVal = a.tenderName;
+                        bVal = b.tenderName;
+                        break;
+                    case 'teamExecutiveName':
+                        aVal = a.teamExecutiveName || '';
+                        bVal = b.teamExecutiveName || '';
+                        break;
+                    case 'bidSubmissionDate':
+                        aVal = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+                        bVal = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+                        break;
+                    case 'finalPrice':
+                        aVal = parseFloat(a.finalPrice || a.tenderValue || '0');
+                        bVal = parseFloat(b.finalPrice || b.tenderValue || '0');
+                        break;
+                    case 'itemName':
+                        aVal = a.itemName || '';
+                        bVal = b.itemName || '';
+                        break;
+                    case 'tenderStatus':
+                        aVal = a.tenderStatus || '';
+                        bVal = b.tenderStatus || '';
+                        break;
+                    case 'resultStatus':
+                        aVal = a.resultStatus || '';
+                        bVal = b.resultStatus || '';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return -1 * sortOrder;
+                if (aVal > bVal) return 1 * sortOrder;
+                return 0;
+            });
+        } else {
+            // Default sort by bidSubmissionDate descending
+            filteredData.sort((a, b) => {
+                const aDate = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+                const bDate = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+                return bDate - aDate;
+            });
+        }
+
+        // Apply pagination
+        const totalFiltered = filteredData.length;
+        const paginatedData = filteredData.slice(offset, offset + limit);
+
+        return {
+            data: paginatedData,
+            meta: {
+                total: totalFiltered,
+                page,
+                limit,
+                totalPages: Math.ceil(totalFiltered / limit),
+            },
+            counts,
+        };
     }
 
     async getDashboardCounts(): Promise<ResultDashboardCounts> {
@@ -136,7 +217,39 @@ export class TenderResultService {
         return counts;
     }
 
-    async findAllFromTenders(): Promise<ResultDashboardRow[]> {
+    async findAllFromTenders(filters?: ResultDashboardFilters): Promise<ResultDashboardRow[]> {
+        // Build orderBy clause based on sortBy (if it's a database field)
+        let orderByClause: any = desc(bidSubmissions.submissionDatetime); // Default
+
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamExecutiveName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortOrder(bidSubmissions.submissionDatetime);
+                    break;
+                case 'finalPrice':
+                    orderByClause = sortOrder(tenderCostingSheets.finalPrice);
+                    break;
+                case 'itemName':
+                    orderByClause = sortOrder(items.name);
+                    break;
+                case 'tenderStatus':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                default:
+                    orderByClause = desc(bidSubmissions.submissionDatetime);
+            }
+        }
+
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -194,7 +307,7 @@ export class TenderResultService {
                     )
                 )
             )
-            .orderBy(asc(bidSubmissions.submissionDatetime));
+            .orderBy(orderByClause);
 
         // Get EMD details for all tenders
         const tenderIds = rows.map((r) => r.tenderId);

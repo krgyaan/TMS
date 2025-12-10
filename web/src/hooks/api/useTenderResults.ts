@@ -9,13 +9,27 @@ import type {
 
 const RESULT_QUERY_KEY = 'tender-results';
 
+export type ResultDashboardFilters = {
+    type?: ResultDashboardType;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 // Fetch Result dashboard data with counts
-export const useResultDashboard = (type?: ResultDashboardType) => {
+export const useResultDashboard = (filters?: ResultDashboardFilters) => {
     return useQuery<ResultDashboardResponse>({
-        queryKey: [RESULT_QUERY_KEY, 'dashboard', type],
+        queryKey: [RESULT_QUERY_KEY, 'dashboard', filters],
         queryFn: async () => {
-            const params = type ? `?type=${type}` : '';
-            const response = await apiClient.get(`/tender-results/dashboard${params}`);
+            const params = new URLSearchParams();
+            if (filters?.type) params.append('type', filters.type);
+            if (filters?.page) params.append('page', filters.page.toString());
+            if (filters?.limit) params.append('limit', filters.limit.toString());
+            if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+            if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+            const query = params.toString();
+            const response = await apiClient.get(`/tender-results/dashboard${query ? `?${query}` : ''}`);
             return response.data;
         },
     });

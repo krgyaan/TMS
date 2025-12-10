@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -15,8 +15,16 @@ import type {
     CreatePhysicalDocDto,
     UpdatePhysicalDocDto,
 } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { items } from '@db/schemas/master/items.schema';
+
+export type PhysicalDocFilters = {
+    physicalDocsSent?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 // ============================================================================
 // Types
@@ -61,7 +69,73 @@ export class PhysicalDocsService {
         private readonly tenderInfosService: TenderInfosService, // Injected
     ) { }
 
-    async findAll(): Promise<PhysicalDocDashboardRow[]> {
+    async findAll(filters?: PhysicalDocFilters): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build WHERE conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            eq(tenderInformation.physicalDocsRequired, 'Yes'),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+        ];
+
+        // Add physicalDocsSent filter condition
+        if (filters?.physicalDocsSent !== undefined) {
+            if (filters.physicalDocsSent) {
+                baseConditions.push(isNotNull(physicalDocs.id));
+            } else {
+                baseConditions.push(isNull(physicalDocs.id));
+            }
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(
+                tenderInformation,
+                eq(tenderInfos.id, tenderInformation.tenderId)
+            )
+            .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Apply sorting
+        let orderByClause;
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'statusName':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        } else {
+            orderByClause = asc(tenderInfos.dueDate);
+        }
+
+        // Get paginated data
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -88,24 +162,33 @@ export class PhysicalDocsService {
                 eq(tenderInfos.id, tenderInformation.tenderId)
             )
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(
-                and(
-                    TenderInfosService.getActiveCondition(),
-                    TenderInfosService.getApprovedCondition(),
-                    eq(tenderInformation.physicalDocsRequired, 'Yes'),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
-                )
-            );
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
 
-        // Sort: pending first (by due date ascending), then sent (by due date ascending)
-        const pendingRows = rows
-            .filter((row) => row.physicalDocs === null)
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-        const sentRows = rows
-            .filter((row) => row.physicalDocs !== null)
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const data = rows.map((row) => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            courierAddress: row.courierAddress || '',
+            physicalDocsRequired: row.physicalDocsRequired || '',
+            physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
+            teamMemberName: row.teamMemberName || '',
+            statusName: row.statusName || '',
+            physicalDocs: row.physicalDocs,
+            courierNo: null,
+        })) as PhysicalDocDashboardRow[];
 
-        return [...pendingRows, ...sentRows] as unknown as PhysicalDocDashboardRow[];
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findById(id: number): Promise<PhysicalDocWithPersons | null> {

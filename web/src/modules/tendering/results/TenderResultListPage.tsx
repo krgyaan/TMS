@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -115,9 +115,35 @@ const getCountForTab = (
 const TenderResultListPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<ResultDashboardType>('pending');
-    const { data: response, isLoading, error } = useResultDashboard();
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
 
-    const { data: resultData, counts } = response || { data: [], counts: null };
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: response, isLoading, error } = useResultDashboard({
+        type: activeTab,
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
+    });
+
+    const resultData = response?.data || [];
+    const counts = response?.counts || null;
+    const totalRows = response?.meta?.total || 0;
 
     const handleViewDetails = useCallback((row: ResultDashboardRow) => {
         if (row.id) {
@@ -172,12 +198,15 @@ const TenderResultListPage = () => {
                 filter: true,
                 flex: 2,
                 minWidth: 250,
+                colId: 'tenderNo',
+                sortable: true,
             }),
             {
                 field: 'teamExecutiveName',
                 headerName: 'Team Executive',
                 flex: 1.5,
                 minWidth: 150,
+                colId: 'teamExecutiveName',
                 valueGetter: (params) => params.data?.teamExecutiveName || '—',
                 sortable: true,
                 filter: true,
@@ -187,6 +216,7 @@ const TenderResultListPage = () => {
                 headerName: 'Bid Submission',
                 flex: 1.5,
                 minWidth: 170,
+                colId: 'bidSubmissionDate',
                 valueGetter: (params) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
@@ -199,6 +229,7 @@ const TenderResultListPage = () => {
                 headerName: 'Final Price',
                 flex: 1.2,
                 minWidth: 140,
+                colId: 'finalPrice',
                 valueGetter: (params) => {
                     const value = params.data?.finalPrice || params.data?.tenderValue;
                     if (!value) return '—';
@@ -212,6 +243,7 @@ const TenderResultListPage = () => {
                 headerName: 'Item',
                 flex: 1,
                 minWidth: 120,
+                colId: 'itemName',
                 valueGetter: (params) => params.data?.itemName || '—',
                 sortable: true,
                 filter: true,
@@ -221,6 +253,7 @@ const TenderResultListPage = () => {
                 headerName: 'Tender Status',
                 flex: 1,
                 minWidth: 130,
+                colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
@@ -274,6 +307,7 @@ const TenderResultListPage = () => {
                 headerName: 'Result',
                 flex: 1.2,
                 minWidth: 150,
+                colId: 'resultStatus',
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
@@ -298,7 +332,6 @@ const TenderResultListPage = () => {
         return TABS_CONFIG.map((tab) => ({
             ...tab,
             count: getCountForTab(tab, resultData, counts),
-            data: resultData?.filter(tab.filterFn) || [],
         }));
     }, [resultData, counts]);
 
@@ -398,30 +431,36 @@ const TenderResultListPage = () => {
                         </TabsList>
 
                         {tabsWithData.map((tab) => (
-                            <TabsContent key={tab.key} value={tab.key} className="px-0">
-                                {tab.data.length === 0 ? (
-                                    <EmptyState
-                                        title={`No ${tab.name.toLowerCase()} results`}
-                                        description={tab.description}
-                                    />
-                                ) : (
-                                    <DataTable
-                                        data={tab.data}
-                                        columnDefs={colDefs as ColDef<any>[]}
-                                        loading={false}
-                                        gridOptions={{
-                                            defaultColDef: {
-                                                editable: false,
-                                                filter: true,
-                                                sortable: true,
-                                                resizable: true,
-                                            },
-                                            pagination: true,
-                                            paginationPageSize: 50,
-                                        }}
-                                        enablePagination
-                                        height="auto"
-                                    />
+                            <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
+                                {activeTab === tab.key && (
+                                    <>
+                                        {(!resultData || resultData.length === 0) ? (
+                                            <EmptyState
+                                                title={`No ${tab.name.toLowerCase()} results`}
+                                                description={tab.description}
+                                            />
+                                        ) : (
+                                            <DataTable
+                                                data={resultData}
+                                                columnDefs={colDefs as ColDef<any>[]}
+                                                loading={isLoading}
+                                                manualPagination={true}
+                                                rowCount={totalRows}
+                                                paginationState={pagination}
+                                                onPaginationChange={setPagination}
+                                                gridOptions={{
+                                                    defaultColDef: {
+                                                        editable: false,
+                                                        filter: true,
+                                                        sortable: true,
+                                                        resizable: true,
+                                                    },
+                                                    onSortChanged: handleSortChanged,
+                                                    overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No results found</span>',
+                                                }}
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </TabsContent>
                         ))}

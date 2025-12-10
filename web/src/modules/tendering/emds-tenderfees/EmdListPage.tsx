@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
@@ -57,13 +57,36 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 const EmdsAndTenderFeesPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
 
     // Fetch dashboard data with counts
     const {
         data: dashboardData,
         isLoading,
         error,
-    } = usePaymentDashboard(activeTab);
+    } = usePaymentDashboard(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
+
+    const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
 
     // Get actions based on row type and status
     const getActionsForRow = (row: EmdDashboardRow): ActionItem<EmdDashboardRow>[] => {
@@ -115,6 +138,7 @@ const EmdsAndTenderFeesPage = () => {
         }),
         {
             field: 'purpose',
+            colId: 'purpose',
             headerName: 'Payment Type',
             width: 140,
             cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
@@ -128,6 +152,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'amountRequired',
+            colId: 'amountRequired',
             headerName: 'Amount',
             width: 130,
             cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) =>
@@ -139,6 +164,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'instrumentType',
+            colId: 'instrumentType',
             headerName: 'Mode',
             width: 140,
             cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
@@ -154,6 +180,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'status',
+            colId: 'status',
             headerName: 'Status',
             width: 130,
             cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
@@ -173,6 +200,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'dueDate',
+            colId: 'dueDate',
             headerName: 'Due Date',
             width: 140,
             cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
@@ -325,18 +353,21 @@ const EmdsAndTenderFeesPage = () => {
                     data={dashboardData?.data || []}
                     loading={isLoading}
                     columnDefs={colDefs}
+                    manualPagination={true}
+                    rowCount={totalRows}
+                    paginationState={pagination}
+                    onPaginationChange={setPagination}
                     gridOptions={{
                         defaultColDef: {
                             filter: true,
                             resizable: true,
+                            sortable: true,
                         },
-                        pagination: true,
-                        paginationPageSize: 20,
+                        onSortChanged: handleSortChanged,
                         rowSelection: 'multiple',
                         suppressRowClickSelection: true,
+                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No payment requests found</span>',
                     }}
-                    enablePagination={true}
-                    height="auto"
                 />
             </CardContent>
         </Card>

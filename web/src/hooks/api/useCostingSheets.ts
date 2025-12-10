@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { costingSheetsService } from '@/services/api/costing-sheets.service';
-import type { CostingSheetDashboardRow } from '@/types/api.types';
+import { costingSheetsService, type CostingSheetListParams } from '@/services/api/costing-sheets.service';
+import type { CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 
 export const costingSheetsKey = {
@@ -8,12 +8,37 @@ export const costingSheetsKey = {
     lists: () => [...costingSheetsKey.all, 'list'] as const,
     detail: (id: number) => [...costingSheetsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...costingSheetsKey.all, 'byTender', tenderId] as const,
+    list: (filters?: Record<string, unknown>) => [...costingSheetsKey.lists(), { filters }] as const,
 };
 
-export const useCostingSheets = () => {
-    return useQuery({
-        queryKey: costingSheetsKey.lists(),
-        queryFn: () => costingSheetsService.getAll(),
+export const useCostingSheets = (
+    tab?: 'pending' | 'submitted' | 'rejected',
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const params: CostingSheetListParams = {
+        ...(tab && { costingStatus: tab }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<CostingSheetDashboardRow>>({
+        queryKey: costingSheetsKey.list(queryKeyFilters),
+        queryFn: () => costingSheetsService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -18,9 +18,35 @@ import { tenderNameCol } from '@/components/data-grid';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: tabsData, isLoading: loading, error } = useRfqs();
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: apiResponse, isLoading: loading, error } = useRfqs({
+        rfqStatus: activeTab,
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
+    });
+
+    const rfqsData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const deleteMutation = useDeleteRfq();
 
@@ -49,24 +75,24 @@ const Rfqs = () => {
         },
     ];
 
-    const tabsConfig = useMemo<{ key: 'pending' | 'sent'; name: string; count: number; data: RfqDashboardRow[] }[]>(() => {
-        if (!tabsData || typeof tabsData !== 'object') return [];
+    const tabsConfig = useMemo<{ key: 'pending' | 'sent'; name: string; count: number }[]>(() => {
+        // Counts will come from backend, but we can calculate from current data for display
+        const pendingCount = activeTab === 'pending' ? totalRows : 0;
+        const sentCount = activeTab === 'sent' ? totalRows : 0;
 
         return [
             {
                 key: 'pending',
                 name: 'Pending',
-                count: tabsData.filter((doc) => doc.rfqId === null).length,
-                data: tabsData.filter((doc) => doc.rfqId === null),
+                count: pendingCount,
             },
             {
                 key: 'sent',
                 name: 'Sent',
-                count: tabsData.filter((doc) => doc.rfqId !== null).length,
-                data: tabsData.filter((doc) => doc.rfqId !== null),
+                count: sentCount,
             },
         ];
-    }, [tabsData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<RfqDashboardRow>[]>(() => [
         tenderNameCol<RfqDashboardRow>('tenderNo', {
@@ -74,12 +100,15 @@ const Rfqs = () => {
             filter: true,
             flex: 2,
             minWidth: 250,
+            colId: 'tenderNo',
+            sortable: true,
         }),
         {
             field: 'dueDate',
             headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
+            colId: 'dueDate',
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
@@ -88,6 +117,7 @@ const Rfqs = () => {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
             minWidth: 300,
+            colId: 'vendorOrganizationNames',
             valueGetter: (params) => {
                 const names = params.data?.vendorOrganizationNames;
                 if (!names) return '—';
@@ -104,6 +134,7 @@ const Rfqs = () => {
             headerName: 'Item',
             flex: 1,
             minWidth: 120,
+            colId: 'itemName',
             valueGetter: (params: any) => params.data?.itemName ? params.data.itemName : '—',
             sortable: true,
             filter: true,
@@ -113,6 +144,7 @@ const Rfqs = () => {
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
+            colId: 'statusName',
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
             sortable: true,
             filter: true,
@@ -199,37 +231,42 @@ const Rfqs = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} RFQs</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'pending'
-                                            ? 'Tenders requiring RFQs will appear here'
-                                            : 'Sent RFQs will be shown here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No RFQs found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {(!rfqsData || rfqsData.length === 0) ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} RFQs</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'pending'
+                                                    ? 'Tenders requiring RFQs will appear here'
+                                                    : 'Sent RFQs will be shown here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={rfqsData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No RFQs found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

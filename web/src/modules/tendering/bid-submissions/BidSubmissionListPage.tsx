@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -20,9 +20,38 @@ type TabKey = 'pending' | 'submitted' | 'missed';
 
 const BidSubmissionListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: bidSubmissionsData, isLoading: loading, error } = useBidSubmissions();
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: apiResponse, isLoading: loading, error } = useBidSubmissions(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
+
+    // Handle PaginatedResult format
+    const bidSubmissionsData = Array.isArray(apiResponse)
+        ? apiResponse
+        : (apiResponse?.data || []);
+    const totalRows = Array.isArray(apiResponse)
+        ? apiResponse.length
+        : (apiResponse?.meta?.total || 0);
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -81,41 +110,24 @@ const BidSubmissionListPage = () => {
     ], [navigate]);
 
     const tabsConfig = useMemo(() => {
-        if (!bidSubmissionsData) return [];
-
         return [
             {
                 key: 'pending' as TabKey,
                 name: 'Pending',
-                count: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Submission Pending'
-                ).length,
-                data: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Submission Pending'
-                ),
+                count: activeTab === 'pending' ? totalRows : 0,
             },
             {
                 key: 'submitted' as TabKey,
                 name: 'Bid Submitted',
-                count: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Bid Submitted'
-                ).length,
-                data: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Bid Submitted'
-                ),
+                count: activeTab === 'submitted' ? totalRows : 0,
             },
             {
                 key: 'missed' as TabKey,
                 name: 'Tender Missed',
-                count: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Tender Missed'
-                ).length,
-                data: bidSubmissionsData.filter((item) =>
-                    item.bidStatus === 'Tender Missed'
-                ),
+                count: activeTab === 'missed' ? totalRows : 0,
             },
         ];
-    }, [bidSubmissionsData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<BidSubmissionDashboardRow>[]>(() => [
         tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
@@ -126,6 +138,7 @@ const BidSubmissionListPage = () => {
         }),
         {
             field: 'teamMemberName',
+            colId: 'teamMemberName',
             headerName: 'Team Member',
             flex: 1.5,
             minWidth: 150,
@@ -135,6 +148,7 @@ const BidSubmissionListPage = () => {
         },
         {
             field: 'dueDate',
+            colId: 'dueDate',
             headerName: 'Due Date & Time',
             flex: 1.5,
             minWidth: 170,
@@ -157,6 +171,7 @@ const BidSubmissionListPage = () => {
         },
         {
             field: 'gstValues',
+            colId: 'gstValues',
             headerName: 'Tender Value',
             flex: 1,
             minWidth: 130,
@@ -170,6 +185,7 @@ const BidSubmissionListPage = () => {
         },
         {
             field: 'finalCosting',
+            colId: 'finalCosting',
             headerName: 'Final Costing',
             flex: 1,
             minWidth: 130,
@@ -183,6 +199,7 @@ const BidSubmissionListPage = () => {
         },
         {
             field: 'statusName',
+            colId: 'statusName',
             headerName: 'Tender Status',
             minWidth: 140,
             sortable: true,
@@ -292,37 +309,42 @@ const BidSubmissionListPage = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} bids</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'pending' && 'Tenders with approved costings will appear here for bid submission'}
-                                        {tab.key === 'submitted' && 'Submitted bids will be shown here'}
-                                        {tab.key === 'missed' && 'Missed tenders will appear here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No bid submissions found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {bidSubmissionsData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} bids</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'pending' && 'Tenders with approved costings will appear here for bid submission'}
+                                                {tab.key === 'submitted' && 'Submitted bids will be shown here'}
+                                                {tab.key === 'missed' && 'Missed tenders will appear here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={bidSubmissionsData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No bid submissions found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

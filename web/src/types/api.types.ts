@@ -31,6 +31,16 @@ export interface PaginatedResponse<T> {
     limit: number
 }
 
+export interface PaginatedResult<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
 export interface ApiError {
     message: string
     statusCode: number
@@ -1148,6 +1158,12 @@ export interface ResultDashboardCounts {
 
 export interface ResultDashboardResponse {
     data: ResultDashboardRow[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
     counts: ResultDashboardCounts;
 }
 
@@ -1219,6 +1235,10 @@ export type UpdateTqMissedDto = {
 export type EmdDashboardFilters = {
     tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
     userId?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 };
 
 export interface EmdDashboardRow {
@@ -1252,6 +1272,12 @@ export interface EmdDashboardCounts {
 export interface EmdDashboardResponse {
     data: EmdDashboardRow[];
     counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }
 
 export type CreatePaymentRequestDto = {
@@ -1269,3 +1295,21 @@ export type UpdateStatusDto = {
     status: string;
     remarks?: string;
 };
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface TenderListParams {
+    statusIds?: number[];
+    unallocated?: boolean;
+    page?: number;
+    limit?: number;
+    search?: string;
+}

@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import type { TenderDocumentChecklistDashboardRow, PaginatedResult } from '@/types/api.types';
 
 export type ExtraDocument = {
     name: string;
@@ -29,8 +29,28 @@ export type UpdateDocumentChecklistDto = {
 };
 
 export const documentChecklistService = {
-    getAll: async (): Promise<TenderDocumentChecklistDashboardRow[]> => {
-        const response = await axiosInstance.get<TenderDocumentChecklistDashboardRow[]>('/document-checklists');
+    getAll: async (params?: { checklistSubmitted?: boolean; page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> => {
+        const searchParams = new URLSearchParams();
+
+        if (params?.checklistSubmitted !== undefined) {
+            searchParams.set('checklistSubmitted', String(params.checklistSubmitted));
+        }
+        if (params?.page) {
+            searchParams.set('page', String(params.page));
+        }
+        if (params?.limit) {
+            searchParams.set('limit', String(params.limit));
+        }
+        if (params?.sortBy) {
+            searchParams.set('sortBy', params.sortBy);
+        }
+        if (params?.sortOrder) {
+            searchParams.set('sortOrder', params.sortOrder);
+        }
+
+        const queryString = searchParams.toString();
+        const url = queryString ? `/document-checklists?${queryString}` : '/document-checklists';
+        const response = await axiosInstance.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(url);
         return response.data;
     },
 

@@ -17,8 +17,20 @@ export class TenderResultController {
     constructor(private readonly tenderResultService: TenderResultService) { }
 
     @Get('dashboard')
-    getDashboard(@Query('type') type?: ResultDashboardType) {
-        return this.tenderResultService.getDashboardData(type);
+    getDashboard(
+        @Query('type') type?: ResultDashboardType,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.tenderResultService.getDashboardData({
+            type,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
     }
 
     @Get('dashboard/counts')

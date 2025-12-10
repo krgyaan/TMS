@@ -102,7 +102,9 @@ export class EmdsService {
      */
     async getDashboardData(
         tab: string,
-        userId?: number
+        userId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
     ): Promise<DashboardResponse> {
         const allData = await this.getAllDashboardItems(userId);
         const counts = this.calculateCounts(allData);
@@ -132,7 +134,73 @@ export class EmdsService {
                 filteredData = allData;
         }
 
-        return { data: filteredData, counts };
+        // Apply sorting
+        if (sort?.sortBy) {
+            const sortOrder = sort.sortOrder === 'desc' ? -1 : 1;
+            filteredData.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (sort.sortBy) {
+                    case 'tenderNo':
+                        aVal = a.tenderNo || '';
+                        bVal = b.tenderNo || '';
+                        break;
+                    case 'tenderName':
+                        aVal = a.tenderName || '';
+                        bVal = b.tenderName || '';
+                        break;
+                    case 'teamMemberName':
+                        aVal = a.teamMemberName || '';
+                        bVal = b.teamMemberName || '';
+                        break;
+                    case 'dueDate':
+                        aVal = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+                        bVal = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+                        break;
+                    case 'amountRequired':
+                        aVal = parseFloat(a.amountRequired || '0');
+                        bVal = parseFloat(b.amountRequired || '0');
+                        break;
+                    case 'status':
+                        aVal = a.status || '';
+                        bVal = b.status || '';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return -1 * sortOrder;
+                if (aVal > bVal) return 1 * sortOrder;
+                return 0;
+            });
+        }
+
+        // Apply pagination
+        const total = filteredData.length;
+        let paginatedData = filteredData;
+        if (pagination?.page && pagination?.limit) {
+            const page = pagination.page;
+            const limit = pagination.limit;
+            const offset = (page - 1) * limit;
+            paginatedData = filteredData.slice(offset, offset + limit);
+        }
+
+        const response: DashboardResponse = {
+            data: paginatedData,
+            counts,
+        };
+
+        if (pagination?.page && pagination?.limit) {
+            response.meta = {
+                total,
+                page: pagination.page,
+                limit: pagination.limit,
+                totalPages: Math.ceil(total / pagination.limit),
+            };
+        }
+
+        return response;
     }
 
     /**

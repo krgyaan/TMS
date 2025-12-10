@@ -1,18 +1,49 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { costingApprovalsService, type ApproveCostingDto, type CostingApprovalDashboardRow, type RejectCostingDto } from '@/services/api/costing-approvals.service';
+import { costingApprovalsService, type ApproveCostingDto, type CostingApprovalDashboardRow, type RejectCostingDto, type CostingApprovalListParams } from '@/services/api/costing-approvals.service';
 import { toast } from 'sonner';
+import type { PaginatedResult } from '@/types/api.types';
 
 export const costingApprovalsKey = {
     all: ['costing-approvals'] as const,
     lists: () => [...costingApprovalsKey.all, 'list'] as const,
     detail: (id: number) => [...costingApprovalsKey.all, 'detail', id] as const,
+    list: (filters?: Record<string, unknown>) => [...costingApprovalsKey.lists(), { filters }] as const,
 };
 
-export const useCostingApprovals = () => {
-    console.log("useCostingApprovals");
-    return useQuery({
-        queryKey: costingApprovalsKey.lists(),
-        queryFn: () => costingApprovalsService.getAll(),
+export const useCostingApprovals = (
+    tab?: 'pending' | 'approved' | 'rejected',
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const costingStatusMap: Record<string, 'Pending' | 'Approved' | 'Rejected/Redo'> = {
+        pending: 'Pending',
+        approved: 'Approved',
+        rejected: 'Rejected/Redo',
+    };
+
+    const params: CostingApprovalListParams = {
+        ...(tab && costingStatusMap[tab] && { costingStatus: costingStatusMap[tab] }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<CostingApprovalDashboardRow>>({
+        queryKey: costingApprovalsKey.list(queryKeyFilters),
+        queryFn: () => costingApprovalsService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

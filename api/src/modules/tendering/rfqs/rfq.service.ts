@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, ne, sql, asc, desc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -16,7 +16,15 @@ import {
 import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+
+export type RfqFilters = {
+    rfqStatus?: 'pending' | 'sent';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 // ============================================================================
 // Types
@@ -72,7 +80,11 @@ export class RfqsService {
         private readonly tenderInfosService: TenderInfosService, // Injected
     ) { }
 
-    async findAll(): Promise<RfqRow[]> {
+    async findAll(filters?: RfqFilters): Promise<PaginatedResult<RfqRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
         const conditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
@@ -81,6 +93,35 @@ export class RfqsService {
             ne(tenderInfos.rfqTo, ''),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
+
+        // Build orderBy clause based on sortBy (if it's a database field)
+        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'itemName':
+                    orderByClause = sortOrder(items.name);
+                    break;
+                case 'statusName':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        }
 
         const rows = await this.db
             .select({
@@ -107,17 +148,54 @@ export class RfqsService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(rfqs, eq(tenderInfos.id, rfqs.tenderId))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(and(...conditions));
+            .where(and(...conditions))
+            .orderBy(orderByClause);
 
-        // Sort: pending first (by due date ascending), then sent (by due date ascending)
-        const pendingRows = rows
-            .filter((row) => row.rfqId === null)
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-        const sentRows = rows
-            .filter((row) => row.rfqId !== null)
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        // Filter by rfqStatus (pending = rfqId is null, sent = rfqId is not null)
+        let filteredRows = rows;
+        if (filters?.rfqStatus) {
+            if (filters.rfqStatus === 'pending') {
+                filteredRows = rows.filter((row) => row.rfqId === null);
+            } else if (filters.rfqStatus === 'sent') {
+                filteredRows = rows.filter((row) => row.rfqId !== null);
+            }
+        }
 
-        return [...pendingRows, ...sentRows] as unknown as RfqRow[];
+        // Apply sorting if sortBy is not a database field (e.g., vendorOrganizationNames)
+        if (filters?.sortBy && ['vendorOrganizationNames'].includes(filters.sortBy)) {
+            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
+            filteredRows.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (filters.sortBy) {
+                    case 'vendorOrganizationNames':
+                        aVal = a.vendorOrganizationNames || '';
+                        bVal = b.vendorOrganizationNames || '';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return -1 * sortOrder;
+                if (aVal > bVal) return 1 * sortOrder;
+                return 0;
+            });
+        }
+
+        // Apply pagination
+        const totalFiltered = filteredRows.length;
+        const paginatedData = filteredRows.slice(offset, offset + limit);
+
+        return {
+            data: paginatedData as unknown as RfqRow[],
+            meta: {
+                total: totalFiltered,
+                page,
+                limit,
+                totalPages: Math.ceil(totalFiltered / limit),
+            },
+        };
     }
 
     async findById(id: number): Promise<RfqDetails | null> {

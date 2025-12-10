@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -19,10 +19,38 @@ import { tenderNameCol } from '@/components/data-grid';
 
 const Checklists = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'submitted'>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: tabsData, isLoading: loading, error } = useDocumentChecklists();
-    console.log(tabsData);
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: apiResponse, isLoading: loading, error } = useDocumentChecklists(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
+
+    // Handle PaginatedResult format
+    const tabsData = Array.isArray(apiResponse)
+        ? apiResponse
+        : (apiResponse?.data || []);
+    const totalRows = Array.isArray(apiResponse)
+        ? apiResponse.length
+        : (apiResponse?.meta?.total || 0);
 
     const checklistActions: ActionItem<TenderDocumentChecklistDashboardRow>[] = [
         {
@@ -48,24 +76,20 @@ const Checklists = () => {
         },
     ];
 
-    const tabsConfig = useMemo<{ key: 'pending' | 'submitted'; name: string; count: number; data: TenderDocumentChecklistDashboardRow[] }[]>(() => {
-        if (!tabsData || typeof tabsData !== 'object' || !Array.isArray(tabsData)) return [];
-
+    const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending',
+                key: 'pending' as const,
                 name: 'Pending',
-                count: tabsData.filter((item) => !item.checklistSubmitted).length,
-                data: tabsData.filter((item) => !item.checklistSubmitted),
+                count: activeTab === 'pending' ? totalRows : 0,
             },
             {
-                key: 'submitted',
+                key: 'submitted' as const,
                 name: 'Checklist Submitted',
-                count: tabsData.filter((item) => item.checklistSubmitted).length,
-                data: tabsData.filter((item) => item.checklistSubmitted),
+                count: activeTab === 'submitted' ? totalRows : 0,
             },
         ];
-    }, [tabsData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRow>[]>(() => [
         tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {
@@ -75,6 +99,7 @@ const Checklists = () => {
         }),
         {
             field: 'teamMemberName',
+            colId: 'teamMemberName',
             headerName: 'Member',
             flex: 1.5,
             minWidth: 150,
@@ -84,6 +109,7 @@ const Checklists = () => {
         },
         {
             field: 'itemName',
+            colId: 'itemName',
             headerName: 'Item',
             flex: 1,
             minWidth: 120,
@@ -93,6 +119,7 @@ const Checklists = () => {
         },
         {
             field: 'dueDate',
+            colId: 'dueDate',
             headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
@@ -102,6 +129,7 @@ const Checklists = () => {
         },
         {
             field: 'gstValues',
+            colId: 'gstValues',
             headerName: 'Tender Value',
             flex: 1,
             minWidth: 130,
@@ -115,6 +143,7 @@ const Checklists = () => {
         },
         {
             field: 'statusName',
+            colId: 'statusName',
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
@@ -214,37 +243,42 @@ const Checklists = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} checklists</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'pending'
-                                            ? 'Tenders requiring checklist submission will appear here'
-                                            : 'Submitted checklists will be shown here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No checklists found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {tabsData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} checklists</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'pending'
+                                                    ? 'Tenders requiring checklist submission will appear here'
+                                                    : 'Submitted checklists will be shown here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={tabsData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No checklists found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

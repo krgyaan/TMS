@@ -2,13 +2,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useAllTenders } from '@/hooks/api/useTenderApprovals';
-import type { TenderApprovalRow } from '@/types/api.types';
+import type { TenderApprovalRow, PaginatedResult } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye } from 'lucide-react';
@@ -33,13 +33,46 @@ type TabConfig = {
 
 const TenderApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | '3'>('0');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    // Fetch counts (all data without filters)
+    const { data: countsData } = useAllTenders();
+
+    // Fetch paginated data for active tab
     const {
-        data: tabsData,
+        data: apiResponse,
         isLoading: loading,
         error
-    } = useAllTenders();
+    } = useAllTenders({
+        tlStatus: activeTab,
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
+    });
+
+    // Determine if response is PaginatedResult or Record
+    const isPaginated = apiResponse && 'meta' in apiResponse;
+    const approvalData = isPaginated ? (apiResponse as PaginatedResult<TenderApprovalRow>).data : [];
+    const totalRows = isPaginated ? (apiResponse as PaginatedResult<TenderApprovalRow>).meta.total : 0;
+    const tabsData = !isPaginated ? apiResponse as Record<string, TenderApprovalRow[]> : null;
 
     const approvalActions: ActionItem<any>[] = [
         {
@@ -69,31 +102,40 @@ const TenderApprovalListPage = () => {
     ];
 
     const tabsConfig = useMemo<TabConfig[]>(() => {
-        if (!tabsData || typeof tabsData !== 'object') return [];
-
-        return Object.entries(TABS_NAMES).map(([key, name]) => {
-            // Access tabsData as object, not array
-            const tabData = (tabsData as Record<string, TenderApprovalRow[]>)[name] || [];
-            return {
+        // Use countsData for counts if available, otherwise use approvalData length for active tab
+        if (countsData && typeof countsData === 'object' && !('meta' in countsData)) {
+            const counts = countsData as Record<string, TenderApprovalRow[]>;
+            return Object.entries(TABS_NAMES).map(([key, name]) => ({
                 key: key as '0' | '1' | '2' | '3',
                 name,
-                count: tabData.length,
-                data: tabData
-            };
-        });
-    }, [tabsData]);
+                count: counts[name]?.length || 0,
+                data: [] // Data will come from paginated response
+            }));
+        }
+
+        // Fallback: use totalRows for active tab, 0 for others
+        return Object.entries(TABS_NAMES).map(([key, name]) => ({
+            key: key as '0' | '1' | '2' | '3',
+            name,
+            count: activeTab === key ? totalRows : 0,
+            data: []
+        }));
+    }, [countsData, activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
         tenderNameCol<TenderApprovalRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             minWidth: 250,
+            colId: 'tenderNo',
+            sortable: true,
         }),
         {
             field: 'teamMemberName',
             headerName: 'Member',
             flex: 1.5,
             minWidth: 150,
+            colId: 'teamMemberName',
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
@@ -103,6 +145,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Due Date/Time',
             flex: 1.5,
             minWidth: 150,
+            colId: 'dueDate',
             valueGetter: (params: any) => {
                 if (!params.data?.dueDate) return '—';
                 return formatDateTime(params.data.dueDate);
@@ -115,6 +158,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Tender Value',
             flex: 1,
             minWidth: 130,
+            colId: 'gstValues',
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
@@ -133,6 +177,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Item',
             flex: 0.8,
             minWidth: 80,
+            colId: 'itemName',
             valueGetter: (params: any) => params.data?.itemName || '—',
             sortable: true,
             filter: true,
@@ -142,6 +187,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
+            colId: 'statusName',
             cellRenderer: (params: any) => {
                 const status = params.data?.statusName;
                 if (!status) return '—';
@@ -159,6 +205,7 @@ const TenderApprovalListPage = () => {
             headerName: 'TL Status',
             flex: 1,
             minWidth: 120,
+            colId: 'tlStatus',
             cellRenderer: (params: any) => {
                 const tlStatus = params.data?.tlStatus;
                 const statusName = TABS_NAMES[tlStatus as keyof typeof TABS_NAMES];
@@ -264,32 +311,36 @@ const TenderApprovalListPage = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    {/* <Loader2 className="h-12 w-12 animate-spin mb-4" /> */}
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {(!approvalData || approvalData.length === 0) ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={approvalData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

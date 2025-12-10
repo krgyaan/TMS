@@ -7,9 +7,10 @@ import {
     Param,
     ParseIntPipe,
     Request,
-    ForbiddenException
+    ForbiddenException,
+    Query
 } from '@nestjs/common';
-import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
+import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 
 @Controller('costing-approvals')
@@ -23,10 +24,30 @@ export class CostingApprovalsController {
     // }
 
     @Get()
-    async findAll(@Request() req: any) {
+    async findAll(
+        @Request() req: any,
+        @Query('costingStatus') costingStatus?: 'Pending' | 'Approved' | 'Rejected/Redo',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
         // this.validateTeamLeader(req.user);
-        let data = await this.costingApprovalsService.findAllForApproval(req.user.team);
-        return data;
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+
+        const filters: CostingApprovalFilters = {
+            ...(costingStatus && { costingStatus }),
+            ...(parseNumber(page) && { page: parseNumber(page) }),
+            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
+            ...(sortBy && { sortBy }),
+            ...(sortOrder && { sortOrder }),
+        };
+
+        return this.costingApprovalsService.findAllForApproval(req.user.team, filters);
     }
 
     @Get(':id')

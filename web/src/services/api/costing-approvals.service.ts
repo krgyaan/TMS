@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderCostingSheet } from '@/types/api.types';
+import type { TenderCostingSheet, PaginatedResult } from '@/types/api.types';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -32,9 +32,37 @@ export type RejectCostingDto = {
     rejectionReason: string;
 };
 
+export type CostingApprovalListParams = {
+    costingStatus?: 'Pending' | 'Approved' | 'Rejected/Redo';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 export const costingApprovalsService = {
-    getAll: async (): Promise<CostingApprovalDashboardRow[]> => {
-        const response = await axiosInstance.get<CostingApprovalDashboardRow[]>('/costing-approvals');
+    getAll: async (params?: CostingApprovalListParams): Promise<PaginatedResult<CostingApprovalDashboardRow>> => {
+        const searchParams = new URLSearchParams();
+
+        if (params?.costingStatus) {
+            searchParams.set('costingStatus', params.costingStatus);
+        }
+        if (params?.page) {
+            searchParams.set('page', String(params.page));
+        }
+        if (params?.limit) {
+            searchParams.set('limit', String(params.limit));
+        }
+        if (params?.sortBy) {
+            searchParams.set('sortBy', params.sortBy);
+        }
+        if (params?.sortOrder) {
+            searchParams.set('sortOrder', params.sortOrder);
+        }
+
+        const queryString = searchParams.toString();
+        const url = queryString ? `/costing-approvals?${queryString}` : '/costing-approvals';
+        const response = await axiosInstance.get<PaginatedResult<CostingApprovalDashboardRow>>(url);
         return response.data;
     },
 

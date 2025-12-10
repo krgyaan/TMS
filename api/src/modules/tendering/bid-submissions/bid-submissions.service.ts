@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNotNull, or, asc } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, asc, desc, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -10,6 +10,7 @@ import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schem
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -27,6 +28,14 @@ export type BidSubmissionDashboardRow = {
     costingSheetId: number | null;
 }
 
+export type BidSubmissionFilters = {
+    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 @Injectable()
 export class BidSubmissionsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
@@ -37,8 +46,40 @@ export class BidSubmissionsService {
      * 1. Tenders with approved costing (pending for bid submission)
      * 2. Tenders with existing bid submissions (regardless of costing status)
      */
-    async findAll(): Promise<BidSubmissionDashboardRow[]> {
-        const rows = await this.db
+    async findAll(filters?: BidSubmissionFilters): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build WHERE conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            or(
+                eq(tenderCostingSheets.status, 'Approved'),
+                isNotNull(bidSubmissions.id)
+            )
+        ];
+
+        // Add bidStatus filter condition
+        if (filters?.bidStatus) {
+            if (filters.bidStatus === 'Submission Pending') {
+                // Submission Pending: no bidSubmission record exists (isNull)
+                baseConditions.push(isNull(bidSubmissions.id));
+            } else {
+                // Bid Submitted or Tender Missed: bidSubmission must exist and status must match
+                baseConditions.push(
+                    isNotNull(bidSubmissions.id),
+                    eq(bidSubmissions.status, filters.bidStatus)
+                );
+            }
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Build base query
+        const baseQuery = this.db
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -61,18 +102,61 @@ export class BidSubmissionsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .where(and(
-                TenderInfosService.getActiveCondition(),
-                TenderInfosService.getApprovedCondition(),
-                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                or(
-                    eq(tenderCostingSheets.status, 'Approved'),
-                    isNotNull(bidSubmissions.id)
-                )
-            ))
-            .orderBy(asc(tenderInfos.dueDate));
+            .where(whereClause);
 
-        return rows.map((row) => {
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Apply sorting
+        let orderByClause;
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    break;
+                case 'finalCosting':
+                    orderByClause = sortOrder(tenderCostingSheets.finalPrice);
+                    break;
+                case 'statusName':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        } else {
+            orderByClause = asc(tenderInfos.dueDate);
+        }
+
+        // Get paginated data
+        const rows = await baseQuery
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        // Map rows
+        const mappedRows = rows.map((row) => {
             let bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
 
             if (!row.bidSubmissionId || !row.bidSubmissionStatus) {
@@ -97,6 +181,16 @@ export class BidSubmissionsService {
                 costingSheetId: row.costingSheetId,
             };
         });
+
+        return {
+            data: mappedRows,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findById(id: number) {

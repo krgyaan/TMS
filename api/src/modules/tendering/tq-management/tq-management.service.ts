@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, desc, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, or, sql, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -9,7 +9,15 @@ import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
 import { tenderQueryItems } from '@db/schemas/tendering/';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+
+export type TqManagementFilters = {
+    tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 export type TqManagementDashboardRow = {
     tenderId: number;
@@ -30,7 +38,10 @@ export type TqManagementDashboardRow = {
 export class TqManagementService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    async findAll(): Promise<TqManagementDashboardRow[]> {
+    async findAll(filters?: TqManagementFilters): Promise<PaginatedResult<TqManagementDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
         // Get all tenders that have TQ records OR submitted bids
         const rows = await this.db
             .select({
@@ -118,21 +129,83 @@ export class TqManagementService {
             });
         }
 
-        // Sort: TQ received first, then by bid submission date (oldest first)
-        result.sort((a, b) => {
-            // TQ received first
-            const aHasTqReceived = a.tqStatus === 'TQ received';
-            const bHasTqReceived = b.tqStatus === 'TQ received';
-            if (aHasTqReceived && !bHasTqReceived) return -1;
-            if (!aHasTqReceived && bHasTqReceived) return 1;
+        // Filter by tqStatus if provided
+        let filteredResult = result;
+        if (filters?.tqStatus) {
+            filteredResult = result.filter(row => row.tqStatus === filters.tqStatus);
+        }
 
-            // Then by bid submission date (oldest first)
-            const aDate = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
-            const bDate = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
-            return aDate - bDate;
-        });
+        // Apply sorting
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
+            filteredResult.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
 
-        return result;
+                switch (filters.sortBy) {
+                    case 'tenderNo':
+                        aVal = a.tenderNo;
+                        bVal = b.tenderNo;
+                        break;
+                    case 'tenderName':
+                        aVal = a.tenderName;
+                        bVal = b.tenderName;
+                        break;
+                    case 'teamMemberName':
+                        aVal = a.teamMemberName || '';
+                        bVal = b.teamMemberName || '';
+                        break;
+                    case 'bidSubmissionDate':
+                        aVal = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+                        bVal = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+                        break;
+                    case 'tqSubmissionDeadline':
+                        aVal = a.tqSubmissionDeadline ? new Date(a.tqSubmissionDeadline).getTime() : 0;
+                        bVal = b.tqSubmissionDeadline ? new Date(b.tqSubmissionDeadline).getTime() : 0;
+                        break;
+                    case 'tqCount':
+                        aVal = a.tqCount || 0;
+                        bVal = b.tqCount || 0;
+                        break;
+                    case 'tqStatus':
+                        aVal = a.tqStatus || '';
+                        bVal = b.tqStatus || '';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return -1 * sortOrder;
+                if (aVal > bVal) return 1 * sortOrder;
+                return 0;
+            });
+        } else {
+            // Default sort: TQ received first, then by bid submission date (oldest first)
+            filteredResult.sort((a, b) => {
+                const aHasTqReceived = a.tqStatus === 'TQ received';
+                const bHasTqReceived = b.tqStatus === 'TQ received';
+                if (aHasTqReceived && !bHasTqReceived) return -1;
+                if (!aHasTqReceived && bHasTqReceived) return 1;
+
+                const aDate = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+                const bDate = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+                return aDate - bDate;
+            });
+        }
+
+        // Apply pagination
+        const totalFiltered = filteredResult.length;
+        const paginatedData = filteredResult.slice(offset, offset + limit);
+
+        return {
+            data: paginatedData,
+            meta: {
+                total: totalFiltered,
+                page,
+                limit,
+                totalPages: Math.ceil(totalFiltered / limit),
+            },
+        };
     }
 
     async findById(id: number) {

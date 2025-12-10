@@ -14,10 +14,18 @@ export const rfqsKey = {
     byTender: (tenderId: number) => [...rfqsKey.all, 'by-tender', tenderId] as const,
 }
 
-export const useRfqs = () => {
+export type RfqFilters = {
+    rfqStatus?: 'pending' | 'sent';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export const useRfqs = (filters?: RfqFilters) => {
     return useQuery({
-        queryKey: rfqsKey.lists(),
-        queryFn: () => rfqsService.getAll(),
+        queryKey: rfqsKey.list(filters),
+        queryFn: () => rfqsService.getAll(filters),
     })
 };
 

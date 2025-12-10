@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, lte, asc } from 'drizzle-orm';
+import { and, eq, lte, asc, desc, sql, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -10,8 +10,16 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
+
+export type RaDashboardFilters = {
+    type?: RaDashboardType;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 export type RaDashboardType = 'under-evaluation' | 'scheduled' | 'completed';
 
@@ -36,6 +44,12 @@ export type RaDashboardRow = {
 export type RaDashboardResponse = {
     data: RaDashboardRow[];
     counts: RaDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 };
 
 export type RaDashboardCounts = {
@@ -69,7 +83,7 @@ export class ReverseAuctionService {
     /**
      * Get RA Dashboard data with counts for all tabs
      */
-    async getDashboardData(type?: RaDashboardType): Promise<RaDashboardResponse> {
+    async getDashboardData(type?: RaDashboardType, filters?: RaDashboardFilters): Promise<RaDashboardResponse> {
         const allData = await this.findAllFromTenders();
         const counts = this.calculateCounts(allData);
 
@@ -95,7 +109,77 @@ export class ReverseAuctionService {
                 filteredData = allData;
         }
 
-        return { data: filteredData, counts };
+        // Apply sorting
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
+            filteredData.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (filters.sortBy) {
+                    case 'tenderNo':
+                        aVal = a.tenderNo || '';
+                        bVal = b.tenderNo || '';
+                        break;
+                    case 'tenderName':
+                        aVal = a.tenderName || '';
+                        bVal = b.tenderName || '';
+                        break;
+                    case 'teamMemberName':
+                        aVal = a.teamMemberName || '';
+                        bVal = b.teamMemberName || '';
+                        break;
+                    case 'bidSubmissionDate':
+                        aVal = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+                        bVal = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+                        break;
+                    case 'tenderValue':
+                        aVal = parseFloat(a.tenderValue || '0');
+                        bVal = parseFloat(b.tenderValue || '0');
+                        break;
+                    case 'raStatus':
+                        aVal = a.raStatus || '';
+                        bVal = b.raStatus || '';
+                        break;
+                    case 'raStartTime':
+                        aVal = a.raStartTime ? new Date(a.raStartTime).getTime() : 0;
+                        bVal = b.raStartTime ? new Date(b.raStartTime).getTime() : 0;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return -1 * sortOrder;
+                if (aVal > bVal) return 1 * sortOrder;
+                return 0;
+            });
+        }
+
+        // Apply pagination
+        const total = filteredData.length;
+        let paginatedData = filteredData;
+        if (filters?.page && filters?.limit) {
+            const page = filters.page;
+            const limit = filters.limit;
+            const offset = (page - 1) * limit;
+            paginatedData = filteredData.slice(offset, offset + limit);
+        }
+
+        const response: RaDashboardResponse = {
+            data: paginatedData,
+            counts,
+        };
+
+        if (filters?.page && filters?.limit) {
+            response.meta = {
+                total,
+                page: filters.page,
+                limit: filters.limit,
+                totalPages: Math.ceil(total / filters.limit),
+            };
+        }
+
+        return response;
     }
 
     async getDashboardCounts(): Promise<RaDashboardCounts> {

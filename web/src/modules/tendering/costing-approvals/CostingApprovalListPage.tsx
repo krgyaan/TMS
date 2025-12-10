@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -20,10 +20,38 @@ type TabKey = 'pending' | 'approved' | 'rejected';
 
 const CostingApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: costingApprovalsData, isLoading: loading, error } = useCostingApprovals();
-    console.log("Costing Approvals Data:", costingApprovalsData);
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: apiResponse, isLoading: loading, error } = useCostingApprovals(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
+
+    // Handle PaginatedResult format
+    const costingApprovalsData = Array.isArray(apiResponse)
+        ? apiResponse
+        : (apiResponse?.data || []);
+    const totalRows = Array.isArray(apiResponse)
+        ? apiResponse.length
+        : (apiResponse?.meta?.total || 0);
 
     const costingApprovalActions: ActionItem<CostingApprovalDashboardRow>[] = useMemo(() => [
         {
@@ -60,41 +88,24 @@ const CostingApprovalListPage = () => {
     ], [navigate]);
 
     const tabsConfig = useMemo(() => {
-        if (!costingApprovalsData) return [];
-
         return [
             {
                 key: 'pending' as TabKey,
                 name: 'Pending Approval',
-                count: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Pending'
-                ).length,
-                data: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Pending'
-                ),
+                count: activeTab === 'pending' ? totalRows : 0,
             },
             {
                 key: 'approved' as TabKey,
                 name: 'Approved',
-                count: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Approved'
-                ).length,
-                data: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Approved'
-                ),
+                count: activeTab === 'approved' ? totalRows : 0,
             },
             {
                 key: 'rejected' as TabKey,
                 name: 'Rejected',
-                count: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Rejected/Redo'
-                ).length,
-                data: costingApprovalsData.filter((item) =>
-                    item.costingStatus === 'Rejected/Redo'
-                ),
+                count: activeTab === 'rejected' ? totalRows : 0,
             },
         ];
-    }, [costingApprovalsData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<CostingApprovalDashboardRow>[]>(() => [
         tenderNameCol<CostingApprovalDashboardRow>('tenderNo', {
@@ -105,6 +116,7 @@ const CostingApprovalListPage = () => {
         }),
         {
             field: 'teamMemberName',
+            colId: 'teamMemberName',
             headerName: 'Team Member',
             flex: 1.5,
             minWidth: 150,
@@ -114,6 +126,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'dueDate',
+            colId: 'dueDate',
             headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
@@ -123,6 +136,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'emdAmount',
+            colId: 'emdAmount',
             headerName: 'EMD',
             flex: 1,
             minWidth: 130,
@@ -136,6 +150,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'gstValues',
+            colId: 'gstValues',
             headerName: 'Tender Value',
             flex: 1,
             minWidth: 130,
@@ -149,6 +164,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'submittedFinalPrice',
+            colId: 'submittedFinalPrice',
             headerName: 'TE Final Price',
             flex: 1,
             minWidth: 130,
@@ -162,6 +178,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'submittedBudgetPrice',
+            colId: 'submittedBudgetPrice',
             headerName: 'TE Budget',
             flex: 1,
             minWidth: 130,
@@ -175,6 +192,7 @@ const CostingApprovalListPage = () => {
         },
         {
             field: 'costingStatus',
+            colId: 'costingStatus',
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
@@ -294,37 +312,42 @@ const CostingApprovalListPage = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'pending' && 'Submitted costing sheets will appear here for approval'}
-                                        {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
-                                        {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No costing sheets found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {costingApprovalsData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'pending' && 'Submitted costing sheets will appear here for approval'}
+                                                {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
+                                                {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={costingApprovalsData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No costing sheets found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

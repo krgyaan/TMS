@@ -44,7 +44,12 @@ export class EmdsController {
         const parsed = DashboardQuerySchema.parse(query);
         // Use current user's ID if not provided in query
         const userId = parsed.userId ?? req.user?.id;
-        return this.emdsService.getDashboardData(parsed.tab ?? 'all', userId);
+        return this.emdsService.getDashboardData(
+            parsed.tab ?? 'all',
+            userId,
+            parsed.page && parsed.limit ? { page: parsed.page, limit: parsed.limit } : undefined,
+            parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined
+        );
     }
 
     @Get('dashboard/counts')
