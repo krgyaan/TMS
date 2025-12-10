@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { DashboardRow } from "@/services/api/emds.service";
+import type { EmdDashboardRow } from "@/types/api.types";
 import { tenderNameCol } from "@/components/data-grid";
 
 // Tab configuration with status mappings
@@ -66,7 +66,7 @@ const EmdsAndTenderFeesPage = () => {
     } = usePaymentDashboard(activeTab);
 
     // Get actions based on row type and status
-    const getActionsForRow = (row: DashboardRow): ActionItem<DashboardRow>[] => {
+    const getActionsForRow = (row: EmdDashboardRow): ActionItem<EmdDashboardRow>[] => {
         if (row.type === 'missing') {
             // No request exists - show Create action
             return [
@@ -86,7 +86,7 @@ const EmdsAndTenderFeesPage = () => {
         }
 
         // Request exists - show Edit/View actions
-        const actions: ActionItem<DashboardRow>[] = [
+        const actions: ActionItem<EmdDashboardRow>[] = [
             {
                 label: 'View Details',
                 icon: <EyeIcon className="w-4 h-4" />,
@@ -107,8 +107,8 @@ const EmdsAndTenderFeesPage = () => {
     };
 
     // Column definitions
-    const colDefs = useMemo<ColDef<DashboardRow>[]>(() => [
-        tenderNameCol<DashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<EmdDashboardRow>[]>(() => [
+        tenderNameCol<EmdDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             minWidth: 250,
@@ -117,7 +117,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'purpose',
             headerName: 'Payment Type',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
                 const purpose = params.value as string;
                 return (
                     <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
@@ -130,7 +130,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'amountRequired',
             headerName: 'Amount',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) =>
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) =>
                 params.value ? (
                     <span className="font-medium">{formatINR(params.value)}</span>
                 ) : (
@@ -141,7 +141,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'instrumentType',
             headerName: 'Mode',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
                 if (!params.value) {
                     return <span className="text-gray-400 text-sm">Not Set</span>;
                 }
@@ -156,7 +156,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'status',
             headerName: 'Status',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
                 const status = params.value as string;
                 const isMissing = params.data?.type === 'missing';
 
@@ -175,7 +175,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'dueDate',
             headerName: 'Due Date',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
                 if (!params.value) return <span className="text-gray-400">—</span>;
 
                 const dueDate = new Date(params.value);
@@ -190,17 +190,21 @@ const EmdsAndTenderFeesPage = () => {
             },
         },
         {
+            field: 'statusName',
+            headerName: 'Status',
+        },
+        {
             field: 'teamMemberName',
             headerName: 'Assigned To',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) =>
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) =>
                 params.value || <span className="text-gray-400">Unassigned</span>,
         },
         {
             headerName: 'Actions',
             filter: false,
             sortable: false,
-            cellRenderer: (params: ICellRendererParams<DashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
                 const actions = getActionsForRow(params.data!);
                 const ActionRenderer = createActionColumnRenderer(actions);
                 return <ActionRenderer data={params.data!} />;
@@ -304,13 +308,13 @@ const EmdsAndTenderFeesPage = () => {
                         <div className="flex gap-4 text-sm text-muted-foreground">
                             <span>
                                 <strong className="text-foreground">
-                                    {dashboardData.data.filter(r => r.type === 'missing').length}
+                                    {dashboardData.data.filter((r: EmdDashboardRow) => r.type === 'missing').length}
                                 </strong> need to be created
                             </span>
                             <span>•</span>
                             <span>
                                 <strong className="text-foreground">
-                                    {dashboardData.data.filter(r => r.type === 'request' && r.status === 'Pending').length}
+                                    {dashboardData.data.filter((r: EmdDashboardRow) => r.type === 'request' && r.status === 'Pending').length}
                                 </strong> awaiting submission
                             </span>
                         </div>

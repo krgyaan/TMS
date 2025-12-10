@@ -118,6 +118,20 @@ export class TqManagementService {
             });
         }
 
+        // Sort: TQ received first, then by bid submission date (oldest first)
+        result.sort((a, b) => {
+            // TQ received first
+            const aHasTqReceived = a.tqStatus === 'TQ received';
+            const bHasTqReceived = b.tqStatus === 'TQ received';
+            if (aHasTqReceived && !bHasTqReceived) return -1;
+            if (!aHasTqReceived && bHasTqReceived) return 1;
+
+            // Then by bid submission date (oldest first)
+            const aDate = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
+            const bDate = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
+            return aDate - bDate;
+        });
+
         return result;
     }
 

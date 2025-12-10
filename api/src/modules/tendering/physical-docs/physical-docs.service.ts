@@ -16,6 +16,7 @@ import type {
     UpdatePhysicalDocDto,
 } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { items } from '@db/schemas/master/items.schema';
 
 // ============================================================================
 // Types
@@ -70,15 +71,18 @@ export class PhysicalDocsService {
                 physicalDocsRequired: tenderInformation.physicalDocsRequired,
                 physicalDocsDeadline: tenderInformation.physicalDocsDeadline,
                 teamMember: tenderInfos.teamMember,
-                status: tenderInfos.status,
                 teamMemberName: users.name,
+                status: tenderInfos.status,
                 statusName: statuses.name,
+                item: tenderInfos.item,
+                itemName: items.name,
+                dueDate: tenderInfos.dueDate,
                 physicalDocs: physicalDocs.id,
-                courierNo: physicalDocs.courierNo,
             })
             .from(tenderInfos)
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(
                 tenderInformation,
                 eq(tenderInfos.id, tenderInformation.tenderId)
@@ -93,9 +97,13 @@ export class PhysicalDocsService {
                 )
             );
 
-        // Sort: pending first, then sent
-        const pendingRows = rows.filter((row) => row.physicalDocs === null);
-        const sentRows = rows.filter((row) => row.physicalDocs !== null);
+        // Sort: pending first (by due date ascending), then sent (by due date ascending)
+        const pendingRows = rows
+            .filter((row) => row.physicalDocs === null)
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const sentRows = rows
+            .filter((row) => row.physicalDocs !== null)
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
         return [...pendingRows, ...sentRows] as unknown as PhysicalDocDashboardRow[];
     }

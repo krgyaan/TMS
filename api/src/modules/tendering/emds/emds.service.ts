@@ -4,7 +4,7 @@ import {
     NotFoundException,
     BadRequestException,
 } from '@nestjs/common';
-import { eq, and, inArray, or } from 'drizzle-orm';
+import { eq, and, inArray, or, lte, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -352,7 +352,8 @@ export class EmdsService {
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     userCondition
                 )
-            );
+            )
+            .orderBy(asc(tenderInfos.dueDate));
 
         if (tenders.length === 0) {
             return [];
@@ -451,10 +452,6 @@ export class EmdsService {
 
         return missingPayments;
     }
-
-    // ========================================================================
-    // Create - Updated to use InstrumentStatusService
-    // ========================================================================
 
     async create(
         tenderId: number,
@@ -556,10 +553,6 @@ export class EmdsService {
 
         return createdRequests;
     }
-
-    // ========================================================================
-    // Private Helpers - Payment Request Creation
-    // ========================================================================
 
     private async createPaymentRequest(
         tx: DbInstance,

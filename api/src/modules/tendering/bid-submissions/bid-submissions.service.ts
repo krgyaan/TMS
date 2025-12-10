@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNotNull, or } from 'drizzle-orm';
+import { and, eq, isNotNull, or, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -62,13 +62,15 @@ export class BidSubmissionsService {
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(
-                eq(tenderInfos.tlStatus, 1),
-                eq(tenderInfos.deleteStatus, 0),
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                 or(
                     eq(tenderCostingSheets.status, 'Approved'),
                     isNotNull(bidSubmissions.id)
                 )
-            ));
+            ))
+            .orderBy(asc(tenderInfos.dueDate));
 
         return rows.map((row) => {
             let bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';

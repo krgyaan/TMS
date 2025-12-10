@@ -1,42 +1,6 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderQuery } from '@/types/api.types';
+import type { TenderQuery, TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto } from '@/types/api.types';
 
-export type TqManagementDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    bidSubmissionDate: Date | null;
-    tqSubmissionDeadline: Date | null;
-    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
-    tqId: number | null;
-    tqCount: number;
-    bidSubmissionId: number | null;
-};
-
-export type CreateTqReceivedDto = {
-    tenderId: number;
-    tqSubmissionDeadline: string;
-    tqDocumentReceived: string | null;
-    tqItems: Array<{
-        tqTypeId: number;
-        queryDescription: string;
-    }>;
-};
-
-export type UpdateTqRepliedDto = {
-    repliedDatetime: string;
-    repliedDocument: string | null;
-    proofOfSubmission: string;
-};
-
-export type UpdateTqMissedDto = {
-    missedReason: string;
-    preventionMeasures: string;
-    tmsImprovements: string;
-};
 
 export const tqManagementService = {
     getAll: async (): Promise<TqManagementDashboardRow[]> => {

@@ -109,9 +109,13 @@ export class RfqsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .where(and(...conditions));
 
-        // Sort: pending first, then sent
-        const pendingRows = rows.filter((row) => row.rfqId === null);
-        const sentRows = rows.filter((row) => row.rfqId !== null);
+        // Sort: pending first (by due date ascending), then sent (by due date ascending)
+        const pendingRows = rows
+            .filter((row) => row.rfqId === null)
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const sentRows = rows
+            .filter((row) => row.rfqId !== null)
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
         return [...pendingRows, ...sentRows] as unknown as RfqRow[];
     }

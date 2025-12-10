@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -64,7 +64,8 @@ export class CostingApprovalsService {
                 TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                 // Only show costing sheets that are submitted, approved, or rejected
                 inArray(tenderCostingSheets.status, ['Pending', 'Approved', 'Rejected/Redo'])
-            ));
+            ))
+            .orderBy(asc(tenderInfos.dueDate));
 
         // console.log("Rows:", rows);
 

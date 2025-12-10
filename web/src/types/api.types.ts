@@ -512,6 +512,27 @@ export interface TenderInfo {
     updatedAt: Date | string;
 }
 
+export interface TenderWithRelations extends TenderInfo {
+    organizationName?: string | null;
+    organizationAcronym?: string | null;
+    teamMemberName?: string | null;
+    teamMemberUsername?: string | null;
+    statusName?: string | null;
+    itemName?: string | null;
+    locationName?: string | null;
+    infoSheet?: TenderInfoSheet | null;
+    physicalDocs?: PhysicalDocsDashboardRow | null;
+    checklist?: TenderDocumentChecklistDashboardRow | null;
+    costingSheet?: CostingSheetDashboardRow | null;
+    bidSubmission?: BidSubmission | null;
+    tqManagement?: TqManagementDashboardRow | null;
+    ra?: RaDashboardRow | null;
+    result?: ResultDashboardRow | null;
+    emds?: EmdDashboardRow | null;
+    processingFees?: EmdDashboardRow | null;
+    emdsTenderFees?: EmdDashboardRow | null;
+}
+
 // Tender with joined relation names
 export interface TenderInfoWithNames extends TenderInfo {
     organizationName?: string | null;
@@ -1129,3 +1150,122 @@ export interface ResultDashboardResponse {
     data: ResultDashboardRow[];
     counts: ResultDashboardCounts;
 }
+
+export interface PhysicalDocsDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    courierAddress: string;
+    physicalDocsRequired: string;
+    physicalDocsDeadline: Date;
+    teamMemberName: string;
+    statusName: string;
+    physicalDocs: number | null;
+    courierNo: number | null;
+};
+
+export interface PhysicalDocPerson {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+};
+
+export interface PhysicalDocWithPersons {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocPerson[];
+};
+
+export type TqManagementDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    bidSubmissionDate: Date | null;
+    tqSubmissionDeadline: Date | null;
+    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    tqId: number | null;
+    tqCount: number;
+    bidSubmissionId: number | null;
+};
+
+export type CreateTqReceivedDto = {
+    tenderId: number;
+    tqSubmissionDeadline: string;
+    tqDocumentReceived: string | null;
+    tqItems: Array<{
+        tqTypeId: number;
+        queryDescription: string;
+    }>;
+};
+
+export type UpdateTqRepliedDto = {
+    repliedDatetime: string;
+    repliedDocument: string | null;
+    proofOfSubmission: string;
+};
+
+export type UpdateTqMissedDto = {
+    missedReason: string;
+    preventionMeasures: string;
+    tmsImprovements: string;
+};
+
+export type EmdDashboardFilters = {
+    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
+    userId?: number;
+};
+
+export interface EmdDashboardRow {
+    id: number | null;
+    type: 'request' | 'missing';
+    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    amountRequired: string;
+    status: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    createdAt: string | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    statusName: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
+}
+
+export interface EmdDashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export interface EmdDashboardResponse {
+    data: EmdDashboardRow[];
+    counts: EmdDashboardCounts;
+}
+
+export type CreatePaymentRequestDto = {
+    emdMode?: string;
+    emd?: any;
+    tenderFeeMode?: string;
+    tenderFee?: any;
+    processingFeeMode?: string;
+    processingFee?: any;
+};
+
+export type UpdatePaymentRequestDto = CreatePaymentRequestDto;
+
+export type UpdateStatusDto = {
+    status: string;
+    remarks?: string;
+};

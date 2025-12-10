@@ -18,7 +18,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
 
-const TendersPage = () => {
+const TenderListPage = () => {
     const { data: statuses, isLoading: statusesLoading, error: statusesError } = useStatuses();
     const [activeTab, setActiveTab] = useState<string>("");
 
@@ -66,11 +66,6 @@ const TendersPage = () => {
     const navigate = useNavigate();
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
-        {
-            label: "Fill Info Sheet",
-            onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
-            icon: <FilePlus className="h-4 w-4" />,
-        },
         {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
@@ -310,4 +305,4 @@ const TendersPage = () => {
     );
 };
 
-export default TendersPage;
+export default TenderListPage;

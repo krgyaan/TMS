@@ -94,6 +94,14 @@ export class TenderApprovalService {
             categorized[category].push(row);
         }
 
+        // Sort Accepted and Rejected tabs by due date descending (latest first)
+        categorized.Approved.sort((a, b) =>
+            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+        );
+        categorized.Rejected.sort((a, b) =>
+            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+        );
+
         // DEBUG: Category counts
         console.log(
             '🔍 Categorized:',

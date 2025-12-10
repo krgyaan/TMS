@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -50,7 +50,8 @@ export class DocumentChecklistsService {
                 TenderInfosService.getActiveCondition(),
                 TenderInfosService.getApprovedCondition(),
                 TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
-            ));
+            ))
+            .orderBy(asc(tenderInfos.dueDate));
 
         return rows.map((row) => ({
             tenderId: row.tenderId,

@@ -12,7 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useTqManagement, type TqManagementDashboardRow, useMarkAsNoTq } from '@/hooks/api/useTqManagement';
+import { useTqManagement, useMarkAsNoTq } from '@/hooks/api/useTqManagement';
+import type { TqManagementDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'awaited' | 'received' | 'replied' | 'missed' | 'noTq';

@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { PhysicalDocsDashboardRow } from '@/types/api.types';
+import type { PhysicalDocsDashboardRow, TenderWithRelations } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
@@ -16,7 +16,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, useDeletePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 
-const PhysicalDocs = () => {
+const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
     const navigate = useNavigate();
 
@@ -231,4 +231,4 @@ const PhysicalDocs = () => {
     );
 };
 
-export default PhysicalDocs;
+export default PhysicalDocsListPage;

@@ -1,57 +1,6 @@
 import { BaseApiService } from './base.service';
-
-type DashboardFilters = {
-    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
-    userId?: number;
-};
-
-interface DashboardRow {
-    id: number | null;
-    type: 'request' | 'missing';
-    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
-    amountRequired: string;
-    status: string;
-    instrumentType: string | null;
-    instrumentStatus: string | null;
-    createdAt: string | null;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    dueDate: string | null;
-    teamMemberId: number | null;
-    teamMemberName: string | null;
-    requestedBy: string | null;
-}
-
-interface DashboardCounts {
-    pending: number;
-    sent: number;
-    approved: number;
-    rejected: number;
-    returned: number;
-    total: number;
-}
-
-interface DashboardResponse {
-    data: DashboardRow[];
-    counts: DashboardCounts;
-}
-
-type CreatePaymentRequestDto = {
-    emdMode?: string;
-    emd?: any;
-    tenderFeeMode?: string;
-    tenderFee?: any;
-    processingFeeMode?: string;
-    processingFee?: any;
-};
-
-type UpdatePaymentRequestDto = CreatePaymentRequestDto;
-
-type UpdateStatusDto = {
-    status: string;
-    remarks?: string;
-};
+import type { EmdDashboardResponse, EmdDashboardCounts, CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, EmdDashboardRow } from '@/types/api.types';
+import type { EmdDashboardFilters } from '@/types/api.types';
 
 class EmdsService extends BaseApiService {
     constructor() {
@@ -59,16 +8,16 @@ class EmdsService extends BaseApiService {
     }
 
     // Dashboard endpoints
-    async getDashboard(filters?: DashboardFilters): Promise<DashboardResponse> {
+    async getDashboard(filters?: EmdDashboardFilters): Promise<EmdDashboardResponse> {
         const params = new URLSearchParams();
         if (filters?.tab) params.append('tab', filters.tab);
         if (filters?.userId) params.append('userId', filters.userId.toString());
         const query = params.toString();
-        return this.get<DashboardResponse>(`/dashboard${query ? `?${query}` : ''}`);
+        return this.get<EmdDashboardResponse>(`/dashboard${query ? `?${query}` : ''}`);
     }
 
-    async getDashboardCounts(): Promise<DashboardCounts> {
-        return this.get<DashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(): Promise<EmdDashboardCounts> {
+        return this.get<EmdDashboardCounts>('/dashboard/counts');
     }
 
     // Existing endpoints
@@ -94,4 +43,4 @@ class EmdsService extends BaseApiService {
 }
 
 export const emdsService = new EmdsService();
-export type { DashboardRow, DashboardCounts, DashboardResponse };
+export type { EmdDashboardRow, EmdDashboardCounts, EmdDashboardResponse };
