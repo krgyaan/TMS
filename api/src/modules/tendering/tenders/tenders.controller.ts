@@ -113,6 +113,11 @@ export class TenderInfoController {
     async list(
         @Query('statusIds') statusIds?: string,
         @Query('unallocated') unallocated?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
+        @Query('teamId') teamId?: string,
+        @Query('assignedTo') assignedTo?: string,
     ) {
         const toNumArray = (v?: string) =>
             (v ?? '')
@@ -120,9 +125,20 @@ export class TenderInfoController {
                 .map((s) => parseInt(s.trim(), 10))
                 .filter((n) => !Number.isNaN(n));
 
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+
         return this.tenderInfosService.findAll({
             statusIds: toNumArray(statusIds),
             unallocated: unallocated === 'true' || unallocated === '1',
+            page: parseNumber(page),
+            limit: parseNumber(limit),
+            search,
+            teamId: parseNumber(teamId),
+            assignedTo: parseNumber(assignedTo),
         });
     }
 

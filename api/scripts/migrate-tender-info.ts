@@ -267,7 +267,7 @@ class TenderInfoTransformer {
             emd: emdValue,
             emdAmount: emdValue,
 
-            teamMember: row.team_member ?? 1,
+            teamMember: row.team_member ?? null,
             dueDate: Parsers.dateTime(row.due_date, row.due_time) ?? new Date(),
             remarks: Parsers.string(row.remarks, 200),
             status: row.status ?? 1,

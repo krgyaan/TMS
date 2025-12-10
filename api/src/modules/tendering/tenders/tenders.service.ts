@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, inArray, isNull, notInArray } from 'drizzle-orm';
+import { eq, and, inArray, isNull, notInArray, sql, desc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
@@ -12,10 +12,10 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 
-export type TenderListFilters = {
-    statusIds?: number[];
-    unallocated?: boolean;
-};
+// export type TenderListFilters = {
+//     statusIds?: number[];
+//     unallocated?: boolean;
+// };
 
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
@@ -91,6 +91,27 @@ export type TenderForApproval = {
     status: number;
     statusName: string | null;
     tlStatus: number;
+};
+
+// Define the response structure
+export type PaginatedResult<T> = {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+};
+
+export type TenderListFilters = {
+    statusIds?: number[];
+    unallocated?: boolean;
+    page?: number;
+    limit?: number;
+    search?: string;
+    teamId?: number;
+    assignedTo?: number;
 };
 
 @Injectable()
@@ -403,21 +424,54 @@ export class TenderInfosService {
         );
     }
 
-    async findAll(filters?: TenderListFilters): Promise<TenderInfoWithNames[]> {
+    async findAll(filters?: TenderListFilters): Promise<PaginatedResult<TenderInfoWithNames>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // 1. Build Where Conditions
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters?.unallocated) {
-            conditions.push(
-                isNull(tenderInfos.teamMember),
-                eq(tenderInfos.status, 1)
-            );
+            conditions.push(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1));
         } else if (filters?.statusIds?.length) {
             conditions.push(inArray(tenderInfos.status, filters.statusIds));
         }
 
-        const rows = await this.getBaseQueryBuilder().where(and(...conditions));
+        // Search Logic (Server-side search is best for pagination)
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(sql`(${tenderInfos.tenderName} ILIKE ${searchStr} OR ${tenderInfos.tenderNo} ILIKE ${searchStr})`);
+        }
 
-        return rows.map((row) =>
+        // Team filter - skip when unallocated is true (unallocated means no team member assigned)
+        if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
+            conditions.push(eq(tenderInfos.team, filters.teamId));
+        }
+
+        // Assigned to filter - skip when unallocated is true (conflicts with teamMember IS NULL)
+        if (!filters?.unallocated && filters?.assignedTo !== undefined && filters?.assignedTo !== null) {
+            conditions.push(eq(tenderInfos.teamMember, filters.assignedTo));
+        }
+
+        const whereClause = and(...conditions);
+
+        // 2. Get Total Count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // 3. Get Data (Paginated)
+        const rows = await this.getBaseQueryBuilder()
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(desc(tenderInfos.createdAt));
+
+        // 4. Map Data
+        const data = rows.map((row) =>
             this.mapJoinedRow({
                 tenderInfos: row.tenderInfos,
                 users: row.users,
@@ -428,6 +482,16 @@ export class TenderInfosService {
                 websites: row.websites,
             })
         );
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findById(id: number): Promise<TenderInfoWithNames | null> {

@@ -1,19 +1,21 @@
 // web/src/services/api/tenders.service.ts
 import { BaseApiService } from './base.service';
 import type {
-    CreateTenderInfoDto,
+    CreateTenderRequest,
     TenderInfo,
     TenderInfoWithNames,
-    UpdateTenderInfoDto,
+    UpdateTenderRequest,
+    PaginatedResult,
 } from '@/types/api.types';
 
 export type TenderListParams = {
-    // Existing filters
     statusIds?: number[];
     unallocated?: boolean;
-    // Team-based filters
     teamId?: number | null;
-    assignedTo?: number | null; // userId for SELF scope
+    assignedTo?: number | null;
+    search?: string;
+    page?: number;
+    limit?: number;
 };
 
 class TenderInfosService extends BaseApiService {
@@ -21,44 +23,46 @@ class TenderInfosService extends BaseApiService {
         super('/tenders');
     }
 
-    async getAll(params?: TenderListParams): Promise<TenderInfoWithNames[]> {
+    async getAll(params?: TenderListParams): Promise<PaginatedResult<TenderInfoWithNames>> {
         const search = new URLSearchParams();
 
         if (params) {
-            // Status filter
             if (params.statusIds?.length) {
                 search.set('statusIds', params.statusIds.join(','));
             }
-
-            // Unallocated filter
             if (params.unallocated) {
                 search.set('unallocated', 'true');
             }
-
-            // Team filter
             if (params.teamId !== undefined && params.teamId !== null) {
                 search.set('teamId', String(params.teamId));
             }
-
-            // Assigned user filter (for SELF scope - executives)
             if (params.assignedTo !== undefined && params.assignedTo !== null) {
                 search.set('assignedTo', String(params.assignedTo));
+            }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
             }
         }
 
         const queryString = search.toString();
-        return this.get<TenderInfoWithNames[]>(queryString ? `?${queryString}` : '');
+        return this.get<PaginatedResult<TenderInfoWithNames>>(queryString ? `?${queryString}` : '');
     }
 
     async getById(id: number): Promise<TenderInfoWithNames> {
         return this.get<TenderInfoWithNames>(`/${id}`);
     }
 
-    async create(data: CreateTenderInfoDto): Promise<TenderInfo> {
+    async create(data: CreateTenderRequest): Promise<TenderInfo> {
         return this.post<TenderInfo>('', data);
     }
 
-    async update(id: number, data: UpdateTenderInfoDto): Promise<TenderInfo> {
+    async update(id: number, data: UpdateTenderRequest): Promise<TenderInfo> {
         return this.patch<TenderInfo>(`/${id}`, data);
     }
 

@@ -10,17 +10,21 @@ import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders } from "@/hooks/api/useTenders";
 import { useStatuses } from "@/hooks/api/useStatuses";
 import type { TenderInfoWithNames, TenderWithRelations } from "@/types/api.types";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
 
 const TenderListPage = () => {
-    const { data: statuses, isLoading: statusesLoading, error: statusesError } = useStatuses();
+    const { data: statuses } = useStatuses();
     const [activeTab, setActiveTab] = useState<string>("");
+
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
 
     const TC = {
         prep: "Under Preperation",
@@ -53,17 +57,31 @@ const TenderListPage = () => {
     }, [statuses]);
 
     useEffect(() => {
-        if (categories.length > 0 && !activeTab) {
-            setActiveTab(categories[0].name);
-        }
+        if (categories.length > 0 && !activeTab) setActiveTab(categories[0].name);
     }, [categories, activeTab]);
+
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
 
     const selectedStatusIds = useMemo(() => categories.find(c => c.name === activeTab)?.statusIds || [], [categories, activeTab]);
 
-    const { data: tenders, isLoading: tendersLoading, error: tendersError, refetch } = useTenders(activeTab, selectedStatusIds);
+    const { data: apiResponse, isLoading: tendersLoading } = useTenders(
+        activeTab,
+        selectedStatusIds,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize }
+    );
 
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
+
+    // Handle both array (old format) and PaginatedResult (new format)
+    const tenders = Array.isArray(apiResponse)
+        ? apiResponse
+        : (apiResponse?.data || []);
+    const totalRows = Array.isArray(apiResponse)
+        ? apiResponse.length
+        : (apiResponse?.meta?.total || 0);
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
         {
@@ -133,22 +151,19 @@ const TenderListPage = () => {
             field: "gstValues",
             headerName: "Tender Value",
             width: 130,
-            cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
+            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "tenderFees",
             headerName: "Tender Fee",
             width: 130,
-            cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
+            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "emd",
             headerName: "EMD",
             width: 130,
-            cellRenderer: (p: { value: number | string | null | undefined }) =>
-                p.value !== null && p.value !== undefined ? formatINR(p.value) : <span className="text-gray-400">—</span>,
+            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "dueDate",
@@ -176,129 +191,65 @@ const TenderListPage = () => {
         },
     ]);
 
-    if (statusesLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-64 mt-2" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-12 w-full mb-4" />
-                    <Skeleton className="h-96 w-full" />
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (statusesError) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Tenders</CardTitle>
-                    <CardDescription>Manage all tenders</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Error loading categories: {statusesError.message}
-                            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="ml-4">
-                                Retry
-                            </Button>
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (tendersError) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Tenders</CardTitle>
-                    <CardDescription>Manage all tenders</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Error loading tenders: {tendersError.message}
-                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
-                                Retry
-                            </Button>
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (categories.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Tenders</CardTitle>
-                    <CardDescription>No categories found</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>No tender categories have been configured. Please add statuses with tender categories first.</AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Tenders</CardTitle>
-                <CardDescription>All tenders categorized by status</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.tendering.tenderCreate}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Tender
-                        </NavLink>
-                    </Button>
-                </CardAction>
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+
+            {/* 2. HEADER: Fixed height */}
+            <CardHeader className="flex-none pb-4">
+                <div className="flex justify-between">
+                    <div>
+                        <CardTitle>Tenders</CardTitle>
+                        <CardDescription>Manage all tenders</CardDescription>
+                    </div>
+                    <CardAction>
+                        <Button variant="default" asChild>
+                            <NavLink to={paths.tendering.tenderCreate}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Tender
+                            </NavLink>
+                        </Button>
+                    </CardAction>
+                </div>
             </CardHeader>
-            <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={value => setActiveTab(value)}>
-                    <TabsList className="m-auto">
+
+            {/* 3. CONTENT: Flex-1 to take remaining space */}
+            <CardContent className="flex-1 px-0">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="flex flex-col w-full"
+                >
+                    <div className="flex-none m-auto">
+                        <TabsList>
+                            {categories.map(category => (
+                                <TabsTrigger key={category.name} value={category.name}>
+                                    {category.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </div>
+
+                    <div className="flex-1 min-h-0">
                         {categories.map(category => (
-                            <TabsTrigger key={category.name} value={category.name}>
-                                {category.label}
-                            </TabsTrigger>
+                            <TabsContent
+                                key={category.name}
+                                value={category.name}
+                                className="m-0 data-[state=inactive]:hidden"
+                            >
+                                {activeTab === category.name && (
+                                    <DataTable
+                                        data={tenders}
+                                        columnDefs={colDefs}
+                                        loading={tendersLoading}
+                                        manualPagination={true}
+                                        rowCount={totalRows}
+                                        paginationState={pagination}
+                                        onPaginationChange={setPagination}
+                                    />
+                                )}
+                            </TabsContent>
                         ))}
-                    </TabsList>
-                    {categories.map(category => (
-                        <TabsContent key={category.name} value={category.name} className="h-screen mt-0">
-                            {activeTab === category.name ? (
-                                <DataTable
-                                    key={`${activeTab}-tenders`}
-                                    data={tenders ?? []}
-                                    columnDefs={colDefs}
-                                    loading={tendersLoading}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: true,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true,
-                                        },
-                                        pagination: true,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px;">No data found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
-                            ) : null}
-                        </TabsContent>
-                    ))}
+                    </div>
                 </Tabs>
             </CardContent>
         </Card>
