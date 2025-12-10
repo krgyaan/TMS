@@ -45,13 +45,8 @@ const BidSubmissionListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
-    // Handle PaginatedResult format
-    const bidSubmissionsData = Array.isArray(apiResponse)
-        ? apiResponse
-        : (apiResponse?.data || []);
-    const totalRows = Array.isArray(apiResponse)
-        ? apiResponse.length
-        : (apiResponse?.meta?.total || 0);
+    const bidSubmissionsData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const getStatusVariant = (status: string) => {
         switch (status) {

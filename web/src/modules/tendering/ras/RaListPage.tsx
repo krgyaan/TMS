@@ -132,8 +132,9 @@ const ReverseAuctionListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
-    const { data: raData, counts } = response || { data: [], counts: null };
-    const totalRows = response?.meta?.total || raData?.length || 0;
+    const raData = response?.data || [];
+    const counts = response?.counts || null;
+    const totalRows = response?.meta?.total || raData.length;
 
     const handleViewDetails = useCallback((row: RaDashboardRow) => {
         if (row.id) {

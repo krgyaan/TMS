@@ -51,9 +51,6 @@ const TqManagementListPage = () => {
         }
     };
 
-    // Fetch counts (all data without filters)
-    const { data: countsData } = useTqManagement();
-
     // Fetch paginated data for active tab
     const { data: apiResponse, isLoading: loading, error } = useTqManagement({
         tqStatus: getTqStatusFromTab(activeTab),
@@ -173,47 +170,34 @@ const TqManagementListPage = () => {
     ], [navigate, markNoTqMutation]);
 
     const tabsConfig = useMemo(() => {
-        // Use countsData for counts if available, otherwise use totalRows for active tab
-        const counts = countsData?.data || [];
-        const getCount = (status: string) => {
-            if (counts.length > 0) {
-                return counts.filter((item: TqManagementDashboardRow) => item.tqStatus === status).length;
-            }
-            return activeTab === 'awaited' && status === 'TQ awaited' ? totalRows :
-                   activeTab === 'received' && status === 'TQ received' ? totalRows :
-                   activeTab === 'replied' && status === 'TQ replied' ? totalRows :
-                   activeTab === 'missed' && status === 'TQ missed' ? totalRows :
-                   activeTab === 'noTq' && status === 'No TQ' ? totalRows : 0;
-        };
-
         return [
             {
                 key: 'awaited' as TabKey,
                 name: 'TQ Awaited',
-                count: getCount('TQ awaited'),
+                count: activeTab === 'awaited' ? totalRows : 0,
             },
             {
                 key: 'received' as TabKey,
                 name: 'TQ Received',
-                count: getCount('TQ received'),
+                count: activeTab === 'received' ? totalRows : 0,
             },
             {
                 key: 'replied' as TabKey,
                 name: 'TQ Replied',
-                count: getCount('TQ replied'),
+                count: activeTab === 'replied' ? totalRows : 0,
             },
             {
                 key: 'missed' as TabKey,
                 name: 'TQ Missed',
-                count: getCount('TQ missed'),
+                count: activeTab === 'missed' ? totalRows : 0,
             },
             {
                 key: 'noTq' as TabKey,
                 name: 'No TQ',
-                count: getCount('No TQ'),
+                count: activeTab === 'noTq' ? totalRows : 0,
             },
         ];
-    }, [countsData, activeTab, totalRows]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<TqManagementDashboardRow>[]>(() => [
         tenderNameCol<TqManagementDashboardRow>('tenderNo', {

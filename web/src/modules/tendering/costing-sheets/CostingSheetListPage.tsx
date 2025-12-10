@@ -47,13 +47,8 @@ const CostingSheets = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
-    // Handle PaginatedResult format
-    const costingSheetsData = Array.isArray(apiResponse)
-        ? apiResponse
-        : (apiResponse?.data || []);
-    const totalRows = Array.isArray(apiResponse)
-        ? apiResponse.length
-        : (apiResponse?.meta?.total || 0);
+    const costingSheetsData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const costingSheetActions: ActionItem<CostingSheetDashboardRow>[] = useMemo(() => [
         {

@@ -28,7 +28,6 @@ type TabConfig = {
     key: '0' | '1' | '2' | '3';
     name: string;
     count: number;
-    data: TenderApprovalRow[];
 };
 
 const TenderApprovalListPage = () => {
@@ -52,10 +51,10 @@ const TenderApprovalListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    // Fetch counts (all data without filters)
+    // Fetch counts (all data without filters) - returns Record format
     const { data: countsData } = useAllTenders();
 
-    // Fetch paginated data for active tab
+    // Fetch paginated data for active tab - returns PaginatedResult format
     const {
         data: apiResponse,
         isLoading: loading,
@@ -68,11 +67,13 @@ const TenderApprovalListPage = () => {
         sortOrder: sortModel[0]?.sort,
     });
 
-    // Determine if response is PaginatedResult or Record
-    const isPaginated = apiResponse && 'meta' in apiResponse;
-    const approvalData = isPaginated ? (apiResponse as PaginatedResult<TenderApprovalRow>).data : [];
-    const totalRows = isPaginated ? (apiResponse as PaginatedResult<TenderApprovalRow>).meta.total : 0;
-    const tabsData = !isPaginated ? apiResponse as Record<string, TenderApprovalRow[]> : null;
+    // apiResponse with filters always returns PaginatedResult
+    const approvalData = apiResponse && 'meta' in apiResponse
+        ? (apiResponse as PaginatedResult<TenderApprovalRow>).data
+        : [];
+    const totalRows = apiResponse && 'meta' in apiResponse
+        ? (apiResponse as PaginatedResult<TenderApprovalRow>).meta.total
+        : 0;
 
     const approvalActions: ActionItem<any>[] = [
         {
@@ -102,14 +103,13 @@ const TenderApprovalListPage = () => {
     ];
 
     const tabsConfig = useMemo<TabConfig[]>(() => {
-        // Use countsData for counts if available, otherwise use approvalData length for active tab
+        // Use countsData for counts if available (Record format), otherwise use totalRows for active tab
         if (countsData && typeof countsData === 'object' && !('meta' in countsData)) {
             const counts = countsData as Record<string, TenderApprovalRow[]>;
             return Object.entries(TABS_NAMES).map(([key, name]) => ({
                 key: key as '0' | '1' | '2' | '3',
                 name,
                 count: counts[name]?.length || 0,
-                data: [] // Data will come from paginated response
             }));
         }
 
@@ -118,7 +118,6 @@ const TenderApprovalListPage = () => {
             key: key as '0' | '1' | '2' | '3',
             name,
             count: activeTab === key ? totalRows : 0,
-            data: []
         }));
     }, [countsData, activeTab, totalRows]);
 
