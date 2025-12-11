@@ -1,10 +1,10 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '@/app.module';
-import { ConfigService } from '@nestjs/config';
-import cookieParser from 'cookie-parser';
-import { DRIZZLE } from '@db/database.module';
-import { StatusCache } from '@/utils/status-cache';
-import type { DbInstance } from '@db';
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "@/app.module";
+import { ConfigService } from "@nestjs/config";
+import cookieParser from "cookie-parser";
+import { DRIZZLE } from "@/db/schemas/shared/database.module";
+import { StatusCache } from "@/utils/status-cache";
+import type { DbInstance } from "@db";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -24,10 +24,7 @@ async function bootstrap() {
 
     app.setGlobalPrefix("api/v1");
 
-    const allowedOrigins = [
-        'http://localhost:5173',
-        'https://tmsv2.volksenergie.in'
-    ];
+    const allowedOrigins = ["http://localhost:5173", "https://tmsv2.volksenergie.in"];
 
     app.enableCors({
         origin: allowedOrigins,

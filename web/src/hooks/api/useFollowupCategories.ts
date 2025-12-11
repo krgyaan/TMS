@@ -1,17 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { followupCategoriesService } from '@/services/api';
-import type {
-    CreateFollowupCategoryDto,
-    UpdateFollowupCategoryDto,
-} from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { followupCategoriesService } from "@/services/api";
+import type { CreateFollowupCategoryDto, UpdateFollowupCategoryDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const followupCategoriesKey = {
-    all: ['followupCategories'] as const,
-    lists: () => [...followupCategoriesKey.all, 'list'] as const,
+    all: ["followupCategories"] as const,
+    lists: () => [...followupCategoriesKey.all, "list"] as const,
     list: (filters?: any) => [...followupCategoriesKey.lists(), { filters }] as const,
-    details: () => [...followupCategoriesKey.all, 'detail'] as const,
+    details: () => [...followupCategoriesKey.all, "detail"] as const,
     detail: (id: number) => [...followupCategoriesKey.details(), id] as const,
 };
 
@@ -35,7 +32,7 @@ export const useFollowupCategory = (id: number | null) => {
 // Search followup categories
 export const useFollowupCategorySearch = (query: string) => {
     return useQuery({
-        queryKey: [...followupCategoriesKey.all, 'search', query],
+        queryKey: [...followupCategoriesKey.all, "search", query],
         // queryFn: () => followupCategoriesService.search(query),
         enabled: query.length > 0,
     });
@@ -46,13 +43,12 @@ export const useCreateFollowupCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateFollowupCategoryDto) =>
-            followupCategoriesService.create(data),
+        mutationFn: (data: CreateFollowupCategoryDto) => followupCategoriesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
-            toast.success('Followup Category created successfully');
+            toast.success("Followup Category created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -63,16 +59,15 @@ export const useUpdateFollowupCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateFollowupCategoryDto }) =>
-            followupCategoriesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateFollowupCategoryDto }) => followupCategoriesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
             queryClient.invalidateQueries({
                 queryKey: followupCategoriesKey.detail(variables.id),
             });
-            toast.success('Followup Category updated successfully');
+            toast.success("Followup Category updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

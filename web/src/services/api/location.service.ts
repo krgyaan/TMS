@@ -1,30 +1,30 @@
-import { BaseApiService } from './base.service'
-import type { Location } from '@/types/api.types'
+import { BaseApiService } from "./base.service";
+import type { Location } from "@/types/api.types";
 
 class LocationsService extends BaseApiService {
     constructor() {
-        super('/locations')
+        super("/locations");
     }
 
     async getAll(): Promise<Location[]> {
-        return (await this.get<Location[]>())
+        return await this.get<Location[]>();
     }
 
     async getById(id: number): Promise<Location> {
-        return this.get<Location>(`/${id}`)
+        return this.get<Location>(`/${id}`);
     }
 
     async create(data: Partial<Location>): Promise<Location> {
-        return this.post<Location>('', data)
+        return this.post<Location>("", data);
     }
 
     async update(id: number, data: Partial<Location>): Promise<Location> {
-        return this.patch<Location>(`/${id}`, data)
+        return this.patch<Location>(`/${id}`, data);
     }
 
     async deleteLocation(id: number): Promise<void> {
-        return this.delete<void>(`/${id}`)
+        return this.delete<void>(`/${id}`);
     }
 }
 
-export const locationsService = new LocationsService()
+export const locationsService = new LocationsService();

@@ -1,17 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { imprestCategoriesService } from '@/services/api';
-import type {
-    CreateImprestCategoryDto,
-    UpdateImprestCategoryDto,
-} from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { imprestCategoriesService } from "@/services/api";
+import type { CreateImprestCategoryDto, UpdateImprestCategoryDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const imprestCategoriesKey = {
-    all: ['imprestCategories'] as const,
-    lists: () => [...imprestCategoriesKey.all, 'list'] as const,
+    all: ["imprestCategories"] as const,
+    lists: () => [...imprestCategoriesKey.all, "list"] as const,
     list: (filters?: any) => [...imprestCategoriesKey.lists(), { filters }] as const,
-    details: () => [...imprestCategoriesKey.all, 'detail'] as const,
+    details: () => [...imprestCategoriesKey.all, "detail"] as const,
     detail: (id: number) => [...imprestCategoriesKey.details(), id] as const,
 };
 
@@ -35,7 +32,7 @@ export const useImprestCategory = (id: number | null) => {
 // Search imprest categories
 export const useImprestCategorySearch = (query: string) => {
     return useQuery({
-        queryKey: [...imprestCategoriesKey.all, 'search', query],
+        queryKey: [...imprestCategoriesKey.all, "search", query],
         // queryFn: () => imprestCategoriesService.search(query),
         enabled: query.length > 0,
     });
@@ -46,13 +43,12 @@ export const useCreateImprestCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateImprestCategoryDto) =>
-            imprestCategoriesService.create(data),
+        mutationFn: (data: CreateImprestCategoryDto) => imprestCategoriesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: imprestCategoriesKey.lists() });
-            toast.success('Imprest Category created successfully');
+            toast.success("Imprest Category created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -63,16 +59,15 @@ export const useUpdateImprestCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateImprestCategoryDto }) =>
-            imprestCategoriesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateImprestCategoryDto }) => imprestCategoriesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: imprestCategoriesKey.lists() });
             queryClient.invalidateQueries({
                 queryKey: imprestCategoriesKey.detail(variables.id),
             });
-            toast.success('Imprest Category updated successfully');
+            toast.success("Imprest Category updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

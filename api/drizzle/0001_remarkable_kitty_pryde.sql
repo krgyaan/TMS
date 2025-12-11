@@ -1,0 +1,17 @@
+-- CREATE TABLE "couriers" (
+-- 	"id" serial PRIMARY KEY NOT NULL,
+-- 	"user_id" integer NOT NULL,
+-- 	"to_org" varchar(255) NOT NULL,
+-- 	"to_name" varchar(255) NOT NULL,
+-- 	"to_addr" text NOT NULL,
+-- 	"to_pin" varchar(10) NOT NULL,
+-- 	"to_mobile" varchar(15) NOT NULL,
+-- 	"emp_from" integer NOT NULL,
+-- 	"del_date" timestamp NOT NULL,
+-- 	"urgency" integer NOT NULL,
+-- 	"courier_docs" jsonb DEFAULT '[]'::jsonb,
+-- 	"status" integer DEFAULT 0,
+-- 	"tracking_number" varchar(100),
+-- 	"created_at" timestamp DEFAULT now(),
+-- 	"updated_at" timestamp DEFAULT now()
+-- );

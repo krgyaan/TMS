@@ -2,10 +2,11 @@
 // ALL SCHEMAS - MAIN BARREL EXPORT
 // ============================================
 
-export * from './tendering';
-export * from './master';
-export * from './auth';
-export * from './vendors';
-export * from './crm';
-export * from './accounts';
-export * from './workflow';
+export * from "./tendering";
+export * from "./master";
+export * from "./auth";
+export * from "./vendors";
+export * from "./crm";
+export * from "./accounts";
+export * from "./workflow";
+export * from "./shared";

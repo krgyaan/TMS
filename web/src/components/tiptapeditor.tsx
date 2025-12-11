@@ -14,21 +14,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 
-import {
-    Bold,
-    Italic,
-    Underline as UnderlineIcon,
-    Strikethrough,
-    List,
-    ListOrdered,
-    Quote,
-    Link2,
-    Unlink,
-    ImageIcon,
-    Undo,
-    Redo,
-    Heading2,
-} from "lucide-react";
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Quote, Link2, Unlink, ImageIcon, Undo, Redo, Heading2 } from "lucide-react";
 
 import "@/tiptap.css"; // ← your styling
 
@@ -58,37 +44,25 @@ export function TiptapEditor({ value, onChange }: { value: string; onChange: (ht
             <Menubar className="rounded-md border bg-muted">
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <Bold
-                            className={editor.isActive("bold") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleBold().run()}
-                        />
+                        <Bold className={editor.isActive("bold") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleBold().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <Italic
-                            className={editor.isActive("italic") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleItalic().run()}
-                        />
+                        <Italic className={editor.isActive("italic") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleItalic().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <UnderlineIcon
-                            className={editor.isActive("underline") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleUnderline().run()}
-                        />
+                        <UnderlineIcon className={editor.isActive("underline") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleUnderline().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <Strikethrough
-                            className={editor.isActive("strike") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleStrike().run()}
-                        />
+                        <Strikethrough className={editor.isActive("strike") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleStrike().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
@@ -96,19 +70,13 @@ export function TiptapEditor({ value, onChange }: { value: string; onChange: (ht
 
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <List
-                            className={editor.isActive("bulletList") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleBulletList().run()}
-                        />
+                        <List className={editor.isActive("bulletList") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleBulletList().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
                     <MenubarTrigger>
-                        <ListOrdered
-                            className={editor.isActive("orderedList") ? "text-primary" : ""}
-                            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                        />
+                        <ListOrdered className={editor.isActive("orderedList") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
@@ -133,7 +101,7 @@ export function TiptapEditor({ value, onChange }: { value: string; onChange: (ht
 
                 <Separator orientation="vertical" className="mx-1" />
 
-                <MenubarMenu>
+                {/* <MenubarMenu>
                     <MenubarTrigger
                         onClick={() => {
                             const url = prompt("Image URL?");
@@ -142,7 +110,7 @@ export function TiptapEditor({ value, onChange }: { value: string; onChange: (ht
                     >
                         <ImageIcon />
                     </MenubarTrigger>
-                </MenubarMenu>
+                </MenubarMenu> */}
 
                 <Separator orientation="vertical" className="mx-1" />
 

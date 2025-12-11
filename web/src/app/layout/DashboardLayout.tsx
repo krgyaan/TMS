@@ -1,4 +1,3 @@
-
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { DocumentTitle } from "@/components/document-title";
@@ -11,13 +10,17 @@ export default function DashboardLayout() {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
+
+            {/* MAIN LAYOUT FIXED → flex, h-full, min-h-0 */}
+            <SidebarInset className="flex flex-col h-full min-h-0">
                 <DocumentTitle title={"Dashboard - TMS"} />
-                <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-accent">
-                    <div className="flex items-center gap-2 px-4">
+
+                {/* HEADER (fixed height) */}
+                <header className="flex h-16 shrink-0 items-center justify-between gap-2 bg-accent px-4">
+                    <div className="flex items-center gap-2">
                         <SidebarTrigger className="-ml-1 cursor-pointer" />
-                        <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-                        <Breadcrumb className="cusor-pointer">
+                        <Separator orientation="vertical" className="h-4" />
+                        <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
                                     <BreadcrumbPage>Dashboard</BreadcrumbPage>
@@ -25,19 +28,15 @@ export default function DashboardLayout() {
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
-                    <div className="mr-5">
-                        <ModeToggle />
-                    </div>
+                    <ModeToggle />
                 </header>
-                <div className="p-2">
-                    <div className="mb-[60px]">
+
+                {/* MAIN CONTENT AREA — MUST BE flex-1 + min-h-0 */}
+                <div className="flex-1 min-h-0 h-full flex flex-col">
+                    {/* OUTLET WRAPPER — ALSO FLEX-1 + min-h-0 */}
+                    <div className="flex-1 h-full min-h-0 overflow-auto p-4">
                         <Outlet />
                     </div>
-                    <SidebarFooter className="min-h-[60px] absolute bg-card bottom-0 left-0 right-0 p-4 border-t">
-                        <div className="flex justify-center items-center">
-                            <span className="text-sm text-muted-foreground py-2">Copyright © 2025 Volks Energie. All rights reserved.</span>
-                        </div>
-                    </SidebarFooter>
                 </div>
             </SidebarInset>
         </SidebarProvider>
