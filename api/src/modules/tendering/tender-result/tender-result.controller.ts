@@ -8,27 +8,16 @@ import {
     ParseIntPipe,
     Query,
 } from '@nestjs/common';
-import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
+import { TenderResultService, type ResultDashboardFilters } from '@/modules/tendering/tender-result/tender-result.service';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
-import type { ResultDashboardType } from '@/modules/tendering/tender-result/tender-result.service';
 
 @Controller('tender-results')
 export class TenderResultController {
     constructor(private readonly tenderResultService: TenderResultService) { }
 
-    @Get('dashboard')
-    getDashboard(@Query('type') type?: ResultDashboardType) {
-        return this.tenderResultService.getDashboardData(type);
-    }
-
-    @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.tenderResultService.getDashboardCounts();
-    }
-
     @Get()
-    findAll() {
-        return this.tenderResultService.findAll();
+    findAll(@Query() filters?: ResultDashboardFilters) {
+        return this.tenderResultService.findAll(filters);
     }
 
     @Get(':id')

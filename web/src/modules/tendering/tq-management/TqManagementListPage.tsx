@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -12,16 +12,56 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useTqManagement, type TqManagementDashboardRow, useMarkAsNoTq } from '@/hooks/api/useTqManagement';
+import { useTqManagement, useMarkAsNoTq } from '@/hooks/api/useTqManagement';
+import type { TqManagementDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'awaited' | 'received' | 'replied' | 'missed' | 'noTq';
 
 const TqManagementListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('awaited');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: tqManagementData, isLoading: loading, error } = useTqManagement();
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    // Map tab key to tqStatus
+    const getTqStatusFromTab = (tab: TabKey): 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ' | undefined => {
+        switch (tab) {
+            case 'awaited': return 'TQ awaited';
+            case 'received': return 'TQ received';
+            case 'replied': return 'TQ replied';
+            case 'missed': return 'TQ missed';
+            case 'noTq': return 'No TQ';
+            default: return undefined;
+        }
+    };
+
+    // Fetch paginated data for active tab
+    const { data: apiResponse, isLoading: loading, error } = useTqManagement({
+        tqStatus: getTqStatusFromTab(activeTab),
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
+    });
+
+    const tqManagementData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
     const markNoTqMutation = useMarkAsNoTq();
 
     const getStatusVariant = (status: string) => {
@@ -130,61 +170,34 @@ const TqManagementListPage = () => {
     ], [navigate, markNoTqMutation]);
 
     const tabsConfig = useMemo(() => {
-        if (!tqManagementData) return [];
-
         return [
             {
                 key: 'awaited' as TabKey,
                 name: 'TQ Awaited',
-                count: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ awaited'
-                ).length,
-                data: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ awaited'
-                ),
+                count: activeTab === 'awaited' ? totalRows : 0,
             },
             {
                 key: 'received' as TabKey,
                 name: 'TQ Received',
-                count: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ received'
-                ).length,
-                data: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ received'
-                ),
+                count: activeTab === 'received' ? totalRows : 0,
             },
             {
                 key: 'replied' as TabKey,
                 name: 'TQ Replied',
-                count: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ replied'
-                ).length,
-                data: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ replied'
-                ),
+                count: activeTab === 'replied' ? totalRows : 0,
             },
             {
                 key: 'missed' as TabKey,
                 name: 'TQ Missed',
-                count: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ missed'
-                ).length,
-                data: tqManagementData.filter((item) =>
-                    item.tqStatus === 'TQ missed'
-                ),
+                count: activeTab === 'missed' ? totalRows : 0,
             },
             {
                 key: 'noTq' as TabKey,
                 name: 'No TQ',
-                count: tqManagementData.filter((item) =>
-                    item.tqStatus === 'No TQ'
-                ).length,
-                data: tqManagementData.filter((item) =>
-                    item.tqStatus === 'No TQ'
-                ),
+                count: activeTab === 'noTq' ? totalRows : 0,
             },
         ];
-    }, [tqManagementData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<TqManagementDashboardRow>[]>(() => [
         tenderNameCol<TqManagementDashboardRow>('tenderNo', {
@@ -192,12 +205,15 @@ const TqManagementListPage = () => {
             filter: true,
             flex: 2,
             minWidth: 250,
+            colId: 'tenderNo',
+            sortable: true,
         }),
         {
             field: 'teamMemberName',
             headerName: 'Team Member',
             flex: 1.5,
             minWidth: 150,
+            colId: 'teamMemberName',
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
@@ -207,6 +223,7 @@ const TqManagementListPage = () => {
             headerName: 'Bid Submission',
             flex: 1.5,
             minWidth: 170,
+            colId: 'bidSubmissionDate',
             valueGetter: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
@@ -216,6 +233,7 @@ const TqManagementListPage = () => {
             headerName: 'TQ Deadline',
             flex: 1.5,
             minWidth: 170,
+            colId: 'tqSubmissionDeadline',
             valueGetter: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
@@ -224,6 +242,7 @@ const TqManagementListPage = () => {
             field: 'tqCount',
             headerName: 'TQ Count',
             width: 100,
+            colId: 'tqCount',
             valueGetter: (params: any) => params.data?.tqCount || 0,
             sortable: true,
             cellRenderer: (params: any) => {
@@ -239,6 +258,7 @@ const TqManagementListPage = () => {
             headerName: 'Status',
             flex: 1,
             minWidth: 130,
+            colId: 'tqStatus',
             sortable: true,
             filter: true,
             cellRenderer: (params: any) => {
@@ -333,39 +353,44 @@ const TqManagementListPage = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} TQs</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'awaited' && 'Submitted bids awaiting TQ will appear here'}
-                                        {tab.key === 'received' && 'Received TQs will be shown here'}
-                                        {tab.key === 'replied' && 'Replied TQs will appear here'}
-                                        {tab.key === 'missed' && 'Missed TQs will be shown here'}
-                                        {tab.key === 'noTq' && 'Tenders qualified without TQ will appear here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No TQs found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {(!tqManagementData || tqManagementData.length === 0) ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} TQs</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'awaited' && 'Submitted bids awaiting TQ will appear here'}
+                                                {tab.key === 'received' && 'Received TQs will be shown here'}
+                                                {tab.key === 'replied' && 'Replied TQs will appear here'}
+                                                {tab.key === 'missed' && 'Missed TQs will be shown here'}
+                                                {tab.key === 'noTq' && 'Tenders qualified without TQ will appear here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={tqManagementData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No TQs found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}

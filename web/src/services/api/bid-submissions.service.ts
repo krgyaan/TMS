@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { BidSubmission } from '@/types/api.types';
+import type { BidSubmission, PaginatedResult } from '@/types/api.types';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -15,6 +15,14 @@ export type BidSubmissionDashboardRow = {
     bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
     bidSubmissionId: number | null;
     costingSheetId: number | null;
+};
+
+export type BidSubmissionListParams = {
+    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 };
 
 export type SubmitBidDto = {
@@ -45,8 +53,28 @@ export type UpdateBidSubmissionDto = {
 };
 
 export const bidSubmissionsService = {
-    getAll: async (): Promise<BidSubmissionDashboardRow[]> => {
-        const response = await axiosInstance.get<BidSubmissionDashboardRow[]>('/bid-submissions');
+    getAll: async (params?: BidSubmissionListParams): Promise<PaginatedResult<BidSubmissionDashboardRow>> => {
+        const searchParams = new URLSearchParams();
+
+        if (params?.bidStatus) {
+            searchParams.set('bidStatus', params.bidStatus);
+        }
+        if (params?.page) {
+            searchParams.set('page', String(params.page));
+        }
+        if (params?.limit) {
+            searchParams.set('limit', String(params.limit));
+        }
+        if (params?.sortBy) {
+            searchParams.set('sortBy', params.sortBy);
+        }
+        if (params?.sortOrder) {
+            searchParams.set('sortOrder', params.sortOrder);
+        }
+
+        const queryString = searchParams.toString();
+        const url = queryString ? `/bid-submissions?${queryString}` : '/bid-submissions';
+        const response = await axiosInstance.get<PaginatedResult<BidSubmissionDashboardRow>>(url);
         return response.data;
     },
 

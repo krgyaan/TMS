@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -10,6 +10,7 @@ import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schem
 import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
+import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -23,11 +24,84 @@ type TenderDocumentChecklistDashboardRow = {
     checklistSubmitted: boolean;
 }
 
+export type DocumentChecklistFilters = {
+    checklistSubmitted?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 @Injectable()
 export class DocumentChecklistsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    async findAll(): Promise<TenderDocumentChecklistDashboardRow[]> {
+    async findAll(filters?: DocumentChecklistFilters): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build WHERE conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+        ];
+
+        // Add checklistSubmitted filter condition
+        if (filters?.checklistSubmitted !== undefined) {
+            if (filters.checklistSubmitted) {
+                baseConditions.push(isNotNull(tenderDocumentChecklists.id));
+            } else {
+                baseConditions.push(isNull(tenderDocumentChecklists.id));
+            }
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Apply sorting
+        let orderByClause;
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    break;
+                case 'statusName':
+                    orderByClause = sortOrder(statuses.name);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        } else {
+            orderByClause = asc(tenderInfos.dueDate);
+        }
+
+        // Get paginated data
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -46,13 +120,12 @@ export class DocumentChecklistsService {
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
-            .where(and(
-                TenderInfosService.getActiveCondition(),
-                TenderInfosService.getApprovedCondition(),
-                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
-            ));
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
 
-        return rows.map((row) => ({
+        const data = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
@@ -63,6 +136,16 @@ export class DocumentChecklistsService {
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
             checklistSubmitted: row.checklistId !== null,
         }));
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findByTenderId(tenderId: number) {

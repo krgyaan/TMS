@@ -1,0 +1,1 @@
+ALTER TABLE "tender_infos" ALTER COLUMN "team_member" DROP NOT NULL;

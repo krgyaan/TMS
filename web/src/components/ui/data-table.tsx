@@ -1,49 +1,47 @@
+// D:\tms\web\src\components\ui\data-table.tsx
 import { useMemo, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, GridOptions, GridReadyEvent, RowSelectionOptions } from 'ag-grid-community';
 import { myAgTheme } from '@/components/data-grid/theme';
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+// import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 
 export interface DataTableProps<T = any> {
-    /** Array of data to display in the table */
     data: T[];
-    /** Column definitions for the table */
     columnDefs: ColDef<T>[];
-    /** Optional grid options to override defaults */
     gridOptions?: Partial<GridOptions<T>>;
-    /** Height of the table (default: 400px) */
-    height?: string | number;
-    /** Whether to show loading state */
     loading?: boolean;
-    /** Callback when grid is ready */
     onGridReady?: (event: GridReadyEvent<T>) => void;
-    /** Custom CSS class for the grid container */
     className?: string;
-    /** Whether to enable pagination (default: true) */
     enablePagination?: boolean;
-    /** Page size for pagination (default: 20) */
     pageSize?: number;
-    /** Whether to enable sorting (default: true) */
     enableSorting?: boolean;
-    /** Whether to enable filtering (default: true) */
     enableFiltering?: boolean;
-    /** Whether to enable column resizing (default: true) */
     enableColumnResizing?: boolean;
-    /** Whether to enable row selection (default: false) */
     enableRowSelection?: boolean;
-    /** Selection type: 'single' or 'multiple' */
     selectionType?: 'single' | 'multiple';
-    /** Callback when row selection changes */
     onSelectionChanged?: (selectedRows: T[]) => void;
-    /** Optional override for theme; defaults to myAgTheme */
     themeOverride?: any;
+    manualPagination?: boolean;
+    rowCount?: number;
+    paginationState?: {
+        pageIndex: number;
+        pageSize: number;
+    };
+    onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void;
 }
 
 const DataTable = <T extends Record<string, any>>({
     data,
     columnDefs,
     gridOptions = {},
-    height = 400,
     loading = false,
+    manualPagination = false,
+    rowCount = 0,
+    paginationState,
+    onPaginationChange,
     onGridReady,
     className = '',
     enablePagination = true,
@@ -56,98 +54,117 @@ const DataTable = <T extends Record<string, any>>({
     onSelectionChanged,
     themeOverride,
 }: DataTableProps<T>) => {
-    // Default grid options
-    const defaultGridOptions: GridOptions<T> = useMemo(() => ({
-        // Enable pagination
-        pagination: enablePagination,
-        paginationPageSize: pageSize,
-        paginationPageSizeSelector: [10, 20, 50, 100],
-        domLayout: 'autoHeight',
 
-        // Enable sorting
+    // 1. Calculate Pagination Logic
+    const activePageSize = manualPagination ? (paginationState?.pageSize ?? 50) : pageSize;
+    const currentPage = (paginationState?.pageIndex ?? 0) + 1;
+    const totalPages = manualPagination ? Math.ceil(rowCount / activePageSize) : 0;
+    const startRow = (currentPage - 1) * activePageSize + 1;
+    const endRow = Math.min(currentPage * activePageSize, rowCount);
+
+    // 2. Memoize Grid Options
+    const defaultGridOptions: GridOptions<T> = useMemo(() => ({
+        pagination: !manualPagination && enablePagination,
+        paginationPageSize: activePageSize,
+        suppressPaginationPanel: manualPagination,
+        domLayout: 'autoHeight',
         defaultColDef: {
             sortable: enableSorting,
             filter: enableFiltering,
             resizable: enableColumnResizing,
-            minWidth: 80,
+            minWidth: 100,
+            flex: 1,
         },
 
-        // Row selection (new object-based API)
-        rowSelection: enableRowSelection
-            ? ({
-                mode: selectionType === 'multiple' ? 'multiRow' : 'singleRow',
-                enableClickSelection: true,
-            } as RowSelectionOptions)
-            : undefined,
+        rowSelection: enableRowSelection ? {
+            mode: selectionType === 'multiple' ? 'multiRow' : 'singleRow',
+            checkboxes: selectionType === 'multiple',
+            headerCheckbox: selectionType === 'multiple',
+            enableClickSelection: false,
+        } as RowSelectionOptions : undefined,
 
-        // Performance optimizations
-        suppressColumnVirtualisation: false,
-        suppressRowVirtualisation: false,
-
-        // UI improvements
-        animateRows: true,
         rowHeight: 40,
-        headerHeight: 40,
-
-        // Loading overlay
-        loadingOverlayComponent: () => (
-            <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-        ),
-
-        // No rows overlay
+        headerHeight: 45,
+        animateRows: true,
         noRowsOverlayComponent: () => (
-            <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center justify-center h-full text-muted-foreground">
                 No data available
             </div>
         ),
-    }), [
-        enablePagination,
-        pageSize,
-        enableSorting,
-        enableFiltering,
-        enableColumnResizing,
-        enableRowSelection,
-        selectionType,
-    ]);
+    }), [enablePagination, activePageSize, enableSorting, enableFiltering, enableColumnResizing, enableRowSelection, selectionType, manualPagination]);
 
-    // Merge user grid options with defaults (shallow, with deep-merge for defaultColDef)
-    const finalGridOptions = useMemo(() => ({
-        ...defaultGridOptions,
-        ...gridOptions,
-        defaultColDef: {
-            ...defaultGridOptions.defaultColDef,
-            ...(gridOptions.defaultColDef || {}),
-        },
-    }), [defaultGridOptions, gridOptions]);
-
-    // Handle grid ready
     const handleGridReady = useCallback((event: GridReadyEvent<T>) => {
-        if (onGridReady) {
-            onGridReady(event);
-        }
+        if (onGridReady) onGridReady(event);
     }, [onGridReady]);
 
-    // Handle selection change
     const handleSelectionChanged = useCallback((event: any) => {
         if (onSelectionChanged && enableRowSelection) {
-            const selectedRows = event.api?.getSelectedRows?.() ?? [];
-            onSelectionChanged(selectedRows as T[]);
+            onSelectionChanged(event.api.getSelectedRows());
         }
     }, [onSelectionChanged, enableRowSelection]);
 
     return (
-        <div className={`${className}`} style={{ height: typeof height === 'number' ? `${height}px` : height }}>
-            <AgGridReact
-                rowData={data}
-                columnDefs={columnDefs}
-                gridOptions={finalGridOptions}
-                onGridReady={handleGridReady}
-                onSelectionChanged={handleSelectionChanged}
-                loading={loading}
-                theme={themeOverride ?? myAgTheme}
-            />
+        <div className={`flex flex-col w-full h-full ${className}`}>
+
+            {/* Grid Container: Takes remaining height */}
+            <div className="relative w-full">
+
+                {loading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                )}
+
+                <div style={{ width: '100%' }}>
+                    <AgGridReact
+                        rowData={data}
+                        columnDefs={columnDefs}
+                        gridOptions={defaultGridOptions}
+                        {...gridOptions}
+                        pagination={!manualPagination && enablePagination}
+                        suppressPaginationPanel={manualPagination}
+                        onGridReady={handleGridReady}
+                        onSelectionChanged={handleSelectionChanged}
+                        theme={themeOverride ?? myAgTheme}
+                    />
+                </div>
+            </div>
+
+            {/* Pagination Footer: Fixed height at bottom */}
+            {manualPagination && paginationState && onPaginationChange && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-background shrink-0">
+                    <div className="text-sm text-muted-foreground">
+                        {rowCount > 0 ? (
+                            <>Showing <strong>{startRow}</strong> to <strong>{endRow}</strong> of <strong>{rowCount}</strong> entries</>
+                        ) : (
+                            "No results found"
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onPaginationChange({ ...paginationState, pageIndex: paginationState.pageIndex - 1 })}
+                            disabled={paginationState.pageIndex === 0 || loading}
+                        >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Previous
+                        </Button>
+                        <div className="text-sm font-medium min-w-[80px] text-center">
+                            Page {currentPage} of {totalPages || 1}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onPaginationChange({ ...paginationState, pageIndex: paginationState.pageIndex + 1 })}
+                            disabled={currentPage >= totalPages || loading}
+                        >
+                            Next
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

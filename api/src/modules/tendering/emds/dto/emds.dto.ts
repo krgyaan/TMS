@@ -159,6 +159,10 @@ export const DashboardQuerySchema = z.object({
         "all",
     ]).optional().default("all"),
     userId: z.coerce.number().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
 export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
@@ -209,4 +213,10 @@ export interface DashboardCounts {
 export interface DashboardResponse {
     data: DashboardRow[];
     counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }

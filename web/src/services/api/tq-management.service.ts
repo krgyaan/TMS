@@ -1,46 +1,24 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderQuery } from '@/types/api.types';
+import type { TenderQuery, TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto, PaginatedResult } from '@/types/api.types';
 
-export type TqManagementDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    bidSubmissionDate: Date | null;
-    tqSubmissionDeadline: Date | null;
-    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
-    tqId: number | null;
-    tqCount: number;
-    bidSubmissionId: number | null;
-};
-
-export type CreateTqReceivedDto = {
-    tenderId: number;
-    tqSubmissionDeadline: string;
-    tqDocumentReceived: string | null;
-    tqItems: Array<{
-        tqTypeId: number;
-        queryDescription: string;
-    }>;
-};
-
-export type UpdateTqRepliedDto = {
-    repliedDatetime: string;
-    repliedDocument: string | null;
-    proofOfSubmission: string;
-};
-
-export type UpdateTqMissedDto = {
-    missedReason: string;
-    preventionMeasures: string;
-    tmsImprovements: string;
+export type TqManagementFilters = {
+    tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 };
 
 export const tqManagementService = {
-    getAll: async (): Promise<TqManagementDashboardRow[]> => {
-        const response = await axiosInstance.get<TqManagementDashboardRow[]>('/tq-management');
+    getAll: async (filters?: TqManagementFilters): Promise<PaginatedResult<TqManagementDashboardRow>> => {
+        const params = new URLSearchParams();
+        if (filters?.tqStatus) params.append('tqStatus', filters.tqStatus);
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', filters.limit.toString());
+        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        const query = params.toString();
+        const response = await axiosInstance.get<PaginatedResult<TqManagementDashboardRow>>(`/tq-management${query ? `?${query}` : ''}`);
         return response.data;
     },
 

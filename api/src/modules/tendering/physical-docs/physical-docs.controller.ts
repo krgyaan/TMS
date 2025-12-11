@@ -10,8 +10,9 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Query,
 } from '@nestjs/common';
-import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
+import { PhysicalDocsService, type PhysicalDocFilters } from '@/modules/tendering/physical-docs/physical-docs.service';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 
 
@@ -20,8 +21,34 @@ export class PhysicalDocsController {
     constructor(private readonly physicalDocsService: PhysicalDocsService) { }
 
     @Get()
-    async list() {
-        return this.physicalDocsService.findAll();
+    async list(
+        @Query('physicalDocsSent') physicalDocsSent?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+
+        const parseBoolean = (v?: string): boolean | undefined => {
+            if (v === 'true') return true;
+            if (v === 'false') return false;
+            return undefined;
+        };
+
+        const filters: PhysicalDocFilters = {
+            ...(parseBoolean(physicalDocsSent) !== undefined && { physicalDocsSent: parseBoolean(physicalDocsSent) }),
+            ...(parseNumber(page) && { page: parseNumber(page) }),
+            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
+            ...(sortBy && { sortBy }),
+            ...(sortOrder && { sortOrder }),
+        };
+
+        return this.physicalDocsService.findAll(filters);
     }
 
     @Get('by-tender/:tenderId')

@@ -8,7 +8,7 @@ import {
     ParseIntPipe,
     Query,
 } from '@nestjs/common';
-import { ReverseAuctionService } from '@/modules/tendering/reverse-auction/reverse-auction.service';
+import { ReverseAuctionService, type RaDashboardFilters } from '@/modules/tendering/reverse-auction/reverse-auction.service';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import type { RaDashboardType } from '@/modules/tendering/reverse-auction/reverse-auction.service';
 
@@ -17,8 +17,28 @@ export class ReverseAuctionController {
     constructor(private readonly reverseAuctionService: ReverseAuctionService) { }
 
     @Get('dashboard')
-    getDashboard(@Query('type') type?: RaDashboardType) {
-        return this.reverseAuctionService.getDashboardData(type);
+    getDashboard(
+        @Query('type') type?: RaDashboardType,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+
+        const filters: RaDashboardFilters = {
+            type,
+            ...(parseNumber(page) && { page: parseNumber(page) }),
+            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
+            ...(sortBy && { sortBy }),
+            ...(sortOrder && { sortOrder }),
+        };
+
+        return this.reverseAuctionService.getDashboardData(type, filters);
     }
 
     @Get('dashboard/counts')

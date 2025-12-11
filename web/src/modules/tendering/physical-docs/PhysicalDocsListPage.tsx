@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -16,11 +16,35 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, useDeletePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 
-const PhysicalDocs = () => {
+const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
 
-    const { data: tabsData, isLoading: loading, error } = usePhysicalDocs();
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
+    const { data: apiResponse, isLoading: loading, error } = usePhysicalDocs(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
+
+    const tabsData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const deleteMutation = useDeletePhysicalDoc();
 
@@ -49,24 +73,20 @@ const PhysicalDocs = () => {
         },
     ];
 
-    const tabsConfig = useMemo<{ key: 'pending' | 'sent'; name: string; count: number; data: PhysicalDocsDashboardRow[] }[]>(() => {
-        if (!tabsData || typeof tabsData !== 'object') return [];
-
+    const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending',
+                key: 'pending' as const,
                 name: 'Pending',
-                count: tabsData.filter((doc) => doc.physicalDocs === null).length,
-                data: tabsData.filter((doc) => doc.physicalDocs === null),
+                count: activeTab === 'pending' ? totalRows : 0,
             },
             {
-                key: 'sent',
+                key: 'sent' as const,
                 name: 'Sent',
-                count: tabsData.filter((doc) => doc.physicalDocs !== null).length,
-                data: tabsData.filter((doc) => doc.physicalDocs !== null),
+                count: activeTab === 'sent' ? totalRows : 0,
             },
         ];
-    }, [tabsData]);
+    }, [activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<PhysicalDocsDashboardRow>[]>(() => [
         tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
@@ -75,7 +95,18 @@ const PhysicalDocs = () => {
             minWidth: 250,
         }),
         {
+            field: 'teamMemberName',
+            colId: 'teamMemberName',
+            headerName: 'Member',
+            flex: 1,
+            minWidth: 120,
+            valueGetter: (params: any) => params.data?.teamMemberName ? params.data.teamMemberName : '—',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'physicalDocsDeadline',
+            colId: 'physicalDocsDeadline',
             headerName: 'Physical Docs Deadline',
             flex: 1.5,
             minWidth: 150,
@@ -85,6 +116,7 @@ const PhysicalDocs = () => {
         },
         {
             field: 'courierAddress',
+            colId: 'courierAddress',
             headerName: 'Courier Address',
             minWidth: 300,
             valueGetter: (params: any) => params.data?.courierAddress ? params.data.courierAddress : '—',
@@ -93,6 +125,7 @@ const PhysicalDocs = () => {
         },
         {
             field: 'statusName',
+            colId: 'statusName',
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
@@ -102,6 +135,7 @@ const PhysicalDocs = () => {
         },
         {
             field: 'courierNo',
+            colId: 'courierNo',
             headerName: 'Courier Number',
             flex: 1,
             minWidth: 120,
@@ -191,37 +225,42 @@ const PhysicalDocs = () => {
                         <TabsContent
                             key={tab.key}
                             value={tab.key}
-                            className="px-0"
+                            className="px-0 m-0 data-[state=inactive]:hidden"
                         >
-                            {tab.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                    <FileX2 className="h-12 w-12 mb-4" />
-                                    <p className="text-lg font-medium">No {tab.name.toLowerCase()} physical docs</p>
-                                    <p className="text-sm mt-2">
-                                        {tab.key === 'pending'
-                                            ? 'Tenders requiring physical documents will appear here'
-                                            : 'Sent physical documents will be shown here'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <DataTable
-                                    data={tab.data}
-                                    columnDefs={colDefs as ColDef<any>[]}
-                                    loading={false}
-                                    gridOptions={{
-                                        defaultColDef: {
-                                            editable: false,
-                                            filter: true,
-                                            sortable: true,
-                                            resizable: true
-                                        },
-                                        pagination: true,
-                                        paginationPageSize: 50,
-                                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No physical docs found</span>',
-                                    }}
-                                    enablePagination
-                                    height="auto"
-                                />
+                            {activeTab === tab.key && (
+                                <>
+                                    {tabsData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} physical docs</p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'pending'
+                                                    ? 'Tenders requiring physical documents will appear here'
+                                                    : 'Sent physical documents will be shown here'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={tabsData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No physical docs found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     ))}
@@ -231,4 +270,4 @@ const PhysicalDocs = () => {
     );
 };
 
-export default PhysicalDocs;
+export default PhysicalDocsListPage;

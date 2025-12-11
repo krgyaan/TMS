@@ -1,40 +1,55 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { tenderInfosService } from "@/services/api";
-import { handleQueryError } from "@/lib/react-query";
-import { toast } from "sonner";
-import { useTeamFilter } from "@/hooks/useTeamFilter";
-import type { CreateTenderRequest, UpdateTenderRequest } from "@/types/api.types";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tenderInfosService } from '@/services/api';
+import { handleQueryError } from '@/lib/react-query';
+import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
+import type { CreateTenderRequest, TenderListParams, UpdateTenderRequest, PaginatedResult, TenderInfoWithNames } from '@/types/api.types';
 
 export const tendersKey = {
-    all: ["tenders"] as const,
-    lists: () => [...tendersKey.all, "list"] as const,
-    list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
-    details: () => [...tendersKey.all, "detail"] as const,
+    all: ['tenders'] as const,
+    lists: () => [...tendersKey.all, 'list'] as const,
+    // list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
+    details: () => [...tendersKey.all, 'detail'] as const,
     detail: (id: number) => [...tendersKey.details(), id] as const,
+    list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
 };
 
-export const useTenders = (activeTab?: string, statusIds: number[] = []) => {
+export const useTenders = (
+    activeTab?: string,
+    statusIds: number[] = [],
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 }
+) => {
     const { queryParams: teamParams, teamId, userId, dataScope } = useTeamFilter();
 
-    // Build combined filters
-    const filters = {
-        ...(activeTab === "unallocated" ? { unallocated: true } : {}),
-        ...(activeTab !== "unallocated" && statusIds.length > 0 ? { statusIds } : {}),
+    const filters: TenderListParams = {
+        ...(activeTab === 'unallocated' ? { unallocated: true } : {}),
+        ...(activeTab !== 'unallocated' && statusIds.length > 0 ? { statusIds } : {}),
         ...teamParams,
+        page: pagination.page,
+        limit: pagination.limit,
+        search: pagination.search
     };
 
-    // Include team filter in query key for proper cache isolation
     const queryKeyFilters = {
         activeTab,
         statusIds,
         teamId,
         userId,
         dataScope,
+        ...pagination,
     };
 
-    return useQuery({
+    return useQuery<PaginatedResult<TenderInfoWithNames>>({
         queryKey: tendersKey.list(queryKeyFilters),
         queryFn: () => tenderInfosService.getAll(filters),
+        // Prevents table flashing while fetching next page
+        placeholderData: (previousData) => {
+            // Only keep previous data if it's the correct structure (PaginatedResult)
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

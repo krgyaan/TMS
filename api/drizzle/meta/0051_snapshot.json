@@ -6663,7 +6663,7 @@
           "name": "team_member",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "due_date": {
           "name": "due_date",

@@ -1,5 +1,5 @@
-import { Controller, Get, Put, Param, Body, ParseIntPipe } from '@nestjs/common';
-import { TenderApprovalService } from '@/modules/tendering/tender-approval/tender-approval.service';
+import { Controller, Get, Put, Param, Body, ParseIntPipe, Query } from '@nestjs/common';
+import { TenderApprovalService, type TenderApprovalFilters } from '@/modules/tendering/tender-approval/tender-approval.service';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 
 @Controller('tender-approvals')
@@ -7,8 +7,20 @@ export class TenderApprovalController {
     constructor(private readonly tenderApprovalService: TenderApprovalService) { }
 
     @Get()
-    async getAll() {
-        return this.tenderApprovalService.getAll();
+    async getAll(
+        @Query('tlStatus') tlStatus?: '0' | '1' | '2' | '3',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.tenderApprovalService.getAll({
+            tlStatus,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
     }
 
     @Get(':id/approval')

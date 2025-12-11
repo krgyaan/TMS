@@ -6663,7 +6663,7 @@
           "name": "team_member",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "due_date": {
           "name": "due_date",
@@ -8278,9 +8278,11 @@
       "name": "tq_status",
       "schema": "public",
       "values": [
-        "Received",
-        "Replied",
-        "Missed"
+        "TQ Received",
+        "TQ Replied",
+        "TQ Missed",
+        "TQ Qualified",
+        "No TQ, Qualified"
       ]
     },
     "public.entity_type": {

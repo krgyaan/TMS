@@ -10,10 +10,18 @@ export const tqManagementKey = {
     items: (id: number) => [...tqManagementKey.all, 'items', id] as const,
 };
 
-export const useTqManagement = () => {
+export type TqManagementFilters = {
+    tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export const useTqManagement = (filters?: TqManagementFilters) => {
     return useQuery({
-        queryKey: tqManagementKey.lists(),
-        queryFn: () => tqManagementService.getAll(),
+        queryKey: [...tqManagementKey.lists(), filters],
+        queryFn: () => tqManagementService.getAll(filters),
     });
 };
 

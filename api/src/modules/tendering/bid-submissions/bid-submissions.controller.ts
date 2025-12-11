@@ -6,18 +6,40 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Request
+    Request,
+    Query
 } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
 import { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
+import type { BidSubmissionFilters } from './bid-submissions.service';
 
 @Controller('bid-submissions')
 export class BidSubmissionsController {
     constructor(private readonly bidSubmissionsService: BidSubmissionsService) { }
 
     @Get()
-    findAll() {
-        return this.bidSubmissionsService.findAll();
+    findAll(
+        @Query('bidStatus') bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+
+        const filters: BidSubmissionFilters = {
+            ...(bidStatus && { bidStatus }),
+            ...(parseNumber(page) && { page: parseNumber(page) }),
+            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
+            ...(sortBy && { sortBy }),
+            ...(sortOrder && { sortOrder }),
+        };
+
+        return this.bidSubmissionsService.findAll(filters);
     }
 
     @Get(':id')

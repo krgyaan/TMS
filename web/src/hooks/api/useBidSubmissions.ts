@@ -1,18 +1,50 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { bidSubmissionsService, type BidSubmissionDashboardRow } from '@/services/api/bid-submissions.service';
+import { bidSubmissionsService, type BidSubmissionDashboardRow, type BidSubmissionListParams } from '@/services/api/bid-submissions.service';
 import { toast } from 'sonner';
+import type { PaginatedResult } from '@/types/api.types';
 
 export const bidSubmissionsKey = {
     all: ['bid-submissions'] as const,
     lists: () => [...bidSubmissionsKey.all, 'list'] as const,
     detail: (id: number) => [...bidSubmissionsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...bidSubmissionsKey.all, 'byTender', tenderId] as const,
+    list: (filters?: Record<string, unknown>) => [...bidSubmissionsKey.lists(), { filters }] as const,
 };
 
-export const useBidSubmissions = () => {
-    return useQuery({
-        queryKey: bidSubmissionsKey.lists(),
-        queryFn: () => bidSubmissionsService.getAll(),
+export const useBidSubmissions = (
+    tab?: 'pending' | 'submitted' | 'missed',
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const bidStatusMap: Record<string, 'Submission Pending' | 'Bid Submitted' | 'Tender Missed'> = {
+        pending: 'Submission Pending',
+        submitted: 'Bid Submitted',
+        missed: 'Tender Missed',
+    };
+
+    const params: BidSubmissionListParams = {
+        ...(tab && bidStatusMap[tab] && { bidStatus: bidStatusMap[tab] }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<BidSubmissionDashboardRow>>({
+        queryKey: bidSubmissionsKey.list(queryKeyFilters),
+        queryFn: () => bidSubmissionsService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

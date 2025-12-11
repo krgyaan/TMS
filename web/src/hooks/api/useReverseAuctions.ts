@@ -10,13 +10,37 @@ import type {
 const RA_QUERY_KEY = 'reverse-auctions';
 
 // Fetch RA dashboard data with counts
-export const useRaDashboard = (type?: RaDashboardType) => {
+export const useRaDashboard = (
+    type?: RaDashboardType,
+    pagination?: { page: number; limit: number },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const queryKeyFilters = {
+        type,
+        ...pagination,
+        ...sort,
+    };
+
     return useQuery<RaDashboardResponse>({
-        queryKey: [RA_QUERY_KEY, 'dashboard', type],
+        queryKey: [RA_QUERY_KEY, 'dashboard', queryKeyFilters],
         queryFn: async () => {
-            const params = type ? `?type=${type}` : '';
-            const response = await apiClient.get(`/reverse-auctions/dashboard${params}`);
+            const params = new URLSearchParams();
+            if (type) params.append('type', type);
+            if (pagination?.page) params.append('page', String(pagination.page));
+            if (pagination?.limit) params.append('limit', String(pagination.limit));
+            if (sort?.sortBy) params.append('sortBy', sort.sortBy);
+            if (sort?.sortOrder) params.append('sortOrder', sort.sortOrder);
+
+            const queryString = params.toString();
+            const url = `/reverse-auctions/dashboard${queryString ? `?${queryString}` : ''}`;
+            const response = await apiClient.get(url);
             return response.data;
+        },
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {
+                return previousData;
+            }
+            return undefined;
         },
     });
 };

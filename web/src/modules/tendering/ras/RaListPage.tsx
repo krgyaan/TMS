@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -107,11 +107,34 @@ const getCountForTab = (
 const ReverseAuctionListPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<RaDashboardType>('under-evaluation');
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, [activeTab]);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
 
     // Fetch data with the active tab filter
-    const { data: response, isLoading, error } = useRaDashboard();
+    const { data: response, isLoading, error } = useRaDashboard(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
 
-    const { data: raData, counts } = response || { data: [], counts: null };
+    const raData = response?.data || [];
+    const counts = response?.counts || null;
+    const totalRows = response?.meta?.total || raData.length;
 
     const handleViewDetails = useCallback((row: RaDashboardRow) => {
         if (row.id) {
@@ -174,6 +197,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'bidSubmissionDate',
+                colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
                 flex: 1.5,
                 minWidth: 170,
@@ -186,6 +210,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'tenderValue',
+                colId: 'tenderValue',
                 headerName: 'Tender Value',
                 flex: 1,
                 minWidth: 130,
@@ -199,6 +224,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'itemName',
+                colId: 'itemName',
                 headerName: 'Item',
                 flex: 1,
                 minWidth: 120,
@@ -208,6 +234,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'tenderStatus',
+                colId: 'tenderStatus',
                 headerName: 'Tender Status',
                 flex: 1,
                 minWidth: 130,
@@ -217,6 +244,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'raStartTime',
+                colId: 'raStartTime',
                 headerName: 'RA Start Time',
                 flex: 1.5,
                 minWidth: 170,
@@ -228,6 +256,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'raEndTime',
+                colId: 'raEndTime',
                 headerName: 'RA End Time',
                 flex: 1.5,
                 minWidth: 170,
@@ -239,6 +268,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'raStatus',
+                colId: 'raStatus',
                 headerName: 'RA Status',
                 flex: 1.2,
                 minWidth: 160,
@@ -252,6 +282,7 @@ const ReverseAuctionListPage = () => {
             },
             {
                 field: 'result',
+                colId: 'result',
                 headerName: 'Result',
                 flex: 1,
                 minWidth: 100,
@@ -275,10 +306,9 @@ const ReverseAuctionListPage = () => {
     const tabsWithData = useMemo(() => {
         return TABS_CONFIG.map((tab) => ({
             ...tab,
-            count: getCountForTab(tab, raData, counts),
-            data: raData?.filter(tab.filterFn) || [],
+            count: activeTab === tab.key ? totalRows : (counts ? getCountForTab(tab, [], counts) : 0),
         }));
-    }, [raData, counts]);
+    }, [activeTab, totalRows, counts]);
 
     if (isLoading) {
         return (
@@ -359,30 +389,36 @@ const ReverseAuctionListPage = () => {
                         </TabsList>
 
                         {tabsWithData.map((tab) => (
-                            <TabsContent key={tab.key} value={tab.key} className="px-0">
-                                {tab.data.length === 0 ? (
-                                    <EmptyState
-                                        title={`No ${tab.name.toLowerCase()} RAs`}
-                                        description={tab.description}
-                                    />
-                                ) : (
-                                    <DataTable
-                                        data={tab.data}
-                                        columnDefs={colDefs as ColDef<any>[]}
-                                        loading={false}
-                                        gridOptions={{
-                                            defaultColDef: {
-                                                editable: false,
-                                                filter: true,
-                                                sortable: true,
-                                                resizable: true,
-                                            },
-                                            pagination: true,
-                                            paginationPageSize: 50,
-                                        }}
-                                        enablePagination
-                                        height="auto"
-                                    />
+                            <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
+                                {activeTab === tab.key && (
+                                    <>
+                                        {(!raData || raData.length === 0) ? (
+                                            <EmptyState
+                                                title={`No ${tab.name.toLowerCase()} RAs`}
+                                                description={tab.description}
+                                            />
+                                        ) : (
+                                            <DataTable
+                                                data={raData}
+                                                columnDefs={colDefs as ColDef<any>[]}
+                                                loading={isLoading}
+                                                manualPagination={true}
+                                                rowCount={totalRows}
+                                                paginationState={pagination}
+                                                onPaginationChange={setPagination}
+                                                gridOptions={{
+                                                    defaultColDef: {
+                                                        editable: false,
+                                                        filter: true,
+                                                        sortable: true,
+                                                        resizable: true,
+                                                    },
+                                                    onSortChanged: handleSortChanged,
+                                                    overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No reverse auctions found</span>',
+                                                }}
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </TabsContent>
                         ))}

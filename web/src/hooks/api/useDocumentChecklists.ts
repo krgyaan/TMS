@@ -1,18 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
+import type { PaginatedResult, TenderDocumentChecklistDashboardRow } from '@/types/api.types';
 
 export const documentChecklistKeys = {
     all: ['documentChecklists'] as const,
     lists: () => [...documentChecklistKeys.all, 'list'] as const,
     detail: (id: number) => [...documentChecklistKeys.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...documentChecklistKeys.all, 'byTender', tenderId] as const,
+    list: (filters?: Record<string, unknown>) => [...documentChecklistKeys.lists(), { filters }] as const,
 };
 
-export const useDocumentChecklists = () => {
-    return useQuery({
-        queryKey: documentChecklistKeys.lists(),
-        queryFn: () => documentChecklistService.getAll(),
+export const useDocumentChecklists = (
+    tab?: 'pending' | 'submitted',
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const params = {
+        ...(tab && { checklistSubmitted: tab === 'submitted' }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<TenderDocumentChecklistDashboardRow>>({
+        queryKey: documentChecklistKeys.list(queryKeyFilters),
+        queryFn: () => documentChecklistService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

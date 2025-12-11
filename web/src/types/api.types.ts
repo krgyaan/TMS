@@ -31,6 +31,16 @@ export interface PaginatedResponse<T> {
     limit: number
 }
 
+export interface PaginatedResult<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
 export interface ApiError {
     message: string
     statusCode: number
@@ -510,6 +520,96 @@ export interface TenderInfo {
 
     createdAt: Date | string;
     updatedAt: Date | string;
+}
+
+export interface IncompleteField {
+    id?: number;
+    fieldName: string;
+    comment: string;
+    status?: 'pending' | 'resolved';
+}
+
+export interface SaveTenderApprovalDto {
+    tlStatus: '0' | '1' | '2' | '3' | number;
+    rfqTo?: number[]; // vendor org IDs
+    tenderFeeMode?: string;
+    emdMode?: string;
+    approvePqrSelection?: '1' | '2';
+    approveFinanceDocSelection?: '1' | '2';
+    tenderStatus?: number; // status ID
+    oemNotAllowed?: string; // vendor org ID
+    tlRejectionRemarks?: string;
+    incompleteFields?: IncompleteField[];
+}
+
+export interface TenderApproval {
+    id: number;
+    tenderId: number;
+    tlStatus: '0' | '1' | '2' | '3' | number;
+    rfqTo: number[] | null;
+    tenderFeeMode: string | null;
+    emdMode: string | null;
+    approvePqrSelection: '1' | '2' | null;
+    approveFinanceDocSelection: '1' | '2' | null;
+    tenderStatus: number | null;
+    oemNotAllowed: number | null;
+    tlRejectionRemarks: string | null;
+    incompleteFields?: IncompleteField[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface TenderApprovalRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    status: number;
+    teamMemberName: string;
+    itemName: string;
+    statusName: string;
+    tlStatus: string | number;
+}
+
+export type TenderApprovalFilters = {
+    tlStatus?: '0' | '1' | '2' | '3' | number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export type TenderApprovalTabData = {
+    key: '0' | '1' | '2' | '3';
+    name: string;
+    count: number;
+    data: TenderApprovalRow[];
+};
+
+export interface TenderWithRelations extends TenderInfo {
+    organizationName?: string | null;
+    organizationAcronym?: string | null;
+    teamMemberName?: string | null;
+    teamMemberUsername?: string | null;
+    statusName?: string | null;
+    itemName?: string | null;
+    locationName?: string | null;
+    infoSheet?: TenderInfoSheet | null;
+    physicalDocs?: PhysicalDocsDashboardRow | null;
+    checklist?: TenderDocumentChecklistDashboardRow | null;
+    costingSheet?: CostingSheetDashboardRow | null;
+    bidSubmission?: BidSubmission | null;
+    tqManagement?: TqManagementDashboardRow | null;
+    ra?: RaDashboardRow | null;
+    result?: ResultDashboardRow | null;
+    emds?: EmdDashboardRow | null;
+    processingFees?: EmdDashboardRow | null;
+    emdsTenderFees?: EmdDashboardRow | null;
 }
 
 // Tender with joined relation names
@@ -1127,5 +1227,188 @@ export interface ResultDashboardCounts {
 
 export interface ResultDashboardResponse {
     data: ResultDashboardRow[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
     counts: ResultDashboardCounts;
+}
+
+export interface PhysicalDocsDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    courierAddress: string;
+    physicalDocsRequired: string;
+    physicalDocsDeadline: Date;
+    teamMemberName: string;
+    statusName: string;
+    physicalDocs: number | null;
+    courierNo: number | null;
+};
+
+export interface PhysicalDocs {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocPerson[];
+}
+
+export interface PhysicalDocsListParams {
+    physicalDocsSent?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreatePhysicalDocsDto {
+    tenderId: number;
+    courierNo: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+}
+
+export interface UpdatePhysicalDocsDto {
+    id: number;
+    courierNo?: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+}
+
+export interface PhysicalDocPerson {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+};
+
+export interface PhysicalDocWithPersons {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocPerson[];
+};
+
+export type TqManagementDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    bidSubmissionDate: Date | null;
+    tqSubmissionDeadline: Date | null;
+    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    tqId: number | null;
+    tqCount: number;
+    bidSubmissionId: number | null;
+};
+
+export type CreateTqReceivedDto = {
+    tenderId: number;
+    tqSubmissionDeadline: string;
+    tqDocumentReceived: string | null;
+    tqItems: Array<{
+        tqTypeId: number;
+        queryDescription: string;
+    }>;
+};
+
+export type UpdateTqRepliedDto = {
+    repliedDatetime: string;
+    repliedDocument: string | null;
+    proofOfSubmission: string;
+};
+
+export type UpdateTqMissedDto = {
+    missedReason: string;
+    preventionMeasures: string;
+    tmsImprovements: string;
+};
+
+export type EmdDashboardFilters = {
+    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
+    userId?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export interface EmdDashboardRow {
+    id: number | null;
+    type: 'request' | 'missing';
+    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    amountRequired: string;
+    status: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    createdAt: string | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    statusName: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
+}
+
+export interface EmdDashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export interface EmdDashboardResponse {
+    data: EmdDashboardRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type CreatePaymentRequestDto = {
+    emdMode?: string;
+    emd?: any;
+    tenderFeeMode?: string;
+    tenderFee?: any;
+    processingFeeMode?: string;
+    processingFee?: any;
+};
+
+export type UpdatePaymentRequestDto = CreatePaymentRequestDto;
+
+export type UpdateStatusDto = {
+    status: string;
+    remarks?: string;
+};
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface TenderListParams {
+    statusIds?: number[];
+    unallocated?: boolean;
+    page?: number;
+    limit?: number;
+    search?: string;
 }

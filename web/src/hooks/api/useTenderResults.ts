@@ -5,20 +5,56 @@ import type {
     ResultDashboardRow,
     ResultDashboardCounts,
     ResultDashboardType,
+    PaginatedResult,
 } from '@/types/api.types';
+import { tenderResultService } from '@/services/api/tender-result.service';
 
 const RESULT_QUERY_KEY = 'tender-results';
 
+export type ResultDashboardFilters = {
+    type?: ResultDashboardType;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export const resultDashboardKey = {
+    all: ['result-dashboard'] as const,
+    lists: () => [...resultDashboardKey.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) => [...resultDashboardKey.lists(), { filters }] as const,
+}
+
 // Fetch Result dashboard data with counts
-export const useResultDashboard = (type?: ResultDashboardType) => {
-    return useQuery<ResultDashboardResponse>({
-        queryKey: [RESULT_QUERY_KEY, 'dashboard', type],
-        queryFn: async () => {
-            const params = type ? `?type=${type}` : '';
-            const response = await apiClient.get(`/tender-results/dashboard${params}`);
-            return response.data;
+export const useResultDashboard = (
+    tab?: ResultDashboardType,
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const params: ResultDashboardFilters = {
+        ...(tab && { type: tab }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<ResultDashboardRow>>({
+        queryKey: resultDashboardKey.list(queryKeyFilters),
+        queryFn: () => tenderResultService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
         },
-    });
+    })
 };
 
 // Fetch only counts (for badges)

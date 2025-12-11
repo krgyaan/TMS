@@ -1,9 +1,24 @@
 import axiosInstance from '@/lib/axios';
-import type { RfqDashboardRow, CreateRfqDto, UpdateRfqDto, Rfq } from '@/types/api.types';
+import type { RfqDashboardRow, CreateRfqDto, UpdateRfqDto, Rfq, PaginatedResult } from '@/types/api.types';
+
+export type RfqFilters = {
+    rfqStatus?: 'pending' | 'sent';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
 
 export const rfqsService = {
-    getAll: async (): Promise<RfqDashboardRow[]> => {
-        const response = await axiosInstance.get<RfqDashboardRow[]>('/rfqs');
+    getAll: async (filters?: RfqFilters): Promise<PaginatedResult<RfqDashboardRow>> => {
+        const params = new URLSearchParams();
+        if (filters?.rfqStatus) params.append('rfqStatus', filters.rfqStatus);
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', filters.limit.toString());
+        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        const query = params.toString();
+        const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs${query ? `?${query}` : ''}`);
         return response.data;
     },
 

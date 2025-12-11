@@ -17,10 +17,31 @@ export const paymentRequestsKey = {
 };
 
 // Dashboard hook with counts
-export const usePaymentDashboard = (tab: string = 'pending') => {
+export const usePaymentDashboard = (
+    tab: string = 'pending',
+    pagination?: { page: number; limit: number },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
     return useQuery({
-        queryKey: paymentRequestsKey.dashboardTab(tab),
-        queryFn: () => emdsService.getDashboard({ tab: tab as any }),
+        queryKey: [...paymentRequestsKey.dashboardTab(tab), queryKeyFilters],
+        queryFn: () => emdsService.getDashboard({
+            tab: tab as any,
+            ...(pagination && { page: pagination.page, limit: pagination.limit }),
+            ...(sort?.sortBy && { sortBy: sort.sortBy }),
+            ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        }),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 

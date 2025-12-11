@@ -10,8 +10,9 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Query,
 } from '@nestjs/common';
-import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
+import { RfqsService, type RfqFilters } from '@/modules/tendering/rfqs/rfq.service';
 import { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 
 
@@ -20,8 +21,20 @@ export class RfqsController {
     constructor(private readonly rfqsService: RfqsService) { }
 
     @Get()
-    async list() {
-        return this.rfqsService.findAll();
+    async list(
+        @Query('rfqStatus') rfqStatus?: 'pending' | 'sent',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.rfqsService.findAll({
+            rfqStatus,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
     }
 
     @Get('by-tender/:tenderId')

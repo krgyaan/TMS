@@ -26,7 +26,7 @@ export const tenderInfos = pgTable("tender_infos", {
     gstValues: decimal("gst_values", { precision: 15, scale: 2 }).notNull().default("0"),
     tenderFees: decimal("tender_fees", { precision: 15, scale: 2 }).notNull().default("0"),
     emd: decimal("emd", { precision: 15, scale: 2 }).notNull().default("0"),
-    teamMember: bigint("team_member", { mode: "number" }).notNull().references(() => users.id),
+    teamMember: bigint("team_member", { mode: "number" }).references(() => users.id),
     dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
     remarks: varchar("remarks", { length: 200 }),
     status: bigint("status", { mode: "number" }).notNull().default(1).references(() => statuses.id),

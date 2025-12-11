@@ -6,9 +6,10 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Request
+    Request,
+    Query
 } from '@nestjs/common';
-import { TqManagementService } from '@/modules/tendering/tq-management/tq-management.service';
+import { TqManagementService, type TqManagementFilters } from '@/modules/tendering/tq-management/tq-management.service';
 import {
     CreateTqReceivedDto,
     UpdateTqRepliedDto,
@@ -22,8 +23,20 @@ export class TqManagementController {
     constructor(private readonly tqManagementService: TqManagementService) { }
 
     @Get()
-    findAll() {
-        return this.tqManagementService.findAll();
+    findAll(
+        @Query('tqStatus') tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.tqManagementService.findAll({
+            tqStatus,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
     }
 
     @Get(':id')
