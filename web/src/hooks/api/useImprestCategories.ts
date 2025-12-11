@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { imprestCategoriesService } from "@/services";
+import { imprestCategoriesService } from "@/services/api";
 import type { CreateImprestCategoryDto, UpdateImprestCategoryDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
