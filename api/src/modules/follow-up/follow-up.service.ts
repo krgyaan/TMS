@@ -1,28 +1,28 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from "@nestjs/common";
 import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL } from "drizzle-orm";
 
-import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "../../db/follow-ups.schema";
-import { clientDirectory } from "../../db/client-directory.schema";
-import { users } from "../../db/users.schema";
+import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "../../db/schemas/shared/follow-ups.schema";
+import { clientDirectory } from "../../db/schemas/shared/client-directory.schema";
+import { users } from "../../db/schemas/auth/users.schema";
 
 import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpDetailsDto } from "./zod";
-import { DRIZZLE } from "../../db/database.module";
+import { DRIZZLE } from "../../db/schemas/shared/database.module";
 import type { DbInstance } from "../../db";
 
-const FREQUENCY_LABELS: Record<string, string> = {
-    daily: "Daily",
-    alternate: "Alternate Days",
-    weekly: "Weekly",
-    biweekly: "Bi-Weekly",
-    monthly: "Monthly",
-    stopped: "Stopped",
+export const FREQUENCY_LABELS: Record<number, string> = {
+    1: "Daily",
+    2: "Alternate Days",
+    3: "Weekly",
+    4: "Bi-Weekly",
+    5: "Monthly",
+    6: "Stopped",
 };
 
-const STOP_REASON_LABELS: Record<string, string> = {
-    party_angry: "Party Angry / Not Interested",
-    objective_achieved: "Objective Achieved",
-    not_reachable: "Not Reachable",
-    other: "Other",
+export const STOP_REASON_LABELS: Record<number, string> = {
+    1: "Party Angry / Not Interested",
+    2: "Objective Achieved",
+    3: "Not Reachable",
+    4: "Other",
 };
 
 @Injectable()
@@ -37,31 +37,84 @@ export class FollowUpService {
     // ========================
 
     async create(dto: CreateFollowUpDto, currentUserId: number): Promise<FollowUp> {
+        // normalize contacts
         const contacts: FollowUpContact[] = dto.contacts.map(c => ({
             name: c.name,
-            email: c.email || null,
-            phone: c.phone || null,
-            org: c.org || null,
+            email: c.email ?? null,
+            phone: c.phone ?? null,
+            org: c.org ?? null,
             addedAt: new Date().toISOString(),
         }));
 
+        // keep client directory in sync (your existing helper)
         await this.syncToClientDirectory(contacts);
 
+        // normalize dates to YYYY-MM-DD for DATE columns
+        const normalizeDateToISODate = (v?: string | null) => {
+            if (!v) return null;
+            const d = new Date(v);
+            if (isNaN(d.getTime())) return null;
+            return d.toISOString().split("T")[0];
+        };
+
+        const startFrom = normalizeDateToISODate(dto.startFrom) ?? new Date().toISOString().split("T")[0];
+        const nextFollowUpDate = normalizeDateToISODate(dto.nextFollowUpDate ?? null);
+
+        // frequency and stopReason are numeric in DB (smallint)
+        const frequency = typeof (dto as any).frequency === "number" ? (dto as any).frequency : dto.frequency ? Number((dto as any).frequency) : 1;
+
+        const stopReason = dto.stopReason == null ? null : Number(dto.stopReason);
+
+        const reminderCount = dto.reminderCount ?? 1;
+
+        // insert into DB
         const [created] = await this.db
             .insert(followUps)
             .values({
+                // required fields
                 area: dto.area,
                 partyName: dto.partyName,
-                amount: dto.amount?.toString() || "0",
-                categoryId: dto.categoryId || null,
-                assignedToId: dto.assignedToId,
+                amount: dto.amount != null ? String(dto.amount) : "0",
+
+                // followup_for in your DDL is varchar(50)
+                followupFor: dto.followupFor ?? null,
+
+                // relationships (nullable in your DDL)
+                assignedToId: dto.assignedToId ?? null,
                 createdById: currentUserId,
+
+                // assignment status is varchar in your DDL
                 assignmentStatus: "assigned",
-                comment: dto.comment || null,
+
+                // text fields
+                comment: dto.comment ?? null,
+                details: dto.details ?? null,
+                latestComment: dto.latestComment ?? null,
+
+                // JSON/array fields
                 contacts,
-                startFrom: dto.startFrom || new Date().toISOString().split("T")[0],
-                frequency: "daily",
-                emdId: dto.emdId || null,
+                followUpHistory: dto.followUpHistory ?? [],
+                attachments: dto.attachments ?? [],
+
+                // scheduling / numeric fields
+                startFrom,
+                nextFollowUpDate,
+                frequency,
+                reminderCount,
+                stopReason,
+
+                // other optional fields
+                proofText: dto.proofText ?? null,
+                proofImagePath: dto.proofImagePath ?? null,
+                stopRemarks: dto.stopRemarks ?? null,
+
+                // audit
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                deletedAt: null,
+
+                // optional
+                emdId: dto.emdId ?? null,
             })
             .returning();
 
@@ -91,11 +144,13 @@ export class FollowUpService {
         const today = new Date().toISOString().split("T")[0];
 
         if (tab === "ongoing") {
-            conditions.push(ne(followUps.frequency, "stopped"));
+            conditions.push(ne(followUps.frequency, 6));
         } else if (tab === "achieved") {
-            conditions.push(eq(followUps.frequency, "stopped"));
+            conditions.push(eq(followUps.frequency, 6));
+            conditions.push(eq(followUps.stopReason, 2));
         } else if (tab === "angry") {
-            conditions.push(eq(followUps.frequency, "stopped"), eq(followUps.stopReason, "party_angry"));
+            conditions.push(eq(followUps.frequency, 6));
+            conditions.push(eq(followUps.stopReason, 1));
         } else if (tab === "future") {
             conditions.push(sql`${followUps.startFrom} > ${today}`);
         }
@@ -103,20 +158,28 @@ export class FollowUpService {
         const orderDirection = sortOrder === "asc" ? asc : desc;
         const orderColumn = this.getOrderColumn(sortBy);
 
-        const results = await this.db
-            .select()
-            .from(followUps)
-            .where(and(...conditions))
-            .orderBy(orderDirection(orderColumn))
-            .limit(limit)
-            .offset(offset);
+        // ⭐ DRIZZLE RELATION QUERY — contacts auto-included
+        const results = await this.db.query.followUps.findMany({
+            where: and(...conditions),
+            with: {
+                contacts: true, // 👈 THIS PULLS FROM follow_up_persons
+            },
+            orderBy: orderDirection(orderColumn),
+            limit,
+            offset,
+        });
 
+        // Count for pagination
         const [{ count }] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(followUps)
             .where(and(...conditions));
 
-        const data = results.map(r => this.transformFollowUp(r));
+        // Transform + include contacts
+        const data = results.map(fu => ({
+            ...this.transformFollowUp(fu),
+            contacts: fu.contacts, // 👈 returned from relations
+        }));
 
         return {
             data,
@@ -138,11 +201,22 @@ export class FollowUpService {
             .from(followUps)
             .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
             .limit(1)
-            .then(r => r[0] ?? null);
+            .then(rows => rows[0] ?? null);
 
         if (!result) {
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
+
+        // Normalize timestamps (timestamptz)
+        const formatDateTime = (d?: Date | null) => (d ? d.toISOString() : null);
+
+        // Normalize DATE columns (Postgres date → YYYY-MM-DD)
+        const formatDateOnly = (d?: string | Date | null) => {
+            if (!d) return null;
+            const dateObj = d instanceof Date ? d : new Date(d);
+            if (isNaN(dateObj.getTime())) return null;
+            return dateObj.toISOString().split("T")[0];
+        };
 
         return {
             id: result.id,
@@ -151,29 +225,38 @@ export class FollowUpService {
             partyName: result.partyName,
 
             amount: result.amount ? Number(result.amount) : null,
-            categoryId: result.categoryId,
+            followupFor: result.followupFor ?? null,
 
-            assignedToId: result.assignedToId,
-            details: result.details,
+            assignedToId: result.assignedToId ?? null,
+            details: result.details ?? null,
 
-            // ✅ MAPPED CORRECTLY
-            status: result.assignmentStatus,
+            // assignment_status (varchar)
+            status: result.assignmentStatus ?? "assigned",
 
-            frequency: result.frequency,
-            startFrom: result.startFrom,
+            // numeric smallint fields
+            frequency: result.frequency ?? null,
+            stopReason: result.stopReason ?? null,
 
-            stopReason: result.stopReason,
-            proofText: result.proofText,
-            proofImagePath: result.proofImagePath,
-            stopRemarks: result.stopRemarks,
+            // date fields
+            startFrom: formatDateOnly(result.startFrom),
+            nextFollowUpDate: formatDateOnly(result.nextFollowUpDate),
 
-            contacts: result.contacts ?? [],
-            attachments: result.attachments ?? [],
+            // stop info
+            proofText: result.proofText ?? null,
+            proofImagePath: result.proofImagePath ?? null,
+            stopRemarks: result.stopRemarks ?? null,
 
-            createdAt: result.createdAt.toDateString(),
-            updatedAt: result.updatedAt.toDateString(),
+            // JSON fields (always arrays)
+            contacts: Array.isArray(result.contacts) ? result.contacts : [],
+            attachments: Array.isArray(result.attachments) ? result.attachments : [],
+            followUpHistory: Array.isArray(result.followUpHistory) ? result.followUpHistory : [],
+
+            // audit timestamps
+            createdAt: formatDateTime(result.createdAt),
+            updatedAt: formatDateTime(result.updatedAt),
         };
     }
+
     // ========================
     // UPDATE
     // ========================

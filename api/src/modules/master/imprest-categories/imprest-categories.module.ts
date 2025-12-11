@@ -1,7 +1,7 @@
-﻿import { Module } from '@nestjs/common';
-import { DatabaseModule } from '@db/database.module';
-import { ImprestCategoriesController } from '@/modules/master/imprest-categories/imprest-categories.controller';
-import { ImprestCategoriesService } from '@/modules/master/imprest-categories/imprest-categories.service';
+﻿import { Module } from "@nestjs/common";
+import { DatabaseModule } from "@/db/schemas/shared/database.module";
+import { ImprestCategoriesController } from "@/modules/master/imprest-categories/imprest-categories.controller";
+import { ImprestCategoriesService } from "@/modules/master/imprest-categories/imprest-categories.service";
 
 @Module({
     imports: [DatabaseModule],
@@ -9,4 +9,4 @@ import { ImprestCategoriesService } from '@/modules/master/imprest-categories/im
     providers: [ImprestCategoriesService],
     exports: [ImprestCategoriesService],
 })
-export class ImprestCategoriesModule { }
+export class ImprestCategoriesModule {}

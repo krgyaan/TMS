@@ -36,6 +36,7 @@
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.2",
         "cookie-parser": "^1.4.7",
+        "csv-parser": "^3.2.0",
         "drizzle-orm": "^0.44.5",
         "googleapis": "^135.0.0",
         "handlebars": "^4.7.8",

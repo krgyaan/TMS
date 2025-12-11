@@ -24,10 +24,15 @@ export class FollowUpController {
     // ========================
 
     @Get()
-    async findAll(@Query() query: FollowUpQueryDto, @Req() req) {
+    async findAll(@Query() query: FollowUpQueryDto, @CurrentUser() user) {
         console.log("Follow up Called");
 
-        let data = await this.service.findAll(query, req.user);
+        const staticUser = {
+            id: 3,
+            role: "admin",
+        };
+
+        let data = await this.service.findAll(query, staticUser);
         console.log(data);
         return data;
     }

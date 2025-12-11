@@ -16,17 +16,18 @@ export const updateFollowUpSchema = z
             .union([z.string(), z.number()])
             .transform(val => (typeof val === "string" ? parseFloat(val) || 0 : val))
             .optional(),
-        categoryId: z.number().positive().nullable().optional(),
-        assignedToId: z.number().positive().optional(),
+        followupFor: z.string().nullable().optional(),
+        assignedToId: z.number().positive().nullable(), // DB allows NULL
+        createdById: z.number().positive().nullable(), // DB allows NULL
         details: z.string().optional(),
         contacts: z.array(contactPersonSchema).optional(),
 
         // Scheduling
-        frequency: z.enum(frequencyValues).optional(),
-        startFrom: z.string().optional(),
+        frequency: z.number().nullable().optional(),
+        startFrom: z.string().nullable().optional(),
 
         // Stop fields
-        stopReason: z.enum(stopReasonValues).nullable().optional(),
+        stopReason: z.number().int().nullable().optional(),
         proofText: z.string().nullable().optional(),
         proofImagePath: z.string().nullable().optional(),
         stopRemarks: z.string().nullable().optional(),
@@ -37,7 +38,7 @@ export const updateFollowUpSchema = z
     .refine(
         data => {
             // If frequency is 'stopped', stopReason is required
-            if (data.frequency === "stopped" && !data.stopReason) {
+            if (data.frequency == 4 && !data.stopReason) {
                 return false;
             }
             return true;
@@ -50,7 +51,7 @@ export const updateFollowUpSchema = z
     .refine(
         data => {
             // If stopReason is 'objective_achieved', proofText is required
-            if (data.stopReason === "objective_achieved" && !data.proofText) {
+            if (data.stopReason == 2 && !data.proofText) {
                 return false;
             }
             return true;
@@ -68,22 +69,26 @@ export const FollowUpDetailsSchema = z.object({
     partyName: z.string(),
 
     amount: z.number().nullable().optional(),
-    categoryId: z.number().nullable().optional(),
+    followupFor: z.string().nullable().optional(),
 
-    assignedToId: z.number(),
+    assignedToId: z.number().nullable().optional(),
     details: z.string().nullable().optional(),
 
     status: z.string(),
 
     // Scheduling
-    frequency: z.enum(["daily", "alternate", "weekly", "biweekly", "monthly", "stopped"]).optional(),
+    frequency: z.number().optional().nullable(),
     startFrom: z.string().nullable().optional(),
 
+    nextFollowUpDate: z.string().nullable().optional(),
+
     // Stop fields
-    stopReason: z.enum(["party_angry", "objective_achieved", "not_reachable", "other"]).nullable().optional(),
+    stopReason: z.number().int().nullable().optional(),
     proofText: z.string().nullable().optional(),
     proofImagePath: z.string().nullable().optional(),
     stopRemarks: z.string().nullable().optional(),
+
+    followUpHistory: z.array(z.any()).optional().default([]),
 
     // Contacts
     contacts: z.array(contactPersonSchema),
@@ -92,8 +97,8 @@ export const FollowUpDetailsSchema = z.object({
     attachments: z.array(z.string()).optional(),
 
     // Metadata
-    createdAt: z.string(),
-    updatedAt: z.string(),
+    createdAt: z.string().nullable(),
+    updatedAt: z.string().nullable(),
 });
 
 export type FollowUpDetailsDto = z.infer<typeof FollowUpDetailsSchema>;
