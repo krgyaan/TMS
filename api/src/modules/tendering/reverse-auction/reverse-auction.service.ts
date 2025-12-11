@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, lte, asc, desc, sql, inArray } from 'drizzle-orm';
+import { and, eq, lte, asc, desc, sql, inArray, isNull, isNotNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -211,22 +211,15 @@ export class ReverseAuctionService {
     async findAllFromTenders(): Promise<RaDashboardRow[]> {
         const rows = await this.db
             .select({
-                // Tender Info
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 tenderValue: tenderInfos.gstValues,
-
-                // Related data
                 teamMemberName: users.name,
                 itemName: items.name,
                 tenderStatus: statuses.name,
-
-                // Bid submission
                 bidSubmissionDate: bidSubmissions.submissionDatetime,
                 bidSubmissionId: bidSubmissions.id,
-
-                // RA data (may be null if not created yet)
                 raId: reverseAuctions.id,
                 raStatus: reverseAuctions.status,
                 raStartTime: reverseAuctions.raStartTime,
@@ -235,29 +228,23 @@ export class ReverseAuctionService {
                 raResult: reverseAuctions.raResult,
             })
             .from(tenderInfos)
-            // Join user
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            // Join tender information to check RA applicable
             .innerJoin(
                 tenderInformation,
                 and(
                     eq(tenderInformation.tenderId, tenderInfos.id),
-                    eq(tenderInformation.reverseAuctionApplicable, 'Yes')
+                    eq(tenderInformation.reverseAuctionApplicable, '1')
                 )
             )
-            // Join bid submissions - must have bid submitted
             .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            // Left join RA (may not exist yet)
             .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-            // Left join other related data
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(
                 and(
-                    // Base filters
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb'])
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
                 )
             )
             .orderBy(asc(bidSubmissions.submissionDatetime));
@@ -272,7 +259,6 @@ export class ReverseAuctionService {
             tenderValue: row.tenderValue,
             itemName: row.itemName,
             tenderStatus: row.tenderStatus,
-            // Calculate RA status
             raStatus: this.calculateRaStatus(row),
             raStartTime: row.raStartTime,
             raEndTime: row.raEndTime,
@@ -293,17 +279,14 @@ export class ReverseAuctionService {
         raEndTime: Date | null;
         raResult: string | null;
     }): string {
-        // If no RA record exists, status is "Under Evaluation"
         if (!row.raId) {
             return RA_STATUS.UNDER_EVALUATION;
         }
 
-        // If RA record exists but no status, default to "Under Evaluation"
         if (!row.raStatus) {
             return RA_STATUS.UNDER_EVALUATION;
         }
 
-        // Check for completed statuses first
         if (row.raResult) {
             switch (row.raResult) {
                 case 'Won':
@@ -315,12 +298,10 @@ export class ReverseAuctionService {
             }
         }
 
-        // Check for disqualification
         if (row.technicallyQualified === 'No') {
             return RA_STATUS.DISQUALIFIED;
         }
 
-        // Check time-based statuses (real-time calculation)
         if (row.raStartTime || row.raEndTime) {
             const now = new Date();
 
@@ -333,7 +314,6 @@ export class ReverseAuctionService {
             }
         }
 
-        // If technically qualified, RA is scheduled
         if (row.technicallyQualified === 'Yes') {
             return RA_STATUS.RA_SCHEDULED;
         }
@@ -663,5 +643,169 @@ export class ReverseAuctionService {
                     reverseAuctionId: raId,
                 });
         }
+    }
+
+    /**
+     * Get RA Dashboard data - Updated implementation per requirements
+     * Type: 'pending' = raResult IS NULL, 'completed' = raResult IS NOT NULL
+     */
+    async getRaData(
+        type?: 'pending' | 'completed',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<RaDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build base conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
+            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
+        ];
+
+        // Add type filter
+        if (type === 'pending') {
+            baseConditions.push(
+                or(
+                    isNull(reverseAuctions.raResult),
+                    isNull(reverseAuctions.id)
+                )!
+            );
+        } else if (type === 'completed') {
+            baseConditions.push(isNotNull(reverseAuctions.raResult));
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Build orderBy clause
+        let orderByClause: any = asc(bidSubmissions.submissionDatetime); // Default
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortOrder(bidSubmissions.submissionDatetime);
+                    break;
+                case 'tenderValue':
+                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    break;
+                case 'raStatus':
+                    orderByClause = sortOrder(reverseAuctions.status);
+                    break;
+                default:
+                    orderByClause = asc(bidSubmissions.submissionDatetime);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, and(
+                eq(tenderInformation.tenderId, tenderInfos.id),
+                eq(tenderInformation.reverseAuctionApplicable, 'Yes')
+            ))
+            .innerJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+                eq(bidSubmissions.status, 'Bid Submitted')
+            ))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                gstValues: tenderInfos.gstValues,
+                teamMemberName: users.name,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                raId: reverseAuctions.id,
+                raStatus: reverseAuctions.status,
+                raStartTime: reverseAuctions.raStartTime,
+                raEndTime: reverseAuctions.raEndTime,
+                raResult: reverseAuctions.raResult,
+            })
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, and(
+                eq(tenderInformation.tenderId, tenderInfos.id),
+                eq(tenderInformation.reverseAuctionApplicable, 'Yes')
+            ))
+            .innerJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+                eq(bidSubmissions.status, 'Bid Submitted')
+            ))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        const data: RaDashboardRow[] = rows.map((row) => ({
+            id: row.raId,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: `${row.tenderName} - ${row.tenderNo}`,
+            teamMemberName: row.teamMemberName,
+            bidSubmissionDate: row.bidSubmissionDate,
+            tenderValue: this.formatINR(row.gstValues),
+            itemName: row.itemName,
+            tenderStatus: row.tenderStatus,
+            raStatus: this.calculateRaStatus({
+                raId: row.raId,
+                raStatus: row.raStatus,
+                technicallyQualified: null,
+                raStartTime: row.raStartTime,
+                raEndTime: row.raEndTime,
+                raResult: row.raResult,
+            }),
+            raStartTime: row.raStartTime,
+            raEndTime: row.raEndTime,
+            technicallyQualified: null,
+            result: row.raResult,
+            hasRaEntry: row.raId !== null,
+        }));
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Format amount as INR currency
+     */
+    private formatINR(amount: string | number | null | undefined): string {
+        if (amount === null || amount === undefined) return '—';
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        if (isNaN(num)) return '—';
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(num);
     }
 }

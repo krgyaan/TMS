@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, asc, desc, or, isNull, inArray, ne } from 'drizzle-orm';
+import { eq, and, asc, desc, or, isNull, inArray, ne, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -215,6 +215,203 @@ export class TenderResultService {
         }
 
         return counts;
+    }
+
+    /**
+     * Get Result Dashboard data - Updated implementation per requirements
+     * Type logic based on status codes and tenderResults existence
+     */
+    async getResultData(
+        type?: 'pending' | 'won' | 'lost' | 'disqualified',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<ResultDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build base conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
+        ];
+
+        // Add type-specific filters
+        if (type === 'pending') {
+            // Status codes 17, 19, 20, 23 AND no tenderResults record
+            baseConditions.push(
+                inArray(tenderInfos.status, [17, 19, 20, 23]),
+                isNull(tenderResults.id)
+            );
+        } else if (type === 'won') {
+            // Status codes 25, 26, 27, 28 from tenderResults
+            baseConditions.push(
+                or(
+                    inArray(tenderInfos.status, [25, 26, 27, 28]),
+                    eq(tenderResults.result, 'Won'),
+                    eq(tenderResults.status, 'Won')
+                )!
+            );
+        } else if (type === 'lost') {
+            // Status codes 18, 21, 24 from tenderResults
+            baseConditions.push(
+                or(
+                    inArray(tenderInfos.status, [18, 21, 24]),
+                    eq(tenderResults.result, 'Lost'),
+                    eq(tenderResults.status, 'Lost')
+                )!
+            );
+        } else if (type === 'disqualified') {
+            // Status codes 22, 38 from tenderResults
+            baseConditions.push(
+                or(
+                    inArray(tenderInfos.status, [22, 38]),
+                    eq(tenderResults.status, 'Disqualified'),
+                    eq(tenderResults.result, 'Disqualified')
+                )!
+            );
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Build orderBy clause
+        let orderByClause: any = desc(bidSubmissions.submissionDatetime); // Default
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortOrder(bidSubmissions.submissionDatetime);
+                    break;
+                case 'finalPrice':
+                    orderByClause = sortOrder(tenderCostingSheets.finalPrice);
+                    break;
+                default:
+                    orderByClause = desc(bidSubmissions.submissionDatetime);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+                eq(bidSubmissions.status, 'Bid Submitted')
+            ))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                gstValues: tenderInfos.gstValues,
+                emdAmount: tenderInfos.emd,
+                teamMemberName: users.name,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                finalPrice: tenderCostingSheets.finalPrice,
+                resultId: tenderResults.id,
+                resultStatus: tenderResults.status,
+                resultResult: tenderResults.result,
+            })
+            .from(tenderInfos)
+            .innerJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+                eq(bidSubmissions.status, 'Bid Submitted')
+            ))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        // Get EMD details
+        const tenderIds = rows.map((r) => r.tenderId);
+        const emdDetailsMap = await this.getEmdDetailsForTenders(tenderIds);
+
+        const data: ResultDashboardRow[] = rows.map((row) => {
+            const resultStatus = this.calculateResultStatusForType(row, type);
+            return {
+                id: row.resultId,
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo,
+                tenderName: `${row.tenderName} - ${row.tenderNo}`,
+                teamExecutiveName: row.teamMemberName,
+                bidSubmissionDate: row.bidSubmissionDate,
+                tenderValue: this.formatINR(row.gstValues),
+                finalPrice: row.finalPrice || row.gstValues,
+                itemName: row.itemName,
+                tenderStatus: row.tenderStatus,
+                resultStatus,
+                emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
+                raApplicable: false,
+                reverseAuctionId: null,
+                raStatus: null,
+                hasResultEntry: row.resultId !== null,
+            };
+        });
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Calculate result status based on type parameter
+     */
+    private calculateResultStatusForType(
+        row: {
+            resultStatus: string | null;
+            resultResult: string | null;
+        },
+        type?: string
+    ): string {
+        if (type === 'pending') return RESULT_STATUS.RESULT_AWAITED;
+        if (type === 'won') return RESULT_STATUS.WON;
+        if (type === 'lost') return RESULT_STATUS.LOST;
+        if (type === 'disqualified') return RESULT_STATUS.DISQUALIFIED;
+
+        if (row.resultResult === 'Won' || row.resultStatus === 'Won') return RESULT_STATUS.WON;
+        if (row.resultResult === 'Lost' || row.resultStatus === 'Lost') return RESULT_STATUS.LOST;
+        if (row.resultStatus === 'Disqualified') return RESULT_STATUS.DISQUALIFIED;
+
+        return RESULT_STATUS.RESULT_AWAITED;
+    }
+
+    /**
+     * Format amount as INR currency
+     */
+    private formatINR(amount: string | number | null | undefined): string {
+        if (amount === null || amount === undefined) return '—';
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        if (isNaN(num)) return '—';
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(num);
     }
 
     async findAllFromTenders(filters?: ResultDashboardFilters): Promise<ResultDashboardRow[]> {

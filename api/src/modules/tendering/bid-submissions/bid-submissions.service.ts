@@ -369,4 +369,147 @@ export class BidSubmissionsService {
 
         return result;
     }
+
+    /**
+     * Get Bid Submission Dashboard data - Updated implementation per requirements
+     * Type logic based on bidSubmissions existence and status
+     */
+    async getBidSubmissionData(
+        type?: 'pending' | 'submitted' | 'missed',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build base conditions - must have approved costing sheet
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            eq(tenderCostingSheets.status, 'Approved'),
+        ];
+
+        // Add type-specific filters
+        if (type === 'pending') {
+            baseConditions.push(
+                or(
+                    isNull(bidSubmissions.id),
+                    eq(bidSubmissions.status, 'Submission Pending')
+                )!
+            );
+        } else if (type === 'submitted') {
+            baseConditions.push(eq(bidSubmissions.status, 'Bid Submitted'));
+        } else if (type === 'missed') {
+            baseConditions.push(eq(bidSubmissions.status, 'Tender Missed'));
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Build orderBy clause
+        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'finalCosting':
+                    orderByClause = sortOrder(tenderCostingSheets.finalPrice);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(tenderCostingSheets, and(
+                eq(tenderCostingSheets.tenderId, tenderInfos.id),
+                eq(tenderCostingSheets.status, 'Approved')
+            ))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+                itemName: items.name,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                emdAmount: tenderInfos.emd,
+                gstValues: tenderInfos.gstValues,
+                costingSheetId: tenderCostingSheets.id,
+                finalCosting: tenderCostingSheets.finalPrice,
+                bidSubmissionId: bidSubmissions.id,
+                bidSubmissionStatus: bidSubmissions.status,
+            })
+            .from(tenderInfos)
+            .innerJoin(tenderCostingSheets, and(
+                eq(tenderCostingSheets.tenderId, tenderInfos.id),
+                eq(tenderCostingSheets.status, 'Approved')
+            ))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        const data: BidSubmissionDashboardRow[] = rows.map((row) => {
+            let bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+            if (!row.bidSubmissionId || !row.bidSubmissionStatus) {
+                bidStatus = 'Submission Pending';
+            } else {
+                bidStatus = row.bidSubmissionStatus as 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+            }
+
+            return {
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo,
+                tenderName: `${row.tenderName} - ${row.tenderNo}`,
+                teamMemberName: row.teamMemberName,
+                itemName: row.itemName,
+                statusName: row.statusName,
+                dueDate: row.dueDate,
+                emdAmount: row.emdAmount,
+                gstValues: row.gstValues ? Number(row.gstValues) : 0,
+                finalCosting: row.finalCosting,
+                bidStatus,
+                bidSubmissionId: row.bidSubmissionId,
+                costingSheetId: row.costingSheetId,
+            };
+        });
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
 }

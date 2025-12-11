@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsDashboardRow, PaginatedResult } from '@/types/api.types'
+import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
@@ -18,7 +18,7 @@ export const usePhysicalDocs = (
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    const params = {
+    const params: PhysicalDocsListParams = {
         ...(tab && { physicalDocsSent: tab === 'sent' }),
         page: pagination.page,
         limit: pagination.limit,

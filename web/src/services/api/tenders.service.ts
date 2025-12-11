@@ -1,4 +1,3 @@
-// web/src/services/api/tenders.service.ts
 import { BaseApiService } from './base.service';
 import type {
     CreateTenderRequest,

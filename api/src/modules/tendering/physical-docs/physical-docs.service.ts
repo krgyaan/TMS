@@ -26,14 +26,11 @@ export type PhysicalDocFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
-// ============================================================================
-// Types
-// ============================================================================
-
-type PhysicalDocDashboardRow = {
+export type PhysicalDocDashboardRow = {
     tenderId: number;
     tenderNo: string;
     tenderName: string;
+    dueDate: Date;
     courierAddress: string;
     physicalDocsRequired: string;
     physicalDocsDeadline: Date;
@@ -43,24 +40,20 @@ type PhysicalDocDashboardRow = {
     courierNo: number | null;
 };
 
-type PhysicalDocPerson = {
+export type PhysicalDocPerson = {
     id: number;
     name: string;
     email: string;
     phone: string;
 };
 
-type PhysicalDocWithPersons = {
+export type PhysicalDocWithPersons = {
     id: number;
     tenderId: number;
     courierNo: number;
     submittedDocs: string | null;
     persons: PhysicalDocPerson[];
 };
-
-// ============================================================================
-// Service
-// ============================================================================
 
 @Injectable()
 export class PhysicalDocsService {
@@ -152,6 +145,7 @@ export class PhysicalDocsService {
                 itemName: items.name,
                 dueDate: tenderInfos.dueDate,
                 physicalDocs: physicalDocs.id,
+                courierNo: physicalDocs.courierNo,
             })
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -167,18 +161,20 @@ export class PhysicalDocsService {
             .offset(offset)
             .orderBy(orderByClause);
 
-        const data = rows.map((row) => ({
+        const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
+            dueDate: row.dueDate,
             courierAddress: row.courierAddress || '',
             physicalDocsRequired: row.physicalDocsRequired || '',
             physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
             teamMemberName: row.teamMemberName || '',
             statusName: row.statusName || '',
             physicalDocs: row.physicalDocs,
-            courierNo: null,
-        })) as PhysicalDocDashboardRow[];
+            courierNo: row.courierNo || null,
+        }));
+        // const data = rows.map(RowMappers.mapPhysicalDocRow as PhysicalDocDashboardRow);
 
         return {
             data,

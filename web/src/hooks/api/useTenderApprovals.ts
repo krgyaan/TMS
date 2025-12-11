@@ -2,21 +2,59 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tenderApprovalsService, type TenderApprovalFilters } from '@/services/api/tender-approvals.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { SaveTenderApprovalDto } from '@/types/api.types';
+import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow } from '@/types/api.types';
+
+// export const tenderApprovalsKey = {
+//     all: ['tender-approvals'] as const,
+//     lists: () => [...tenderApprovalsKey.all, 'list'] as const,
+//     list: (filters?: TenderApprovalFilters) => [...tenderApprovalsKey.lists(), { filters }] as const,
+//     details: () => [...tenderApprovalsKey.all, 'detail'] as const,
+//     detail: (tenderId: number) => [...tenderApprovalsKey.details(), tenderId] as const,
+// };
 
 export const tenderApprovalsKey = {
     all: ['tender-approvals'] as const,
     lists: () => [...tenderApprovalsKey.all, 'list'] as const,
-    list: (filters?: TenderApprovalFilters) => [...tenderApprovalsKey.lists(), { filters }] as const,
+    list: (filters?: Record<string, unknown>) => [...tenderApprovalsKey.lists(), { filters }] as const,
     details: () => [...tenderApprovalsKey.all, 'detail'] as const,
-    detail: (tenderId: number) => [...tenderApprovalsKey.details(), tenderId] as const,
-};
+    detail: (id: number) => [...tenderApprovalsKey.details(), id] as const,
+    byTender: (tenderId: number) => [...tenderApprovalsKey.all, 'by-tender', tenderId] as const,
+}
 
-export const useAllTenders = (filters?: TenderApprovalFilters) => {
-    return useQuery({
-        queryKey: tenderApprovalsKey.list(filters),
-        queryFn: () => tenderApprovalsService.getAll(filters),
-    });
+export const useTenderApprovals = (
+    tab?: '0' | '1' | '2' | '3',
+    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const params: TenderApprovalFilters = {
+        ...(tab && { tlStatus: tab }),
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+    };
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+    };
+
+    return useQuery<PaginatedResult<TenderApprovalRow>>({
+        queryKey: tenderApprovalsKey.list(queryKeyFilters),
+        queryFn: () => tenderApprovalsService.getAll(params),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
+    })
+
+    // return useQuery({
+    //     queryKey: tenderApprovalsKey.list(filters),
+    //     queryFn: () => tenderApprovalsService.getAll(filters),
+    // });
 };
 
 export const useTenderApproval = (tenderId: number | null) => {

@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { PhysicalDocsDashboardRow, TenderWithRelations } from '@/types/api.types';
+import type { PhysicalDocsDashboardRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
@@ -94,6 +94,16 @@ const PhysicalDocsListPage = () => {
             filter: true,
             minWidth: 250,
         }),
+        {
+            field: 'teamMemberName',
+            colId: 'teamMemberName',
+            headerName: 'Member',
+            flex: 1,
+            minWidth: 120,
+            valueGetter: (params: any) => params.data?.teamMemberName ? params.data.teamMemberName : '—',
+            sortable: true,
+            filter: true,
+        },
         {
             field: 'physicalDocsDeadline',
             colId: 'physicalDocsDeadline',

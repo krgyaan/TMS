@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -294,5 +294,125 @@ export class CostingApprovalsService {
             .returning();
 
         return result;
+    }
+
+    /**
+     * Get Costing Approval Dashboard data - Updated implementation per requirements
+     * Type logic based on tenderCostingSheets.status
+     */
+    async getCostingApprovalData(
+        type?: 'pending' | 'approved' | 'rejected',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build base conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+        ];
+
+        // Add type-specific filters
+        if (type === 'pending') {
+            baseConditions.push(eq(tenderCostingSheets.status, 'Submitted'));
+        } else if (type === 'approved') {
+            baseConditions.push(eq(tenderCostingSheets.status, 'Approved'));
+        } else if (type === 'rejected') {
+            baseConditions.push(eq(tenderCostingSheets.status, 'Rejected/Redo'));
+        }
+
+        const whereClause = and(...baseConditions);
+
+        // Build orderBy clause
+        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+        if (filters?.sortBy) {
+            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortOrder(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    break;
+                default:
+                    orderByClause = asc(tenderInfos.dueDate);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMember: tenderInfos.teamMember,
+                teamMemberName: users.name,
+                itemName: items.name,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                emdAmount: tenderInfos.emd,
+                gstValues: tenderInfos.gstValues,
+                costingSheetId: tenderCostingSheets.id,
+                costingStatus: tenderCostingSheets.status,
+                googleSheetUrl: tenderCostingSheets.googleSheetUrl,
+            })
+            .from(tenderInfos)
+            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        const data: CostingApprovalDashboardRow[] = rows.map((row) => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: `${row.tenderName} - ${row.tenderNo}`,
+            teamMember: row.teamMember,
+            teamMemberName: row.teamMemberName,
+            itemName: row.itemName,
+            statusName: row.statusName,
+            dueDate: row.dueDate,
+            emdAmount: row.emdAmount,
+            gstValues: row.gstValues ? Number(row.gstValues) : 0,
+            costingStatus: row.costingStatus as 'Pending' | 'Approved' | 'Rejected/Redo',
+            googleSheetUrl: row.googleSheetUrl,
+            costingSheetId: row.costingSheetId,
+        }));
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 }

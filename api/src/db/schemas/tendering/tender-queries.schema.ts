@@ -14,9 +14,11 @@ import { tqTypes } from '@db/schemas/tendering/tq-types.schema';
 
 // Enum for TQ status
 export const tqStatusEnum = pgEnum('tq_status', [
-    'Received',
-    'Replied',
-    'Missed',
+    'TQ Received',
+    'TQ Replied',
+    'TQ Missed',
+    'TQ Qualified',
+    'No TQ, Qualified',
 ]);
 
 export const tenderQueries = pgTable('tender_queries', {

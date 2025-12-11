@@ -522,6 +522,75 @@ export interface TenderInfo {
     updatedAt: Date | string;
 }
 
+export interface IncompleteField {
+    id?: number;
+    fieldName: string;
+    comment: string;
+    status?: 'pending' | 'resolved';
+}
+
+export interface SaveTenderApprovalDto {
+    tlStatus: '0' | '1' | '2' | '3' | number;
+    rfqTo?: number[]; // vendor org IDs
+    tenderFeeMode?: string;
+    emdMode?: string;
+    approvePqrSelection?: '1' | '2';
+    approveFinanceDocSelection?: '1' | '2';
+    tenderStatus?: number; // status ID
+    oemNotAllowed?: string; // vendor org ID
+    tlRejectionRemarks?: string;
+    incompleteFields?: IncompleteField[];
+}
+
+export interface TenderApproval {
+    id: number;
+    tenderId: number;
+    tlStatus: '0' | '1' | '2' | '3' | number;
+    rfqTo: number[] | null;
+    tenderFeeMode: string | null;
+    emdMode: string | null;
+    approvePqrSelection: '1' | '2' | null;
+    approveFinanceDocSelection: '1' | '2' | null;
+    tenderStatus: number | null;
+    oemNotAllowed: number | null;
+    tlRejectionRemarks: string | null;
+    incompleteFields?: IncompleteField[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface TenderApprovalRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    status: number;
+    teamMemberName: string;
+    itemName: string;
+    statusName: string;
+    tlStatus: string | number;
+}
+
+export type TenderApprovalFilters = {
+    tlStatus?: '0' | '1' | '2' | '3' | number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export type TenderApprovalTabData = {
+    key: '0' | '1' | '2' | '3';
+    name: string;
+    count: number;
+    data: TenderApprovalRow[];
+};
+
 export interface TenderWithRelations extends TenderInfo {
     organizationName?: string | null;
     organizationAcronym?: string | null;
@@ -1179,6 +1248,36 @@ export interface PhysicalDocsDashboardRow {
     physicalDocs: number | null;
     courierNo: number | null;
 };
+
+export interface PhysicalDocs {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocPerson[];
+}
+
+export interface PhysicalDocsListParams {
+    physicalDocsSent?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreatePhysicalDocsDto {
+    tenderId: number;
+    courierNo: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+}
+
+export interface UpdatePhysicalDocsDto {
+    id: number;
+    courierNo?: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+}
 
 export interface PhysicalDocPerson {
     id: number;

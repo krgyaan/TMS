@@ -53,7 +53,7 @@ export type UpdateBidSubmissionDto = {
 };
 
 export const bidSubmissionsService = {
-    getAll: async (params?: BidSubmissionListParams): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
+    getAll: async (params?: BidSubmissionListParams): Promise<PaginatedResult<BidSubmissionDashboardRow>> => {
         const searchParams = new URLSearchParams();
 
         if (params?.bidStatus) {

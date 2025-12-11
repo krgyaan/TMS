@@ -1,53 +1,62 @@
-import axiosInstance from '@/lib/axios';
-import type { PhysicalDocs, PhysicalDocsDashboardRow, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    PhysicalDocs,
+    PhysicalDocsDashboardRow,
+    CreatePhysicalDocsDto,
+    UpdatePhysicalDocsDto,
+    PaginatedResult,
+    PhysicalDocsListParams,
+} from '@/types/api.types';
 
-export const physicalDocsService = {
-    getAll: async (params?: { physicalDocsSent?: boolean; page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<PaginatedResult<PhysicalDocsDashboardRow>> => {
-        const searchParams = new URLSearchParams();
+class PhysicalDocsService extends BaseApiService {
+    constructor() {
+        super('/physical-docs');
+    }
 
-        if (params?.physicalDocsSent !== undefined) {
-            searchParams.set('physicalDocsSent', String(params.physicalDocsSent));
+    async getAll(params?: PhysicalDocsListParams): Promise<PaginatedResult<PhysicalDocsDashboardRow>> {
+        const search = new URLSearchParams();
+
+        if (params) {
+            if (params.physicalDocsSent !== undefined) {
+                search.set('physicalDocsSent', String(params.physicalDocsSent));
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
+            }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
-        if (params?.page) {
-            searchParams.set('page', String(params.page));
-        }
-        if (params?.limit) {
-            searchParams.set('limit', String(params.limit));
-        }
-        if (params?.sortBy) {
-            searchParams.set('sortBy', params.sortBy);
-        }
-        if (params?.sortOrder) {
-            searchParams.set('sortOrder', params.sortOrder);
-        }
 
-        const queryString = searchParams.toString();
-        const url = queryString ? `/physical-docs?${queryString}` : '/physical-docs';
-        const response = await axiosInstance.get<PaginatedResult<PhysicalDocsDashboardRow>>(url);
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<PaginatedResult<PhysicalDocsDashboardRow>>(queryString ? `?${queryString}` : '');
+    }
 
-    getById: async (id: number): Promise<PhysicalDocs | null> => {
-        const response = await axiosInstance.get<PhysicalDocs>(`/physical-docs/${id}`);
-        return response.data;
-    },
+    async getById(id: number): Promise<PhysicalDocs | null> {
+        return this.get<PhysicalDocs>(`/${id}`);
+    }
 
-    getByTenderId: async (tenderId: number): Promise<PhysicalDocs | null> => {
-        const response = await axiosInstance.get<PhysicalDocs>(`/physical-docs/by-tender/${tenderId}`);
-        return response.data;
-    },
+    async getByTenderId(tenderId: number): Promise<PhysicalDocs | null> {
+        return this.get<PhysicalDocs>(`/by-tender/${tenderId}`);
+    }
 
-    create: async (data: CreatePhysicalDocsDto): Promise<PhysicalDocs> => {
-        const response = await axiosInstance.post<PhysicalDocs>(`/physical-docs`, data);
-        return response.data;
-    },
+    async create(data: CreatePhysicalDocsDto): Promise<PhysicalDocs> {
+        return this.post<PhysicalDocs>('', data);
+    }
 
-    update: async (id: number, data: UpdatePhysicalDocsDto): Promise<PhysicalDocs> => {
-        const response = await axiosInstance.patch<PhysicalDocs>(`/physical-docs/${id}`, data);
-        return response.data;
-    },
+    async update(id: number, data: UpdatePhysicalDocsDto): Promise<PhysicalDocs> {
+        return this.patch<PhysicalDocs>(`/${id}`, data);
+    }
 
-    delete: async (id: number): Promise<void> => {
-        await axiosInstance.delete(`/physical-docs/${id}`);
-    },
-};
+    async remove(id: number): Promise<void> {
+        return this.delete<void>(`/${id}`);
+    }
+}
+
+export const physicalDocsService = new PhysicalDocsService();

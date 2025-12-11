@@ -1,39 +1,45 @@
-import axiosInstance from '@/lib/axios';
-import type { TenderApproval, SaveTenderApprovalDto, TenderApprovalRow, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    TenderApproval,
+    SaveTenderApprovalDto,
+    TenderApprovalRow,
+    PaginatedResult,
+    TenderApprovalFilters,
+} from '@/types/api.types';
 
-export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
+class TenderApprovalsService extends BaseApiService {
+    constructor() {
+        super('/tender-approvals');
+    }
 
-export const tenderApprovalsService = {
-    getAll: async (filters?: TenderApprovalFilters): Promise<Record<string, TenderApprovalRow[]> | PaginatedResult<TenderApprovalRow>> => {
-        const params = new URLSearchParams();
-        if (filters?.tlStatus) params.append('tlStatus', filters.tlStatus);
-        if (filters?.page) params.append('page', filters.page.toString());
-        if (filters?.limit) params.append('limit', filters.limit.toString());
-        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
-        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
-        const query = params.toString();
-        const response = await axiosInstance.get<Record<string, TenderApprovalRow[]> | PaginatedResult<TenderApprovalRow>>(`/tender-approvals${query ? `?${query}` : ''}`);
-        return response.data;
-    },
+    async getAll(
+        params?: TenderApprovalFilters
+    ): Promise<PaginatedResult<TenderApprovalRow>> {
+        const search = new URLSearchParams();
 
-    getByTenderId: async (tenderId: number): Promise<TenderApproval | null> => {
-        const response = await axiosInstance.get<TenderApproval>(`/tender-approvals/${tenderId}/approval`);
-        return response.data;
-    },
+        if (params) {
+            if (params.tlStatus) search.set('tlStatus', String(params.tlStatus));
+            if (params.page) search.set('page', params.page.toString());
+            if (params.limit) search.set('limit', params.limit.toString());
+            if (params.sortBy) search.set('sortBy', params.sortBy);
+            if (params.sortOrder) search.set('sortOrder', params.sortOrder);
+        }
 
-    create: async (tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> => {
-        const response = await axiosInstance.put<TenderApproval>(`/tender-approvals/${tenderId}/approval`, data);
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<PaginatedResult<TenderApprovalRow>>(queryString ? `?${queryString}` : '');
+    }
 
-    update: async (tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> => {
-        const response = await axiosInstance.put<TenderApproval>(`/tender-approvals/${tenderId}/approval`, data);
-        return response.data;
-    },
-};
+    async getByTenderId(tenderId: number): Promise<TenderApproval | null> {
+        return this.get<TenderApproval>(`/${tenderId}/approval`);
+    }
+
+    async create(tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> {
+        return this.post<TenderApproval>(`/${tenderId}/approval`, data);
+    }
+
+    async update(tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> {
+        return this.post<TenderApproval>(`/${tenderId}/approval`, data);
+    }
+}
+
+export const tenderApprovalsService = new TenderApprovalsService();

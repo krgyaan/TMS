@@ -7,8 +7,8 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useAllTenders } from '@/hooks/api/useTenderApprovals';
-import type { TenderApprovalRow, PaginatedResult } from '@/types/api.types';
+import { useTenderApprovals } from '@/hooks/api/useTenderApprovals';
+import type { TenderApprovalRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye } from 'lucide-react';
@@ -17,18 +17,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
 import { tenderNameCol } from '@/components/data-grid';
 
-const TABS_NAMES = {
-    '0': 'Pending',
-    '1': 'Approved',
-    '2': 'Rejected',
-    '3': 'Incomplete',
-} as const;
-
-type TabConfig = {
-    key: '0' | '1' | '2' | '3';
-    name: string;
-    count: number;
-};
+const TABS_NAMES = { '0': 'Pending', '1': 'Approved', '2': 'Rejected', '3': 'Incomplete' } as const;
 
 const TenderApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | '3'>('0');
@@ -51,29 +40,14 @@ const TenderApprovalListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    // Fetch counts (all data without filters) - returns Record format
-    const { data: countsData } = useAllTenders();
+    const { data: apiResponse, isLoading: loading, error } = useTenderApprovals(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
 
-    // Fetch paginated data for active tab - returns PaginatedResult format
-    const {
-        data: apiResponse,
-        isLoading: loading,
-        error
-    } = useAllTenders({
-        tlStatus: activeTab,
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-        sortBy: sortModel[0]?.colId,
-        sortOrder: sortModel[0]?.sort,
-    });
-
-    // apiResponse with filters always returns PaginatedResult
-    const approvalData = apiResponse && 'meta' in apiResponse
-        ? (apiResponse as PaginatedResult<TenderApprovalRow>).data
-        : [];
-    const totalRows = apiResponse && 'meta' in apiResponse
-        ? (apiResponse as PaginatedResult<TenderApprovalRow>).meta.total
-        : 0;
+    const approvalData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const approvalActions: ActionItem<any>[] = [
         {
@@ -102,24 +76,13 @@ const TenderApprovalListPage = () => {
         },
     ];
 
-    const tabsConfig = useMemo<TabConfig[]>(() => {
-        // Use countsData for counts if available (Record format), otherwise use totalRows for active tab
-        if (countsData && typeof countsData === 'object' && !('meta' in countsData)) {
-            const counts = countsData as Record<string, TenderApprovalRow[]>;
-            return Object.entries(TABS_NAMES).map(([key, name]) => ({
-                key: key as '0' | '1' | '2' | '3',
-                name,
-                count: counts[name]?.length || 0,
-            }));
-        }
-
-        // Fallback: use totalRows for active tab, 0 for others
+    const tabsConfig = useMemo(() => {
         return Object.entries(TABS_NAMES).map(([key, name]) => ({
             key: key as '0' | '1' | '2' | '3',
             name,
             count: activeTab === key ? totalRows : 0,
         }));
-    }, [countsData, activeTab, totalRows]);
+    }, [apiResponse, activeTab, totalRows]);
 
     const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
         tenderNameCol<TenderApprovalRow>('tenderNo', {

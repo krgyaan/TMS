@@ -12,7 +12,7 @@ import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 
 export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3';
+    tlStatus?: '0' | '1' | '2' | '3' | number;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -60,19 +60,20 @@ export class TenderApprovalService {
         private readonly tenderInfosService: TenderInfosService, // Injected
     ) { }
 
-    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow> | Record<TabCategory, TenderRow[]>> {
+    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
+        console.log("Filters: ", filters);
+
         const conditions = [
             TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
         ];
 
         // Filter by tlStatus if provided
         if (filters?.tlStatus !== undefined) {
-            conditions.push(eq(tenderInfos.tlStatus, filters.tlStatus));
+            conditions.push(eq(tenderInfos.tlStatus, filters.tlStatus as number));
         }
 
         // Build orderBy clause based on sortBy
@@ -138,9 +139,7 @@ export class TenderApprovalService {
             .where(and(...conditions))
             .orderBy(orderByClause)) as unknown as TenderRow[];
 
-        // If filters are provided, return PaginatedResult
         if (filters?.tlStatus !== undefined || filters?.page !== undefined) {
-            // Count total matching rows
             const totalRows = rows.length;
             const paginatedData = rows.slice(offset, offset + limit);
 
@@ -148,38 +147,24 @@ export class TenderApprovalService {
                 data: paginatedData,
                 meta: {
                     total: totalRows,
-                    page,
-                    limit,
+                    page: page,
+                    limit: limit,
                     totalPages: Math.ceil(totalRows / limit),
                 },
             };
         }
 
-        // Otherwise, return categorized data (for backward compatibility)
-        const categorized: Record<TabCategory, TenderRow[]> = {
-            Pending: [],
-            Approved: [],
-            Rejected: [],
-            Incomplete: [],
+        return {
+            data: rows,
+            meta: {
+                total: rows.length,
+                page: page,
+                limit: limit,
+                totalPages: Math.ceil(rows.length / limit),
+            },
         };
-
-        for (const row of rows) {
-            const statusKey = row.tlStatus?.toString();
-            const category =
-                TABS_NAMES[statusKey as keyof typeof TABS_NAMES] ?? 'Incomplete';
-            categorized[category].push(row);
-        }
-
-        // Sort Accepted and Rejected tabs by due date descending (latest first)
-        categorized.Approved.sort((a, b) =>
-            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-        );
-        categorized.Rejected.sort((a, b) =>
-            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-        );
-
-        return categorized;
     }
+
 
     async getByTenderId(tenderId: number) {
         // Validate tender exists first
