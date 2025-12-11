@@ -1,10 +1,12 @@
 import {
     Body,
+    BadRequestException,
     Controller,
     Get,
     HttpCode,
     HttpStatus,
     Post,
+    Query,
     Res,
     UnauthorizedException,
 } from '@nestjs/common';
@@ -14,6 +16,9 @@ import { AuthService } from '@/modules/auth/auth.service';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { ConfigService } from '@nestjs/config';
+import type { AuthConfig } from '@config/auth.config';
+import authConfig from '@config/auth.config';
 
 const LoginSchema = z.object({
     email: z.string().email(),
@@ -27,7 +32,10 @@ const GoogleCallbackSchema = z.object({
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly configService: ConfigService,
+    ) { }
 
     @Public()
     @Post('login')
@@ -71,23 +79,115 @@ export class AuthController {
         return this.authService.generateGoogleLoginUrl();
     }
 
+    /**
+     * GET handler for Google OAuth callback (when Google redirects directly to backend)
+     * This sets the auth cookie and redirects to the frontend
+     */
+    @Public()
+    @Get('google/callback')
+    async googleCallbackGet(
+        @Query() query: Record<string, unknown>,
+        @Res() res: Response,
+    ) {
+        let code: string;
+        let state: string | undefined;
+
+        try {
+            const parsed = GoogleCallbackSchema.parse(query);
+            code = parsed.code;
+            state = parsed.state;
+        } catch (error) {
+            const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
+            const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
+            const errorMessage = encodeURIComponent(
+                `Invalid OAuth callback parameters. ${error instanceof Error ? error.message : 'Missing required fields: code and optional state.'}`
+            );
+            return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}`);
+        }
+
+        try {
+            const session = await this.authService.handleGoogleLoginCallback(
+                code,
+                state,
+            );
+
+            this.setAuthCookie(res, session.accessToken);
+
+            // Redirect to frontend dashboard (cookie is set, frontend will detect auth)
+            const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
+            const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
+            return res.redirect(`${frontendBaseUrl}/`);
+        } catch (error) {
+            // Redirect to frontend callback page with error
+            const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
+            const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
+            const errorMessage = encodeURIComponent(
+                error instanceof BadRequestException
+                    ? error.message
+                    : `Google OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+            );
+            return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}`);
+        }
+    }
+
+    /**
+     * Extract base URL from redirect URI (e.g., http://localhost:5173/auth/google/callback -> http://localhost:5173)
+     */
+    private getFrontendBaseUrl(redirectUri?: string): string {
+        if (!redirectUri) {
+            return 'http://localhost:5173';
+        }
+        try {
+            const url = new URL(redirectUri);
+            return `${url.protocol}//${url.host}`;
+        } catch {
+            return 'http://localhost:5173';
+        }
+    }
+
+    /**
+     * POST handler for Google OAuth callback (when frontend makes API call)
+     * This is used when Google redirects to frontend, and frontend calls backend
+     */
     @Public()
     @Post('google/callback')
     @HttpCode(HttpStatus.OK)
-    async googleCallback(
+    async googleCallbackPost(
         @Body() body: unknown,
         @Res({ passthrough: true }) res: Response,
     ) {
-        const { code, state } = GoogleCallbackSchema.parse(body);
+        let code: string;
+        let state: string | undefined;
 
-        const session = await this.authService.handleGoogleLoginCallback(
-            code,
-            state,
-        );
+        try {
+            const parsed = GoogleCallbackSchema.parse(body);
+            code = parsed.code;
+            state = parsed.state;
+        } catch (error) {
+            throw new BadRequestException(
+                `Invalid request body for Google OAuth callback. ${error instanceof Error ? error.message : 'Missing required fields: code and optional state.'}`
+            );
+        }
 
-        this.setAuthCookie(res, session.accessToken);
+        try {
+            const session = await this.authService.handleGoogleLoginCallback(
+                code,
+                state,
+            );
 
-        return { user: session.user };
+            this.setAuthCookie(res, session.accessToken);
+
+            return { user: session.user };
+        } catch (error) {
+            // Re-throw BadRequestException as-is for clearer error messages
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            // Wrap unexpected errors
+            throw new BadRequestException(
+                `Google OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+            );
+        }
     }
 
     /**
