@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { followupCategoriesService } from "@/services";
+import { followupCategoriesService } from "@/services/api";
 import type { CreateFollowupCategoryDto, UpdateFollowupCategoryDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
