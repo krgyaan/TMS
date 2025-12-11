@@ -69,14 +69,13 @@ export const useCreateTenderApproval = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tenderId, data }: { tenderId: number; data: SaveTenderApprovalDto }) =>
-            tenderApprovalsService.create(tenderId, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: SaveTenderApprovalDto }) => tenderApprovalsService.create(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
-            toast.success('Tender approval submitted successfully');
+            toast.success("Tender approval submitted successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -86,14 +85,13 @@ export const useUpdateTenderApproval = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tenderId, data }: { tenderId: number; data: SaveTenderApprovalDto }) =>
-            tenderApprovalsService.update(tenderId, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: SaveTenderApprovalDto }) => tenderApprovalsService.update(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
-            toast.success('Tender approval updated successfully');
+            toast.success("Tender approval updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

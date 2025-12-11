@@ -10,8 +10,8 @@ export const physicalDocsKey = {
     list: (filters?: Record<string, unknown>) => [...physicalDocsKey.lists(), { filters }] as const,
     details: () => [...physicalDocsKey.all, 'detail'] as const,
     detail: (id: number) => [...physicalDocsKey.details(), id] as const,
-    byTender: (tenderId: number) => [...physicalDocsKey.all, 'by-tender', tenderId] as const,
-}
+    byTender: (tenderId: number) => [...physicalDocsKey.all, "by-tender", tenderId] as const,
+};
 
 export const usePhysicalDocs = (
     tab?: 'pending' | 'sent',
@@ -61,48 +61,47 @@ export const usePhysicalDocByTenderId = (tenderId: number | null) => {
 };
 
 export const useCreatePhysicalDoc = () => {
-    const queryClient = useQueryClient()
+    const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: (data: CreatePhysicalDocsDto) => physicalDocsService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() })
-            toast.success('Physical doc created successfully')
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
+            toast.success("Physical doc created successfully");
         },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
+        onError: error => {
+            toast.error(handleQueryError(error));
         },
-    })
-}
+    });
+};
 
 export const useUpdatePhysicalDoc = () => {
-    const queryClient = useQueryClient()
+    const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: UpdatePhysicalDocsDto) =>
-            physicalDocsService.update(data.id, data),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() })
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.detail(data.id) })
-            toast.success('Physical doc updated successfully')
+        mutationFn: (data: UpdatePhysicalDocsDto) => physicalDocsService.update(data.id, data),
+        onSuccess: data => {
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.detail(data.id) });
+            toast.success("Physical doc updated successfully");
         },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
+        onError: error => {
+            toast.error(handleQueryError(error));
         },
-    })
-}
+    });
+};
 
 export const useDeletePhysicalDoc = () => {
-    const queryClient = useQueryClient()
+    const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: (id: number) => physicalDocsService.delete(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() })
-            toast.success('Physical doc deleted successfully')
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
+            toast.success("Physical doc deleted successfully");
         },
-        onError: (error) => {
-            toast.error(handleQueryError(error))
+        onError: error => {
+            toast.error(handleQueryError(error));
         },
-    })
-}
+    });
+};

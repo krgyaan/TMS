@@ -71,11 +71,11 @@ export class GoogleService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
 
-    private createClient() {
+    private createClient(redirectUri?: string) {
         return new google.auth.OAuth2(
             this.config.clientId,
             this.config.clientSecret,
-            this.config.redirectUri,
+            redirectUri ?? this.config.redirectUri,
         );
     }
 
@@ -88,8 +88,8 @@ export class GoogleService {
         return this.createAuthUrlWithState(String(userId));
     }
 
-    createAuthUrlWithState(state: string): { url: string } {
-        const client = this.createClient();
+    createAuthUrlWithState(state: string, redirectUri?: string): { url: string } {
+        const client = this.createClient(redirectUri);
         const url = client.generateAuthUrl({
             access_type: 'offline',
             include_granted_scopes: true,
@@ -100,11 +100,11 @@ export class GoogleService {
         return { url };
     }
 
-    async exchangeCode(code: string): Promise<{
+    async exchangeCode(code: string, redirectUri?: string): Promise<{
         tokens: GoogleTokenPayload;
         profile: oauth2_v2.Schema$Userinfo;
     }> {
-        const client = this.createClient();
+        const client = this.createClient(redirectUri);
         const { tokens: rawTokens } = await client.getToken(code);
         if (!rawTokens || typeof rawTokens !== 'object') {
             throw new BadRequestException('Google did not return an access token');

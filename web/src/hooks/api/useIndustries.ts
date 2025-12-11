@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { industriesService } from '@/services/api';
-import type { CreateIndustryDto, UpdateIndustryDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { industriesService } from "@/services";
+import type { CreateIndustryDto, UpdateIndustryDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const industriesKey = {
-    all: ['industries'] as const,
-    lists: () => [...industriesKey.all, 'list'] as const,
+    all: ["industries"] as const,
+    lists: () => [...industriesKey.all, "list"] as const,
     list: (filters?: any) => [...industriesKey.lists(), { filters }] as const,
-    details: () => [...industriesKey.all, 'detail'] as const,
+    details: () => [...industriesKey.all, "detail"] as const,
     detail: (id: number) => [...industriesKey.details(), id] as const,
 };
 
@@ -34,9 +34,9 @@ export const useCreateIndustry = () => {
         mutationFn: (data: CreateIndustryDto) => industriesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: industriesKey.lists() });
-            toast.success('Industry created successfully');
+            toast.success("Industry created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -46,14 +46,13 @@ export const useUpdateIndustry = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateIndustryDto }) =>
-            industriesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateIndustryDto }) => industriesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: industriesKey.lists() });
             queryClient.invalidateQueries({ queryKey: industriesKey.detail(variables.id) });
-            toast.success('Industry updated successfully');
+            toast.success("Industry updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

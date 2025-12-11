@@ -1,13 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teamService } from '@/services/api/team.service';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
-import type { CreateTeamDto, UpdateTeamDto } from '@/types/api.types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { teamService } from "@/services/api/team.service";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
+import type { CreateTeamDto, UpdateTeamDto } from "@/types/api.types";
 
 export const teamKeys = {
-    all: ['teams'] as const,
-    list: () => [...teamKeys.all, 'list'] as const,
-    detail: (id: number) => [...teamKeys.all, 'detail', id] as const,
+    all: ["teams"] as const,
+    list: () => [...teamKeys.all, "list"] as const,
+    detail: (id: number) => [...teamKeys.all, "detail", id] as const,
 };
 
 interface UseTeamsOptions {
@@ -38,9 +38,9 @@ export function useCreateTeam() {
         mutationFn: (data: CreateTeamDto) => teamService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: teamKeys.all });
-            toast.success('Team created successfully');
+            toast.success("Team created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -50,13 +50,12 @@ export function useUpdateTeam() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateTeamDto }) =>
-            teamService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateTeamDto }) => teamService.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: teamKeys.all });
-            toast.success('Team updated successfully');
+            toast.success("Team updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

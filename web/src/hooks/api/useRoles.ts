@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { rolesService } from '@/services/api';
-import type { CreateRoleDto, UpdateRoleDto } from '@/types/api.types';
-import { handleQueryError } from '@/lib/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { rolesService } from "@/services";
+import type { CreateRoleDto, UpdateRoleDto } from "@/types/api.types";
+import { handleQueryError } from "@/lib/react-query";
+import { toast } from "sonner";
 
 export const rolesKey = {
-    all: ['roles'] as const,
-    lists: () => [...rolesKey.all, 'list'] as const,
+    all: ["roles"] as const,
+    lists: () => [...rolesKey.all, "list"] as const,
     list: (filters?: any) => [...rolesKey.lists(), { filters }] as const,
-    details: () => [...rolesKey.all, 'detail'] as const,
+    details: () => [...rolesKey.all, "detail"] as const,
     detail: (id: number) => [...rolesKey.details(), id] as const,
 };
 
@@ -34,9 +34,9 @@ export const useCreateRole = () => {
         mutationFn: (data: CreateRoleDto) => rolesService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
-            toast.success('Role created successfully');
+            toast.success("Role created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -46,14 +46,13 @@ export const useUpdateRole = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateRoleDto }) =>
-            rolesService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateRoleDto }) => rolesService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
             queryClient.invalidateQueries({ queryKey: rolesKey.detail(variables.id) });
-            toast.success('Role updated successfully');
+            toast.success("Role updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });

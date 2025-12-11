@@ -74,31 +74,67 @@ export class AuthService {
     }
 
     async generateGoogleLoginUrl(): Promise<{ url: string }> {
+        // Validate redirect URI format
+        try {
+            new URL(this.config.googleRedirect);
+        } catch {
+            throw new BadRequestException(
+                `Invalid redirect URI format: ${this.config.googleRedirect}. Must be a valid URL.`
+            );
+        }
+
         const state = await this.jwtService.signAsync({ purpose: "google-login" }, { secret: this.config.stateSecret, expiresIn: "5m" });
-        return this.googleService.createAuthUrlWithState(state);
+        return this.googleService.createAuthUrlWithState(state, this.config.googleRedirect);
     }
 
     async handleGoogleLoginCallback(code: string, state?: string): Promise<SessionWithToken> {
         if (!state) {
-            throw new BadRequestException("Missing OAuth state parameter");
+            throw new BadRequestException("Missing OAuth state parameter. The Google OAuth callback must include a state parameter.");
         }
 
+        if (!code || code.trim().length === 0) {
+            throw new BadRequestException("Missing or empty authorization code from Google OAuth callback.");
+        }
+
+        // Validate redirect URI format
         try {
-            GoogleLoginStateSchema.parse(
-                await this.jwtService.verifyAsync(state, {
-                    secret: this.config.stateSecret,
-                })
-            );
+            new URL(this.config.googleRedirect);
         } catch {
-            throw new BadRequestException("Google login state verification failed");
+            throw new BadRequestException(
+                `Invalid redirect URI configuration: ${this.config.googleRedirect}. Please check AUTH_GOOGLE_REDIRECT environment variable.`
+            );
         }
 
-        const exchangeResult = await this.googleService.exchangeCode(code);
+        let verifiedState;
+        try {
+            verifiedState = await this.jwtService.verifyAsync(state, {
+                secret: this.config.stateSecret,
+            });
+            GoogleLoginStateSchema.parse(verifiedState);
+        } catch (error) {
+            if (error instanceof Error && error.name === 'TokenExpiredError') {
+                throw new BadRequestException("Google login state has expired. Please try logging in again.");
+            }
+            throw new BadRequestException("Google login state verification failed. The state parameter may be invalid or tampered with.");
+        }
+
+        let exchangeResult;
+        try {
+            exchangeResult = await this.googleService.exchangeCode(code, this.config.googleRedirect);
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            throw new BadRequestException(
+                `Failed to exchange Google authorization code for tokens: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the redirect URI matches Google OAuth configuration.`
+            );
+        }
+
         const tokens = exchangeResult.tokens;
         const profile = exchangeResult.profile;
 
         if (!profile.email) {
-            throw new BadRequestException("Google account does not expose an email address");
+            throw new BadRequestException("Google account does not expose an email address. Please ensure your Google account has an email address and grants permission to share it.");
         }
 
         let user = await this.usersService.findByEmail(profile.email);

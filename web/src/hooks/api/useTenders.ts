@@ -68,9 +68,9 @@ export const useCreateTender = () => {
         mutationFn: (data: CreateTenderRequest) => tenderInfosService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
-            toast.success('Tender created successfully');
+            toast.success("Tender created successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -80,14 +80,13 @@ export const useUpdateTender = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateTenderRequest }) =>
-            tenderInfosService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateTenderRequest }) => tenderInfosService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
-            toast.success('Tender updated successfully');
+            toast.success("Tender updated successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
@@ -100,9 +99,9 @@ export const useDeleteTender = () => {
         mutationFn: (id: number) => tenderInfosService.remove(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
-            toast.success('Tender deleted successfully');
+            toast.success("Tender deleted successfully");
         },
-        onError: (error) => {
+        onError: error => {
             toast.error(handleQueryError(error));
         },
     });
