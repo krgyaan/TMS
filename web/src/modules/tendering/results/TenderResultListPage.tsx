@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, FileX2, Gavel, Trophy, XCircle, Eye } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -83,35 +83,6 @@ const getStatusVariant = (status: string): string => {
     }
 };
 
-const getEmdStatusVariant = (status: string | null): string => {
-    if (!status) return 'secondary';
-    const upperStatus = status.toUpperCase();
-
-    if (upperStatus.includes('REJECTED')) return 'destructive';
-    if (upperStatus.includes('APPROVED') || upperStatus.includes('COMPLETED')) return 'success';
-    if (upperStatus.includes('SUBMITTED') || upperStatus.includes('INITIATED')) return 'info';
-    if (upperStatus.includes('PENDING')) return 'warning';
-    return 'secondary';
-};
-
-const getCountForTab = (
-    tab: TabConfig,
-    data: ResultDashboardRow[] | undefined,
-    counts: any
-): number => {
-    if (counts) {
-        switch (tab.key) {
-            case 'pending':
-                return counts.pending;
-            case 'won':
-                return counts.won;
-            case 'lost':
-                return counts.lost;
-        }
-    }
-    return data?.filter(tab.filterFn).length || 0;
-};
-
 const TenderResultListPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<ResultDashboardType>('pending');
@@ -133,17 +104,15 @@ const TenderResultListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const { data: response, isLoading, error } = useResultDashboard({
-        type: activeTab,
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-        sortBy: sortModel[0]?.colId,
-        sortOrder: sortModel[0]?.sort,
-    });
+    const { data: apiResponse, isLoading, error } = useResultDashboard(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
 
-    const resultData = response?.data || [];
-    const counts = response?.counts || null;
-    const totalRows = response?.meta?.total || 0;
+    );
+
+    const resultData = apiResponse?.data || [];
+    const totalRows = apiResponse?.meta?.total || 0;
 
     const handleViewDetails = useCallback((row: ResultDashboardRow) => {
         if (row.id) {
@@ -270,13 +239,17 @@ const TenderResultListPage = () => {
                     if (!emd) return '—';
 
                     if (emd.displayText === 'Not Applicable') {
-                        return <span className="text-muted-foreground text-sm">N/A</span>;
+                        return (
+                            <Badge variant="secondary" className="text-xs">
+                                {emd.displayText}
+                            </Badge>
+                        );
                     }
 
                     if (emd.displayText === 'Not Requested') {
                         return (
                             <Badge variant="outline" className="text-xs">
-                                Not Requested
+                                {emd.displayText}
                             </Badge>
                         );
                     }
@@ -285,17 +258,17 @@ const TenderResultListPage = () => {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Badge
-                                    variant={getEmdStatusVariant(emd.instrumentStatus) as any}
+                                    variant='success'
                                     className="text-xs w-fit"
                                 >
-                                    {emd.amount}
+                                    {formatINR(parseFloat(emd.amount))}
                                 </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <div className="text-xs space-y-1">
                                     <p>Amount: {formatINR(parseFloat(emd.amount))}</p>
                                     <p>{emd.displayText}</p>
-                                    <p>Status: {emd.instrumentStatus || 'N/A'}</p>
+                                    <p>Status: {emd.instrumentStatus || '—'}</p>
                                 </div>
                             </TooltipContent>
                         </Tooltip>
@@ -331,9 +304,9 @@ const TenderResultListPage = () => {
     const tabsWithData = useMemo(() => {
         return TABS_CONFIG.map((tab) => ({
             ...tab,
-            count: getCountForTab(tab, resultData, counts),
+            count: activeTab === tab.key ? totalRows : 0,
         }));
-    }, [resultData, counts]);
+    }, [activeTab, totalRows, TABS_CONFIG]);
 
     if (isLoading) {
         return (
@@ -385,28 +358,6 @@ const TenderResultListPage = () => {
                                 Track and manage tender results after bid submission.
                             </CardDescription>
                         </div>
-                        {counts && (
-                            <div className="flex gap-4 text-sm">
-                                <StatBadge
-                                    label="Won"
-                                    count={counts.won}
-                                    variant="success"
-                                    icon={<Trophy className="h-3 w-3" />}
-                                />
-                                <StatBadge
-                                    label="Lost"
-                                    count={counts.lost}
-                                    variant="destructive"
-                                    icon={<XCircle className="h-3 w-3" />}
-                                />
-                                <StatBadge
-                                    label="Pending"
-                                    count={counts.pending}
-                                    variant="secondary"
-                                    icon={<Clock className="h-3 w-3" />}
-                                />
-                            </div>
-                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -435,10 +386,15 @@ const TenderResultListPage = () => {
                                 {activeTab === tab.key && (
                                     <>
                                         {(!resultData || resultData.length === 0) ? (
-                                            <EmptyState
-                                                title={`No ${tab.name.toLowerCase()} results`}
-                                                description={tab.description}
-                                            />
+                                            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                                <FileX2 className="h-12 w-12 mb-4" />
+                                                <p className="text-lg font-medium">No {tab.name.toLowerCase()} tender</p>
+                                                <p className="text-sm mt-2">
+                                                    {tab.key === 'pending'
+                                                        ? 'Tenders requiring result declaration will appear here'
+                                                        : 'Tender results will be shown here'}
+                                                </p>
+                                            </div>
                                         ) : (
                                             <DataTable
                                                 data={resultData}
@@ -470,33 +426,5 @@ const TenderResultListPage = () => {
         </>
     );
 };
-
-const EmptyState = ({ title, description }: { title: string; description: string }) => (
-    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-        <FileX2 className="h-12 w-12 mb-4" />
-        <p className="text-lg font-medium">{title}</p>
-        <p className="text-sm mt-2">{description}</p>
-    </div>
-);
-
-const StatBadge = ({
-    label,
-    count,
-    variant,
-    icon,
-}: {
-    label: string;
-    count: number;
-    variant: string;
-    icon: React.ReactNode;
-}) => (
-    <div className="flex items-center gap-1.5">
-        <Badge variant={variant as any} className="gap-1">
-            {icon}
-            {count}
-        </Badge>
-        <span className="text-muted-foreground text-xs">{label}</span>
-    </div>
-);
 
 export default TenderResultListPage;

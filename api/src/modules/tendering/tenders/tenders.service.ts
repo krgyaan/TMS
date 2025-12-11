@@ -12,11 +12,6 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 
-// export type TenderListFilters = {
-//     statusIds?: number[];
-//     unallocated?: boolean;
-// };
-
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
     teamMemberName: string | null;
