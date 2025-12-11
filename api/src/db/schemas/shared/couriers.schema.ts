@@ -1,8 +1,12 @@
 // src/db/couriers.schema.ts
-import { pgTable, serial, integer, varchar, text, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, bigint, integer, varchar, text, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const couriers = pgTable("couriers", {
-    id: serial("id").primaryKey(),
+    // id: integer("id").primaryKey(),
+    id: bigint("id", { mode: "number" })
+        .primaryKey()
+        .default(sql`nextval('courier_id_seq')`),
     user_id: integer("user_id").notNull(),
 
     // Recipient details
