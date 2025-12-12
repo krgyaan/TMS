@@ -59,24 +59,24 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
         resolver: zodResolver(PhysicalDocsFormSchema),
         defaultValues: {
             tenderId: tenderId,
-            courierNo: 0,
+            courierNo: undefined!,
             submittedDocs: [],
             physicalDocsPersons: [],
-        } as unknown as FormValues,
+        },
     });
 
     useEffect(() => {
         if (existingData) {
             form.reset({
                 tenderId: tenderId,
-                courierNo: existingData.courierNo || 0,
+                courierNo: existingData.courierNo || undefined!,
                 submittedDocs: existingData.submittedDocs?.split(',') || [],
                 physicalDocsPersons: existingData.persons?.map((person) => ({
                     name: person.name,
                     email: person.email,
                     phone: person.phone,
                 })) || [],
-            } as unknown as FormValues);
+            });
         }
     }, [existingData, form, tenderId]);
 

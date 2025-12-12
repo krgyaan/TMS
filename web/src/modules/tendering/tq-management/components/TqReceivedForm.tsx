@@ -65,7 +65,7 @@ export default function TqReceivedForm({
             tenderId: tenderId,
             tqSubmissionDeadline: '',
             tqDocumentReceived: '',
-            tqItems: [{ tqTypeId: 0, queryDescription: '' }],
+            tqItems: [],
         },
     });
 

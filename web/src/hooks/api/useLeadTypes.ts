@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { leadTypesService } from "@/services";
+import { leadTypesService } from "@/services/api";
 import type { CreateLeadTypeDto, UpdateLeadTypeDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";

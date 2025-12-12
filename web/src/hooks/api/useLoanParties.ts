@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { loanPartiesService } from "@/services";
+import { loanPartiesService } from "@/services/api";
 import type { CreateLoanPartyDto, UpdateLoanPartyDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";

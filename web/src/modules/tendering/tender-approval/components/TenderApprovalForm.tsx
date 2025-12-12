@@ -49,7 +49,7 @@ const TenderApprovalFormSchema = z.object({
 }).refine((data) => {
     // If incomplete status, must have at least 1 incomplete field
     if (data.tlDecision === '3') {
-        return data.incompleteFields && data.incompleteFields.length > 0;
+        return Array.isArray(data.incompleteFields) && data.incompleteFields.length > 0;
     }
     return true;
 }, {

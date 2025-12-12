@@ -116,7 +116,7 @@ export function EmdTenderFeeRequestForm({ tenderId }: EmdTenderFeeRequestFormPro
     const createRequest = useCreatePaymentRequest();
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(EmdRequestSchema) as any,
+        resolver: zodResolver(EmdRequestSchema),
         defaultValues: {
             emd: { mode: undefined, details: {} },
             tenderFee: { mode: undefined, details: {} },

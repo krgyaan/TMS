@@ -1,5 +1,5 @@
 ﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { statusesService } from "@/services";
+import { statusesService } from "@/services/api";
 import type { Status } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";

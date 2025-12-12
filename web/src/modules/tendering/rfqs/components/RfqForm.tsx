@@ -107,8 +107,9 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                 }
             });
 
+            const dueDateValue = initialData.dueDate ? new Date(initialData.dueDate) : new Date();
             form.reset({
-                dueDate: new Date(initialData.dueDate || Date.now()),
+                dueDate: dueDateValue,
                 docList: initialData.docList || '',
                 items: initialData.items.map(i => ({
                     requirement: i.requirement,
@@ -214,7 +215,13 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                         <div className="space-y-4">
                             <div className="w-full md:w-1/3">
                                 <FieldWrapper control={form.control} name="dueDate" label="RFQ Due Date">
-                                    {(field) => <DateTimeInput value={field.value?.toISOString() || ''} onChange={field.onChange} placeholder="Select date and time" />}
+                                    {(field) => (
+                                        <DateTimeInput
+                                            value={field.value ? (field.value instanceof Date ? field.value.toISOString().slice(0, 16) : String(field.value)) : ''}
+                                            onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
+                                            placeholder="Select date and time"
+                                        />
+                                    )}
                                 </FieldWrapper>
                             </div>
 

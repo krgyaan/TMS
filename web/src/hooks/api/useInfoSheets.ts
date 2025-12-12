@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { infoSheetsService } from "@/services";
+import { infoSheetsService } from "@/services/api";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import type { SaveTenderInfoSheetDto } from "@/types/api.types";

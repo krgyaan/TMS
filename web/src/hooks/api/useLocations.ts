@@ -1,5 +1,5 @@
 ﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { locationsService } from "@/services";
+import { locationsService } from "@/services/api";
 import type { Location } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";

@@ -162,13 +162,9 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     };
 
     const handleAiSubmit: SubmitHandler<AiFormValues> = async _values => {
-        try {
-            // TODO: Implement AI-based tender creation workflow
-            // await createTender.mutateAsync(payload);
-            // navigate(paths.tendering.tenders);
-        } catch (error) {
-            console.error("AI form error:", error);
-        }
+        // AI form submission is not yet implemented
+        // This feature will be available in a future update
+        alert("AI-based tender creation is not yet available. Please use the manual form instead.");
     };
 
     const saving = createTender.isPending || updateTender.isPending;
@@ -223,8 +219,8 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                 </div>
 
                                 <div className="w-full flex items-center justify-center gap-2">
-                                    <Button type="submit" disabled={saving}>
-                                        {saving ? "Processing..." : "Submit with AI"}
+                                    <Button type="submit" disabled={true} title="AI-based tender creation is not yet available">
+                                        Coming Soon - Submit with AI
                                     </Button>
                                     <Button type="button" variant="outline" onClick={() => aiForm.reset()} disabled={saving}>
                                         Reset
