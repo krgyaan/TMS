@@ -6,7 +6,7 @@ import { clientDirectory } from "../../db/schemas/shared/client-directory.schema
 import { users } from "../../db/schemas/auth/users.schema";
 
 import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpDetailsDto } from "./zod";
-import { DRIZZLE } from "../../db/schemas/shared/database.module";
+import { DRIZZLE } from "../../db/database.module";
 import type { DbInstance } from "../../db";
 
 export const FREQUENCY_LABELS: Record<number, string> = {

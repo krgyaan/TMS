@@ -2,7 +2,7 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, and, desc } from "drizzle-orm";
 
-import { DRIZZLE } from "../../db/schemas/shared/database.module";
+import { DRIZZLE } from "../../db/database.module";
 import type { DbInstance } from "../../db";
 import { couriers } from "../../db/schemas/shared/couriers.schema";
 import { users } from "../../db//schemas/auth/users.schema";
