@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -15,8 +15,15 @@ import { useCreateUser, useUpdateUser } from '@/hooks/api/useUsers'
 import { useCreateUserProfile, useUpdateUserProfile } from '@/hooks/api/useUserProfiles'
 import { useTeams } from '@/hooks/api/useTeams'
 import { useDesignations } from '@/hooks/api/useDesignations'
+import { useRoles } from '@/hooks/api/useRoles'
+import { usePermissions } from '@/hooks/api/usePermissions'
+import { useUserRole, useAssignUserRole, useUpdateUserRole } from '@/hooks/api/useUserRoles'
+import { useUserPermissions, useAssignUserPermissions, useUpdateUserPermissions } from '@/hooks/api/useUserPermissions'
 import { SelectField } from '@/components/form/SelectField'
-import type { User, CreateUserDto, UpdateUserDto, UserProfile } from '@/types/api.types'
+import { PermissionSelector } from '@/components/PermissionSelector'
+import { rolesService } from '@/services/api/role.service'
+import type { User, CreateUserDto, UpdateUserDto, Permission, UserPermission } from '@/types/api.types'
+import type { UserProfile, UserRole } from '@/types/auth.types'
 
 const preprocessText = (value: unknown) => {
     if (typeof value !== 'string') {
@@ -83,6 +90,7 @@ const UserFormSchema = z.object({
             message: 'Password must be at least 6 characters',
         }),
     isActive: z.boolean().default(true),
+    roleId: z.number().int().positive('Role is required').optional(),
     profile: ProfileSchema,
 })
 
@@ -101,6 +109,49 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
     const updateProfile = useUpdateUserProfile()
     const { data: teams = [] } = useTeams()
     const { data: designations = [] } = useDesignations()
+    const { data: roles = [] } = useRoles()
+    const { data: allPermissions = [] } = usePermissions()
+    const assignRole = useAssignUserRole()
+    const updateRole = useUpdateUserRole()
+    const assignPermissions = useAssignUserPermissions()
+    const updatePermissions = useUpdateUserPermissions()
+
+    // State for role and permissions
+    const [selectedRoleId, setSelectedRoleId] = useState<string>('')
+    const [rolePermissions, setRolePermissions] = useState<Permission[]>([])
+    const [selectedPermissions, setSelectedPermissions] = useState<Map<number, boolean>>(new Map())
+
+    // Load user role and permissions in edit mode
+    const { data: userRole } = useUserRole(mode === 'edit' && user ? user.id : null)
+    const { data: userPermissionsData } = useUserPermissions(mode === 'edit' && user ? user.id : null)
+
+    // Load role permissions when role is selected
+    useEffect(() => {
+        if (selectedRoleId) {
+            rolesService
+                .getRolePermissions(Number(selectedRoleId))
+                .then((perms) => setRolePermissions(perms))
+                .catch(() => setRolePermissions([]))
+        } else {
+            setRolePermissions([])
+        }
+    }, [selectedRoleId])
+
+    // Initialize role and permissions in edit mode
+    useEffect(() => {
+        if (mode === 'edit' && user) {
+            if (userRole) {
+                setSelectedRoleId(String((userRole as UserRole).id))
+            }
+            if (userPermissionsData && Array.isArray(userPermissionsData)) {
+                const permMap = new Map<number, boolean>()
+                userPermissionsData.forEach((up: UserPermission) => {
+                    permMap.set(up.permissionId, up.granted)
+                })
+                setSelectedPermissions(permMap)
+            }
+        }
+    }, [mode, user, userRole, userPermissionsData])
 
     const form = useForm<UserFormValues>({
         resolver: zodResolver(UserFormSchema) as any,
@@ -163,6 +214,33 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
         [designations],
     )
 
+    const roleOptions = useMemo(
+        () => [
+            { id: '', name: 'None' },
+            ...roles.map((role) => ({ id: String(role.id), name: role.name })),
+        ],
+        [roles],
+    )
+
+    const handlePermissionChange = (permissionId: number, granted: boolean) => {
+        setSelectedPermissions((prev) => {
+            const next = new Map(prev)
+            if (granted) {
+                next.set(permissionId, true)
+            } else {
+                // If it's an inherited permission, we need to explicitly deny it
+                // Otherwise, remove it
+                const isInherited = rolePermissions.some((p) => p.id === permissionId)
+                if (isInherited) {
+                    next.set(permissionId, false)
+                } else {
+                    next.delete(permissionId)
+                }
+            }
+            return next
+        })
+    }
+
     const hasProfileData = (profile: UserFormValues['profile']) => {
         return Object.entries(profile).some(([key, value]) => {
             if (value == null) {
@@ -188,7 +266,7 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
     const mapProfilePayload = (
         profile: UserFormValues['profile'],
         userId: number,
-    ): Omit<UserProfile, 'id'> => {
+    ): Omit<UserProfile, 'id' | 'createdAt' | 'updatedAt'> => {
         const payload: Omit<UserProfile, 'id'> = {
             userId,
             firstName: profile.firstName ?? null,
@@ -207,6 +285,8 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             dateOfExit: profile.dateOfExit ?? null,
             timezone: profile.timezone ?? null,
             locale: profile.locale ?? null,
+            createdAt: null,
+            updatedAt: null,
         }
 
         return payload
@@ -218,7 +298,12 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             return
         }
 
-        const basePayload: Omit<CreateUserDto, 'password'> & { password?: string } = {
+        if (mode === 'create' && !selectedRoleId) {
+            form.setError('roleId', { type: 'manual', message: 'Role is required' })
+            return
+        }
+
+        const basePayload: Omit<CreateUserDto, 'password'> & { password?: string; roleId?: number } = {
             name: values.name.trim(),
             email: values.email.trim().toLowerCase(),
             username: values.username?.trim() ? values.username.trim() : null,
@@ -230,26 +315,68 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             basePayload.password = values.password
         }
 
+        if (mode === 'create' && selectedRoleId) {
+            basePayload.roleId = Number(selectedRoleId)
+        }
+
         const profilePayload = (userId: number) => mapProfilePayload(values.profile, userId)
         const shouldPersistProfile = hasProfileData(values.profile)
 
+        let userId: number
+
         if (mode === 'create') {
             const createdUser = await createUser.mutateAsync(basePayload as CreateUserDto)
-            if (createdUser?.id && shouldPersistProfile) {
-                await createProfile.mutateAsync(profilePayload(createdUser.id))
+            userId = createdUser.id
+            if (shouldPersistProfile) {
+                await createProfile.mutateAsync({ ...profilePayload(userId), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+            }
+
+            // Role is already assigned in backend, but assign permissions if any are selected
+            if (selectedPermissions.size > 0) {
+                const permissionsArray = Array.from(selectedPermissions.entries()).map(([permissionId, granted]) => ({
+                    permissionId,
+                    granted,
+                }))
+                await assignPermissions.mutateAsync({
+                    userId,
+                    data: { permissions: permissionsArray },
+                })
             }
         } else if (user) {
-            await updateUser.mutateAsync({ id: user.id, data: basePayload as UpdateUserDto })
+            userId = user.id
+            await updateUser.mutateAsync({ id: userId, data: basePayload as UpdateUserDto })
             if (shouldPersistProfile) {
                 if (user.profile) {
                     await updateProfile.mutateAsync({
-                        userId: user.id,
-                        data: profilePayload(user.id),
+                        userId,
+                        data: profilePayload(userId),
                     })
                 } else {
-                    await createProfile.mutateAsync(profilePayload(user.id))
+                    await createProfile.mutateAsync(profilePayload(userId))
                 }
             }
+
+            // Update role if changed
+            if (selectedRoleId && Number(selectedRoleId) !== userRole?.id) {
+                await updateRole.mutateAsync({
+                    userId,
+                    data: { roleId: Number(selectedRoleId) },
+                })
+            }
+
+            // Update permissions if changed
+            if (selectedPermissions.size > 0) {
+                const permissionsArray = Array.from(selectedPermissions.entries()).map(([permissionId, granted]) => ({
+                    permissionId,
+                    granted,
+                }))
+                await updatePermissions.mutateAsync({
+                    userId,
+                    data: { permissions: permissionsArray },
+                })
+            }
+        } else {
+            return
         }
 
         navigate(paths.master.users)
@@ -259,7 +386,11 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
         createUser.isPending ||
         updateUser.isPending ||
         createProfile.isPending ||
-        updateProfile.isPending
+        updateProfile.isPending ||
+        assignRole.isPending ||
+        updateRole.isPending ||
+        assignPermissions.isPending ||
+        updatePermissions.isPending
 
     return (
         <Card>
@@ -320,6 +451,65 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                                 </FormItem>
                             )}
                         />
+
+                        <div className="space-y-4 rounded-md border p-4">
+                            <div>
+                                <p className="text-sm font-semibold">Role & Permissions</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Assign a role and customize permissions for this user.
+                                </p>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Role <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={selectedRoleId}
+                                        onChange={(e) => setSelectedRoleId(e.target.value)}
+                                        disabled={saving}
+                                        required={mode === 'create'}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <option value="">{mode === 'create' ? 'Select a role' : 'None'}</option>
+                                        {roleOptions.filter(opt => opt.id !== '').map((option) => (
+                                            <option key={option.id} value={option.id}>
+                                                {option.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {form.formState.errors.roleId && (
+                                        <p className="text-sm text-red-500">{form.formState.errors.roleId.message}</p>
+                                    )}
+                                </div>
+                                {selectedRoleId && (
+                                    <div className="mt-4">
+                                        <p className="text-sm font-medium mb-2">Permissions</p>
+                                        <p className="text-xs text-muted-foreground mb-4">
+                                            Permissions inherited from role are shown with "(from role)" label. You can override them by checking/unchecking.
+                                        </p>
+                                        <PermissionSelector
+                                            permissions={allPermissions}
+                                            selectedPermissions={Array.from(selectedPermissions.entries())
+                                                .map(([permissionId, granted]) => {
+                                                    const perm = allPermissions.find((p) => p.id === permissionId)
+                                                    if (!perm) return null
+                                                    return {
+                                                        id: 0,
+                                                        permissionId,
+                                                        module: perm.module,
+                                                        action: perm.action,
+                                                        description: perm.description ?? null,
+                                                        granted,
+                                                    } as UserPermission
+                                                })
+                                                .filter((p): p is UserPermission => p !== null)}
+                                            rolePermissions={rolePermissions}
+                                            onChange={handlePermissionChange}
+                                            disabled={saving}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         <div className="space-y-4 rounded-md border p-4">
                             <div>

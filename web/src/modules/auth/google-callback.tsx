@@ -28,11 +28,12 @@ const GoogleLoginCallback = () => {
             const code = params.get("code");
             const state = params.get("state");
             const errorParam = params.get("error");
+            const successParam = params.get("success");
 
             console.log("🔍 Google Callback - Processing...");
-            console.log("📋 URL Params:", { code: !!code, state: !!state, error: errorParam });
+            console.log("📋 URL Params:", { code: !!code, state: !!state, error: errorParam, success: successParam });
 
-            // Handle error from Google
+            // Handle error from Google or backend
             if (errorParam) {
                 console.error("❌ Google OAuth error:", errorParam);
                 setError(`Google sign-in failed: ${errorParam}`);
@@ -43,7 +44,44 @@ const GoogleLoginCallback = () => {
                 return;
             }
 
-            // Validate we have the code
+            // If backend already processed the callback (success=true), verify auth and redirect
+            if (successParam === "true") {
+                console.log("✅ Backend already processed callback, verifying authentication...");
+                setMessage("Verifying authentication...");
+
+                try {
+                    // Verify user is authenticated by checking current user
+                    const response = await authService.getCurrentUser();
+                    const user = response.user as AuthUser;
+
+                    console.log("✅ User authenticated");
+                    console.log("👤 User:", user.name);
+                    console.log("🎭 Role:", user.role?.name ?? "No role");
+                    console.log("👥 Team:", user.team?.name ?? "No team");
+
+                    // Store user data
+                    setStoredUser(user);
+                    queryClient.setQueryData(authKeys.currentUser, user);
+
+                    setMessage("Success! Redirecting...");
+                    toast.success(`Welcome, ${user.name}!`);
+
+                    // Navigate to dashboard
+                    setTimeout(() => {
+                        navigate("/", { replace: true });
+                    }, 500);
+                } catch (err) {
+                    console.error("❌ Failed to verify authentication:", err);
+                    setError("Failed to verify authentication");
+                    setMessage("");
+                    clearAuthSession();
+                    toast.error("Authentication verification failed");
+                    setTimeout(() => navigate("/login", { replace: true }), 2000);
+                }
+                return;
+            }
+
+            // Validate we have the code (for direct frontend callback flow)
             if (!code) {
                 console.error("❌ No authorization code received");
                 setError("No authorization code received from Google");

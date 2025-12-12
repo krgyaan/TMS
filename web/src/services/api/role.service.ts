@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { Role, CreateRoleDto, UpdateRoleDto } from '@/types/api.types';
+import type { Role, CreateRoleDto, UpdateRoleDto, Permission } from '@/types/api.types';
 
 class RolesService extends BaseApiService {
     constructor() {
@@ -22,13 +22,21 @@ class RolesService extends BaseApiService {
         return this.patch<Role>(`/${id}`, data);
     }
 
-    // async delete(id: number): Promise<void> {
-    //     return this.delete<void>(`/${id}`);
-    // }
+    async getRolePermissions(id: number): Promise<Permission[]> {
+        return this.get<Permission[]>(`/${id}/permissions`);
+    }
 
-    // async search(query: string): Promise<Role[]> {
-    //     return this.get<Role[]>('/search', { params: { q: query } });
-    // }
+    async deleteRole(id: number): Promise<void> {
+        return this.delete<void>(`/${id}`);
+    }
+
+    async assignPermissions(roleId: number, permissionIds: number[]): Promise<void> {
+        return this.post<void>(`/${roleId}/permissions`, { permissionIds });
+    }
+
+    async removePermission(roleId: number, permissionId: number): Promise<void> {
+        return this.delete<void>(`/${roleId}/permissions/${permissionId}`);
+    }
 }
 
 export const rolesService = new RolesService();

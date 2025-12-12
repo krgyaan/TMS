@@ -15,10 +15,14 @@ import type { ActionItem } from '@/components/ui/ActionMenu'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { paths } from '@/app/routes/paths'
 import { useUsers, useDeleteUser } from '@/hooks/api/useUsers'
+import { useRoles } from '@/hooks/api/useRoles'
+import { useDesignations } from '@/hooks/api/useDesignations'
+import { useTeams } from '@/hooks/api/useTeams'
+import { usePermissions } from '@/hooks/api/usePermissions'
 import type { User } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Mail, Phone, UserRound } from 'lucide-react'
+import { AlertCircle, Mail, Phone, UserRound, Shield, Briefcase, Users, KeyRound, ArrowRight } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -43,6 +47,10 @@ const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
 const UserPage = () => {
     const navigate = useNavigate()
     const { data: users, isLoading, error, refetch } = useUsers()
+    const { data: roles = [] } = useRoles()
+    const { data: designations = [] } = useDesignations()
+    const { data: teams = [] } = useTeams()
+    const { data: permissions = [] } = usePermissions()
     const deleteUser = useDeleteUser()
     const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null })
 
@@ -163,6 +171,77 @@ const UserPage = () => {
 
     return (
         <>
+            {/* Dashboard Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+                <Card
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(paths.master.roles)}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Roles</CardTitle>
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{roles.length}</div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            Total roles
+                            <ArrowRight className="h-3 w-3" />
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(paths.master.designations)}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Designations</CardTitle>
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{designations.length}</div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            Total designations
+                            <ArrowRight className="h-3 w-3" />
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(paths.master.teams)}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Teams</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{teams.length}</div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            Total teams
+                            <ArrowRight className="h-3 w-3" />
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(paths.master.permissions)}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Permissions</CardTitle>
+                        <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{permissions.length}</div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            Total permissions
+                            <ArrowRight className="h-3 w-3" />
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+
             <Card>
                 <CardHeader>
                     <CardTitle>Employees</CardTitle>

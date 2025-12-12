@@ -12,16 +12,16 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import {
     useDesignations,
+    useDeleteDesignation,
 } from '@/hooks/api/useDesignations';
 import type { Designation } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { DesignationModal } from './components/DesignationModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -35,16 +35,17 @@ const DesignationPage = () => {
         error,
         refetch,
     } = useDesignations();
-    // const deleteCategory = useDeleteDesignation();
-    const navigate = useNavigate()
+    const deleteCategory = useDeleteDesignation();
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedDesignation, setSelectedDesignation] = useState<Designation | null>(null);
 
     // Category actions
     const categoryActions: ActionItem<Designation>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.designations_edit(row.id));
+                setSelectedDesignation(row);
+                setModalOpen(true);
             },
         },
         {
@@ -53,7 +54,7 @@ const DesignationPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        // await deleteCategory.mutateAsync(row.id);
+                        await deleteCategory.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -148,11 +149,15 @@ const DesignationPage = () => {
                     Manage designations for user management
                 </CardDescription>
                 <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.followupCategories_create}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Designation
-                        </NavLink>
+                    <Button
+                        variant="default"
+                        onClick={() => {
+                            setSelectedDesignation(null);
+                            setModalOpen(true);
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add New Designation
                     </Button>
                 </CardAction>
             </CardHeader>
@@ -180,6 +185,19 @@ const DesignationPage = () => {
                     height="100%"
                 />
             </CardContent>
+            <DesignationModal
+                open={modalOpen}
+                onOpenChange={(open) => {
+                    setModalOpen(open);
+                    if (!open) {
+                        setSelectedDesignation(null);
+                    }
+                }}
+                designation={selectedDesignation}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
         </Card>
     );
 };

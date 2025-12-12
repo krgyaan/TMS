@@ -56,6 +56,7 @@ import { BidSubmissionsModule } from "@/modules/tendering/bid-submissions/bid-su
 import { TqManagementModule } from "@/modules/tendering/tq-management/tq-management.module";
 import { ReverseAuctionModule } from "@/modules/tendering/reverse-auction/reverse-auction.module";
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
+import { PermissionsModule } from "./modules/master/permissions/permissions.module";
 
 @Module({
     imports: [
@@ -81,6 +82,7 @@ import { TenderResultModule } from "@/modules/tendering/tender-result/tender-res
         DatabaseModule,
         UsersModule,
         RolesModule,
+        PermissionsModule,
         DesignationsModule,
         TeamsModule,
         UserProfilesModule,

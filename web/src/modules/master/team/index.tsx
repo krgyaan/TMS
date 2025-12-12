@@ -5,14 +5,13 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { useTeams } from '@/hooks/api/useTeams';
+import { useTeams, useDeleteTeam } from '@/hooks/api/useTeams';
 import type { Team } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TeamModal } from './components/TeamModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -21,15 +20,16 @@ const rowSelection: RowSelectionOptions = {
 
 const TeamsPage = () => {
     const { data: teams, isLoading, error, refetch } = useTeams();
-    // const deleteTeam = useDeleteTeam();
-    const navigate = useNavigate()
+    const deleteTeam = useDeleteTeam();
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
     const teamActions: ActionItem<Team>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.teams_edit(row.id));
+                setSelectedTeam(row);
+                setModalOpen(true);
             },
         },
         {
@@ -38,7 +38,7 @@ const TeamsPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        // await deleteTeam.mutateAsync(row.id);
+                        await deleteTeam.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -133,11 +133,15 @@ const TeamsPage = () => {
                 <CardTitle>Teams</CardTitle>
                 <CardDescription>Manage organizational teams</CardDescription>
                 <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.teams_create}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Team
-                        </NavLink>
+                    <Button
+                        variant="default"
+                        onClick={() => {
+                            setSelectedTeam(null);
+                            setModalOpen(true);
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Team
                     </Button>
                 </CardAction>
             </CardHeader>
@@ -165,6 +169,19 @@ const TeamsPage = () => {
                     height="100%"
                 />
             </CardContent>
+            <TeamModal
+                open={modalOpen}
+                onOpenChange={(open) => {
+                    setModalOpen(open);
+                    if (!open) {
+                        setSelectedTeam(null);
+                    }
+                }}
+                team={selectedTeam}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
         </Card>
     );
 };

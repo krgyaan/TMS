@@ -58,17 +58,51 @@ export const useUpdateRole = () => {
     });
 };
 
-// export const useDeleteRole = () => {
-//     const queryClient = useQueryClient();
+export const useDeleteRole = () => {
+    const queryClient = useQueryClient();
 
-//     return useMutation({
-//         mutationFn: (id: number) => rolesService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
-//             toast.success('Role deleted successfully');
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error));
-//         },
-//     });
-// };
+    return useMutation({
+        mutationFn: (id: number) => rolesService.deleteRole(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
+            toast.success('Role deleted successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useAssignRolePermissions = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ roleId, permissionIds }: { roleId: number; permissionIds: number[] }) =>
+            rolesService.assignPermissions(roleId, permissionIds),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: rolesKey.detail(variables.roleId) });
+            queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
+            toast.success('Permissions assigned successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useRemoveRolePermission = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ roleId, permissionId }: { roleId: number; permissionId: number }) =>
+            rolesService.removePermission(roleId, permissionId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: rolesKey.detail(variables.roleId) });
+            queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
+            toast.success('Permission removed successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};

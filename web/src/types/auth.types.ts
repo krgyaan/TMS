@@ -54,6 +54,7 @@ export interface AuthUser {
     username: string | null;
     mobile: string | null;
     isActive: boolean;
+    image: string | null;
     createdAt: string;
     updatedAt: string;
     profile: UserProfile | null;

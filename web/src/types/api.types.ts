@@ -63,6 +63,7 @@ export interface CreateUserDto {
     mobile?: string | null
     password: string
     isActive?: boolean
+    roleId: number
 }
 
 export interface UpdateUserDto extends Partial<CreateUserDto> { }
@@ -407,6 +408,38 @@ export interface CreateRoleDto {
 }
 
 export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
+
+// ========== PERMISSIONS ==========
+export interface Permission {
+    id: number;
+    module: string;
+    action: string;
+    description?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UserPermission {
+    id: number;
+    permissionId: number;
+    module: string;
+    action: string;
+    description?: string | null;
+    granted: boolean;
+}
+
+export interface AssignRoleDto {
+    roleId: number;
+}
+
+export interface AssignPermissionDto {
+    permissionId: number;
+    granted: boolean;
+}
+
+export interface AssignPermissionsDto {
+    permissions: AssignPermissionDto[];
+}
 
 // ========== STATES ==========
 export interface State {

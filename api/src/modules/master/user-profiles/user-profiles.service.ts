@@ -49,4 +49,14 @@ export class UserProfilesService {
 
         return rows[0];
     }
+
+    async updateAvatar(userId: number, filePath: string): Promise<UserProfile> {
+        const existingProfile = await this.findByUserId(userId);
+
+        if (existingProfile) {
+            return this.updateByUserId(userId, { image: filePath });
+        } else {
+            return this.create({ userId, image: filePath });
+        }
+    }
 }

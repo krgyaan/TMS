@@ -22,6 +22,7 @@ const CRMRoutes = lazy(() => import("./sections/crm.routes"));
 const PerformanceRoutes = lazy(() => import("./sections/performance.routes"));
 const IntegrationsRoutes = lazy(() => import("./sections/integrations.routes"));
 const SharedRoutes = lazy(() => import("./sections/shared.routes"));
+const Profile = lazy(() => import("@/modules/profile"));
 
 export default function AppRoutes() {
     return (
@@ -46,6 +47,16 @@ export default function AppRoutes() {
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+                    {/* Profile */}
+                    <Route
+                        path="/profile"
+                        element={
+                            <RouteWrapper>
+                                <Profile />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Integrations */}
                     <Route

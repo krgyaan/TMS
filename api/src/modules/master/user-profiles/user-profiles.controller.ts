@@ -6,9 +6,15 @@ import {
     ParseIntPipe,
     Patch,
     Post,
+    UseGuards,
+    BadRequestException,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { UserProfilesService } from '@/modules/master/user-profiles/user-profiles.service';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { ProfileEditGuard } from './guards/profile-edit.guard';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 const CreateUserProfileSchema = z.object({
     userId: z.number(),
@@ -39,6 +45,7 @@ const UpdateUserProfileSchema = CreateUserProfileSchema.partial().omit({
 type UpdateUserProfileDto = z.infer<typeof UpdateUserProfileSchema>;
 
 @Controller('user-profiles')
+@UseGuards(JwtAuthGuard)
 export class UserProfilesController {
     constructor(private readonly userProfilesService: UserProfilesService) { }
 
@@ -59,11 +66,32 @@ export class UserProfilesController {
     }
 
     @Patch(':userId')
+    @UseGuards(ProfileEditGuard)
     async update(
         @Param('userId', ParseIntPipe) userId: number,
         @Body() body: unknown,
+        @CurrentUser() currentUser: ValidatedUser,
     ) {
         const parsed = UpdateUserProfileSchema.parse(body);
         return this.userProfilesService.updateByUserId(userId, parsed);
+    }
+
+    @Post(':userId/avatar')
+    @UseGuards(ProfileEditGuard)
+    async uploadAvatar(
+        @Param('userId', ParseIntPipe) userId: number,
+        @Body() body: unknown,
+    ) {
+        const schema = z.object({
+            image: z.string().min(1, 'Image path is required'),
+        });
+        const parsed = schema.parse(body);
+
+        if (!parsed.image) {
+            throw new BadRequestException('Image path is required');
+        }
+
+        await this.userProfilesService.updateAvatar(userId, parsed.image);
+        return { message: 'Avatar updated successfully', path: parsed.image };
     }
 }
