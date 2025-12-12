@@ -1445,3 +1445,63 @@ export interface TenderListParams {
     limit?: number;
     search?: string;
 }
+
+export interface RfqDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    itemName: string;
+    rfqTo: string;
+    teamMemberName: string;
+    statusName: string;
+    dueDate: Date;
+    rfqId: number | null;
+    vendorOrganizationNames: string | null;
+}
+
+export interface Rfq {
+}
+
+export interface RfqItem {
+    id: number;
+    rfqId: number;
+    requirement: string;
+    unit: string | null;
+    qty: string | null;
+}
+
+export interface RfqDocument {
+    id: number;
+    rfqId: number;
+    docType: string;
+    path: string;
+    metadata: any;
+}
+
+export interface CreateRfqDto {
+    tenderId: number;
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
+    documents?: Array<{
+        docType: string;
+        path: string;
+        metadata?: any;
+    }>;
+}
+
+export interface UpdateRfqDto {
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items?: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
+}

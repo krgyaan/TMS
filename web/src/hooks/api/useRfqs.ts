@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CreateRfqDto, UpdateRfqDto, VendorOrganizationWithRelations } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
-import { rfqsService } from "@/services/rfqs.service";
-import { vendorOrganizationsService } from "@/services/vendor-organization.service";
+import { rfqsService } from "@/services/api";
+import { vendorOrganizationsService } from "@/services/api";
 
 export const rfqsKey = {
     all: ["rfqs"] as const,
