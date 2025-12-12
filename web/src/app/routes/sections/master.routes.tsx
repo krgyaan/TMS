@@ -73,13 +73,9 @@ const Master_EMDResponsibility_Edit = lazy(() => import('@/modules/master/emd-re
 
 // Designations
 const Master_Designation = lazy(() => import('@/modules/master/designation'));
-const Master_Designation_Create = lazy(() => import('@/modules/master/designation/create'));
-const Master_Designation_Edit = lazy(() => import('@/modules/master/designation/edit'));
 
 // Roles
 const Master_Role = lazy(() => import('@/modules/master/role'));
-const Master_Role_Create = lazy(() => import('@/modules/master/role/create'));
-const Master_Role_Edit = lazy(() => import('@/modules/master/role/edit'));
 
 // Permissions
 const Master_Permissions = lazy(() => import('@/modules/master/permissions'));
@@ -111,8 +107,6 @@ const Master_State_Edit = lazy(() => import('@/modules/master/state/edit'));
 
 // Teams
 const Master_Team = lazy(() => import('@/modules/master/team'));
-const Master_Team_Create = lazy(() => import('@/modules/master/team/create'));
-const Master_Team_Edit = lazy(() => import('@/modules/master/team/edit'));
 
 // Lead Types
 const Master_LeadType = lazy(() => import('@/modules/master/lead-type'));
@@ -238,18 +232,10 @@ export default function MasterRoutes() {
             </Route>
 
             {/* Designations */}
-            <Route path="designations">
-                <Route index element={<RouteWrapper><Master_Designation /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_Designation_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_Designation_Edit /></RouteWrapper>} />
-            </Route>
+            <Route path="designations" element={<RouteWrapper><Master_Designation /></RouteWrapper>} />
 
             {/* Roles */}
-            <Route path="roles">
-                <Route index element={<RouteWrapper><Master_Role /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_Role_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_Role_Edit /></RouteWrapper>} />
-            </Route>
+            <Route path="roles" element={<RouteWrapper><Master_Role /></RouteWrapper>} />
 
             {/* Permissions */}
             <Route path="permissions" element={<RouteWrapper><Master_Permissions /></RouteWrapper>} />
@@ -290,11 +276,7 @@ export default function MasterRoutes() {
             </Route>
 
             {/* Teams */}
-            <Route path="teams">
-                <Route index element={<RouteWrapper><Master_Team /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_Team_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_Team_Edit /></RouteWrapper>} />
-            </Route>
+            <Route path="teams" element={<RouteWrapper><Master_Team /></RouteWrapper>} />
 
             {/* Lead Types */}
             <Route path="lead-types">
