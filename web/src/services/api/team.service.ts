@@ -22,6 +22,10 @@ class TeamService extends BaseApiService {
     async update(id: number, data: UpdateTeamDto): Promise<Team> {
         return this.patch<Team>(`/${id}`, data);
     }
+
+    async deleteTeam(id: number): Promise<void> {
+        return this.delete<void>(`/${id}`);
+    }
 }
 
 export const teamService = new TeamService();

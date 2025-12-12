@@ -11,6 +11,7 @@ import { HealthModule } from '@/modules/master/health/health.module';
 import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import { RolesModule } from '@/modules/master/roles/roles.module';
+import { PermissionsModule } from '@/modules/master/permissions/permissions.module';
 import { DesignationsModule } from '@/modules/master/designations/designations.module';
 import { TeamsModule } from '@/modules/master/teams/teams.module';
 import { UserProfilesModule } from '@/modules/master/user-profiles/user-profiles.module';
@@ -67,6 +68,7 @@ import { TenderResultModule } from '@/modules/tendering/tender-result/tender-res
         DatabaseModule,
         UsersModule,
         RolesModule,
+        PermissionsModule,
         DesignationsModule,
         TeamsModule,
         UserProfilesModule,

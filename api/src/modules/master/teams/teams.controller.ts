@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Delete,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { TeamsService } from '@/modules/master/teams/teams.service';
@@ -58,5 +59,11 @@ export class TeamsController {
     async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateTeamSchema.parse(body);
         return this.teamsService.update(id, parsed);
+    }
+
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param('id', ParseIntPipe) id: number) {
+        await this.teamsService.delete(id);
     }
 }

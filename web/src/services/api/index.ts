@@ -17,6 +17,7 @@ export { designationsService } from './designation.service'
 export { industriesService } from './industry.service';
 export { teamService } from './team.service';
 export { rolesService } from './role.service';
+export { permissionsService } from './permissions.service';
 export { statesService } from './state.service';
 export { tqTypesService } from './tq-type.service';
 export { leadTypesService } from './lead-type.service';

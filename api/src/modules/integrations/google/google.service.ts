@@ -14,6 +14,7 @@ import {
     oauthAccounts,
     type OauthAccount,
 } from '@db/schemas/auth/oauth-accounts.schema';
+import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
 
 type CredentialPayload = {
     access_token: string;
@@ -197,6 +198,29 @@ export class GoogleService {
             stored = inserted[0];
         }
 
+        // Update user profile with Google avatar if available
+        if (profile.picture) {
+            const existingProfile = await this.db
+                .select()
+                .from(userProfiles)
+                .where(eq(userProfiles.userId, userId))
+                .limit(1);
+
+            if (existingProfile[0]) {
+                // Update existing profile
+                await this.db
+                    .update(userProfiles)
+                    .set({ image: profile.picture, updatedAt: new Date() })
+                    .where(eq(userProfiles.userId, userId));
+            } else {
+                // Create profile with Google avatar
+                await this.db.insert(userProfiles).values({
+                    userId,
+                    image: profile.picture,
+                });
+            }
+        }
+
         this.logger.log(
             `Linked Google account ${profile.email ?? profile.id} to user ${userId}`,
         );
@@ -217,6 +241,21 @@ export class GoogleService {
         }
 
         const { tokens, profile } = await this.exchangeCode(params.code);
+        return this.upsertConnection(userId, tokens, profile);
+    }
+
+    async handleAccountLinkCallback(
+        code: string,
+        state: string,
+        userId: number,
+    ): Promise<GoogleConnection> {
+        // Verify state matches userId
+        const stateUserId = Number(state);
+        if (!Number.isInteger(stateUserId) || stateUserId !== userId) {
+            throw new BadRequestException('Invalid OAuth state for account linking');
+        }
+
+        const { tokens, profile } = await this.exchangeCode(code);
         return this.upsertConnection(userId, tokens, profile);
     }
 

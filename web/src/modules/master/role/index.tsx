@@ -5,14 +5,13 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { useRoles } from '@/hooks/api/useRoles';
+import { useRoles, useDeleteRole } from '@/hooks/api/useRoles';
 import type { Role } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { RoleModal } from './components/RoleModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -21,15 +20,16 @@ const rowSelection: RowSelectionOptions = {
 
 const RolesPage = () => {
     const { data: roles, isLoading, error, refetch } = useRoles();
-    // const deleteRole = useDeleteRole();
-    const navigate = useNavigate()
+    const deleteRole = useDeleteRole();
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
     const roleActions: ActionItem<Role>[] = [
         {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.roles_edit(row.id));
+                setSelectedRole(row);
+                setModalOpen(true);
             },
         },
         {
@@ -38,7 +38,7 @@ const RolesPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        // await deleteRole.mutateAsync(row.id);
+                        await deleteRole.mutateAsync(row.id);
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -133,11 +133,15 @@ const RolesPage = () => {
                 <CardTitle>Roles</CardTitle>
                 <CardDescription>Manage user roles and permissions</CardDescription>
                 <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.roles_create}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Role
-                        </NavLink>
+                    <Button
+                        variant="default"
+                        onClick={() => {
+                            setSelectedRole(null);
+                            setModalOpen(true);
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Role
                     </Button>
                 </CardAction>
             </CardHeader>
@@ -165,6 +169,19 @@ const RolesPage = () => {
                     height="100%"
                 />
             </CardContent>
+            <RoleModal
+                open={modalOpen}
+                onOpenChange={(open) => {
+                    setModalOpen(open);
+                    if (!open) {
+                        setSelectedRole(null);
+                    }
+                }}
+                role={selectedRole}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
         </Card>
     );
 };

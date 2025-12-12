@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { followupCategoriesService } from '@/services/api';
+import { designationsService } from '@/services/api';
 import type {
     CreateDesignationDto,
     UpdateDesignationDto,
@@ -7,27 +7,27 @@ import type {
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 
-export const followupCategoriesKey = {
-    all: ['followupCategories'] as const,
-    lists: () => [...followupCategoriesKey.all, 'list'] as const,
-    list: (filters?: any) => [...followupCategoriesKey.lists(), { filters }] as const,
-    details: () => [...followupCategoriesKey.all, 'detail'] as const,
-    detail: (id: number) => [...followupCategoriesKey.details(), id] as const,
+export const designationKey = {
+    all: ['designations'] as const,
+    lists: () => [...designationKey.all, 'list'] as const,
+    list: (filters?: any) => [...designationKey.lists(), { filters }] as const,
+    details: () => [...designationKey.all, 'detail'] as const,
+    detail: (id: number) => [...designationKey.details(), id] as const,
 };
 
 // Get all followup categories
 export const useDesignations = () => {
     return useQuery({
-        queryKey: followupCategoriesKey.lists(),
-        queryFn: () => followupCategoriesService.getAll(),
+        queryKey: designationKey.lists(),
+        queryFn: () => designationsService.getAll(),
     });
 };
 
 // Get followup category by ID
 export const useDesignation = (id: number | null) => {
     return useQuery({
-        queryKey: followupCategoriesKey.detail(id!),
-        queryFn: () => followupCategoriesService.getById(id!),
+        queryKey: designationKey.detail(id!),
+        queryFn: () => designationsService.getById(id!),
         enabled: !!id,
     });
 };
@@ -35,7 +35,7 @@ export const useDesignation = (id: number | null) => {
 // Search followup categories
 export const useDesignationSearch = (query: string) => {
     return useQuery({
-        queryKey: [...followupCategoriesKey.all, 'search', query],
+        queryKey: [...designationKey.all, 'search', query],
         // queryFn: () => followupCategoriesService.search(query),
         enabled: query.length > 0,
     });
@@ -47,10 +47,10 @@ export const useCreateDesignation = () => {
 
     return useMutation({
         mutationFn: (data: CreateDesignationDto) =>
-            followupCategoriesService.create(data),
+            designationsService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
-            toast.success('Followup Category created successfully');
+            queryClient.invalidateQueries({ queryKey: designationKey.lists() });
+            toast.success('Designation created successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
@@ -64,13 +64,13 @@ export const useUpdateDesignation = () => {
 
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdateDesignationDto }) =>
-            followupCategoriesService.update(id, data),
+            designationsService.update(id, data),
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
+            queryClient.invalidateQueries({ queryKey: designationKey.lists() });
             queryClient.invalidateQueries({
-                queryKey: followupCategoriesKey.detail(variables.id),
+                queryKey: designationKey.detail(variables.id),
             });
-            toast.success('Followup Category updated successfully');
+            toast.success('Designation updated successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
@@ -78,18 +78,17 @@ export const useUpdateDesignation = () => {
     });
 };
 
-// Delete followup category
-// export const useDeleteDesignation = () => {
-//     const queryClient = useQueryClient();
+export const useDeleteDesignation = () => {
+    const queryClient = useQueryClient();
 
-//     return useMutation({
-//         mutationFn: (id: number) => followupCategoriesService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: followupCategoriesKey.lists() });
-//             toast.success('Followup Category deleted successfully');
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error));
-//         },
-//     });
-// };
+    return useMutation({
+        mutationFn: (id: number) => designationsService.deleteDesignation(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: designationKey.lists() });
+            toast.success('Designation deleted successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};

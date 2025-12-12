@@ -14,6 +14,7 @@ export const paths = {
     // ==================== TENDERING ====================
 
     dashboard: "/",
+    profile: "/profile",
 
     // ==================== TENDERING ====================
     tendering: {
@@ -197,6 +198,8 @@ export const paths = {
         roles: "/master/roles",
         roles_create: "/master/roles/create",
         roles_edit: (id: number | string) => `/master/roles/${id}/edit`,
+
+        permissions: "/master/permissions",
 
         industries: "/master/industries",
         industries_create: "/master/industries/create",

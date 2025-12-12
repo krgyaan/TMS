@@ -23,6 +23,9 @@ import { TeamSwitcher } from "@/components/team-switcher";
 import { paths } from "@/app/routes/paths";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 import { getStoredUser, clearAuthSession } from "@/lib/auth";
+import { useCurrentUser } from "@/hooks/api/useAuth";
+import { filterMenuItemsByPermissions } from "@/lib/menu-permissions";
+import type { ParentMenuItem } from "@/lib/menu-permissions";
 
 const data = {
     user: {
@@ -374,14 +377,20 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
-    const currentUser = storedUser ?? {
+    const displayUser = currentUser ?? storedUser ?? {
         id: 0,
         name: data.user.name,
         email: data.user.email,
         username: null,
         mobile: null,
     };
+
+    // Filter menu items based on user permissions
+    const filteredMenuItems = React.useMemo(() => {
+        return filterMenuItemsByPermissions(currentUser, data.navMain as ParentMenuItem[]);
+    }, [currentUser]);
 
     const handleLogout = React.useCallback(() => {
         clearAuthSession();
@@ -394,10 +403,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <TeamSwitcher />
             </SidebarHeader>
             <SidebarContent>
-                <NavMain items={data.navMain} />
+                <NavMain items={filteredMenuItems} />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser user={currentUser} onLogout={handleLogout} />
+                <NavUser user={displayUser} onLogout={handleLogout} />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>

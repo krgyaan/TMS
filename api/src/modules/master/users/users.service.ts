@@ -1,13 +1,16 @@
-﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { hash, verify } from 'argon2';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { users, type NewUser, type User } from '@db/schemas/auth/users.schema';
 import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
 import { userRoles } from '@db/schemas/auth/user-roles.schema';
+import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
+import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
 import { roles } from '@db/schemas/auth/roles.schema';
+import { permissions } from '@db/schemas/auth/permissions.schema';
 import { designations } from '@db/schemas/master/designations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from '@/common/constants/roles.constant';
@@ -233,6 +236,22 @@ export class UsersService {
 
     // NEW: Assign role to user
     async assignRole(userId: number, roleId: number): Promise<void> {
+        // Verify user exists
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User with ID ${userId} not found`);
+        }
+
+        // Verify role exists
+        const role = await this.db
+            .select()
+            .from(roles)
+            .where(eq(roles.id, roleId))
+            .limit(1);
+        if (!role[0]) {
+            throw new NotFoundException(`Role with ID ${roleId} not found`);
+        }
+
         await this.db
             .insert(userRoles)
             .values({ userId, roleId })
@@ -240,6 +259,116 @@ export class UsersService {
                 target: userRoles.userId,
                 set: { roleId, updatedAt: new Date() },
             });
+    }
+
+    // NEW: Get user's role
+    async getUserRole(userId: number): Promise<{ id: number; name: string } | null> {
+        const result = await this.db
+            .select({
+                id: roles.id,
+                name: roles.name,
+            })
+            .from(userRoles)
+            .innerJoin(roles, eq(roles.id, userRoles.roleId))
+            .where(eq(userRoles.userId, userId))
+            .limit(1);
+        return result[0] ?? null;
+    }
+
+    // NEW: Assign permissions to user (bulk)
+    async assignPermissions(
+        userId: number,
+        permissionIds: number[],
+        granted: boolean[],
+    ): Promise<void> {
+        // Verify user exists
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User with ID ${userId} not found`);
+        }
+
+        if (permissionIds.length !== granted.length) {
+            throw new Error('permissionIds and granted arrays must have the same length');
+        }
+
+        if (permissionIds.length === 0) {
+            return;
+        }
+
+        // Verify permissions exist
+        const existingPermissions = await this.db
+            .select()
+            .from(permissions)
+            .where(inArray(permissions.id, permissionIds));
+
+        if (existingPermissions.length !== permissionIds.length) {
+            throw new NotFoundException('One or more permissions not found');
+        }
+
+        // Delete existing user permissions for these permission IDs
+        await this.db
+            .delete(userPermissions)
+            .where(
+                and(
+                    eq(userPermissions.userId, userId),
+                    inArray(userPermissions.permissionId, permissionIds)
+                )
+            );
+
+        // Insert new permissions
+        const values = permissionIds.map((permissionId, index) => ({
+            userId,
+            permissionId,
+            granted: granted[index],
+        }));
+
+        await this.db.insert(userPermissions).values(values);
+    }
+
+    // NEW: Get user's permissions with granted/denied status
+    async getUserPermissions(userId: number): Promise<
+        Array<{
+            id: number;
+            permissionId: number;
+            module: string;
+            action: string;
+            description: string | null;
+            granted: boolean;
+        }>
+    > {
+        const result = await this.db
+            .select({
+                id: userPermissions.id,
+                permissionId: userPermissions.permissionId,
+                module: permissions.module,
+                action: permissions.action,
+                description: permissions.description,
+                granted: userPermissions.granted,
+            })
+            .from(userPermissions)
+            .innerJoin(permissions, eq(permissions.id, userPermissions.permissionId))
+            .where(eq(userPermissions.userId, userId));
+
+        return result;
+    }
+
+    // NEW: Remove user permission override
+    async removeUserPermission(userId: number, permissionId: number): Promise<void> {
+        const result = await this.db
+            .delete(userPermissions)
+            .where(
+                and(
+                    eq(userPermissions.userId, userId),
+                    eq(userPermissions.permissionId, permissionId)
+                )
+            )
+            .returning();
+
+        if (result.length === 0) {
+            throw new NotFoundException(
+                `User permission override not found for user ${userId} and permission ${permissionId}`
+            );
+        }
     }
 
     // NEW: Get role by name
@@ -361,12 +490,53 @@ export class UsersService {
         return rows[0];
     }
 
-    async delete(id: number): Promise<void> {
+    async delete(id: number, currentUserId: number): Promise<void> {
+        // Cannot delete yourself
+        if (id === currentUserId) {
+            throw new ForbiddenException('You cannot delete your own account');
+        }
+
+        // Get user's role to check if Super User
+        const userRole = await this.getUserRole(id);
+        if (userRole?.name === RoleName.SUPER_USER) {
+            throw new ForbiddenException('Cannot delete Super User account');
+        }
+
         const rows = (await this.db
             .update(users)
             .set({
                 isActive: false,
                 deletedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(and(eq(users.id, id), isNull(users.deletedAt)))
+            .returning()) as unknown as User[];
+
+        if (!rows[0]) {
+            throw new NotFoundException(`User with ID ${id} not found`);
+        }
+    }
+
+    async activate(id: number): Promise<void> {
+        const rows = (await this.db
+            .update(users)
+            .set({
+                isActive: true,
+                updatedAt: new Date(),
+            })
+            .where(and(eq(users.id, id), isNull(users.deletedAt)))
+            .returning()) as unknown as User[];
+
+        if (!rows[0]) {
+            throw new NotFoundException(`User with ID ${id} not found`);
+        }
+    }
+
+    async deactivate(id: number): Promise<void> {
+        const rows = (await this.db
+            .update(users)
+            .set({
+                isActive: false,
                 updatedAt: new Date(),
             })
             .where(and(eq(users.id, id), isNull(users.deletedAt)))

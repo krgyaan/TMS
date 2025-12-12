@@ -5,6 +5,7 @@ import {
     HttpCode,
     HttpStatus,
     Post,
+    Query,
     Res,
     UnauthorizedException,
 } from '@nestjs/common';
@@ -14,6 +15,8 @@ import { AuthService } from '@/modules/auth/auth.service';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import authConfig from '@/config/auth.config';
+import { ConfigService } from '@nestjs/config';
 
 const LoginSchema = z.object({
     email: z.string().email(),
@@ -27,7 +30,10 @@ const GoogleCallbackSchema = z.object({
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly configService: ConfigService,
+    ) { }
 
     @Public()
     @Post('login')
@@ -69,6 +75,45 @@ export class AuthController {
     @Get('google/url')
     async googleUrl() {
         return this.authService.generateGoogleLoginUrl();
+    }
+
+    @Public()
+    @Get('google/callback')
+    async googleCallbackGet(
+        @Query() query: Record<string, unknown>,
+        @Res() res: Response,
+    ) {
+        const { code, state } = GoogleCallbackSchema.parse(query);
+
+        try {
+            const session = await this.authService.handleGoogleLoginCallback(
+                code,
+                state,
+            );
+
+            this.setAuthCookie(res, session.accessToken);
+
+            // Redirect to frontend callback URL with success flag
+            // Don't include code/state since they've already been used
+            // The cookie is already set, so the frontend can verify authentication
+            const frontendCallbackUrl = this.configService.get<string>(
+                'auth.googleRedirect',
+                'http://localhost:5173/auth/google/callback',
+            );
+            const redirectUrl = new URL(frontendCallbackUrl);
+            redirectUrl.searchParams.set('success', 'true');
+            res.redirect(redirectUrl.toString());
+        } catch (error) {
+            // Redirect to frontend callback with error
+            const frontendCallbackUrl = this.configService.get<string>(
+                'auth.googleRedirect',
+                'http://localhost:5173/auth/google/callback',
+            );
+            const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+            const redirectUrl = new URL(frontendCallbackUrl);
+            redirectUrl.searchParams.set('error', errorMessage);
+            res.redirect(redirectUrl.toString());
+        }
     }
 
     @Public()

@@ -61,3 +61,18 @@ export function useUpdateTeam() {
         },
     });
 }
+
+export function useDeleteTeam() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => teamService.deleteTeam(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: teamKeys.all });
+            toast.success('Team deleted successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+}

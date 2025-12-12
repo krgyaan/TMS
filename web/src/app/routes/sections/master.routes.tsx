@@ -81,6 +81,9 @@ const Master_Role = lazy(() => import('@/modules/master/role'));
 const Master_Role_Create = lazy(() => import('@/modules/master/role/create'));
 const Master_Role_Edit = lazy(() => import('@/modules/master/role/edit'));
 
+// Permissions
+const Master_Permissions = lazy(() => import('@/modules/master/permissions'));
+
 // Industries
 const Master_Industry = lazy(() => import('@/modules/master/industry'));
 const Master_Industry_Create = lazy(() => import('@/modules/master/industry/create'));
@@ -247,6 +250,9 @@ export default function MasterRoutes() {
                 <Route path="create" element={<RouteWrapper><Master_Role_Create /></RouteWrapper>} />
                 <Route path=":id/edit" element={<RouteWrapper><Master_Role_Edit /></RouteWrapper>} />
             </Route>
+
+            {/* Permissions */}
+            <Route path="permissions" element={<RouteWrapper><Master_Permissions /></RouteWrapper>} />
 
             {/* Industries */}
             <Route path="industries">

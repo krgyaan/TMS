@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     Param,
     ParseIntPipe,
@@ -21,6 +22,10 @@ const CreateRoleSchema = z.object({
 });
 
 const UpdateRoleSchema = CreateRoleSchema.partial();
+
+const AssignPermissionsSchema = z.object({
+    permissionIds: z.array(z.number()).min(1, 'At least one permission is required'),
+});
 
 @Controller('roles')
 export class RolesController {
@@ -47,6 +52,11 @@ export class RolesController {
         return role;
     }
 
+    @Get(':id/permissions')
+    async getRolePermissions(@Param('id', ParseIntPipe) id: number) {
+        return this.rolesService.getRolePermissions(id);
+    }
+
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() body: unknown) {
@@ -60,4 +70,29 @@ export class RolesController {
         return this.rolesService.update(id, parsed);
     }
 
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param('id', ParseIntPipe) id: number) {
+        await this.rolesService.delete(id);
+    }
+
+    @Post(':id/permissions')
+    @HttpCode(HttpStatus.OK)
+    async assignPermissions(
+        @Param('id', ParseIntPipe) roleId: number,
+        @Body() body: unknown,
+    ) {
+        const parsed = AssignPermissionsSchema.parse(body);
+        await this.rolesService.assignPermissions(roleId, parsed.permissionIds);
+        return { message: 'Permissions assigned successfully' };
+    }
+
+    @Delete(':id/permissions/:permissionId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async removePermission(
+        @Param('id', ParseIntPipe) roleId: number,
+        @Param('permissionId', ParseIntPipe) permissionId: number,
+    ) {
+        await this.rolesService.removePermission(roleId, permissionId);
+    }
 }
