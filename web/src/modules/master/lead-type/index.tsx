@@ -12,14 +12,14 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import { useLeadTypes } from '@/hooks/api/useLeadTypes';
 import type { LeadType } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { LeadTypeDrawer } from './components/LeadTypeDrawer';
+import { LeadTypeViewModal } from './components/LeadTypeViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -28,16 +28,24 @@ const rowSelection: RowSelectionOptions = {
 
 const LeadTypesPage = () => {
     const { data: leadTypes, isLoading, error, refetch } = useLeadTypes();
-    // const deleteLeadType = useDeleteLeadType();
-    const navigate = useNavigate();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedLeadType, setSelectedLeadType] = useState<LeadType | null>(null);
 
     // Lead Type actions
     const leadTypeActions: ActionItem<LeadType>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedLeadType(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.leadTypes_edit(row.id));
+                setSelectedLeadType(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -47,6 +55,7 @@ const LeadTypesPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteLeadType.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -142,45 +151,77 @@ const LeadTypesPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedLeadType(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedLeadType(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Lead Types</CardTitle>
-                <CardDescription>Manage lead source and classification types</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.leadTypes_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Lead Types</CardTitle>
+                    <CardDescription>Manage lead source and classification types</CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedLeadType(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Lead Type
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={leadTypes || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteLeadType.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={leadTypes || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <LeadTypeDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                leadType={selectedLeadType}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <LeadTypeViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                leadType={selectedLeadType}
+            />
+        </>
     );
 };
 

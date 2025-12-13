@@ -1,7 +1,15 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+
 const CreateLoanPartyPage = () => {
-    return (
-        <div>Create Loan Party</div>
-    )
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        navigate(paths.master.loanParties, { replace: true });
+    }, [navigate]);
+
+    return null;
 }
 
-export default CreateLoanPartyPage
+export default CreateLoanPartyPage;

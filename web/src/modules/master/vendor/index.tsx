@@ -240,109 +240,6 @@ const VendorsPage = () => {
         },
     ]);
 
-    // GST Modal Column Definitions
-    const gstColDefs = useMemo<ColDef<VendorGst>[]>(
-        () => [
-            {
-                headerName: 'S.No.',
-                valueGetter: 'node.rowIndex + 1',
-                width: 80,
-                filter: false,
-            },
-            {
-                field: 'gstState',
-                headerName: 'State',
-                flex: 1,
-                filter: 'agTextColumnFilter',
-            },
-            {
-                field: 'gstNum',
-                headerName: 'GST Number',
-                flex: 1.5,
-                filter: 'agTextColumnFilter',
-                cellClass: 'font-mono',
-            }
-        ],
-        []
-    );
-
-    // Accounts Modal Column Definitions
-    const accountsColDefs = useMemo<ColDef<VendorAcc>[]>(
-        () => [
-            {
-                headerName: 'S.No.',
-                valueGetter: 'node.rowIndex + 1',
-                width: 80,
-                filter: false,
-            },
-            {
-                field: 'accountName',
-                headerName: 'Account Name',
-                flex: 1.5,
-                filter: 'agTextColumnFilter',
-            },
-            {
-                field: 'accountNum',
-                headerName: 'Account Number',
-                flex: 1,
-                filter: 'agTextColumnFilter',
-                cellClass: 'font-mono',
-            },
-            {
-                field: 'accountIfsc',
-                headerName: 'IFSC Code',
-                flex: 1,
-                filter: 'agTextColumnFilter',
-                cellClass: 'font-mono',
-            }
-        ],
-        []
-    );
-
-    // Vendors Modal Column Definitions
-    const vendorsColDefs = useMemo<ColDef<Vendor>[]>(
-        () => [
-            {
-                headerName: 'S.No.',
-                valueGetter: 'node.rowIndex + 1',
-                width: 80,
-                filter: false,
-            },
-            {
-                field: 'name',
-                headerName: 'Vendor Name',
-                flex: 1.5,
-                filter: 'agTextColumnFilter',
-                cellRenderer: (params: any) => {
-                    const vendor = params.data;
-                    return (
-                        <div className="py-2">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold">{vendor.name}</span>
-                                <Badge variant={vendor.status ? 'default' : 'secondary'}>
-                                    {vendor.status ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </div>
-                            {vendor.email && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Mail className="h-3 w-3" />
-                                    {vendor.email}
-                                </div>
-                            )}
-                            {vendor.address && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                    <MapPin className="h-3 w-3" />
-                                    {vendor.address}
-                                </div>
-                            )}
-                        </div>
-                    );
-                },
-                autoHeight: true,
-            },
-        ],
-        []
-    );
 
     // Loading state
     if (isLoading) {
@@ -437,7 +334,7 @@ const VendorsPage = () => {
                 open={gstModal.open}
                 onOpenChange={(open) => setGstModal({ ...gstModal, open })}
             >
-                <DialogContent className="max-w-6xl max-h-[80vh]">
+                <DialogContent className="max-w-2xl max-h-[80vh]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5" />
@@ -447,26 +344,35 @@ const VendorsPage = () => {
                             Total GST Numbers: {gstModal.data.length}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4" style={{ height: '500px' }}>
+                    <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
                         {gstModal.data.length > 0 ? (
-                            <DataTable
-                                data={gstModal.data}
-                                columnDefs={gstColDefs}
-                                gridOptions={{
-                                    defaultColDef: {
-                                        editable: false,
-                                        filter: true,
-                                        sortable: true,
-                                        resizable: true,
-                                    },
-                                    pagination: true,
-                                    paginationPageSize: 10,
-                                }}
-                                enablePagination={true}
-                                height="100%"
-                            />
+                            <div className="space-y-3">
+                                {gstModal.data.map((gst, index) => (
+                                    <div
+                                        key={gst.id}
+                                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                                    >
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm font-medium text-muted-foreground w-8">
+                                                    {index + 1}.
+                                                </span>
+                                                <div>
+                                                    <div className="font-medium">{gst.gstState}</div>
+                                                    <div className="text-sm text-muted-foreground font-mono mt-1">
+                                                        {gst.gstNum}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Badge variant={gst.status ? 'default' : 'secondary'}>
+                                            {gst.status ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <FileText className="h-12 w-12 mb-4 opacity-50" />
                                 <p>No GST numbers found for this organization</p>
                             </div>
@@ -480,7 +386,7 @@ const VendorsPage = () => {
                 open={accountsModal.open}
                 onOpenChange={(open) => setAccountsModal({ ...accountsModal, open })}
             >
-                <DialogContent className="max-w-6xl max-h-[80vh]">
+                <DialogContent className="max-w-2xl max-h-[80vh]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <CreditCard className="h-5 w-5" />
@@ -490,26 +396,42 @@ const VendorsPage = () => {
                             Total Bank Accounts: {accountsModal.data.length}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4" style={{ height: '500px' }}>
+                    <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
                         {accountsModal.data.length > 0 ? (
-                            <DataTable
-                                data={accountsModal.data}
-                                columnDefs={accountsColDefs}
-                                gridOptions={{
-                                    defaultColDef: {
-                                        editable: false,
-                                        filter: true,
-                                        sortable: true,
-                                        resizable: true,
-                                    },
-                                    pagination: true,
-                                    paginationPageSize: 10,
-                                }}
-                                enablePagination={true}
-                                height="100%"
-                            />
+                            <div className="space-y-3">
+                                {accountsModal.data.map((account, index) => (
+                                    <div
+                                        key={account.id}
+                                        className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className="text-sm font-medium text-muted-foreground w-8">
+                                                        {index + 1}.
+                                                    </span>
+                                                    <div className="font-medium">{account.accountName}</div>
+                                                </div>
+                                                <div className="ml-11 space-y-1">
+                                                    <div className="text-sm text-muted-foreground">
+                                                        <span className="font-medium">Account:</span>{' '}
+                                                        <span className="font-mono">{account.accountNum}</span>
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        <span className="font-medium">IFSC:</span>{' '}
+                                                        <span className="font-mono">{account.accountIfsc}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Badge variant={account.status ? 'default' : 'secondary'}>
+                                                {account.status ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <CreditCard className="h-12 w-12 mb-4 opacity-50" />
                                 <p>No bank accounts found for this organization</p>
                             </div>
@@ -523,7 +445,7 @@ const VendorsPage = () => {
                 open={vendorsModal.open}
                 onOpenChange={(open) => setVendorsModal({ ...vendorsModal, open })}
             >
-                <DialogContent className="max-w-6xl max-h-[80vh]">
+                <DialogContent className="max-w-2xl max-h-[80vh]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Users className="h-5 w-5" />
@@ -533,26 +455,46 @@ const VendorsPage = () => {
                             Total Vendors: {vendorsModal.data.length}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4" style={{ height: '500px' }}>
+                    <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
                         {vendorsModal.data.length > 0 ? (
-                            <DataTable
-                                data={vendorsModal.data}
-                                columnDefs={vendorsColDefs}
-                                gridOptions={{
-                                    defaultColDef: {
-                                        editable: false,
-                                        filter: true,
-                                        sortable: true,
-                                        resizable: true,
-                                    },
-                                    pagination: true,
-                                    paginationPageSize: 10,
-                                }}
-                                enablePagination={true}
-                                height="100%"
-                            />
+                            <div className="space-y-3">
+                                {vendorsModal.data.map((vendor, index) => (
+                                    <div
+                                        key={vendor.id}
+                                        className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className="text-sm font-medium text-muted-foreground w-8">
+                                                        {index + 1}.
+                                                    </span>
+                                                    <div className="font-medium">{vendor.name}</div>
+                                                </div>
+                                                <div className="ml-11 space-y-1">
+                                                    {vendor.email && (
+                                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                            <Mail className="h-3 w-3" />
+                                                            {vendor.email}
+                                                        </div>
+                                                    )}
+                                                    {vendor.address && (
+                                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                            <MapPin className="h-3 w-3" />
+                                                            {vendor.address}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <Badge variant={vendor.status ? 'default' : 'secondary'}>
+                                                {vendor.status ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <Users className="h-12 w-12 mb-4 opacity-50" />
                                 <p>No vendors found for this organization</p>
                             </div>

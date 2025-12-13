@@ -1,7 +1,15 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+
 const EditImprestCategoryPage = () => {
-    return (
-        <div>Edit Imprest Category</div>
-    )
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        navigate(paths.master.imprestCategories, { replace: true });
+    }, [navigate]);
+
+    return null;
 }
 
-export default EditImprestCategoryPage
+export default EditImprestCategoryPage;

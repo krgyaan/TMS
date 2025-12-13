@@ -1,4 +1,4 @@
-﻿import { useState, type ReactNode } from 'react'
+﻿import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
     Card,
@@ -12,54 +12,40 @@ import DataTable from '@/components/ui/data-table'
 import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
 import type { ActionItem } from '@/components/ui/ActionMenu'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
 import { useItems, useDeleteItem } from '@/hooks/api/useItems'
 import type { Item } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Package } from 'lucide-react'
+import { AlertCircle, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { ItemDrawer } from './components/ItemDrawer'
+import { ItemViewModal } from './components/ItemViewModal'
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
     headerCheckbox: false,
 }
 
-const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{value ?? '—'}</p>
-    </div>
-)
-
-const formatDate = (value?: string) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
-}
-
 const ItemPage = () => {
-    const navigate = useNavigate()
     const { data: items, isLoading, error, refetch } = useItems()
     const deleteItem = useDeleteItem()
-    const [viewState, setViewState] = useState<{ open: boolean; data: Item | null }>({ open: false, data: null })
+    const [drawerState, setDrawerState] = useState<{ open: boolean; item: Item | null }>({
+        open: false,
+        item: null,
+    })
+    const [viewState, setViewState] = useState<{ open: boolean; item: Item | null }>({
+        open: false,
+        item: null,
+    })
 
     const itemActions: ActionItem<Item>[] = [
         {
             label: 'View',
-            onClick: (row) => setViewState({ open: true, data: row }),
+            onClick: (row) => setViewState({ open: true, item: row }),
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.master.items_edit(row.id)),
+            onClick: (row) => setDrawerState({ open: true, item: row }),
         },
         {
             label: 'Delete',
@@ -155,8 +141,12 @@ const ItemPage = () => {
                     <CardTitle>Items</CardTitle>
                     <CardDescription>List of all Item</CardDescription>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.master.items_create}>Add New Item</NavLink>
+                        <Button
+                            variant="default"
+                            onClick={() => setDrawerState({ open: true, item: null })}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Item
                         </Button>
                     </CardAction>
                 </CardHeader>
@@ -178,38 +168,20 @@ const ItemPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog
+            <ItemDrawer
+                open={drawerState.open}
+                onOpenChange={(open) => setDrawerState({ ...drawerState, open })}
+                item={drawerState.item}
+                onSuccess={() => {
+                    refetch()
+                    setDrawerState({ open: false, item: null })
+                }}
+            />
+            <ItemViewModal
                 open={viewState.open}
-                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
-            >
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Package className="h-5 w-5" />
-                            {viewState.data?.name}
-                        </DialogTitle>
-                        <DialogDescription>Item details</DialogDescription>
-                    </DialogHeader>
-                    {viewState.data ? (
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <DetailItem label="Team" value={viewState.data.team?.name || '—'} />
-                            <DetailItem label="Heading" value={viewState.data.heading?.name || '—'} />
-                            <DetailItem
-                                label="Status"
-                                value={
-                                    <Badge variant={viewState.data.status ? 'default' : 'secondary'}>
-                                        {viewState.data.status ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                }
-                            />
-                            <DetailItem label="Team ID" value={viewState.data.teamId ?? '—'} />
-                            <DetailItem label="Heading ID" value={viewState.data.headingId ?? '—'} />
-                            <DetailItem label="Created" value={formatDate(viewState.data.createdAt)} />
-                            <DetailItem label="Updated" value={formatDate(viewState.data.updatedAt)} />
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+                onOpenChange={(open) => setViewState({ ...viewState, open })}
+                item={viewState.item}
+            />
         </>
     )
 }

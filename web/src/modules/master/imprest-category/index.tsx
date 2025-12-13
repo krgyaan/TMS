@@ -12,8 +12,6 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import {
     useImprestCategories,
 } from '@/hooks/api/useImprestCategories';
@@ -22,6 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ImprestCategoryDrawer } from './components/ImprestCategoryDrawer';
+import { ImprestCategoryViewModal } from './components/ImprestCategoryViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -35,16 +35,24 @@ const ImprestCategoryPage = () => {
         error,
         refetch,
     } = useImprestCategories();
-    // const deleteCategory = useDeleteImprestCategory();
-    const navigate = useNavigate()
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<ImprestCategory | null>(null);
 
     // Category actions
     const categoryActions: ActionItem<ImprestCategory>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedCategory(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.imprestCategories_edit(row.id));
+                setSelectedCategory(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -54,6 +62,7 @@ const ImprestCategoryPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteCategory.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -149,47 +158,79 @@ const ImprestCategoryPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedCategory(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedCategory(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Imprest Categories</CardTitle>
-                <CardDescription>
-                    Manage imprest categories for expense tracking
-                </CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.imprestCategories_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Imprest Categories</CardTitle>
+                    <CardDescription>
+                        Manage imprest categories for expense tracking
+                    </CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedCategory(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add New Category
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={categories || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteCategory.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={categories || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <ImprestCategoryDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                imprestCategory={selectedCategory}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <ImprestCategoryViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                imprestCategory={selectedCategory}
+            />
+        </>
     );
 };
 

@@ -1,4 +1,4 @@
-﻿import { useState, type ReactNode } from 'react'
+﻿import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
     Card,
@@ -12,57 +12,40 @@ import DataTable from '@/components/ui/data-table'
 import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
 import type { ActionItem } from '@/components/ui/ActionMenu'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
 import { useOrganizations, useDeleteOrganization } from '@/hooks/api/useOrganizations'
 import type { Organization } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Building2 } from 'lucide-react'
+import { AlertCircle, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { OrganizationDrawer } from './components/OrganizationDrawer'
+import { OrganizationViewModal } from './components/OrganizationViewModal'
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
     headerCheckbox: false,
 }
 
-const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{value ?? '—'}</p>
-    </div>
-)
-
-const formatDate = (value?: string) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
-}
-
 const OrganizationPage = () => {
     const { data: organizations, isLoading, error, refetch } = useOrganizations()
     const deleteOrganization = useDeleteOrganization()
-    const navigate = useNavigate()
-    const [viewState, setViewState] = useState<{ open: boolean; data: Organization | null }>({
+    const [drawerState, setDrawerState] = useState<{ open: boolean; organization: Organization | null }>({
         open: false,
-        data: null,
+        organization: null,
+    })
+    const [viewState, setViewState] = useState<{ open: boolean; organization: Organization | null }>({
+        open: false,
+        organization: null,
     })
 
     const organizationActions: ActionItem<Organization>[] = [
         {
             label: 'View',
-            onClick: (row) => setViewState({ open: true, data: row }),
+            onClick: (row) => setViewState({ open: true, organization: row }),
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.master.organizations_edit(row.id)),
+            onClick: (row) => setDrawerState({ open: true, organization: row }),
         },
         {
             label: 'Delete',
@@ -152,8 +135,12 @@ const OrganizationPage = () => {
                     <CardTitle>Organizations</CardTitle>
                     <CardDescription>Manage all organizations and their industries</CardDescription>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.master.organizations_create}>Add New Organization</NavLink>
+                        <Button
+                            variant="default"
+                            onClick={() => setDrawerState({ open: true, organization: null })}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Organization
                         </Button>
                     </CardAction>
                 </CardHeader>
@@ -182,37 +169,20 @@ const OrganizationPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog
+            <OrganizationDrawer
+                open={drawerState.open}
+                onOpenChange={(open) => setDrawerState({ ...drawerState, open })}
+                organization={drawerState.organization}
+                onSuccess={() => {
+                    refetch()
+                    setDrawerState({ open: false, organization: null })
+                }}
+            />
+            <OrganizationViewModal
                 open={viewState.open}
-                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
-            >
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Building2 className="h-5 w-5" />
-                            {viewState.data?.name}
-                        </DialogTitle>
-                        <DialogDescription>Organization details</DialogDescription>
-                    </DialogHeader>
-                    {viewState.data ? (
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <DetailItem label="Acronym" value={viewState.data.acronym || '—'} />
-                            <DetailItem label="Industry" value={viewState.data.industry?.name || '—'} />
-                            <DetailItem
-                                label="Status"
-                                value={
-                                    <Badge variant={viewState.data.status ? 'default' : 'secondary'}>
-                                        {viewState.data.status ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                }
-                            />
-                            <DetailItem label="Industry ID" value={viewState.data.industryId ?? '—'} />
-                            <DetailItem label="Created" value={formatDate(viewState.data.createdAt)} />
-                            <DetailItem label="Updated" value={formatDate(viewState.data.updatedAt)} />
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+                onOpenChange={(open) => setViewState({ ...viewState, open })}
+                organization={viewState.organization}
+            />
         </>
     )
 }

@@ -1,7 +1,15 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+
 const EditLeadTypePage = () => {
-    return (
-        <div>Edit Lead Type</div>
-    )
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        navigate(paths.master.leadTypes, { replace: true });
+    }, [navigate]);
+
+    return null;
 }
 
-export default EditLeadTypePage
+export default EditLeadTypePage;

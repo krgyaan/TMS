@@ -1,16 +1,27 @@
 import { useParams } from 'react-router-dom'
-import { StatusForm } from './components/StatusForm'
+import { StatusDrawer } from './components/StatusDrawer'
 import { useStatus } from '@/hooks/api/useStatuses'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { paths } from '@/app/routes/paths'
 
 const EditStatusPage = () => {
     const { id } = useParams<{ id: string }>()
+    const navigate = useNavigate()
     const statusId = Number(id)
     const { data, isLoading, error, refetch } = useStatus(statusId)
+    const [open, setOpen] = useState(true)
+
+    useEffect(() => {
+        if (!open) {
+            navigate(paths.master.statuses)
+        }
+    }, [open, navigate])
 
     if (!statusId) {
         return (
@@ -64,7 +75,14 @@ const EditStatusPage = () => {
         )
     }
 
-    return <StatusForm mode="edit" status={data} />
+    return (
+        <StatusDrawer
+            open={open}
+            onOpenChange={setOpen}
+            status={data}
+            onSuccess={() => navigate(paths.master.statuses)}
+        />
+    )
 }
 
 export default EditStatusPage

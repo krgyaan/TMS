@@ -5,14 +5,14 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import { useIndustries } from '@/hooks/api/useIndustries';
 import type { Industry } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { IndustryDrawer } from './components/IndustryDrawer';
+import { IndustryViewModal } from './components/IndustryViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -21,15 +21,23 @@ const rowSelection: RowSelectionOptions = {
 
 const IndustriesPage = () => {
     const { data: industries, isLoading, error, refetch } = useIndustries();
-    // const deleteIndustry = useDeleteIndustry();
-    const navigate = useNavigate()
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
 
     const industryActions: ActionItem<Industry>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedIndustry(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.industries_edit(row.id));
+                setSelectedIndustry(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -39,6 +47,7 @@ const IndustriesPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteIndustry.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -127,45 +136,77 @@ const IndustriesPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedIndustry(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedIndustry(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Industries</CardTitle>
-                <CardDescription>Manage industry classifications</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.industries_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Industries</CardTitle>
+                    <CardDescription>Manage industry classifications</CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedIndustry(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Industry
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={industries || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteIndustry.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={industries || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <IndustryDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                industry={selectedIndustry}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <IndustryViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                industry={selectedIndustry}
+            />
+        </>
     );
 };
 

@@ -12,8 +12,6 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import {
     useDocumentsSubmitted,
 } from '@/hooks/api/useDocumentsSubmitted';
@@ -22,6 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { DocumentSubmittedDrawer } from './components/DocumentSubmittedDrawer';
+import { DocumentSubmittedViewModal } from './components/DocumentSubmittedViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -35,16 +35,24 @@ const DocumentsSubmittedPage = () => {
         error,
         refetch,
     } = useDocumentsSubmitted();
-    // const deleteDocument = useDeleteDocumentSubmitted();
-    const navigate = useNavigate();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState<DocumentSubmitted | null>(null);
 
     // Document actions
     const documentActions: ActionItem<DocumentSubmitted>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedDocument(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.documentSubmitted_edit(row.id));
+                setSelectedDocument(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -54,6 +62,7 @@ const DocumentsSubmittedPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteDocument.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -140,47 +149,79 @@ const DocumentsSubmittedPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedDocument(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedDocument(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Documents Submitted</CardTitle>
-                <CardDescription>
-                    Manage document types required for submissions
-                </CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.documentSubmitted_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Documents Submitted</CardTitle>
+                    <CardDescription>
+                        Manage document types required for submissions
+                    </CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedDocument(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Document Type
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={documents || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteDocument.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={documents || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <DocumentSubmittedDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                documentSubmitted={selectedDocument}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <DocumentSubmittedViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                documentSubmitted={selectedDocument}
+            />
+        </>
     );
 };
 

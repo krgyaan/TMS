@@ -1,7 +1,26 @@
-import { StatusForm } from './components/StatusForm'
+import { StatusDrawer } from './components/StatusDrawer'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { paths } from '@/app/routes/paths'
 
 const CreateStatusPage = () => {
-    return <StatusForm mode="create" />
+    const navigate = useNavigate()
+    const [open, setOpen] = useState(true)
+
+    useEffect(() => {
+        if (!open) {
+            navigate(paths.master.statuses)
+        }
+    }, [open, navigate])
+
+    return (
+        <StatusDrawer
+            open={open}
+            onOpenChange={setOpen}
+            status={null}
+            onSuccess={() => navigate(paths.master.statuses)}
+        />
+    )
 }
 
 export default CreateStatusPage

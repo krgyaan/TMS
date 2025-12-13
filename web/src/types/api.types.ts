@@ -475,6 +475,38 @@ export interface CreateTqTypeDto {
 
 export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
 
+// ========== EMD RESPONSIBILITY ==========
+export interface EmdResponsibility {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateEmdResponsibilityDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> { }
+
+// ========== FINANCIAL YEAR ==========
+export interface FinancialYear {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateFinancialYearDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
+
 // ========== LEAD TYPES ==========
 export interface LeadType {
     id: number;

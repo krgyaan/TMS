@@ -12,8 +12,6 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import {
     useFollowupCategories,
 } from '@/hooks/api/useFollowupCategories';
@@ -22,6 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { FollowupCategoryDrawer } from './components/FollowupCategoryDrawer';
+import { FollowupCategoryViewModal } from './components/FollowupCategoryViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -35,16 +35,24 @@ const FollowupCategoryPage = () => {
         error,
         refetch,
     } = useFollowupCategories();
-    // const deleteCategory = useDeleteFollowupCategory();
-    const navigate = useNavigate();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<FollowupCategory | null>(null);
 
     // Category actions
     const categoryActions: ActionItem<FollowupCategory>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedCategory(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.followupCategories_edit(row.id));
+                setSelectedCategory(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -54,6 +62,7 @@ const FollowupCategoryPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteCategory.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -140,47 +149,79 @@ const FollowupCategoryPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedCategory(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedCategory(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Followup Categories</CardTitle>
-                <CardDescription>
-                    Manage categories for client followup tracking
-                </CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.followupCategories_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Followup Categories</CardTitle>
+                    <CardDescription>
+                        Manage categories for client followup tracking
+                    </CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedCategory(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add New Category
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={categories || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteCategory.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={categories || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <FollowupCategoryDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                followupCategory={selectedCategory}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <FollowupCategoryViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                followupCategory={selectedCategory}
+            />
+        </>
     );
 };
 

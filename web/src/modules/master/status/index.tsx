@@ -1,4 +1,4 @@
-﻿import { useState, type ReactNode } from 'react'
+﻿import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
     Card,
@@ -12,60 +12,40 @@ import DataTable from '@/components/ui/data-table'
 import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
 import type { ActionItem } from '@/components/ui/ActionMenu'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
 import { useStatuses, useDeleteStatus } from '@/hooks/api/useStatuses'
 import type { Status } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { StatusDrawer } from './components/StatusDrawer'
+import { StatusViewModal } from './components/StatusViewModal'
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
     headerCheckbox: false,
 }
 
-const formatDate = (value?: string | null) => {
-    if (!value) {
-        return '—'
-    }
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
-}
-
-const DetailItem = ({ label, children }: { label: string; children: ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{children}</p>
-    </div>
-)
-
 const StatusPage = () => {
-    const navigate = useNavigate()
     const { data: statuses, isLoading, error, refetch } = useStatuses()
     const deleteStatus = useDeleteStatus()
-
-    const [viewState, setViewState] = useState<{ open: boolean; data: Status | null }>({
+    const [drawerState, setDrawerState] = useState<{ open: boolean; status: Status | null }>({
         open: false,
-        data: null,
+        status: null,
+    })
+    const [viewState, setViewState] = useState<{ open: boolean; status: Status | null }>({
+        open: false,
+        status: null,
     })
 
     const statusActions: ActionItem<Status>[] = [
         {
             label: 'View',
-            onClick: (row) => setViewState({ open: true, data: row }),
+            onClick: (row) => setViewState({ open: true, status: row }),
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.master.statuses_edit(row.id)),
+            onClick: (row) => setDrawerState({ open: true, status: row }),
         },
         {
             label: 'Delete',
@@ -155,8 +135,12 @@ const StatusPage = () => {
                     <CardTitle>Status</CardTitle>
                     <CardDescription>Manage tender statuses and their categories</CardDescription>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.master.statuses_create}>Add New Status</NavLink>
+                        <Button
+                            variant="default"
+                            onClick={() => setDrawerState({ open: true, status: null })}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Status
                         </Button>
                     </CardAction>
                 </CardHeader>
@@ -178,39 +162,20 @@ const StatusPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog
+            <StatusDrawer
+                open={drawerState.open}
+                onOpenChange={(open) => setDrawerState({ ...drawerState, open })}
+                status={drawerState.status}
+                onSuccess={() => {
+                    refetch()
+                    setDrawerState({ open: false, status: null })
+                }}
+            />
+            <StatusViewModal
                 open={viewState.open}
-                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
-            >
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{viewState.data?.name}</DialogTitle>
-                        <DialogDescription>
-                            Tender status details and metadata
-                        </DialogDescription>
-                    </DialogHeader>
-                    {viewState.data ? (
-                        <div className="space-y-6">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <DetailItem label="Status">
-                                    <Badge variant={viewState.data.status ? 'default' : 'secondary'}>
-                                        {viewState.data.status ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                </DetailItem>
-                                <DetailItem label="Tender Category">
-                                    {viewState.data.tenderCategory || '—'}
-                                </DetailItem>
-                                <DetailItem label="Created">
-                                    {formatDate(viewState.data.createdAt)}
-                                </DetailItem>
-                                <DetailItem label="Updated">
-                                    {formatDate(viewState.data.updatedAt)}
-                                </DetailItem>
-                            </div>
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+                onOpenChange={(open) => setViewState({ ...viewState, open })}
+                status={viewState.status}
+            />
         </>
     )
 }
