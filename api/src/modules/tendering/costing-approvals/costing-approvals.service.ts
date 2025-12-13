@@ -10,6 +10,7 @@ import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { users } from '@/db/schemas/auth/users.schema';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -37,7 +38,11 @@ export type CostingApprovalFilters = {
 
 @Injectable()
 export class CostingApprovalsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     /**
      * Get all costing sheets for TL approval
@@ -203,25 +208,51 @@ export class CostingApprovalsService {
         }
     ) {
         // Verify access
-        await this.findById(id, userTeam);
+        const costingSheet = await this.findById(id, userTeam);
 
-        const [result] = await this.db
-            .update(tenderCostingSheets)
-            .set({
-                status: 'Approved',
-                finalPrice: data.finalPrice,
-                receiptPrice: data.receiptPrice,
-                budgetPrice: data.budgetPrice,
-                grossMargin: data.grossMargin,
-                oemVendorIds: data.oemVendorIds,
-                tlRemarks: data.tlRemarks,
-                approvedBy: userId,
-                approvedAt: new Date(),
-                rejectionReason: null, // Clear rejection reason if any
-                updatedAt: new Date(),
-            })
-            .where(eq(tenderCostingSheets.id, id))
-            .returning();
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(costingSheet.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 7 (Price Bid Approved) and track it
+        const newStatus = 7; // Status ID for "Price Bid Approved"
+
+        const [result] = await this.db.transaction(async (tx) => {
+            const updated = await tx
+                .update(tenderCostingSheets)
+                .set({
+                    status: 'Approved',
+                    finalPrice: data.finalPrice,
+                    receiptPrice: data.receiptPrice,
+                    budgetPrice: data.budgetPrice,
+                    grossMargin: data.grossMargin,
+                    oemVendorIds: data.oemVendorIds,
+                    tlRemarks: data.tlRemarks,
+                    approvedBy: userId,
+                    approvedAt: new Date(),
+                    rejectionReason: null, // Clear rejection reason if any
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenderCostingSheets.id, id))
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, costingSheet.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                costingSheet.tenderId,
+                newStatus,
+                userId,
+                prevStatus,
+                'Price bid approved'
+            );
+
+            return updated;
+        });
 
         return result;
     }

@@ -6,12 +6,13 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Request,
     Query
 } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
 import { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 import type { BidSubmissionFilters } from './bid-submissions.service';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('bid-submissions')
 export class BidSubmissionsController {
@@ -53,7 +54,10 @@ export class BidSubmissionsController {
     }
 
     @Post('submit')
-    submitBid(@Body() dto: SubmitBidDto, @Request() req: any) {
+    submitBid(
+        @Body() dto: SubmitBidDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
         return this.bidSubmissionsService.submitBid({
             tenderId: dto.tenderId,
             submissionDatetime: new Date(dto.submissionDatetime),
@@ -61,18 +65,21 @@ export class BidSubmissionsController {
             proofOfSubmission: dto.proofOfSubmission,
             finalPriceSs: dto.finalPriceSs,
             finalBiddingPrice: dto.finalBiddingPrice,
-            submittedBy: req.user?.id || 1, // Adjust based on your auth
+            submittedBy: user.sub,
         });
     }
 
     @Post('missed')
-    markAsMissed(@Body() dto: MarkAsMissedDto, @Request() req: any) {
+    markAsMissed(
+        @Body() dto: MarkAsMissedDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
         return this.bidSubmissionsService.markAsMissed({
             tenderId: dto.tenderId,
             reasonForMissing: dto.reasonForMissing,
             preventionMeasures: dto.preventionMeasures,
             tmsImprovements: dto.tmsImprovements,
-            submittedBy: req.user?.id || 1,
+            submittedBy: user.sub,
         });
     }
 

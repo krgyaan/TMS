@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common';
 import { RfqsService, type RfqFilters } from '@/modules/tendering/rfqs/rfq.service';
 import { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 
 @Controller('rfqs')
@@ -57,8 +59,11 @@ export class RfqsController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: CreateRfqDto) {
-        return this.rfqsService.create(body);
+    async create(
+        @Body() body: CreateRfqDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.rfqsService.create(body, user.sub);
     }
 
     @Patch(':id')

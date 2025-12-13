@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common';
 import { PhysicalDocsService, type PhysicalDocFilters } from '@/modules/tendering/physical-docs/physical-docs.service';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 
 @Controller('physical-docs')
@@ -71,8 +73,11 @@ export class PhysicalDocsController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: CreatePhysicalDocDto) {
-        return this.physicalDocsService.create(body);
+    async create(
+        @Body() body: CreatePhysicalDocDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.physicalDocsService.create(body, user.sub);
     }
 
     @Patch(':id')

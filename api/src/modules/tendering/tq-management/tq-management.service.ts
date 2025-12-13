@@ -10,6 +10,7 @@ import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
 import { tenderQueryItems } from '@db/schemas/tendering/';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type TqManagementFilters = {
     tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
@@ -36,7 +37,11 @@ export type TqManagementDashboardRow = {
 
 @Injectable()
 export class TqManagementService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     async findAll(filters?: TqManagementFilters): Promise<PaginatedResult<TqManagementDashboardRow>> {
         const page = filters?.page || 1;
@@ -251,32 +256,58 @@ export class TqManagementService {
             queryDescription: string;
         }>;
     }) {
-        // Create TQ record
-        const [tqRecord] = await this.db
-            .insert(tenderQueries)
-            .values({
-                tenderId: data.tenderId,
-                tqSubmissionDeadline: data.tqSubmissionDeadline,
-                tqDocumentReceived: data.tqDocumentReceived,
-                receivedBy: data.receivedBy,
-                receivedAt: new Date(),
-                status: 'TQ received',
-            })
-            .returning();
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
 
-        // Create TQ items
-        if (data.tqItems && data.tqItems.length > 0) {
-            await this.db.insert(tenderQueryItems).values(
-                data.tqItems.map((item, index) => ({
-                    tenderQueryId: tqRecord.id,
-                    srNo: index + 1,
-                    tqTypeId: item.tqTypeId,
-                    queryDescription: item.queryDescription,
-                }))
+        // AUTO STATUS CHANGE: Update tender status to 19 (TQ Received) and track it
+        const newStatus = 19; // Status ID for "TQ Received"
+
+        const result = await this.db.transaction(async (tx) => {
+            // Create TQ record
+            const [tqRecord] = await tx
+                .insert(tenderQueries)
+                .values({
+                    tenderId: data.tenderId,
+                    tqSubmissionDeadline: data.tqSubmissionDeadline,
+                    tqDocumentReceived: data.tqDocumentReceived,
+                    receivedBy: data.receivedBy,
+                    receivedAt: new Date(),
+                    status: 'TQ received',
+                })
+                .returning();
+
+            // Create TQ items
+            if (data.tqItems && data.tqItems.length > 0) {
+                await tx.insert(tenderQueryItems).values(
+                    data.tqItems.map((item, index) => ({
+                        tenderQueryId: tqRecord.id,
+                        srNo: index + 1,
+                        tqTypeId: item.tqTypeId,
+                        queryDescription: item.queryDescription,
+                    }))
+                );
+            }
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                data.receivedBy,
+                prevStatus,
+                'TQ received'
             );
-        }
 
-        return tqRecord;
+            return tqRecord;
+        });
+
+        return result;
     }
 
     async updateTqReplied(
@@ -288,21 +319,51 @@ export class TqManagementService {
             repliedBy: number;
         }
     ) {
-        const [result] = await this.db
-            .update(tenderQueries)
-            .set({
-                status: 'TQ replied',
-                repliedDatetime: data.repliedDatetime,
-                repliedDocument: data.repliedDocument,
-                proofOfSubmission: data.proofOfSubmission,
-                repliedBy: data.repliedBy,
-                repliedAt: new Date(),
-                updatedAt: new Date(),
-            })
-            .where(eq(tenderQueries.id, id))
-            .returning();
+        // Get TQ record to find tenderId
+        const tqRecord = await this.findById(id);
 
-        return result;
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 20 (TQ replied) and track it
+        // Note: Status 40 (TQ replied, Qualified) would require additional qualification check
+        const newStatus = 20; // Status ID for "TQ replied"
+
+        const result = await this.db.transaction(async (tx) => {
+            const updated = await tx
+                .update(tenderQueries)
+                .set({
+                    status: 'TQ replied',
+                    repliedDatetime: data.repliedDatetime,
+                    repliedDocument: data.repliedDocument,
+                    proofOfSubmission: data.proofOfSubmission,
+                    repliedBy: data.repliedBy,
+                    repliedAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenderQueries.id, id))
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tqRecord.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tqRecord.tenderId,
+                newStatus,
+                data.repliedBy,
+                prevStatus,
+                'TQ replied'
+            );
+
+            return updated;
+        });
+
+        return result[0];
     }
 
     async updateTqMissed(
@@ -311,35 +372,92 @@ export class TqManagementService {
             missedReason: string;
             preventionMeasures: string;
             tmsImprovements: string;
-        }
+        },
+        changedBy: number
     ) {
-        const [result] = await this.db
-            .update(tenderQueries)
-            .set({
-                status: 'TQ missed',
-                missedReason: data.missedReason,
-                preventionMeasures: data.preventionMeasures,
-                tmsImprovements: data.tmsImprovements,
-                updatedAt: new Date(),
-            })
-            .where(eq(tenderQueries.id, id))
-            .returning();
+        // Get TQ record to find tenderId
+        const tqRecord = await this.findById(id);
 
-        return result;
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 39 (Disqualified, TQ missed) and track it
+        const newStatus = 39; // Status ID for "Disqualified, TQ missed"
+
+        const result = await this.db.transaction(async (tx) => {
+            const updated = await tx
+                .update(tenderQueries)
+                .set({
+                    status: 'TQ missed',
+                    missedReason: data.missedReason,
+                    preventionMeasures: data.preventionMeasures,
+                    tmsImprovements: data.tmsImprovements,
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenderQueries.id, id))
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tqRecord.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tqRecord.tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'TQ missed'
+            );
+
+            return updated;
+        });
+
+        return result[0];
     }
 
-    async markAsNoTq(tenderId: number, userId: number) {
-        // Create a TQ record with "No TQ" status
-        const [result] = await this.db
-            .insert(tenderQueries)
-            .values({
-                tenderId: tenderId,
-                status: 'No TQ',
-                receivedBy: userId,
-                receivedAt: new Date(),
-                tqSubmissionDeadline: null,
-            })
-            .returning();
+    async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true) {
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status based on qualification
+        // Status 37 (Qualified, No TQ received) or Status 38 (Disqualified, No TQ received)
+        const newStatus = qualified ? 37 : 38;
+
+        const result = await this.db.transaction(async (tx) => {
+            // Create a TQ record with "No TQ" status
+            const [tqRecord] = await tx
+                .insert(tenderQueries)
+                .values({
+                    tenderId: tenderId,
+                    status: 'No TQ',
+                    receivedBy: userId,
+                    receivedAt: new Date(),
+                    tqSubmissionDeadline: null,
+                })
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                userId,
+                prevStatus,
+                qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received'
+            );
+
+            return tqRecord;
+        });
 
         return result;
     }

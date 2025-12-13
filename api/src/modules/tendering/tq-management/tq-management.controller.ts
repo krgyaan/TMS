@@ -6,7 +6,6 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Request,
     Query
 } from '@nestjs/common';
 import { TqManagementService, type TqManagementFilters } from '@/modules/tendering/tq-management/tq-management.service';
@@ -17,6 +16,8 @@ import {
     MarkAsNoTqDto,
     UpdateTqReceivedDto
 } from './dto/tq-management.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('tq-management')
 export class TqManagementController {
@@ -55,12 +56,15 @@ export class TqManagementController {
     }
 
     @Post('received')
-    createTqReceived(@Body() dto: CreateTqReceivedDto, @Request() req: any) {
+    createTqReceived(
+        @Body() dto: CreateTqReceivedDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
         return this.tqManagementService.createTqReceived({
             tenderId: dto.tenderId,
             tqSubmissionDeadline: new Date(dto.tqSubmissionDeadline),
             tqDocumentReceived: dto.tqDocumentReceived,
-            receivedBy: req.user?.id || 1,
+            receivedBy: user.sub,
             tqItems: dto.tqItems,
         });
     }
@@ -69,27 +73,32 @@ export class TqManagementController {
     updateTqReplied(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateTqRepliedDto,
-        @Request() req: any
+        @CurrentUser() user: ValidatedUser
     ) {
         return this.tqManagementService.updateTqReplied(id, {
             repliedDatetime: new Date(dto.repliedDatetime),
             repliedDocument: dto.repliedDocument,
             proofOfSubmission: dto.proofOfSubmission,
-            repliedBy: req.user?.id || 1,
+            repliedBy: user.sub,
         });
     }
 
     @Patch(':id/missed')
     updateTqMissed(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateTqMissedDto
+        @Body() dto: UpdateTqMissedDto,
+        @CurrentUser() user: ValidatedUser
     ) {
-        return this.tqManagementService.updateTqMissed(id, dto);
+        return this.tqManagementService.updateTqMissed(id, dto, user.sub);
     }
 
     @Post('no-tq')
-    markAsNoTq(@Body() dto: MarkAsNoTqDto, @Request() req: any) {
-        return this.tqManagementService.markAsNoTq(dto.tenderId, req.user?.id || 1);
+    markAsNoTq(
+        @Body() dto: MarkAsNoTqDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        // Default to qualified=true, can be extended to accept qualification status from DTO
+        return this.tqManagementService.markAsNoTq(dto.tenderId, user.sub, dto.qualified ?? true);
     }
 
     @Patch(':id/received')

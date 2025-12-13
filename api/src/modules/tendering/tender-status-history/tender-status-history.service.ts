@@ -8,6 +8,7 @@ import {
 } from '@db/schemas/tendering/tender-status-history.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
+import { alias } from 'drizzle-orm/pg-core';
 
 export type TenderStatusHistoryWithNames = {
     id: number;
@@ -35,83 +36,78 @@ export class TenderStatusHistoryService {
         return rows[0];
     }
 
+    /**
+     * Track status change - helper method for easy status tracking
+     */
+    async trackStatusChange(
+        tenderId: number,
+        newStatus: number,
+        changedBy: number,
+        prevStatus?: number | null,
+        comment?: string | null
+    ): Promise<void> {
+        await this.create({
+            tenderId,
+            prevStatus: prevStatus ?? null,
+            newStatus,
+            comment: comment ?? null,
+            changedBy,
+        });
+    }
+
+    /**
+     * Optimized findByTenderId - fixed N+1 query issue using proper aliases
+     */
     async findByTenderId(
         tenderId: number,
     ): Promise<TenderStatusHistoryWithNames[]> {
+        // Use proper aliases for multiple joins on same table
+        const prevStatusAlias = alias(statuses, 'prev_status');
+        const newStatusAlias = alias(statuses, 'new_status');
+        const userAlias = alias(users, 'changed_by_user');
+
         const rows = await this.db
             .select({
-                history: tenderStatusHistory,
-                prevStatusName: statuses.name,
-                newStatusData: {
-                    id: statuses.id,
-                    name: statuses.name,
-                },
-                userData: {
-                    name: users.name,
-                    username: users.username,
-                },
+                id: tenderStatusHistory.id,
+                tenderId: tenderStatusHistory.tenderId,
+                prevStatus: tenderStatusHistory.prevStatus,
+                newStatus: tenderStatusHistory.newStatus,
+                comment: tenderStatusHistory.comment,
+                changedBy: tenderStatusHistory.changedBy,
+                createdAt: tenderStatusHistory.createdAt,
+                prevStatusName: prevStatusAlias.name,
+                newStatusName: newStatusAlias.name,
+                changedByName: userAlias.name,
+                changedByUsername: userAlias.username,
             })
             .from(tenderStatusHistory)
             .leftJoin(
-                statuses,
-                eq(tenderStatusHistory.prevStatus, statuses.id),
+                prevStatusAlias,
+                eq(tenderStatusHistory.prevStatus, prevStatusAlias.id)
             )
             .innerJoin(
-                statuses as any,
-                eq(tenderStatusHistory.newStatus, statuses.id),
+                newStatusAlias,
+                eq(tenderStatusHistory.newStatus, newStatusAlias.id)
             )
-            .innerJoin(users, eq(tenderStatusHistory.changedBy, users.id))
+            .innerJoin(
+                userAlias,
+                eq(tenderStatusHistory.changedBy, userAlias.id)
+            )
             .where(eq(tenderStatusHistory.tenderId, tenderId))
             .orderBy(desc(tenderStatusHistory.createdAt));
 
-        const results = await this.db
-            .select()
-            .from(tenderStatusHistory)
-            .where(eq(tenderStatusHistory.tenderId, tenderId))
-            .orderBy(desc(tenderStatusHistory.createdAt));
-
-        // Fetch related data
-        const enriched: TenderStatusHistoryWithNames[] = [];
-
-        for (const record of results) {
-            let prevStatusName: string | null = null;
-            let newStatusName: string | null = null;
-            let changedByName: string | null = null;
-            let changedByUsername: string | null = null;
-
-            if (record.prevStatus) {
-                const prevStatusData = await this.db
-                    .select()
-                    .from(statuses)
-                    .where(eq(statuses.id, record.prevStatus))
-                    .limit(1);
-                prevStatusName = prevStatusData[0]?.name ?? null;
-            }
-
-            const newStatusData = await this.db
-                .select()
-                .from(statuses)
-                .where(eq(statuses.id, record.newStatus))
-                .limit(1);
-            newStatusName = newStatusData[0]?.name ?? null;
-
-            const userData = await this.db
-                .select()
-                .from(users)
-                .where(eq(users.id, record.changedBy))
-                .limit(1);
-            changedByName = userData[0]?.name ?? null;
-            changedByUsername = userData[0]?.username ?? null;
-
-            enriched.push({
-                ...record,
-                prevStatusName,
-                newStatusName,
-                changedByName,
-                changedByUsername,
-            });
-        }
-
-        return enriched;
+        return rows.map((row) => ({
+            id: row.id,
+            tenderId: row.tenderId,
+            prevStatus: row.prevStatus,
+            prevStatusName: row.prevStatusName,
+            newStatus: row.newStatus,
+            newStatusName: row.newStatusName,
+            comment: row.comment,
+            changedBy: row.changedBy,
+            changedByName: row.changedByName,
+            changedByUsername: row.changedByUsername,
+            createdAt: row.createdAt,
+        }));
     }
 }

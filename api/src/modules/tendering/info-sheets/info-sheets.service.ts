@@ -14,6 +14,8 @@ import {
 } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 
 // ============================================================================
 // Types
@@ -33,7 +35,8 @@ export type TenderInfoSheetWithRelations = TenderInformation & {
 export class TenderInfoSheetsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService, // Injected
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     async findByTenderId(
@@ -93,7 +96,8 @@ export class TenderInfoSheetsService {
 
     async create(
         tenderId: number,
-        payload: TenderInfoSheetPayload
+        payload: TenderInfoSheetPayload,
+        changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
@@ -105,6 +109,10 @@ export class TenderInfoSheetsService {
                 `Info sheet already exists for tender ${tenderId}`
             );
         }
+
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
 
         // Insert main info sheet
         const [infoSheet] = await this.db
@@ -208,6 +216,23 @@ export class TenderInfoSheetsService {
             );
         }
 
+        // AUTO STATUS CHANGE: Update tender status to 2 (Tender Info filled) and track it
+        const newStatus = 2; // Status ID for "Tender Info filled"
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tenderId));
+
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'Tender info sheet filled'
+            );
+        });
+
         return this.findByTenderId(
             tenderId
         ) as Promise<TenderInfoSheetWithRelations>;
@@ -215,7 +240,8 @@ export class TenderInfoSheetsService {
 
     async update(
         tenderId: number,
-        payload: TenderInfoSheetPayload
+        payload: TenderInfoSheetPayload,
+        changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);

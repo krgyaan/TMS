@@ -24,6 +24,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
@@ -91,6 +92,7 @@ export class EmdsService {
         private readonly tenderInfosService: TenderInfosService,
         private readonly instrumentStatusService: InstrumentStatusService,
         private readonly historyService: InstrumentStatusHistoryService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     // ========================================================================
@@ -528,6 +530,10 @@ export class EmdsService {
     ) {
         const tender = await this.tenderInfosService.getTenderForPayment(tenderId);
 
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
         const [infoSheet] = await this.db
             .select()
             .from(tenderInformation)
@@ -535,6 +541,7 @@ export class EmdsService {
             .limit(1);
 
         const createdRequests: PaymentRequest[] = [];
+        let emdRequested = false;
 
         await this.db.transaction(async (tx) => {
             // Create EMD request if mode is provided
@@ -550,6 +557,7 @@ export class EmdsService {
                         userId
                     );
                     createdRequests.push(request);
+                    emdRequested = true;
 
                     await this.createInstrumentWithDetails(
                         tx,
@@ -616,6 +624,23 @@ export class EmdsService {
                         userId
                     );
                 }
+            }
+
+            // AUTO STATUS CHANGE: Update tender status to 5 (EMD Requested) if EMD was requested
+            if (emdRequested && userId) {
+                const newStatus = 5; // Status ID for "EMD Requested"
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    tenderId,
+                    newStatus,
+                    userId,
+                    prevStatus,
+                    'EMD requested'
+                );
             }
         });
 

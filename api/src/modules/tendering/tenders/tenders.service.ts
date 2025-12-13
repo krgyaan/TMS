@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, and, inArray, isNull, notInArray, sql, desc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -11,6 +11,7 @@ import { locations } from '@db/schemas/master/locations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
@@ -111,7 +112,10 @@ export type TenderListFilters = {
 
 @Injectable()
 export class TenderInfosService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
         const statusIds = categories
@@ -510,7 +514,19 @@ export class TenderInfosService {
 
     async create(data: NewTenderInfo): Promise<TenderInfo> {
         const rows = await this.db.insert(tenderInfos).values(data).returning();
-        return rows[0];
+        const newTender = rows[0];
+
+        // Track initial status (status = 1) automatically
+        const initialStatus = data.status ?? 1;
+        await this.tenderStatusHistoryService.trackStatusChange(
+            newTender.id as number,
+            initialStatus,
+            data.teamMember ?? 0,
+            null,
+            'Tender created'
+        );
+
+        return newTender;
     }
 
     async update(id: number, data: Partial<NewTenderInfo>): Promise<TenderInfo> {
@@ -597,5 +613,49 @@ export class TenderInfosService {
         }
 
         return this.update(id, updateData);
+    }
+
+    /**
+     * Update tender status manually with comment
+     */
+    async updateStatus(
+        tenderId: number,
+        newStatus: number,
+        changedBy: number,
+        comment: string
+    ): Promise<TenderInfo> {
+        const currentTender = await this.validateExists(tenderId);
+        const prevStatus = currentTender.status;
+
+        if (prevStatus === newStatus) {
+            throw new BadRequestException('Status is already set to this value');
+        }
+
+        // Update status in transaction
+        const updated = await this.db.transaction(async (tx) => {
+            // Update tender status
+            const [updatedTender] = await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tenderId))
+                .returning();
+
+            if (!updatedTender) {
+                throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+            }
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                comment
+            );
+
+            return updatedTender;
+        });
+
+        return updated;
     }
 }

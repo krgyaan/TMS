@@ -1,6 +1,8 @@
 import { Controller, Get, Put, Param, Body, ParseIntPipe, Query } from '@nestjs/common';
 import { TenderApprovalService, type TenderApprovalFilters } from '@/modules/tendering/tender-approval/tender-approval.service';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('tender-approvals')
 export class TenderApprovalController {
@@ -32,7 +34,8 @@ export class TenderApprovalController {
     async createOrUpdateApproval(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() data: TenderApprovalPayload,
+        @CurrentUser() user: ValidatedUser
     ) {
-        return this.tenderApprovalService.updateApproval(tenderId, data);
+        return this.tenderApprovalService.updateApproval(tenderId, data, user.sub);
     }
 }

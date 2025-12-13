@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
 import { TenderInfoSheetPayloadSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('tender-info-sheets')
 export class TenderInfoSheetsController {
@@ -26,17 +28,19 @@ export class TenderInfoSheetsController {
     async create(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
     ) {
         const payload = TenderInfoSheetPayloadSchema.parse(body);
-        return this.infoSheetsService.create(tenderId, payload);
+        return this.infoSheetsService.create(tenderId, payload, user.sub);
     }
 
     @Patch(':tenderId')
     async update(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
     ) {
         const payload = TenderInfoSheetPayloadSchema.parse(body);
-        return this.infoSheetsService.update(tenderId, payload);
+        return this.infoSheetsService.update(tenderId, payload, user.sub);
     }
 }

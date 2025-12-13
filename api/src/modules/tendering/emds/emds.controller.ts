@@ -21,6 +21,8 @@ import {
     type DashboardCounts,
 } from '@/modules/tendering/emds/dto/emds.dto';
 import type { Request } from 'express';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 // Extend Express Request to include user
 interface AuthenticatedRequest extends Request {
@@ -65,11 +67,10 @@ export class EmdsController {
     async create(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() body: unknown,
-        @Req() req: AuthenticatedRequest,
+        @CurrentUser() user: ValidatedUser,
     ) {
         const payload = CreatePaymentRequestSchema.parse(body);
-        const userId = req.user?.id;
-        return this.emdsService.create(tenderId, payload, userId);
+        return this.emdsService.create(tenderId, payload, user.sub);
     }
 
     @Get('tenders/:tenderId')
