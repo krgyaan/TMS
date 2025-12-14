@@ -10,7 +10,7 @@ import { vendors } from './vendors.schema';
 
   export const vendorFiles = pgTable('vendor_files', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    vendorId: bigint('vendor_id', { mode: 'number' }).notNull().references(()=>vendors.id),
+    vendorId: bigint('vendor_id', { mode: 'number' }).notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     filePath: varchar('file_path', { length: 255 }).notNull(),
     status: boolean('status').notNull().default(true),

@@ -11,9 +11,7 @@ import { users } from '@db/schemas/auth/users.schema';
 
 export const oauthAccounts = pgTable('oauth_accounts', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
-  userId: bigint('user_id', { mode: 'number' })
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
   provider: varchar('provider', { length: 50 }).notNull(),
   providerUserId: varchar('provider_user_id', { length: 255 }).notNull(),
   providerEmail: varchar('provider_email', { length: 255 }),

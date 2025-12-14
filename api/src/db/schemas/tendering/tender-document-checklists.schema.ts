@@ -11,10 +11,10 @@ import { users } from '@db/schemas/auth/users.schema';
 
 export const tenderDocumentChecklists = pgTable('tender_document_checklists', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    tenderId: integer('tender_id').notNull().unique().references(() => tenderInfos.id, { onDelete: 'cascade' }),
+    tenderId: integer('tender_id').notNull().unique(),
     selectedDocuments: jsonb('selected_documents').$type<string[]>(), // ["PAN & GST", "MSME", "Cancelled Cheque"]
     extraDocuments: jsonb('extra_documents').$type<{ name: string; path: string }[]>(), // [{ name: "file1.pdf", path: "/uploads/..." }]
-    submittedBy: bigint('submitted_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
+    submittedBy: bigint('submitted_by', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

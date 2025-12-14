@@ -23,12 +23,12 @@ export const tqStatusEnum = pgEnum('tq_status', [
 
 export const tenderQueries = pgTable('tender_queries', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    tenderId: bigint('tender_id', { mode: 'number' }).notNull().references(() => tenderInfos.id, { onDelete: 'cascade' }),
+    tenderId: bigint('tender_id', { mode: 'number' }).notNull(),
 
     // TQ Received Info
     tqSubmissionDeadline: timestamp('tq_submission_deadline', { withTimezone: true }),
     tqDocumentReceived: varchar('tq_document_received', { length: 500 }),
-    receivedBy: bigint('received_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
+    receivedBy: bigint('received_by', { mode: 'number' }),
     receivedAt: timestamp('received_at', { withTimezone: true }),
 
     // TQ Status Flow
@@ -38,7 +38,7 @@ export const tenderQueries = pgTable('tender_queries', {
     repliedDatetime: timestamp('replied_datetime', { withTimezone: true }),
     repliedDocument: varchar('replied_document', { length: 500 }),
     proofOfSubmission: varchar('proof_of_submission', { length: 500 }),
-    repliedBy: bigint('replied_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
+    repliedBy: bigint('replied_by', { mode: 'number' }),
     repliedAt: timestamp('replied_at', { withTimezone: true }),
 
     // TQ Missed Info
@@ -53,9 +53,9 @@ export const tenderQueries = pgTable('tender_queries', {
 // TQ Query Items (normalized from JSON)
 export const tenderQueryItems = pgTable('tender_query_items', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    tenderQueryId: bigint('tender_query_id', { mode: 'number' }).notNull().references(() => tenderQueries.id, { onDelete: 'cascade' }),
+    tenderQueryId: bigint('tender_query_id', { mode: 'number' }).notNull(),
     srNo: integer('sr_no').notNull(),
-    tqTypeId: bigint('tq_type_id', { mode: 'number' }).references(() => tqTypes.id, { onDelete: 'set null' }),
+    tqTypeId: bigint('tq_type_id', { mode: 'number' }),
     queryDescription: text('query_description').notNull(),
     response: text('response'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

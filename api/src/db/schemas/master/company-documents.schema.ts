@@ -10,9 +10,7 @@ import { companies } from '@db/schemas/master/companies.schema';
 
 export const companyDocuments = pgTable('company_documents', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
-  companyId: bigint('company_id', { mode: 'number' })
-    .notNull()
-    .references(() => companies.id, { onDelete: 'cascade' }),
+  companyId: bigint('company_id', { mode: 'number' }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   size: bigint('size', { mode: 'number' }).default(0),
   isFolder: boolean('is_folder').notNull().default(false),

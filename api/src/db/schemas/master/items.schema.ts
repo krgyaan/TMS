@@ -12,10 +12,8 @@ import { itemHeadings } from '@db/schemas/master/item-headings.schema';
 export const items = pgTable('items', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   name: varchar('name', { length: 100 }).notNull().unique(),
-  teamId: bigint('team_id', { mode: 'number' }).references(() => teams.id),
-  headingId: bigint('heading_id', { mode: 'number' }).references(
-    () => itemHeadings.id,
-  ),
+  teamId: bigint('team_id', { mode: 'number' }),
+  headingId: bigint('heading_id', { mode: 'number' }),
   status: boolean('status').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

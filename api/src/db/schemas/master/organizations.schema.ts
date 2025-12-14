@@ -12,9 +12,7 @@ export const organizations = pgTable('organizations', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: varchar('name', { length: 255 }).notNull().unique(),
     acronym: varchar('acronym', { length: 50 }),
-    industryId: bigint('industry_id', { mode: 'number' }).references(
-        () => industries.id,
-    ),
+    industryId: bigint('industry_id', { mode: 'number' }),
     status: boolean('status').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()

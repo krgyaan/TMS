@@ -11,7 +11,7 @@ import { teams } from '@db/schemas/master/teams.schema';
 export const itemHeadings = pgTable('item_headings', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: varchar('name', { length: 100 }).notNull().unique(),
-    teamId: bigint('team_id', { mode: 'number' }).references(() => teams.id),
+    teamId: bigint('team_id', { mode: 'number' }),
     status: boolean('status').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()

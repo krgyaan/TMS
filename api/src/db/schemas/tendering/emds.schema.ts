@@ -1,5 +1,4 @@
-import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, foreignKey, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -51,13 +50,6 @@ export const paymentRequests = pgTable('payment_requests', {
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (table) => {
     return [
-        {
-            fkTender: foreignKey({
-                columns: [table.tenderId],
-                foreignColumns: [tenderInfos.id],
-                name: 'fk_payment_request_tender',
-            }).onDelete('cascade')
-        },
         { purposeIdx: index('payment_requests_purpose_idx').on(table.purpose) },
         { legacyEmdIdx: index('payment_requests_legacy_emd_id_idx').on(table.legacyEmdId) },
     ];
@@ -128,13 +120,6 @@ export const paymentInstruments = pgTable('payment_instruments', {
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (table) => {
     return [
-        {
-            fkRequest: foreignKey({
-                columns: [table.requestId],
-                foreignColumns: [paymentRequests.id],
-                name: 'fk_instrument_request',
-            }).onDelete('cascade')
-        },
         { typeIdx: index('instruments_type_idx').on(table.instrumentType) },
         { statusIdx: index('instruments_status_idx').on(table.status) },
         { utrIdx: index('instruments_utr_idx').on(table.utr) },
@@ -165,9 +150,7 @@ export const instrumentDdDetails = pgTable('instrument_dd_details', {
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // FDR - FIXED DEPOSIT RECEIPT DETAILS
@@ -189,9 +172,7 @@ export const instrumentFdrDetails = pgTable('instrument_fdr_details', {
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // BG - BANK GUARANTEE DETAILS
@@ -286,9 +267,7 @@ export const instrumentBgDetails = pgTable('instrument_bg_details', {
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // CHEQUE DETAILS
@@ -328,9 +307,7 @@ export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // BANK TRANSFER / PORTAL PAYMENT DETAILS
@@ -365,9 +342,7 @@ export const instrumentTransferDetails = pgTable('instrument_transfer_details', 
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // INSTRUMENT STATUS HISTORY
@@ -393,9 +368,7 @@ export const instrumentStatusHistory = pgTable('instrument_status_history', {
     userAgent: varchar('user_agent', { length: 200 }).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-    { fkInstrument: foreignKey({ columns: [t.instrumentId], foreignColumns: [paymentInstruments.id] }).onDelete('cascade') }
-]);
+}, (t) => []);
 
 // ============================================
 // TYPES

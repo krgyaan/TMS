@@ -6,9 +6,7 @@ export const followUpPersons = pgTable(
     {
         id: bigint("id", { mode: "number" }).primaryKey(), // MySQL ID preserved
 
-        followUpId: bigint("follow_up_id", { mode: "number" })
-            .notNull()
-            .references(() => followUps.id, { onDelete: "cascade" }),
+        followUpId: bigint("follow_up_id", { mode: "number" }).notNull(),
 
         name: varchar("name", { length: 255 }),
         email: varchar("email", { length: 255 }),

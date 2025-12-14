@@ -18,16 +18,13 @@ export const tenderResults = pgTable(
         id: bigserial("id", { mode: "number" }).primaryKey(),
 
         // Foreign Key to Tenders
-        tenderId: bigint("tender_id", { mode: "number" }).notNull().references(() => tenderInfos.id, { onDelete: "cascade" }),
+        tenderId: bigint("tender_id", { mode: "number" }).notNull(),
 
         // Status (synced from RA Dashboard if RA applicable)
         status: varchar("status", { length: 50 }).default("Under Evaluation").notNull(),
 
         // Link to RA Management (if RA applicable)
-        reverseAuctionId: bigint("reverse_auction_id", { mode: "number" }).references(
-            () => reverseAuctions.id,
-            { onDelete: "set null" }
-        ),
+        reverseAuctionId: bigint("reverse_auction_id", { mode: "number" }),
 
         // ============================================
         // Upload Result Fields (for non-RA tenders)

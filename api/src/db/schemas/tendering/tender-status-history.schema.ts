@@ -12,18 +12,11 @@ import { users } from '@db/schemas/auth/users.schema';
 
 export const tenderStatusHistory = pgTable('tender_status_history', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    tenderId: bigint('tender_id', { mode: 'number' })
-        .notNull()
-        .references(() => tenderInfos.id, { onDelete: 'cascade' }),
-    prevStatus: bigint('prev_status', { mode: 'number' })
-        .references(() => statuses.id),
-    newStatus: bigint('new_status', { mode: 'number' })
-        .notNull()
-        .references(() => statuses.id),
+    tenderId: bigint('tender_id', { mode: 'number' }).notNull(),
+    prevStatus: bigint('prev_status', { mode: 'number' }),
+    newStatus: bigint('new_status', { mode: 'number' }).notNull(),
     comment: text('comment'),
-    changedBy: bigint('changed_by', { mode: 'number' })
-        .notNull()
-        .references(() => users.id),
+    changedBy: bigint('changed_by', { mode: 'number' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
