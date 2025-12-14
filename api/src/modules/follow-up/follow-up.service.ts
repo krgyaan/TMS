@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from "@nestjs/common";
 import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL } from "drizzle-orm";
 
-import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "../../db/schemas/shared/follow-ups.schema";
-import { clientDirectory } from "../../db/schemas/shared/client-directory.schema";
-import { users } from "../../db/schemas/auth/users.schema";
+import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "@/db/schemas/shared/follow-ups.schema";
+import { clientDirectory } from "@/db/schemas/shared/client-directory.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 
-import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpDetailsDto } from "./zod";
-import { DRIZZLE } from "../../db/database.module";
-import type { DbInstance } from "../../db";
+import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpDetailsDto } from "@/modules/follow-up/zod";
+import { DRIZZLE } from "@/db/database.module";
+import type { DbInstance } from "@/db";
 
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
@@ -30,7 +30,7 @@ export class FollowUpService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
-    ) {}
+    ) { }
 
     // ========================
     // CREATE

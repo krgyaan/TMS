@@ -1,18 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CourierController } from './courier.controller';
+import { CourierController } from '@/modules/courier/courier.controller';
 
 describe('CourierController', () => {
-  let controller: CourierController;
+    let controller: CourierController;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [CourierController],
-    }).compile();
+    beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+            controllers: [CourierController],
+        }).compile();
 
-    controller = module.get<CourierController>(CourierController);
-  });
+        controller = module.get<CourierController>(CourierController);
+    });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+    it('should be defined', () => {
+        expect(controller).toBeDefined();
+    });
 });

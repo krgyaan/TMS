@@ -3,10 +3,10 @@ import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
 
-import { EmployeeImprestService } from "./employee-imprest.service";
-import type { CreateEmployeeImprestDto } from "./zod/create-employee-imprest.schema";
-import type { UpdateEmployeeImprestDto } from "./zod/update-employee-imprest.schema";
-import { CurrentUser } from "../../decorators/current-user.decorator";
+import { EmployeeImprestService } from "@/modules/employee-imprest/employee-imprest.service";
+import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import { CurrentUser } from "@/decorators/current-user.decorator";
 
 // Multer config
 const multerConfig = {
@@ -24,7 +24,7 @@ const multerConfig = {
 };
 @Controller("employee-imprest")
 export class EmployeeImprestController {
-    constructor(private readonly service: EmployeeImprestService) {}
+    constructor(private readonly service: EmployeeImprestService) { }
 
     @Post()
     create(@Body() body: CreateEmployeeImprestDto, @CurrentUser("id") userId: number) {

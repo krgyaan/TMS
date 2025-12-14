@@ -4,10 +4,10 @@ import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
 
-import { CourierService } from "./courier.service";
-import type { CreateCourierDto } from "./zod/create-courier.schema";
-import type { UpdateCourierDto } from "./zod/update-courier.schema";
-import { CurrentUser } from "../../decorators/current-user.decorator";
+import { CourierService } from "@/modules/courier/courier.service";
+import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
+import type { UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
+import { CurrentUser } from "@/decorators/current-user.decorator";
 
 // Allowed file types
 const ALLOWED_MIME_TYPES = [
@@ -73,7 +73,7 @@ const docketSlipMulterConfig = {
 
 @Controller("couriers")
 export class CourierController {
-    constructor(private readonly service: CourierService) {}
+    constructor(private readonly service: CourierService) { }
 
     @Post()
     create(@Body() body: CreateCourierDto, @CurrentUser("id") userId: number) {

@@ -2,16 +2,16 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, and, desc } from "drizzle-orm";
 
-import { DRIZZLE } from "../../db/database.module";
-import type { DbInstance } from "../../db";
-import { couriers } from "../../db/schemas/shared/couriers.schema";
-import { users } from "../../db//schemas/auth/users.schema";
+import { DRIZZLE } from "@/db/database.module";
+import type { DbInstance } from "@/db";
+import { couriers } from "@/db/schemas/shared/couriers.schema";
+import { users } from "@/db//schemas/auth/users.schema";
 
-import type { CreateCourierDto } from "./zod/create-courier.schema";
-import type { UpdateCourierDto } from "./zod/update-courier.schema";
-import type { DispatchCourierDto } from "./zod/dispatch-courier.schema";
+import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
+import type { UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
+import type { DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
 
-import { MailerService } from "src/mailer/mailer.service";
+import { MailerService } from "@/mailer/mailer.service";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -34,7 +34,7 @@ export class CourierService {
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailer: MailerService
-    ) {}
+    ) { }
 
     private validateDispatchData(dispatchData: DispatchCourierDto): void {
         if (!dispatchData.courier_provider?.trim()) {

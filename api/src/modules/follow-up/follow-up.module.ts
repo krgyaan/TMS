@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { FollowUpController } from "./follow-up.controller";
-import { FollowUpService } from "./follow-up.service";
-import { DatabaseModule } from "../../db/database.module";
+import { FollowUpController } from "@/modules/follow-up/follow-up.controller";
+import { FollowUpService } from "@/modules/follow-up/follow-up.service";
+import { DatabaseModule } from "@/db/database.module";
 
 @Module({
     imports: [DatabaseModule],
@@ -9,4 +9,4 @@ import { DatabaseModule } from "../../db/database.module";
     providers: [FollowUpService],
     exports: [FollowUpService],
 })
-export class FollowUpModule {}
+export class FollowUpModule { }

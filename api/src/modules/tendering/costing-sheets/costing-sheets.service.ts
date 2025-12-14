@@ -245,7 +245,7 @@ export class CostingSheetsService {
         // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) and track it
         const newStatus = 6; // Status ID for "Price Bid ready"
 
-        const [result] = await this.db.transaction(async (tx) => {
+        const result = await this.db.transaction(async (tx) => {
             const costingSheet = await tx
                 .insert(tenderCostingSheets)
                 .values({
