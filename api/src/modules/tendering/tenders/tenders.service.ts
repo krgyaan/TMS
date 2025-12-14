@@ -658,4 +658,72 @@ export class TenderInfosService {
 
         return updated;
     }
+
+    /**
+     * Generate a unique tender name based on organization, item, and location
+     */
+    async generateTenderName(
+        organizationId: number,
+        itemId: number,
+        locationId?: number
+    ): Promise<{ tenderName: string }> {
+        // Fetch organization acronym
+        const [organization] = await this.db
+            .select({ acronym: organizations.acronym })
+            .from(organizations)
+            .where(eq(organizations.id, organizationId))
+            .limit(1);
+
+        if (!organization || !organization.acronym) {
+            throw new NotFoundException(`Organization with ID ${organizationId} not found or has no acronym`);
+        }
+
+        // Fetch item name
+        const [item] = await this.db
+            .select({ name: items.name })
+            .from(items)
+            .where(eq(items.id, itemId))
+            .limit(1);
+
+        if (!item || !item.name) {
+            throw new NotFoundException(`Item with ID ${itemId} not found`);
+        }
+
+        // Build base name parts
+        const nameParts = [organization.acronym.trim(), item.name.trim()];
+
+        // Add location name if provided
+        if (locationId) {
+            const [location] = await this.db
+                .select({ name: locations.name })
+                .from(locations)
+                .where(eq(locations.id, locationId))
+                .limit(1);
+
+            if (location && location.name) {
+                nameParts.push(location.name.trim());
+            }
+        }
+
+        // Build base name
+        const baseName = nameParts.join(' ');
+
+        // Query existing tenders with names starting with baseName
+        const existingTenders = await this.db
+            .select({ tenderName: tenderInfos.tenderName })
+            .from(tenderInfos)
+            .where(sql`${tenderInfos.tenderName} LIKE ${`${baseName}%`}`)
+            .limit(100); // Reasonable limit to check duplicates
+
+        // Count how many tenders start with this base name
+        const existingCount = existingTenders.length;
+
+        // Generate unique name
+        let uniqueName = baseName;
+        if (existingCount > 0) {
+            uniqueName = `${baseName} (${existingCount})`;
+        }
+
+        return { tenderName: uniqueName };
+    }
 }

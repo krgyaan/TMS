@@ -106,3 +106,13 @@ export const useDeleteTender = () => {
         },
     });
 };
+
+export const useGenerateTenderName = () => {
+    return useMutation({
+        mutationFn: (params: { organization: number; item: number; location?: number }) =>
+            tenderInfosService.generateName(params),
+        onError: error => {
+            console.error("Error generating tender name:", error);
+        },
+    });
+};

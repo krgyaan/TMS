@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +14,7 @@ import { SelectField } from "@/components/form/SelectField";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
 import { DateInput } from "@/components/form/DateInput";
 import { FileUploadField } from "@/components/form/FileUploadField";
-import { useCreateTender, useUpdateTender } from "@/hooks/api/useTenders";
+import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames } from "@/types/api.types";
 import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
@@ -65,6 +65,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const navigate = useNavigate();
     const createTender = useCreateTender();
     const updateTender = useUpdateTender();
+    const generateTenderName = useGenerateTenderName();
 
     const teamOptions = useTeamOptions([1, 2]);
     const organizationOptions = useOrganizationOptions();
@@ -105,12 +106,28 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         },
     });
 
+    // Watch organization, item, and location fields for auto-generation
+    const organization = useWatch({ control: manualForm.control, name: "organization" });
+    const item = useWatch({ control: manualForm.control, name: "item" });
+    const location = useWatch({ control: manualForm.control, name: "location" });
+
+    // Track if form has been initialized to avoid auto-generation on initial load
+    const isInitialLoad = useRef(true);
+    const previousValues = useRef<{ organization?: number; item?: number; location?: number }>({});
+
     useEffect(() => {
         if (!tender || mode !== "edit") {
+            // For create mode, mark as ready after first render
+            if (mode === "create") {
+                // Use setTimeout to ensure form is ready
+                setTimeout(() => {
+                    isInitialLoad.current = false;
+                }, 0);
+            }
             return;
         }
         try {
-            manualForm.reset({
+            const resetValues = {
                 team: Number(tender.team) || (undefined as any),
                 tenderNo: tender.tenderNo || "",
                 tenderName: tender.tenderName || "",
@@ -119,17 +136,70 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 tenderFees: tender.tenderFees != null ? Number(tender.tenderFees) : 0,
                 emd: tender.emd != null ? Number(tender.emd) : 0,
                 teamMember: Number(tender.teamMember) || (undefined as any),
-                dueDate: tender.dueDate || "",
+                dueDate: tender.dueDate ? (tender.dueDate as Date).toISOString() : undefined,
                 location: tender.location ? Number(tender.location) : undefined,
                 website: tender.website ? Number(tender.website) : undefined,
                 item: Number(tender.item) || (undefined as any),
                 status: Number(tender.status) ?? 1,
                 remarks: tender.remarks || "",
-            });
+            };
+            manualForm.reset(resetValues);
+            // Set initial values after reset to prevent auto-generation trigger
+            previousValues.current = {
+                organization: resetValues.organization,
+                item: resetValues.item,
+                location: resetValues.location,
+            };
+            // Mark as ready after reset completes
+            setTimeout(() => {
+                isInitialLoad.current = false;
+            }, 0);
         } catch (err) {
             console.error("Error resetting form:", err);
         }
-    }, [tender, mode]);
+    }, [tender, mode, manualForm]);
+
+    // Auto-generate tender name when organization, item, or location changes
+    useEffect(() => {
+        // Skip on initial load
+        if (isInitialLoad.current) {
+            return;
+        }
+
+        // Check if values actually changed
+        const hasChanged =
+            previousValues.current.organization !== organization ||
+            previousValues.current.item !== item ||
+            previousValues.current.location !== location;
+
+        if (!hasChanged) {
+            return;
+        }
+
+        // Only generate if organization and item are present (location is optional)
+        if (organization && item) {
+            const generateName = async () => {
+                try {
+                    const result = await generateTenderName.mutateAsync({
+                        organization,
+                        item,
+                        location,
+                    });
+                    if (result?.tenderName) {
+                        manualForm.setValue("tenderName", result.tenderName, { shouldValidate: false });
+                    }
+                } catch (error) {
+                    console.error("Error generating tender name:", error);
+                    // Don't show error toast, just log it
+                }
+            };
+
+            generateName();
+        }
+
+        // Update previous values
+        previousValues.current = { organization, item, location };
+    }, [organization, item, location, generateTenderName, manualForm]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
@@ -138,11 +208,11 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 tenderNo: values.tenderNo,
                 tenderName: values.tenderName,
                 organization: values.organization,
-                gstValues: values.gstValues,
-                tenderFees: values.tenderFees,
-                emd: values.emd,
+                gstValues: values.gstValues.toString(),
+                tenderFees: values.tenderFees.toString(),
+                emd: values.emd.toString(),
                 teamMember: values.teamMember,
-                dueDate: values.dueDate,
+                dueDate: new Date(values.dueDate).toISOString(),
                 location: values.location || undefined,
                 website: values.website || undefined,
                 item: values.item,

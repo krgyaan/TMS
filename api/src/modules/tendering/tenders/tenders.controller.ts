@@ -109,6 +109,12 @@ const UpdateStatusSchema = z.object({
     comment: z.string().min(1, 'Comment is required'),
 });
 
+const GenerateTenderNameSchema = z.object({
+    organization: z.coerce.number().int().positive("Organization is required"),
+    item: z.coerce.number().int().positive("Item is required"),
+    location: z.coerce.number().int().positive().optional(),
+});
+
 type CreateTenderDto = z.infer<typeof CreateTenderInfoSchema>;
 type UpdateTenderDto = z.infer<typeof UpdateTenderInfoSchema>;
 
@@ -214,6 +220,19 @@ export class TenderInfoController {
             parsed.status,
             user.sub,
             parsed.comment
+        );
+    }
+
+    /**
+     * Generate tender name based on organization, item, and location
+     */
+    @Post('generate-name')
+    async generateName(@Body() body: unknown) {
+        const parsed = GenerateTenderNameSchema.parse(body);
+        return this.tenderInfosService.generateTenderName(
+            parsed.organization,
+            parsed.item,
+            parsed.location
         );
     }
 }

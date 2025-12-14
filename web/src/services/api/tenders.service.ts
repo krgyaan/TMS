@@ -68,6 +68,10 @@ class TenderInfosService extends BaseApiService {
     async remove(id: number): Promise<void> {
         return super.delete<void>(`/${id}`);
     }
+
+    async generateName(params: { organization: number; item: number; location?: number }): Promise<{ tenderName: string }> {
+        return this.post<{ tenderName: string }>('/generate-name', params);
+    }
 }
 
 export const tenderInfosService = new TenderInfosService();
