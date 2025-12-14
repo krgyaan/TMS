@@ -71,12 +71,12 @@ export const courierApi = {
     createDispatch: async (id: number, data: CreateDispatchInput): Promise<Courier> => {
         const formData = new FormData();
 
-        formData.append("courier_provider", data.courier_provider);
-        formData.append("docket_no", data.docket_no);
-        formData.append("pickup_date", data.pickup_date);
+        formData.append("courier_provider", data.courierProvider);
+        formData.append("docket_no", data.docketNo);
+        formData.append("pickup_date", data.pickupDate);
 
-        if (data.docket_slip) {
-            formData.append("docket_slip", data.docket_slip);
+        if (data.docketSlip) {
+            formData.append("docket_slip", data.docketSlip);
         }
 
         const response = await api.post(`${ENDPOINT}/${id}/dispatch`, formData, {
@@ -103,7 +103,7 @@ export const courierApi = {
     // Upload documents
     uploadDocs: async (id: number, files: File[]): Promise<Courier> => {
         const formData = new FormData();
-        files.forEach(file => formData.append("courier_docs[]", file));
+        files.forEach(file => formData.append("courierDocs[]", file));
 
         const response = await api.post(`${ENDPOINT}/${id}/upload`, formData, {
             headers: { "Content-Type": "multipart/form-data" },
@@ -114,7 +114,7 @@ export const courierApi = {
     // Upload delivery POD
     uploadDeliveryPod: async (id: number, file: File): Promise<Courier> => {
         const formData = new FormData();
-        formData.append("delivery_pod", file);
+        formData.append("deliveryPod", file);
 
         const response = await api.post(`${ENDPOINT}/${id}/upload-pod`, formData, {
             headers: { "Content-Type": "multipart/form-data" },

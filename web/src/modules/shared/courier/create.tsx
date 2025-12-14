@@ -21,19 +21,19 @@ import { useUsers } from "@/hooks/api/useUsers";
 // Validation Schema
 // =====================
 const courierFormSchema = z.object({
-    to_org: z.string().min(1, "Organization name is required"),
-    to_name: z.string().min(1, "Recipient name is required"),
-    to_addr: z.string().min(1, "Address is required"),
-    to_pin: z
+    toOrg: z.string().min(1, "Organization name is required"),
+    toName: z.string().min(1, "Recipient name is required"),
+    toAddr: z.string().min(1, "Address is required"),
+    toPin: z
         .string()
         .min(1, "Pin code is required")
         .regex(/^\d{6}$/, "Pin code must be 6 digits"),
-    to_mobile: z
+    toMobile: z
         .string()
         .min(1, "Mobile number is required")
         .regex(/^\d{10}$/, "Mobile number must be 10 digits"),
-    emp_from: z.number({ required_error: "Please select an employee" }).int().positive(),
-    del_date: z.string().min(1, "Expected delivery date is required"),
+    empFrom: z.number({ required_error: "Please select an employee" }).int().positive(),
+    delDate: z.string().min(1, "Expected delivery date is required"),
     urgency: z.number({ required_error: "Please select dispatch urgency" }).int().min(1).max(2),
 });
 
@@ -79,13 +79,13 @@ const CourierForm = () => {
     } = useForm<CourierFormData>({
         resolver: zodResolver(courierFormSchema),
         defaultValues: {
-            to_org: "",
-            to_name: "",
-            to_addr: "",
-            to_pin: "",
-            to_mobile: "",
-            emp_from: undefined,
-            del_date: "",
+            toOrg: "",
+            toName: "",
+            toAddr: "",
+            toPin: "",
+            toMobile: "",
+            empFrom: undefined,
+            delDate: "",
             urgency: undefined,
         },
     });
@@ -202,8 +202,8 @@ const CourierForm = () => {
                                     <Label htmlFor="to_org">
                                         Organization Name <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="to_org" placeholder="Enter organization name" {...register("to_org")} disabled={isSubmitting} />
-                                    {errors.to_org && <p className="text-sm text-destructive">{errors.to_org.message}</p>}
+                                    <Input id="to_org" placeholder="Enter organization name" {...register("toOrg")} disabled={isSubmitting} />
+                                    {errors.toOrg && <p className="text-sm text-destructive">{errors.toOrg.message}</p>}
                                 </div>
 
                                 {/* Recipient Name */}
@@ -211,8 +211,8 @@ const CourierForm = () => {
                                     <Label htmlFor="to_name">
                                         Name <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="to_name" placeholder="Enter recipient name" {...register("to_name")} disabled={isSubmitting} />
-                                    {errors.to_name && <p className="text-sm text-destructive">{errors.to_name.message}</p>}
+                                    <Input id="to_name" placeholder="Enter recipient name" {...register("toName")} disabled={isSubmitting} />
+                                    {errors.toName && <p className="text-sm text-destructive">{errors.toName.message}</p>}
                                 </div>
 
                                 {/* Address */}
@@ -220,8 +220,8 @@ const CourierForm = () => {
                                     <Label htmlFor="to_addr">
                                         Address <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="to_addr" placeholder="Enter complete address" {...register("to_addr")} disabled={isSubmitting} />
-                                    {errors.to_addr && <p className="text-sm text-destructive">{errors.to_addr.message}</p>}
+                                    <Input id="to_addr" placeholder="Enter complete address" {...register("toAddr")} disabled={isSubmitting} />
+                                    {errors.toAddr && <p className="text-sm text-destructive">{errors.toAddr.message}</p>}
                                 </div>
 
                                 {/* Pin Code */}
@@ -229,8 +229,8 @@ const CourierForm = () => {
                                     <Label htmlFor="to_pin">
                                         Pin Code <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="to_pin" placeholder="Enter 6-digit pin code" maxLength={6} {...register("to_pin")} disabled={isSubmitting} />
-                                    {errors.to_pin && <p className="text-sm text-destructive">{errors.to_pin.message}</p>}
+                                    <Input id="to_pin" placeholder="Enter 6-digit pin code" maxLength={6} {...register("toPin")} disabled={isSubmitting} />
+                                    {errors.toPin && <p className="text-sm text-destructive">{errors.toPin.message}</p>}
                                 </div>
 
                                 {/* Mobile Number */}
@@ -238,8 +238,8 @@ const CourierForm = () => {
                                     <Label htmlFor="to_mobile">
                                         Mobile Number <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="to_mobile" placeholder="Enter 10-digit mobile number" maxLength={10} {...register("to_mobile")} disabled={isSubmitting} />
-                                    {errors.to_mobile && <p className="text-sm text-destructive">{errors.to_mobile.message}</p>}
+                                    <Input id="to_mobile" placeholder="Enter 10-digit mobile number" maxLength={10} {...register("toMobile")} disabled={isSubmitting} />
+                                    {errors.toMobile && <p className="text-sm text-destructive">{errors.toMobile.message}</p>}
                                 </div>
                             </div>
                         </div>
@@ -252,7 +252,7 @@ const CourierForm = () => {
                                     <Label htmlFor="emp_from">
                                         Courier from <span className="text-red-500">*</span>
                                     </Label>
-                                    <Select onValueChange={value => setValue("emp_from", Number(value))} disabled={isSubmitting || employeesLoading}>
+                                    <Select onValueChange={value => setValue("empFrom", Number(value))} disabled={isSubmitting || employeesLoading}>
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder={employeesLoading ? "Loading employees..." : "Select Employee"} />
                                         </SelectTrigger>
@@ -264,7 +264,7 @@ const CourierForm = () => {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.emp_from && <p className="text-sm text-destructive">{errors.emp_from.message}</p>}
+                                    {errors.empFrom && <p className="text-sm text-destructive">{errors.empFrom.message}</p>}
                                 </div>
 
                                 {/* Expected Delivery Date */}
@@ -272,8 +272,8 @@ const CourierForm = () => {
                                     <Label htmlFor="del_date">
                                         Expected Delivery Date <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="del_date" type="date" min={new Date().toISOString().split("T")[0]} {...register("del_date")} disabled={isSubmitting} />
-                                    {errors.del_date && <p className="text-sm text-destructive">{errors.del_date.message}</p>}
+                                    <Input id="del_date" type="date" min={new Date().toISOString().split("T")[0]} {...register("delDate")} disabled={isSubmitting} />
+                                    {errors.delDate && <p className="text-sm text-destructive">{errors.delDate.message}</p>}
                                 </div>
 
                                 {/* Dispatch Urgency */}
