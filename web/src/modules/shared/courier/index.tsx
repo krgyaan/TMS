@@ -56,12 +56,12 @@ const formatDateTime = (dateStr: string | null): string => {
 };
 
 // Generate request number
-const getRequestNo = (id: number, createdAt: string): string => {
-    const date = new Date(createdAt);
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    return `CR-${year}${month}-${id.toString().padStart(4, "0")}`;
-};
+// const getRequestNo = (id: number, createdAt: string): string => {
+//     const date = new Date(createdAt);
+//     const year = date.getFullYear().toString().slice(-2);
+//     const month = (date.getMonth() + 1).toString().padStart(2, "0");
+//     return `CR-${year}${month}-${id.toString().padStart(4, "0")}`;
+// };
 
 const CourierDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -128,7 +128,7 @@ const CourierDashboard: React.FC = () => {
     // Handle delete
     const handleDelete = useCallback(
         (courier: Courier) => {
-            if (window.confirm(`Are you sure you want to delete courier ${getRequestNo(courier.id, courier.created_at)}?`)) {
+            if (window.confirm(`Are you sure you want to delete courier ${courier.id}?`)) {
                 deleteMutation.mutate(courier.id);
             }
         },
@@ -176,21 +176,46 @@ const CourierDashboard: React.FC = () => {
             {
                 headerName: "Request No",
                 width: 150,
-                valueGetter: (p: any) => (p.data ? getRequestNo(p.data.id, p.data.created_at) : "-"),
+                valueGetter: (p: any) => (p.data ? p.data.id : "-"),
             },
             {
-                field: "created_at",
+                field: "createdAt",
                 headerName: "Request Date",
                 width: 140,
-                valueGetter: (p: any) => formatDate(p.data?.created_at),
+                valueGetter: (p: any) => formatDate(p.data?.createdAt),
             },
-            { field: "to_name", headerName: "To (Name)", width: 160 },
-            { field: "to_org", headerName: "Organization", width: 160 },
+            { field: "toName", headerName: "To (Name)", width: 160 },
+            { field: "toOrg", headerName: "Organization", width: 160 },
             {
-                field: "del_date",
+                field: "delDate",
                 headerName: "Expected Delivery",
                 width: 140,
-                valueGetter: (p: any) => formatDate(p.data?.del_date),
+                valueGetter: (p: any) => formatDate(p.data?.delDate),
+            },
+
+            {
+                field: "courierProvider",
+                headerName: "Provider",
+                width: 130,
+                valueGetter: (p: any) => p.data?.courierProvider ?? "-",
+            },
+            {
+                field: "pickupDate",
+                headerName: "Pickup Date",
+                width: 150,
+                valueGetter: (p: any) => formatDateTime(p.data?.pickupDate),
+            },
+            {
+                field: "docketNo",
+                headerName: "Docket No",
+                width: 130,
+                valueGetter: (p: any) => p.data?.docketNo ?? "-",
+            },
+            {
+                field: "deliveryDate",
+                headerName: "Delivery Date",
+                width: 150,
+                valueGetter: (p: any) => formatDateTime(p.data?.deliveryDate),
             },
             {
                 headerName: "Timer",
@@ -209,30 +234,6 @@ const CourierDashboard: React.FC = () => {
                         <span>-</span>
                     );
                 },
-            },
-            {
-                field: "courier_provider",
-                headerName: "Provider",
-                width: 130,
-                valueGetter: (p: any) => p.data?.courier_provider ?? "-",
-            },
-            {
-                field: "pickup_date",
-                headerName: "Pickup Date",
-                width: 150,
-                valueGetter: (p: any) => formatDateTime(p.data?.pickup_date),
-            },
-            {
-                field: "docket_no",
-                headerName: "Docket No",
-                width: 130,
-                valueGetter: (p: any) => p.data?.docket_no ?? "-",
-            },
-            {
-                field: "delivery_date",
-                headerName: "Delivery Date",
-                width: 150,
-                valueGetter: (p: any) => formatDateTime(p.data?.delivery_date),
             },
             {
                 headerName: "Action",
@@ -391,12 +392,7 @@ const CourierDashboard: React.FC = () => {
             <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>
-                            Change Status
-                            {selectedCourier && (
-                                <span className="text-sm font-normal text-muted-foreground ml-2">({getRequestNo(selectedCourier.id, selectedCourier.created_at)})</span>
-                            )}
-                        </DialogTitle>
+                        <DialogTitle>Change Status</DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={handleSubmitStatus} className="grid gap-4">

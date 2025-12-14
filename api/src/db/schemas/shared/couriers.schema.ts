@@ -1,44 +1,41 @@
-// src/db/couriers.schema.ts
-import { pgTable, serial, bigint, integer, varchar, text, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+// couriers.schema.ts
+import { pgTable, varchar, integer, boolean, timestamp, jsonb, text, serial } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const couriers = pgTable("couriers", {
-    // id: integer("id").primaryKey(),
-    id: bigint("id", { mode: "number" })
+    id: integer("id")
         .primaryKey()
-        .default(sql`nextval('courier_id_seq')`),
-    user_id: integer("user_id").notNull(),
+        .notNull()
+        .default(sql`nextval('couriers_id_seq')`),
 
-    // Recipient details
-    to_org: varchar("to_org", { length: 255 }).notNull(),
-    to_name: varchar("to_name", { length: 255 }).notNull(),
-    to_addr: text("to_addr").notNull(),
-    to_pin: varchar("to_pin", { length: 10 }).notNull(),
-    to_mobile: varchar("to_mobile", { length: 15 }).notNull(),
+    userId: integer("user_id").notNull(),
 
-    // Courier details
-    emp_from: integer("emp_from").notNull(),
-    del_date: timestamp("del_date").notNull(),
+    toOrg: varchar("to_org", { length: 255 }).notNull(),
+    toName: varchar("to_name", { length: 255 }).notNull(),
+    toAddr: text("to_addr").notNull(),
+    toPin: varchar("to_pin", { length: 255 }).notNull(),
+    toMobile: varchar("to_mobile", { length: 255 }).notNull(),
+
+    empFrom: integer("emp_from").notNull(),
+
+    delDate: timestamp("del_date", { mode: "date" }).notNull(),
     urgency: integer("urgency").notNull(),
 
-    // Dispatch details
-    courier_provider: varchar("courier_provider", { length: 100 }),
-    pickup_date: timestamp("pickup_date"),
-    docket_no: varchar("docket_no", { length: 100 }),
-
-    // Delivery details
-    delivery_date: timestamp("delivery_date"),
-    delivery_pod: varchar("delivery_pod", { length: 255 }),
-    within_time: boolean("within_time"),
-
-    // Documents
-    courier_docs: jsonb("courier_docs").$type<{ url: string; name: string; type: string }[]>().default([]),
-
-    // Status: 0=Pending, 1=Dispatched, 2=Not Delivered, 3=Delivered, 4=Rejected
+    courierDocs: jsonb("courier_docs").default([]),
     status: integer("status").default(0),
-    tracking_number: varchar("tracking_number", { length: 100 }),
 
-    // Timestamps
-    created_at: timestamp("created_at").defaultNow(),
-    updated_at: timestamp("updated_at").defaultNow(),
+    trackingNumber: varchar("tracking_number", { length: 255 }),
+
+    courierProvider: varchar("courier_provider", { length: 255 }),
+    pickupDate: timestamp("pickup_date", { mode: "date" }),
+    docketNo: varchar("docket_no", { length: 255 }),
+    docketSlip: varchar("docket_slip", { length: 255 }),
+
+    deliveryDate: timestamp("delivery_date", { mode: "date" }),
+    deliveryPod: varchar("delivery_pod", { length: 255 }),
+
+    withinTime: boolean("within_time"),
+
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
