@@ -12,20 +12,14 @@ import { teams } from '@db/schemas/master/teams.schema';
 
 export const userProfiles = pgTable('user_profiles', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    userId: bigint('user_id', { mode: 'number' })
-        .notNull()
-        .references(() => users.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' }).notNull(),
     firstName: varchar('first_name', { length: 255 }),
     lastName: varchar('last_name', { length: 255 }),
     dateOfBirth: date('date_of_birth'),
     gender: varchar('gender', { length: 20 }),
     employeeCode: varchar('employee_code', { length: 50 }).unique(),
-    designationId: bigint('designation_id', { mode: 'number' }).references(
-        () => designations.id,
-    ),
-    primaryTeamId: bigint('primary_team_id', { mode: 'number' }).references(
-        () => teams.id,
-    ),
+    designationId: bigint('designation_id', { mode: 'number' }),
+    primaryTeamId: bigint('primary_team_id', { mode: 'number' }),
     altEmail: varchar('alt_email', { length: 255 }),
     emergencyContactName: varchar('emergency_contact_name', { length: 255 }),
     emergencyContactPhone: varchar('emergency_contact_phone', { length: 20 }),

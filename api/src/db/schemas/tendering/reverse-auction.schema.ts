@@ -17,9 +17,7 @@ export const reverseAuctions = pgTable(
         id: bigserial("id", { mode: "number" }).primaryKey(),
 
         // Foreign Key to Tenders
-        tenderId: bigint("tender_id", { mode: "number" })
-            .notNull()
-            .references(() => tenderInfos.id, { onDelete: "cascade" }),
+        tenderId: bigint("tender_id", { mode: "number" }).notNull(),
 
         // Denormalized for quick access (from tender)
         tenderNo: varchar("tender_no", { length: 255 }).notNull(),

@@ -17,7 +17,7 @@ export const physicalDocs = pgTable('physical_docs', {
 
 export const physicalDocsPersons = pgTable('physical_docs_persons', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    physicalDocId: bigint('physical_doc_id', { mode: 'number' }).notNull().references(() => physicalDocs.id, { onDelete: 'cascade' }),
+    physicalDocId: bigint('physical_doc_id', { mode: 'number' }).notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     phone: varchar("phone", { length: 255 }).notNull(),

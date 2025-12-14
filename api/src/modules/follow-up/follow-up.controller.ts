@@ -1,13 +1,13 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, Req, NotFoundException } from "@nestjs/common";
 
-import { FollowUpService } from "./follow-up.service";
-import { CurrentUser } from "../../decorators/current-user.decorator";
+import { FollowUpService } from "@/modules/follow-up/follow-up.service";
+import { CurrentUser } from "@/decorators/current-user.decorator";
 
-import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto } from "./zod";
+import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto } from "@/modules/follow-up/zod";
 
 @Controller("follow-up")
 export class FollowUpController {
-    constructor(private readonly service: FollowUpService) {}
+    constructor(private readonly service: FollowUpService) { }
 
     // ========================
     // CREATE

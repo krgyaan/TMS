@@ -12,14 +12,14 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import { useWebsites } from '@/hooks/api/useWebsites';
 import type { Website } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { WebsiteDrawer } from './components/WebsiteDrawer';
+import { WebsiteViewModal } from './components/WebsiteViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -28,16 +28,24 @@ const rowSelection: RowSelectionOptions = {
 
 const WebsitesPage = () => {
     const { data: websites, isLoading, error, refetch } = useWebsites();
-    // const deleteWebsite = useDeleteWebsite();
-    const navigate = useNavigate()
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
 
     // Website actions
     const websiteActions: ActionItem<Website>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedWebsite(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.websites_edit(row.id));
+                setSelectedWebsite(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -47,6 +55,7 @@ const WebsitesPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteWebsite.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -156,45 +165,77 @@ const WebsitesPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedWebsite(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedWebsite(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Websites</CardTitle>
-                <CardDescription>Manage all website links and URLs</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.websites_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Websites</CardTitle>
+                    <CardDescription>Manage all website links and URLs</CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedWebsite(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add New Website
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={websites || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteWebsite.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={websites || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <WebsiteDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                website={selectedWebsite}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <WebsiteViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                website={selectedWebsite}
+            />
+        </>
     );
 };
 

@@ -16,6 +16,8 @@ import {
 import { z } from 'zod';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 // Reusable decimal field transformer
 const decimalField = (message: string, required = true) => {
@@ -102,6 +104,17 @@ const SaveTenderApprovalSchema = z.object({
     tlRejectionRemarks: z.string().optional(),
 });
 
+const UpdateStatusSchema = z.object({
+    status: z.coerce.number().int().positive('Status must be a positive number'),
+    comment: z.string().min(1, 'Comment is required'),
+});
+
+const GenerateTenderNameSchema = z.object({
+    organization: z.coerce.number().int().positive("Organization is required"),
+    item: z.coerce.number().int().positive("Item is required"),
+    location: z.coerce.number().int().positive().optional(),
+});
+
 type CreateTenderDto = z.infer<typeof CreateTenderInfoSchema>;
 type UpdateTenderDto = z.infer<typeof UpdateTenderInfoSchema>;
 
@@ -153,7 +166,10 @@ export class TenderInfoController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: unknown) {
+    async create(
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
+    ) {
         const parsed = CreateTenderInfoSchema.parse(body);
         return this.tenderInfosService.create(parsed);
     }
@@ -186,5 +202,37 @@ export class TenderInfoController {
     ) {
         const parsed = SaveTenderApprovalSchema.parse(body);
         return this.tenderInfosService.updateApproval(id, parsed);
+    }
+
+    /**
+     * Manual status update endpoint
+     * Requires status ID and comment
+     */
+    @Patch(':id/status')
+    async updateStatus(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        const parsed = UpdateStatusSchema.parse(body);
+        return this.tenderInfosService.updateStatus(
+            id,
+            parsed.status,
+            user.sub,
+            parsed.comment
+        );
+    }
+
+    /**
+     * Generate tender name based on organization, item, and location
+     */
+    @Post('generate-name')
+    async generateName(@Body() body: unknown) {
+        const parsed = GenerateTenderNameSchema.parse(body);
+        return this.tenderInfosService.generateTenderName(
+            parsed.organization,
+            parsed.item,
+            parsed.location
+        );
     }
 }

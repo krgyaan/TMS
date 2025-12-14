@@ -10,6 +10,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type TenderApprovalFilters = {
     tlStatus?: '0' | '1' | '2' | '3' | number;
@@ -57,7 +58,8 @@ type TenderRow = {
 export class TenderApprovalService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService, // Injected
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
@@ -233,14 +235,21 @@ export class TenderApprovalService {
         };
     }
 
-    async updateApproval(tenderId: number, payload: TenderApprovalPayload) {
+    async updateApproval(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
+
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
 
         const updateData: any = {
             tlStatus: payload.tlStatus,
             updatedAt: new Date(),
         };
+
+        let newStatus: number | null = null;
+        let statusComment: string = '';
 
         // Clear incomplete fields for statuses other than '3'
         if (payload.tlStatus !== '3') {
@@ -250,6 +259,7 @@ export class TenderApprovalService {
         }
 
         if (payload.tlStatus === '1') {
+            // Approved - Status 3
             const rfqToString = payload.rfqTo?.join(',') || '';
 
             updateData.rfqTo = rfqToString;
@@ -261,12 +271,18 @@ export class TenderApprovalService {
 
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;
+            updateData.status = 3; // Tender Info approved
+            newStatus = 3;
+            statusComment = 'Tender info approved';
         } else if (payload.tlStatus === '2') {
+            // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
             updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
             updateData.oemNotAllowed = payload.oemNotAllowed;
 
             if (payload.tenderStatus) {
                 updateData.status = payload.tenderStatus;
+                newStatus = payload.tenderStatus;
+                statusComment = 'Tender rejected';
             }
 
             updateData.rfqTo = null;
@@ -275,6 +291,7 @@ export class TenderApprovalService {
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
         } else if (payload.tlStatus === '3') {
+            // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
             updateData.rfqTo = null;
             updateData.tenderFeeMode = null;
@@ -283,6 +300,9 @@ export class TenderApprovalService {
             updateData.approveFinanceDocSelection = null;
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;
+            updateData.status = 29; // Tender Info sheet Incomplete
+            newStatus = 29;
+            statusComment = 'Tender info sheet incomplete';
 
             // Delete existing incomplete fields
             await this.db
@@ -306,11 +326,26 @@ export class TenderApprovalService {
             }
         }
 
-        await this.db
-            .update(tenderInfos)
-            .set(updateData)
-            .where(eq(tenderInfos.id, tenderId))
-            .returning();
+        // Update tender and track status change in transaction
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderInfos)
+                .set(updateData)
+                .where(eq(tenderInfos.id, tenderId))
+                .returning();
+
+            // Track status change if status was updated
+            if (newStatus !== null && newStatus !== prevStatus) {
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    tenderId,
+                    newStatus,
+                    changedBy,
+                    prevStatus,
+                    statusComment,
+                    tx
+                );
+            }
+        });
 
         return this.getByTenderId(tenderId);
     }

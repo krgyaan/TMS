@@ -51,7 +51,7 @@ export default function CostingRejectionForm({
                 id: costingSheet.id,
                 data: data,
             });
-            navigate(paths.tendering.costingApproval);
+            navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error rejecting costing:', error);
         }

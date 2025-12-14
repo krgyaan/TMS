@@ -6,12 +6,13 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Request,
     ForbiddenException,
     Query
 } from '@nestjs/common';
 import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
@@ -25,14 +26,14 @@ export class CostingApprovalsController {
 
     @Get()
     async findAll(
-        @Request() req: any,
+        @CurrentUser() user: ValidatedUser,
         @Query('costingStatus') costingStatus?: 'Pending' | 'Approved' | 'Rejected/Redo',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     ) {
-        // this.validateTeamLeader(req.user);
+        // this.validateTeamLeader(user);
         const parseNumber = (v?: string): number | undefined => {
             if (!v) return undefined;
             const num = parseInt(v, 10);
@@ -47,29 +48,29 @@ export class CostingApprovalsController {
             ...(sortOrder && { sortOrder }),
         };
 
-        return this.costingApprovalsService.findAllForApproval(req.user.team, filters);
+        return this.costingApprovalsService.findAllForApproval((user as any).team, filters);
     }
 
     @Get(':id')
     findById(
         @Param('id', ParseIntPipe) id: number,
-        @Request() req: any
+        @CurrentUser() user: ValidatedUser
     ) {
-        // this.validateTeamLeader(req.user);
-        return this.costingApprovalsService.findById(id, req.user.team);
+        // this.validateTeamLeader(user);
+        return this.costingApprovalsService.findById(id, (user as any).team);
     }
 
     @Post(':id/approve')
     approve(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: ApproveCostingDto,
-        @Request() req: any
+        @CurrentUser() user: ValidatedUser
     ) {
-        // this.validateTeamLeader(req.user);
+        // this.validateTeamLeader(user);
         return this.costingApprovalsService.approve(
             id,
-            req.user.team,
-            req.user.id,
+            (user as any).team,
+            user.sub,
             dto
         );
     }
@@ -78,13 +79,13 @@ export class CostingApprovalsController {
     reject(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: RejectCostingDto,
-        @Request() req: any
+        @CurrentUser() user: ValidatedUser
     ) {
-        // this.validateTeamLeader(req.user);
+        // this.validateTeamLeader(user);
         return this.costingApprovalsService.reject(
             id,
-            req.user.team,
-            req.user.id,
+            (user as any).team,
+            user.sub,
             dto.rejectionReason
         );
     }
@@ -93,13 +94,13 @@ export class CostingApprovalsController {
     updateApproved(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateApprovedCostingDto,
-        @Request() req: any
+        @CurrentUser() user: ValidatedUser
     ) {
-        // this.validateTeamLeader(req.user);
+        // this.validateTeamLeader(user);
         return this.costingApprovalsService.updateApproved(
             id,
-            req.user.team,
-            req.user.id,
+            (user as any).team,
+            user.sub,
             dto
         );
     }

@@ -15,7 +15,6 @@ export default function RaSchedulePage() {
     const navigate = useNavigate();
     const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tenderId));
     const { data: bidSubmission, isLoading: bidLoading } = useBidSubmissionByTender(Number(tenderId));
-    const { data: ra, isLoading: raLoading } = useReverseAuction(0); // Will fetch by tenderId below
 
     // Fetch RA by tenderId if exists
     const [raId, setRaId] = React.useState<number | null>(null);

@@ -15,7 +15,7 @@ import { vendors } from "@db/schemas/vendors/vendors.schema";
 // RFQs
 export const rfqs = pgTable("rfqs", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    tenderId: bigint("tender_id", { mode: "number" }).notNull().references(() => tenderInfos.id),
+    tenderId: bigint("tender_id", { mode: "number" }).notNull(),
     dueDate: timestamp("due_date", { withTimezone: true }),
     docList: text("doc_list"),
     requestedVendor: varchar("requested_vendor", { length: 255 }),
@@ -26,7 +26,7 @@ export const rfqs = pgTable("rfqs", {
 // RFQ Items
 export const rfqItems = pgTable("rfq_items", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    rfqId: bigint("rfq_id", { mode: "number" }).notNull().references(() => rfqs.id),
+    rfqId: bigint("rfq_id", { mode: "number" }).notNull(),
     requirement: text("requirement").notNull(),
     unit: varchar("unit", { length: 64 }),
     qty: numeric("qty"),
@@ -47,8 +47,8 @@ export const rfqDocuments = pgTable("rfq_documents", {
 // RFQ Responses (one per vendor per RFQ)
 export const rfqResponses = pgTable("rfq_responses", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    rfqId: bigint("rfq_id", { mode: "number" }).notNull().references(() => rfqs.id),
-    vendorId: bigint("vendor_id", { mode: "number" }).notNull().references(() => vendors.id),
+    rfqId: bigint("rfq_id", { mode: "number" }).notNull(),
+    vendorId: bigint("vendor_id", { mode: "number" }).notNull(),
     receiptDatetime: timestamp("receipt_datetime", { withTimezone: true }).notNull(),
     gstPercentage: numeric("gst_percentage", { precision: 5, scale: 2 }),
     gstType: varchar("gst_type", { length: 50 }),
@@ -62,8 +62,8 @@ export const rfqResponses = pgTable("rfq_responses", {
 // Line-level item pricing per version
 export const rfqResponseItems = pgTable("rfq_response_items", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    rfqResponseId: bigint("rfq_response_id", { mode: "number" }).notNull().references(() => rfqResponses.id),
-    rfqItemId: bigint("item_id", { mode: "number" }).notNull().references(() => rfqItems.id),
+    rfqResponseId: bigint("rfq_response_id", { mode: "number" }).notNull(),
+    rfqItemId: bigint("item_id", { mode: "number" }).notNull(),
     requirement: text("requirement").notNull(),
     unit: varchar("unit", { length: 64 }),
     qty: numeric("qty"),
@@ -75,7 +75,7 @@ export const rfqResponseItems = pgTable("rfq_response_items", {
 // Documents in responses (optional)
 export const rfqResponseDocuments = pgTable("rfq_response_documents", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    rfqResponseId: bigint("rfq_response_id", { mode: "number" }).notNull().references(() => rfqResponses.id),
+    rfqResponseId: bigint("rfq_response_id", { mode: "number" }).notNull(),
     docType: varchar("doc_type", { length: 50 }).notNull(),
     path: varchar("path", { length: 255 }).notNull(),
     metadata: jsonb("metadata").default("{}"),

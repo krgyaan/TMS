@@ -10,7 +10,7 @@ import { vendorOrganizations } from './vendor-organizations.schema';
 
   export const vendorGsts = pgTable('vendor_gsts', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    org: bigint('org', { mode: 'number' }).notNull().references(()=>vendorOrganizations.id),
+    org: bigint('org', { mode: 'number' }).notNull(),
     gstState: varchar('gst_state', { length: 255 }).notNull(),
     gstNum: varchar('gst_num', { length: 255 }).notNull(),
     status: boolean('status').notNull().default(true),

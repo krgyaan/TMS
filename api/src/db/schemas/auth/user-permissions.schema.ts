@@ -19,12 +19,8 @@ export const userPermissions = pgTable(
     'user_permissions',
     {
         id: bigserial('id', { mode: 'number' }).primaryKey(),
-        userId: bigint('user_id', { mode: 'number' })
-            .notNull()
-            .references(() => users.id, { onDelete: 'cascade' }),
-        permissionId: bigint('permission_id', { mode: 'number' })
-            .notNull()
-            .references(() => permissions.id, { onDelete: 'cascade' }),
+        userId: bigint('user_id', { mode: 'number' }).notNull(),
+        permissionId: bigint('permission_id', { mode: 'number' }).notNull(),
         // true = grant, false = deny (override)
         granted: boolean('granted').notNull().default(true),
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

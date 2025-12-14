@@ -11,9 +11,7 @@ import { vendorOrganizations } from './vendor-organizations.schema';
 
 export const vendors = pgTable('vendors', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
-  organizationId: bigint('organization_id', { mode: 'number' }).references(
-    () => vendorOrganizations.id,
-  ),
+  organizationId: bigint('organization_id', { mode: 'number' }),
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }),
   address: text('address'),

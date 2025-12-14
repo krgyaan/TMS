@@ -28,16 +28,22 @@ import {
     Mail,
 } from 'lucide-react';
 import { useVendorOrganizationsWithRelations } from '@/hooks/api/useVendorOrganizations';
-import type { VendorOrganizationWithRelations } from '@/types/api.types';
+import type { VendorOrganizationWithRelations, VendorOrganization } from '@/types/api.types';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { VendorOrganizationDrawer } from './components/VendorOrganizationDrawer';
+import { VendorOrganizationViewModal } from './components/VendorOrganizationViewModal';
+import { useState } from 'react';
 
 const VendorOrganizationsPage = () => {
     const { data: organizations, isLoading, error, refetch } = useVendorOrganizationsWithRelations();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedOrganization, setSelectedOrganization] = useState<VendorOrganization | null>(null);
 
     if (isLoading) {
         return (
@@ -73,7 +79,12 @@ const VendorOrganizationsPage = () => {
                         Manage vendor organizations, persons, GST numbers, and bank accounts
                     </p>
                 </div>
-                <Button>
+                <Button
+                    onClick={() => {
+                        setSelectedOrganization(null);
+                        setDrawerOpen(true);
+                    }}
+                >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Organization
                 </Button>
@@ -100,6 +111,29 @@ const VendorOrganizationsPage = () => {
                     </CardContent>
                 </Card>
             )}
+            <VendorOrganizationDrawer
+                open={drawerOpen}
+                onOpenChange={(open) => {
+                    setDrawerOpen(open);
+                    if (!open) {
+                        setSelectedOrganization(null);
+                    }
+                }}
+                vendorOrganization={selectedOrganization}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <VendorOrganizationViewModal
+                open={viewModalOpen}
+                onOpenChange={(open) => {
+                    setViewModalOpen(open);
+                    if (!open) {
+                        setSelectedOrganization(null);
+                    }
+                }}
+                vendorOrganization={selectedOrganization}
+            />
         </div>
     );
 };
@@ -160,7 +194,22 @@ const OrganizationCard = ({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Edit Organization</DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedOrganization(organization);
+                                        setViewModalOpen(true);
+                                    }}
+                                >
+                                    View Organization
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedOrganization(organization);
+                                        setDrawerOpen(true);
+                                    }}
+                                >
+                                    Edit Organization
+                                </DropdownMenuItem>
                                 <DropdownMenuItem>Add Person</DropdownMenuItem>
                                 <DropdownMenuItem>Add GST</DropdownMenuItem>
                                 <DropdownMenuItem>Add Bank Account</DropdownMenuItem>

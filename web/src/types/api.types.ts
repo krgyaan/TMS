@@ -475,6 +475,38 @@ export interface CreateTqTypeDto {
 
 export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
 
+// ========== EMD RESPONSIBILITY ==========
+export interface EmdResponsibility {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateEmdResponsibilityDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> { }
+
+// ========== FINANCIAL YEAR ==========
+export interface FinancialYear {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateFinancialYearDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
+
 // ========== LEAD TYPES ==========
 export interface LeadType {
     id: number;
@@ -1444,4 +1476,64 @@ export interface TenderListParams {
     page?: number;
     limit?: number;
     search?: string;
+}
+
+export interface RfqDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    itemName: string;
+    rfqTo: string;
+    teamMemberName: string;
+    statusName: string;
+    dueDate: Date;
+    rfqId: number | null;
+    vendorOrganizationNames: string | null;
+}
+
+export interface Rfq {
+}
+
+export interface RfqItem {
+    id: number;
+    rfqId: number;
+    requirement: string;
+    unit: string | null;
+    qty: string | null;
+}
+
+export interface RfqDocument {
+    id: number;
+    rfqId: number;
+    docType: string;
+    path: string;
+    metadata: any;
+}
+
+export interface CreateRfqDto {
+    tenderId: number;
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
+    documents?: Array<{
+        docType: string;
+        path: string;
+        metadata?: any;
+    }>;
+}
+
+export interface UpdateRfqDto {
+    dueDate?: string;
+    docList?: string;
+    requestedVendor?: string;
+    items?: Array<{
+        requirement: string;
+        unit?: string;
+        qty?: number;
+    }>;
 }

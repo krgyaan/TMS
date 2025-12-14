@@ -27,7 +27,7 @@ export interface BidDocuments {
 
 export const bidSubmissions = pgTable('bid_submissions', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    tenderId: bigint('tender_id', { mode: 'number' }).notNull().references(() => tenderInfos.id, { onDelete: 'cascade' }),
+    tenderId: bigint('tender_id', { mode: 'number' }).notNull(),
     status: bidSubmissionStatusEnum('status').notNull().default('Submission Pending'),
 
     // For Bid Submitted
@@ -37,7 +37,7 @@ export const bidSubmissions = pgTable('bid_submissions', {
     // Documents stored in single JSON field
     documents: jsonb('documents').$type<BidDocuments>(),
 
-    submittedBy: bigint('submitted_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
+    submittedBy: bigint('submitted_by', { mode: 'number' }),
 
     // For Tender Missed
     reasonForMissing: text('reason_for_missing'),

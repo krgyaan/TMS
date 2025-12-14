@@ -1,4 +1,4 @@
-﻿import { useState, type ReactNode } from 'react'
+﻿import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
     Card,
@@ -12,59 +12,40 @@ import DataTable from '@/components/ui/data-table'
 import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
 import type { ActionItem } from '@/components/ui/ActionMenu'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
 import { useLocations, useDeleteLocation } from '@/hooks/api/useLocations'
 import type { Location } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, MapPin, Compass, Globe } from 'lucide-react'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { AlertCircle, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { LocationDrawer } from './components/LocationDrawer'
+import { LocationViewModal } from './components/LocationViewModal'
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
     headerCheckbox: false,
 }
 
-const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{value ?? '—'}</p>
-    </div>
-)
-
-const formatDate = (value?: string) => {
-    if (!value) {
-        return '—'
-    }
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
-}
-
 const LocationPage = () => {
     const { data: locations, isLoading, error, refetch } = useLocations()
     const deleteLocation = useDeleteLocation()
-    const navigate = useNavigate()
-    const [viewState, setViewState] = useState<{ open: boolean; data: Location | null }>({
+    const [drawerState, setDrawerState] = useState<{ open: boolean; location: Location | null }>({
         open: false,
-        data: null,
+        location: null,
+    })
+    const [viewState, setViewState] = useState<{ open: boolean; location: Location | null }>({
+        open: false,
+        location: null,
     })
 
     const locationActions: ActionItem<Location>[] = [
         {
             label: 'View',
-            onClick: (row) => setViewState({ open: true, data: row }),
+            onClick: (row) => setViewState({ open: true, location: row }),
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.master.locations_edit(row.id)),
+            onClick: (row) => setDrawerState({ open: true, location: row }),
         },
         {
             label: 'Delete',
@@ -150,8 +131,12 @@ const LocationPage = () => {
                     <CardTitle>Locations</CardTitle>
                     <CardDescription>List of all Location</CardDescription>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.master.locations_create}>Add New Location</NavLink>
+                        <Button
+                            variant="default"
+                            onClick={() => setDrawerState({ open: true, location: null })}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Location
                         </Button>
                     </CardAction>
                 </CardHeader>
@@ -173,61 +158,20 @@ const LocationPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog
+            <LocationDrawer
+                open={drawerState.open}
+                onOpenChange={(open) => setDrawerState({ ...drawerState, open })}
+                location={drawerState.location}
+                onSuccess={() => {
+                    refetch()
+                    setDrawerState({ open: false, location: null })
+                }}
+            />
+            <LocationViewModal
                 open={viewState.open}
-                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
-            >
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <MapPin className="h-5 w-5" />
-                            {viewState.data?.name}
-                        </DialogTitle>
-                        <DialogDescription>Location details</DialogDescription>
-                    </DialogHeader>
-                    {viewState.data ? (
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <DetailItem label="Acronym" value={viewState.data.acronym || '—'} />
-                            <DetailItem
-                                label="State"
-                                value={
-                                    viewState.data.state ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <Globe className="h-4 w-4" />
-                                            {viewState.data.state}
-                                        </span>
-                                    ) : (
-                                        '—'
-                                    )
-                                }
-                            />
-                            <DetailItem
-                                label="Region"
-                                value={
-                                    viewState.data.region ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <Compass className="h-4 w-4" />
-                                            {viewState.data.region}
-                                        </span>
-                                    ) : (
-                                        '—'
-                                    )
-                                }
-                            />
-                            <DetailItem
-                                label="Status"
-                                value={
-                                    <Badge variant={viewState.data.status ? 'default' : 'secondary'}>
-                                        {viewState.data.status ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                }
-                            />
-                            <DetailItem label="Created" value={formatDate(viewState.data.createdAt)} />
-                            <DetailItem label="Updated" value={formatDate(viewState.data.updatedAt)} />
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+                onOpenChange={(open) => setViewState({ ...viewState, open })}
+                location={viewState.location}
+            />
         </>
     )
 }

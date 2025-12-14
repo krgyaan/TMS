@@ -11,6 +11,7 @@ import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -38,7 +39,11 @@ export type BidSubmissionFilters = {
 
 @Injectable()
 export class BidSubmissionsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     /**
      * Get all tenders for bid submission dashboard
@@ -226,53 +231,82 @@ export class BidSubmissionsService {
         finalBiddingPrice: string | null;
         submittedBy: number;
     }) {
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 17 (Bid Submitted) and track it
+        const newStatus = 17; // Status ID for "Bid Submitted"
+
         // Check if bid submission already exists
         const existing = await this.findByTenderId(data.tenderId);
 
-        if (existing) {
-            // Update existing
-            const [result] = await this.db
-                .update(bidSubmissions)
-                .set({
-                    status: 'Bid Submitted',
-                    submissionDatetime: data.submissionDatetime,
-                    finalBiddingPrice: data.finalBiddingPrice,
-                    documents: {
-                        submittedDocs: data.submittedDocs,
-                        submissionProof: data.proofOfSubmission,
-                        finalPriceSs: data.finalPriceSs,
-                    },
-                    submittedBy: data.submittedBy,
-                    // Clear missed fields if any
-                    reasonForMissing: null,
-                    preventionMeasures: null,
-                    tmsImprovements: null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(bidSubmissions.id, existing.id))
-                .returning();
+        const result = await this.db.transaction(async (tx) => {
+            let bidSubmission;
+            if (existing) {
+                // Update existing
+                const [updated] = await tx
+                    .update(bidSubmissions)
+                    .set({
+                        status: 'Bid Submitted',
+                        submissionDatetime: data.submissionDatetime,
+                        finalBiddingPrice: data.finalBiddingPrice,
+                        documents: {
+                            submittedDocs: data.submittedDocs,
+                            submissionProof: data.proofOfSubmission,
+                            finalPriceSs: data.finalPriceSs,
+                        },
+                        submittedBy: data.submittedBy,
+                        // Clear missed fields if any
+                        reasonForMissing: null,
+                        preventionMeasures: null,
+                        tmsImprovements: null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(bidSubmissions.id, existing.id))
+                    .returning();
 
-            return result;
-        } else {
-            // Create new
-            const [result] = await this.db
-                .insert(bidSubmissions)
-                .values({
-                    tenderId: data.tenderId,
-                    status: 'Bid Submitted',
-                    submissionDatetime: data.submissionDatetime,
-                    finalBiddingPrice: data.finalBiddingPrice,
-                    documents: {
-                        submittedDocs: data.submittedDocs,
-                        submissionProof: data.proofOfSubmission,
-                        finalPriceSs: data.finalPriceSs,
-                    },
-                    submittedBy: data.submittedBy,
-                })
-                .returning();
+                bidSubmission = updated;
+            } else {
+                // Create new
+                const [created] = await tx
+                    .insert(bidSubmissions)
+                    .values({
+                        tenderId: data.tenderId,
+                        status: 'Bid Submitted',
+                        submissionDatetime: data.submissionDatetime,
+                        finalBiddingPrice: data.finalBiddingPrice,
+                        documents: {
+                            submittedDocs: data.submittedDocs,
+                            submissionProof: data.proofOfSubmission,
+                            finalPriceSs: data.finalPriceSs,
+                        },
+                        submittedBy: data.submittedBy,
+                    })
+                    .returning();
 
-            return result;
-        }
+                bidSubmission = created;
+            }
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                data.submittedBy,
+                prevStatus,
+                'Bid submitted'
+            );
+
+            return bidSubmission;
+        });
+
+        return result;
     }
 
     async markAsMissed(data: {
@@ -282,45 +316,74 @@ export class BidSubmissionsService {
         tmsImprovements: string;
         submittedBy: number;
     }) {
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 8 (Missed) and track it
+        const newStatus = 8; // Status ID for "Missed"
+
         // Check if bid submission already exists
         const existing = await this.findByTenderId(data.tenderId);
 
-        if (existing) {
-            // Update existing
-            const [result] = await this.db
-                .update(bidSubmissions)
-                .set({
-                    status: 'Tender Missed',
-                    reasonForMissing: data.reasonForMissing,
-                    preventionMeasures: data.preventionMeasures,
-                    tmsImprovements: data.tmsImprovements,
-                    submittedBy: data.submittedBy,
-                    // Clear bid fields if any
-                    submissionDatetime: null,
-                    finalBiddingPrice: null,
-                    documents: null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(bidSubmissions.id, existing.id))
-                .returning();
+        const result = await this.db.transaction(async (tx) => {
+            let bidSubmission;
+            if (existing) {
+                // Update existing
+                const [updated] = await tx
+                    .update(bidSubmissions)
+                    .set({
+                        status: 'Tender Missed',
+                        reasonForMissing: data.reasonForMissing,
+                        preventionMeasures: data.preventionMeasures,
+                        tmsImprovements: data.tmsImprovements,
+                        submittedBy: data.submittedBy,
+                        // Clear bid fields if any
+                        submissionDatetime: null,
+                        finalBiddingPrice: null,
+                        documents: null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(bidSubmissions.id, existing.id))
+                    .returning();
 
-            return result;
-        } else {
-            // Create new
-            const [result] = await this.db
-                .insert(bidSubmissions)
-                .values({
-                    tenderId: data.tenderId,
-                    status: 'Tender Missed',
-                    reasonForMissing: data.reasonForMissing,
-                    preventionMeasures: data.preventionMeasures,
-                    tmsImprovements: data.tmsImprovements,
-                    submittedBy: data.submittedBy,
-                })
-                .returning();
+                bidSubmission = updated;
+            } else {
+                // Create new
+                const [created] = await tx
+                    .insert(bidSubmissions)
+                    .values({
+                        tenderId: data.tenderId,
+                        status: 'Tender Missed',
+                        reasonForMissing: data.reasonForMissing,
+                        preventionMeasures: data.preventionMeasures,
+                        tmsImprovements: data.tmsImprovements,
+                        submittedBy: data.submittedBy,
+                    })
+                    .returning();
 
-            return result;
-        }
+                bidSubmission = created;
+            }
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                data.submittedBy,
+                prevStatus,
+                'Tender missed'
+            );
+
+            return bidSubmission;
+        });
+
+        return result;
     }
 
     async update(

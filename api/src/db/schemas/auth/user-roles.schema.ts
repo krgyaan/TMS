@@ -14,12 +14,8 @@ export const userRoles = pgTable(
     'user_roles',
     {
         id: bigserial('id', { mode: 'number' }).primaryKey(),
-        userId: bigint('user_id', { mode: 'number' })
-            .notNull()
-            .references(() => users.id, { onDelete: 'cascade' }),
-        roleId: bigint('role_id', { mode: 'number' })
-            .notNull()
-            .references(() => roles.id, { onDelete: 'cascade' }),
+        userId: bigint('user_id', { mode: 'number' }).notNull(),
+        roleId: bigint('role_id', { mode: 'number' }).notNull(),
         createdAt: timestamp('created_at', { withTimezone: true })
             .notNull()
             .defaultNow(),

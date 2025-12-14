@@ -17,6 +17,7 @@ import type {
 } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { items } from '@db/schemas/master/items.schema';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -59,7 +60,8 @@ export type PhysicalDocWithPersons = {
 export class PhysicalDocsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService, // Injected
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     async findAll(filters?: PhysicalDocFilters): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
@@ -299,9 +301,16 @@ export class PhysicalDocsService {
         };
     }
 
-    async create(data: CreatePhysicalDocDto): Promise<PhysicalDocWithPersons> {
+    async create(data: CreatePhysicalDocDto, changedBy: number): Promise<PhysicalDocWithPersons> {
         // Validate tender exists and is approved
         await this.tenderInfosService.validateApproved(data.tenderId);
+
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 30 (Physical Docs Submitted) and track it
+        const newStatus = 30; // Status ID for "Physical Docs Submitted"
 
         return await this.db.transaction(async (tx) => {
             // Insert physical doc
@@ -336,6 +345,22 @@ export class PhysicalDocsService {
                     phone: p.phone,
                 }));
             }
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'Physical docs submitted',
+                tx
+            );
 
             return {
                 id: physicalDoc.id,

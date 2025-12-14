@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { CourierController } from "./courier.controller";
-import { CourierService } from "./courier.service";
-import { MailerModule } from "src/mailer/mailer.module";
+import { CourierController } from "@/modules/courier/courier.controller";
+import { CourierService } from "@/modules/courier/courier.service";
+import { MailerModule } from "@/mailer/mailer.module";
 
 @Module({
     imports: [MailerModule],

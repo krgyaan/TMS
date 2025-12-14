@@ -25,3 +25,6 @@ export { loanPartiesService } from './loan-party.service';
 export { tenderInfosService } from './tenders.service';
 export { infoSheetsService } from './info-sheet.service';
 export { emdsService } from './emds.service';
+export { rfqsService } from './rfqs.service';
+export { emdResponsibilityService } from './emd-responsibility.service';
+export { financialYearService } from './financial-year.service';

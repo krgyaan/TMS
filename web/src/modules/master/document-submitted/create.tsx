@@ -1,7 +1,15 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+
 const CreateDocumentSubmittedPage = () => {
-    return (
-        <div>Create Document Submitted</div>
-    )
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        navigate(paths.master.documentSubmitted, { replace: true });
+    }, [navigate]);
+
+    return null;
 }
 
-export default CreateDocumentSubmittedPage
+export default CreateDocumentSubmittedPage;

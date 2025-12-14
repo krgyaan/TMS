@@ -12,6 +12,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -78,7 +79,11 @@ const STATUS_GROUPS = {
 
 @Injectable()
 export class ReverseAuctionService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     /**
      * Get RA Dashboard data with counts for all tabs
@@ -463,7 +468,7 @@ export class ReverseAuctionService {
      * Schedule RA - Update with qualification details
      * Creates RA entry if it doesn't exist
      */
-    async scheduleRa(id: number | null, tenderId: number, dto: ScheduleRaDto) {
+    async scheduleRa(id: number | null, tenderId: number, dto: ScheduleRaDto, changedBy: number) {
         let raId = id;
 
         // If no RA ID provided, get or create one
@@ -474,10 +479,17 @@ export class ReverseAuctionService {
 
         const existing = await this.findById(raId);
 
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
         let updateData: any = {
             technicallyQualified: dto.technicallyQualified,
             updatedAt: new Date(),
         };
+
+        let newStatus: number | null = null;
+        let statusComment: string = '';
 
         if (dto.technicallyQualified === 'No') {
             // Disqualified
@@ -491,16 +503,42 @@ export class ReverseAuctionService {
             updateData.raStartTime = dto.raStartTime ? new Date(dto.raStartTime) : null;
             updateData.raEndTime = dto.raEndTime ? new Date(dto.raEndTime) : null;
             updateData.scheduledAt = new Date();
+
+            // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
+            newStatus = 23; // Status ID for "RA scheduled"
+            statusComment = 'RA scheduled';
         }
 
-        const [result] = await this.db
-            .update(reverseAuctions)
-            .set(updateData)
-            .where(eq(reverseAuctions.id, raId))
-            .returning();
+        const result = await this.db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(reverseAuctions)
+                .set(updateData)
+                .where(eq(reverseAuctions.id, raId))
+                .returning();
 
-        // Sync to tender_results
-        await this.syncToTenderResult(existing.tenderId, raId, result.status);
+            // Sync to tender_results
+            await this.syncToTenderResult(existing.tenderId, raId, updated.status);
+
+            // Update tender status if RA was scheduled
+            if (newStatus !== null) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+
+                // Track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    tenderId,
+                    newStatus,
+                    changedBy,
+                    prevStatus,
+                    statusComment,
+                    tx
+                );
+            }
+
+            return updated;
+        });
 
         return result;
     }
@@ -508,10 +546,17 @@ export class ReverseAuctionService {
     /**
      * Upload RA Result
      */
-    async uploadResult(id: number, dto: UploadRaResultDto) {
+    async uploadResult(id: number, dto: UploadRaResultDto, changedBy: number) {
         const existing = await this.findById(id);
 
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(existing.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
         let status: string;
+        let newTenderStatus: number | null = null;
+        let statusComment: string = '';
+
         switch (dto.raResult) {
             case 'Won':
                 status = RA_STATUS.WON;
@@ -521,31 +566,56 @@ export class ReverseAuctionService {
                 break;
             case 'H1 Elimination':
                 status = RA_STATUS.LOST_H1;
+                // AUTO STATUS CHANGE: Update tender status to 41 (H1 Elimination)
+                newTenderStatus = 41; // Status ID for "H1 Elimination"
+                statusComment = 'H1 Elimination';
                 break;
             default:
                 status = existing.status;
         }
 
-        const [result] = await this.db
-            .update(reverseAuctions)
-            .set({
-                status,
-                raResult: dto.raResult,
-                veL1AtStart: dto.veL1AtStart,
-                raStartPrice: dto.raStartPrice,
-                raClosePrice: dto.raClosePrice,
-                raCloseTime: dto.raCloseTime ? new Date(dto.raCloseTime) : null,
-                screenshotQualifiedParties: dto.screenshotQualifiedParties,
-                screenshotDecrements: dto.screenshotDecrements,
-                finalResultScreenshot: dto.finalResultScreenshot,
-                resultUploadedAt: new Date(),
-                updatedAt: new Date(),
-            })
-            .where(eq(reverseAuctions.id, id))
-            .returning();
+        const result = await this.db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(reverseAuctions)
+                .set({
+                    status,
+                    raResult: dto.raResult,
+                    veL1AtStart: dto.veL1AtStart,
+                    raStartPrice: dto.raStartPrice,
+                    raClosePrice: dto.raClosePrice,
+                    raCloseTime: dto.raCloseTime ? new Date(dto.raCloseTime) : null,
+                    screenshotQualifiedParties: dto.screenshotQualifiedParties,
+                    screenshotDecrements: dto.screenshotDecrements,
+                    finalResultScreenshot: dto.finalResultScreenshot,
+                    resultUploadedAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(reverseAuctions.id, id))
+                .returning();
 
-        // Sync to tender_results
-        await this.syncToTenderResult(existing.tenderId, id, status);
+            // Sync to tender_results
+            await this.syncToTenderResult(existing.tenderId, id, status);
+
+            // Update tender status if H1 Elimination
+            if (newTenderStatus !== null) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newTenderStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, existing.tenderId));
+
+                // Track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    existing.tenderId,
+                    newTenderStatus,
+                    changedBy,
+                    prevStatus,
+                    statusComment,
+                    tx
+                );
+            }
+
+            return updated;
+        });
 
         return result;
     }

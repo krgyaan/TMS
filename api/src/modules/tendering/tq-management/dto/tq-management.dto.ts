@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsNotEmpty, IsArray, IsOptional, IsDateString, ValidateNested } from 'class-validator';
+import { IsNumber, IsString, IsNotEmpty, IsArray, IsOptional, IsDateString, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class TqItemDto {
@@ -59,6 +59,10 @@ export class UpdateTqMissedDto {
 export class MarkAsNoTqDto {
     @IsNumber()
     tenderId: number;
+
+    @IsBoolean()
+    @IsOptional()
+    qualified: boolean = true;
 }
 
 export class UpdateTqReceivedDto {

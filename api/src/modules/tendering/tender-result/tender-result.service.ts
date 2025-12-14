@@ -17,6 +17,7 @@ import {
 } from '@db/schemas/tendering/emds.schema';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
 
@@ -62,7 +63,11 @@ const RESULT_STATUS = {
 
 @Injectable()
 export class TenderResultService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     async findAll(filters?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
         const page = filters?.page || 1;
@@ -398,7 +403,7 @@ export class TenderResultService {
         return result;
     }
 
-    async uploadResult(id: number | null, tenderId: number, dto: UploadResultDto) {
+    async uploadResult(id: number | null, tenderId: number, dto: UploadResultDto, changedBy: number) {
         let resultId = id;
 
         if (!resultId) {
@@ -414,14 +419,24 @@ export class TenderResultService {
             );
         }
 
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
         let updateData: any = {
             technicallyQualified: dto.technicallyQualified,
             updatedAt: new Date(),
         };
 
+        let newStatus: number | null = null;
+        let statusComment: string = '';
+
         if (dto.technicallyQualified === 'No') {
             updateData.status = RESULT_STATUS.DISQUALIFIED;
             updateData.disqualificationReason = dto.disqualificationReason;
+            // AUTO STATUS CHANGE: Update tender status to 22 (Disqualified)
+            newStatus = 22; // Status ID for "Disqualified (reason)"
+            statusComment = 'Disqualified';
         } else {
             updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
             updateData.qualifiedPartiesCount = dto.qualifiedPartiesCount;
@@ -433,13 +448,45 @@ export class TenderResultService {
             updateData.qualifiedPartiesScreenshot = dto.qualifiedPartiesScreenshot;
             updateData.finalResultScreenshot = dto.finalResultScreenshot;
             updateData.resultUploadedAt = new Date();
+
+            if (dto.result === 'Won') {
+                // AUTO STATUS CHANGE: Update tender status to 25 (Won (PO awaited))
+                newStatus = 25; // Status ID for "Won (PO awaited)"
+                statusComment = 'Won (PO awaited)';
+            } else if (dto.result === 'Lost') {
+                // AUTO STATUS CHANGE: Update tender status to 24 (Lost)
+                newStatus = 24; // Status ID for "Lost (Price Bid result to be uploaded)"
+                statusComment = 'Lost';
+            }
         }
 
-        const [result] = await this.db
-            .update(tenderResults)
-            .set(updateData)
-            .where(eq(tenderResults.id, resultId))
-            .returning();
+        const result = await this.db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(tenderResults)
+                .set(updateData)
+                .where(eq(tenderResults.id, resultId))
+                .returning();
+
+            // Update tender status if status change is needed
+            if (newStatus !== null) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+
+                // Track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    tenderId,
+                    newStatus,
+                    changedBy,
+                    prevStatus,
+                    statusComment,
+                    tx
+                );
+            }
+
+            return updated;
+        });
 
         return result;
     }

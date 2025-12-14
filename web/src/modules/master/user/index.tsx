@@ -23,6 +23,9 @@ import type { User } from '@/types/api.types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Mail, Phone, UserRound, Shield, Briefcase, Users, KeyRound, ArrowRight } from 'lucide-react'
+import { RolesDrawer } from '@/modules/master/role/components/RolesDrawer'
+import { DesignationsDrawer } from '@/modules/master/designation/components/DesignationsDrawer'
+import { TeamsDrawer } from '@/modules/master/team/components/TeamsDrawer'
 import {
     Dialog,
     DialogContent,
@@ -53,6 +56,9 @@ const UserPage = () => {
     const { data: permissions = [] } = usePermissions()
     const deleteUser = useDeleteUser()
     const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null })
+    const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false)
+    const [designationsDrawerOpen, setDesignationsDrawerOpen] = useState(false)
+    const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false)
 
     const employeeActions: ActionItem<User>[] = [
         {
@@ -172,71 +178,84 @@ const UserPage = () => {
     return (
         <>
             {/* Dashboard Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
+                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-lg font-medium">Users</CardTitle>
+                        <UserRound className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{users?.length ?? 0}</div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            Total users (Active and Inactive)
+                        </p>
+                    </CardContent>
+                </Card>
+
                 <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(paths.master.roles)}
+                    className="cursor-pointer hover:shadow-md transition-shadow group"
+                    onClick={() => setRolesDrawerOpen(true)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Roles</CardTitle>
+                        <CardTitle className="text-lg font-medium">Roles</CardTitle>
                         <Shield className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{roles.length}</div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             Total roles
-                            <ArrowRight className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3 group-hover:translate-x-1 group-hover:text-primary transition-transform duration-300" />
                         </p>
                     </CardContent>
                 </Card>
 
                 <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(paths.master.designations)}
+                    className="cursor-pointer hover:shadow-md transition-shadow group"
+                    onClick={() => setDesignationsDrawerOpen(true)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Designations</CardTitle>
+                        <CardTitle className="text-lg font-medium">Designations</CardTitle>
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{designations.length}</div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             Total designations
-                            <ArrowRight className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3 group-hover:translate-x-1 group-hover:text-primary transition-transform duration-300" />
                         </p>
                     </CardContent>
                 </Card>
 
                 <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(paths.master.teams)}
+                    className="cursor-pointer hover:shadow-md transition-shadow group"
+                    onClick={() => setTeamsDrawerOpen(true)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Teams</CardTitle>
+                        <CardTitle className="text-lg font-medium">Teams</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{teams.length}</div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             Total teams
-                            <ArrowRight className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3 group-hover:translate-x-1 group-hover:text-primary transition-transform duration-300" />
                         </p>
                     </CardContent>
                 </Card>
 
                 <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    className="cursor-pointer hover:shadow-md transition-shadow group"
                     onClick={() => navigate(paths.master.permissions)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Permissions</CardTitle>
+                        <CardTitle className="text-lg font-medium">Permissions</CardTitle>
                         <KeyRound className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{permissions.length}</div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             Total permissions
-                            <ArrowRight className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3 group-hover:translate-x-1 group-hover:text-primary transition-transform duration-300" />
                         </p>
                     </CardContent>
                 </Card>
@@ -262,10 +281,6 @@ const UserPage = () => {
                             pagination: true,
                         }}
                         enablePagination
-                        enableRowSelection
-                        selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Row Selected!', rows)}
-                        height="100%"
                     />
                 </CardContent>
             </Card>
@@ -341,6 +356,10 @@ const UserPage = () => {
                     ) : null}
                 </DialogContent>
             </Dialog>
+
+            <RolesDrawer open={rolesDrawerOpen} onOpenChange={setRolesDrawerOpen} />
+            <DesignationsDrawer open={designationsDrawerOpen} onOpenChange={setDesignationsDrawerOpen} />
+            <TeamsDrawer open={teamsDrawerOpen} onOpenChange={setTeamsDrawerOpen} />
         </>
     )
 }

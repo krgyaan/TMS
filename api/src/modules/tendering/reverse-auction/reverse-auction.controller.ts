@@ -11,6 +11,8 @@ import {
 import { ReverseAuctionService, type RaDashboardFilters } from '@/modules/tendering/reverse-auction/reverse-auction.service';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import type { RaDashboardType } from '@/modules/tendering/reverse-auction/reverse-auction.service';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('reverse-auctions')
 export class ReverseAuctionController {
@@ -75,19 +77,21 @@ export class ReverseAuctionController {
     @Patch(':id/schedule')
     async scheduleRa(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: ScheduleRaDto
+        @Body() dto: ScheduleRaDto,
+        @CurrentUser() user: ValidatedUser
     ) {
         // Fetch RA to get tenderId
         const ra = await this.reverseAuctionService.findById(id);
-        return this.reverseAuctionService.scheduleRa(id, ra.tenderId, dto);
+        return this.reverseAuctionService.scheduleRa(id, ra.tenderId, dto, user.sub);
     }
 
     @Patch(':id/upload-result')
     uploadResult(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UploadRaResultDto
+        @Body() dto: UploadRaResultDto,
+        @CurrentUser() user: ValidatedUser
     ) {
-        return this.reverseAuctionService.uploadResult(id, dto);
+        return this.reverseAuctionService.uploadResult(id, dto, user.sub);
     }
 
     @Post('update-started-status')

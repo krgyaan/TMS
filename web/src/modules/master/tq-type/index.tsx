@@ -12,14 +12,14 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
 import type { TqType } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TqTypeDrawer } from './components/TqTypeDrawer';
+import { TqTypeViewModal } from './components/TqTypeViewModal';
 
 const rowSelection: RowSelectionOptions = {
     mode: 'multiRow',
@@ -28,16 +28,24 @@ const rowSelection: RowSelectionOptions = {
 
 const TqTypesPage = () => {
     const { data: tqTypes, isLoading, error, refetch } = useTqTypes();
-    // const deleteTqType = useDeleteTqType();
-    const navigate = useNavigate()
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedTqType, setSelectedTqType] = useState<TqType | null>(null);
 
     // TQ Type actions
     const tqTypeActions: ActionItem<TqType>[] = [
         {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedTqType(row);
+                setViewModalOpen(true);
+            },
+        },
+        {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.tqTypes_edit(row.id));
+                setSelectedTqType(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -47,6 +55,7 @@ const TqTypesPage = () => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteTqType.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -141,45 +150,77 @@ const TqTypesPage = () => {
         );
     }
 
+    const handleDrawerClose = (open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setSelectedTqType(null);
+        }
+    };
+
+    const handleViewModalClose = (open: boolean) => {
+        setViewModalOpen(open);
+        if (!open) {
+            setSelectedTqType(null);
+        }
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>TQ Types</CardTitle>
-                <CardDescription>Manage Technical/Quality classification types</CardDescription>
-                <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.tqTypes_create}>
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>TQ Types</CardTitle>
+                    <CardDescription>Manage Technical/Quality classification types</CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="default"
+                            onClick={() => {
+                                setSelectedTqType(null);
+                                setDrawerOpen(true);
+                            }}
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Add TQ Type
-                        </NavLink>
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-                <DataTable
-                    data={tqTypes || []}
-                    columnDefs={colDefs}
-                    // loading={isLoading || deleteTqType.isPending}
-                    gridOptions={{
-                        defaultColDef: {
-                            editable: false,
-                            filter: true,
-                            sortable: true,
-                            resizable: true,
-                        },
-                        rowSelection,
-                        pagination: true,
-                        paginationPageSize: 20,
-                        paginationPageSizeSelector: [10, 20, 50, 100],
-                    }}
-                    enablePagination={true}
-                    enableRowSelection={true}
-                    selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
-                    height="100%"
-                />
-            </CardContent>
-        </Card>
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="h-screen px-0">
+                    <DataTable
+                        data={tqTypes || []}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: {
+                                editable: false,
+                                filter: true,
+                                sortable: true,
+                                resizable: true,
+                            },
+                            rowSelection,
+                            pagination: true,
+                            paginationPageSize: 20,
+                            paginationPageSizeSelector: [10, 20, 50, 100],
+                        }}
+                        enablePagination={true}
+                        enableRowSelection={true}
+                        selectionType="multiple"
+                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        height="100%"
+                    />
+                </CardContent>
+            </Card>
+            <TqTypeDrawer
+                open={drawerOpen}
+                onOpenChange={handleDrawerClose}
+                tqType={selectedTqType}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <TqTypeViewModal
+                open={viewModalOpen}
+                onOpenChange={handleViewModalClose}
+                tqType={selectedTqType}
+            />
+        </>
     );
 };
 

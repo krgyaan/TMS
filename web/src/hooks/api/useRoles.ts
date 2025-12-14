@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { rolesService } from "@/services";
+import { rolesService } from "@/services/api";
 import type { CreateRoleDto, UpdateRoleDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";

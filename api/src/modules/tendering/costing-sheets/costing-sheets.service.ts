@@ -10,6 +10,7 @@ import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schem
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -38,7 +39,11 @@ export type CostingSheetFilters = {
 
 @Injectable()
 export class CostingSheetsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) { }
 
     async findAll(filters?: CostingSheetFilters): Promise<PaginatedResult<CostingSheetDashboardRow>> {
         const page = filters?.page || 1;
@@ -233,22 +238,49 @@ export class CostingSheetsService {
         teRemarks: string;
         submittedBy: number;
     }) {
-        const [result] = await this.db
-            .insert(tenderCostingSheets)
-            .values({
-                tenderId: data.tenderId,
-                submittedFinalPrice: data.submittedFinalPrice,
-                submittedReceiptPrice: data.submittedReceiptPrice,
-                submittedBudgetPrice: data.submittedBudgetPrice,
-                submittedGrossMargin: data.submittedGrossMargin,
-                teRemarks: data.teRemarks,
-                submittedBy: data.submittedBy,
-                status: 'Submitted',
-                submittedAt: new Date(),
-            })
-            .returning();
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
 
-        return result;
+        // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) and track it
+        const newStatus = 6; // Status ID for "Price Bid ready"
+
+        const result = await this.db.transaction(async (tx) => {
+            const costingSheet = await tx
+                .insert(tenderCostingSheets)
+                .values({
+                    tenderId: data.tenderId,
+                    submittedFinalPrice: data.submittedFinalPrice,
+                    submittedReceiptPrice: data.submittedReceiptPrice,
+                    submittedBudgetPrice: data.submittedBudgetPrice,
+                    submittedGrossMargin: data.submittedGrossMargin,
+                    teRemarks: data.teRemarks,
+                    submittedBy: data.submittedBy,
+                    status: 'Submitted',
+                    submittedAt: new Date(),
+                })
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                data.submittedBy,
+                prevStatus,
+                'Price bid ready',
+                tx
+            );
+
+            return costingSheet;
+        });
+
+        return result[0];
     }
 
     async update(id: number, data: {
@@ -257,21 +289,51 @@ export class CostingSheetsService {
         submittedBudgetPrice: string;
         submittedGrossMargin: string;
         teRemarks: string;
-    }) {
-        const [result] = await this.db
-            .update(tenderCostingSheets)
-            .set({
-                submittedFinalPrice: data.submittedFinalPrice,
-                submittedReceiptPrice: data.submittedReceiptPrice,
-                submittedBudgetPrice: data.submittedBudgetPrice,
-                submittedGrossMargin: data.submittedGrossMargin,
-                teRemarks: data.teRemarks,
-                status: 'Submitted',
-                submittedAt: new Date(),
-                updatedAt: new Date(),
-            })
-            .where(eq(tenderCostingSheets.id, id))
-            .returning();
+    }, changedBy: number) {
+        // Get costing sheet to find tenderId
+        const costingSheet = await this.findById(id);
+
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(costingSheet.tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) when resubmitted
+        const newStatus = 6; // Status ID for "Price Bid ready"
+
+        const [result] = await this.db.transaction(async (tx) => {
+            const updated = await tx
+                .update(tenderCostingSheets)
+                .set({
+                    submittedFinalPrice: data.submittedFinalPrice,
+                    submittedReceiptPrice: data.submittedReceiptPrice,
+                    submittedBudgetPrice: data.submittedBudgetPrice,
+                    submittedGrossMargin: data.submittedGrossMargin,
+                    teRemarks: data.teRemarks,
+                    status: 'Submitted',
+                    submittedAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenderCostingSheets.id, id))
+                .returning();
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, costingSheet.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                costingSheet.tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'Price bid ready',
+                tx
+            );
+
+            return updated;
+        });
 
         return result;
     }

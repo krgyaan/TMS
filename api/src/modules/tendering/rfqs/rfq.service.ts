@@ -17,6 +17,7 @@ import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 export type RfqFilters = {
     rfqStatus?: 'pending' | 'sent';
@@ -77,7 +78,8 @@ type RfqDetails = {
 export class RfqsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService, // Injected
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     async findAll(filters?: RfqFilters): Promise<PaginatedResult<RfqRow>> {
@@ -272,9 +274,13 @@ export class RfqsService {
         };
     }
 
-    async create(data: CreateRfqDto): Promise<RfqDetails> {
+    async create(data: CreateRfqDto, changedBy: number): Promise<RfqDetails> {
         // Validate tender exists and is approved
         await this.tenderInfosService.validateApproved(data.tenderId);
+
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(data.tenderId);
+        const prevStatus = currentTender?.status ?? null;
 
         // Create the main RFQ record
         const rfqData: NewRfq = {
@@ -315,6 +321,23 @@ export class RfqsService {
                 .values(documentsData)
                 .returning();
         }
+
+        // AUTO STATUS CHANGE: Update tender status to 4 (RFQ Sent) and track it
+        const newStatus = 4; // Status ID for "RFQ Sent"
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'RFQ sent'
+            );
+        });
 
         return {
             ...newRfq,

@@ -70,7 +70,7 @@ export const wfTemplates = pgTable('wf_templates', {
     name: varchar('name', { length: 255 }).notNull(),
     code: varchar('code', { length: 50 }).notNull().unique(),
     description: text('description'),
-    teamId: bigint('team_id', { mode: 'number' }).references(() => teams.id),
+    teamId: bigint('team_id', { mode: 'number' }),
     entityType: entityTypeEnum('entity_type').notNull(),
     isActive: boolean('is_active').default(true).notNull(),
     version: integer('version').default(1).notNull(),
@@ -82,7 +82,7 @@ export const wfTemplates = pgTable('wf_templates', {
     }>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id),
+    createdBy: bigint('created_by', { mode: 'number' }),
 }, (table) => ([
     { name: 'codeIdx', columns: [table.code] },
     { name: 'entityTypeIdx', columns: [table.entityType] },
@@ -94,9 +94,7 @@ export const wfTemplates = pgTable('wf_templates', {
  */
 export const wfSteps = pgTable('wf_steps', {
     id: bigint('id', { mode: 'number' }).primaryKey(),
-    workflowTemplateId: bigint('workflow_template_id', { mode: 'number' })
-        .references(() => wfTemplates.id, { onDelete: 'cascade' })
-        .notNull(),
+    workflowTemplateId: bigint('workflow_template_id', { mode: 'number' }).notNull(),
 
     // Step Identification
     stepKey: varchar('step_key', { length: 100 }).notNull(),
@@ -172,9 +170,7 @@ export const wfSteps = pgTable('wf_steps', {
  */
 export const wfInstances = pgTable('wf_instances', {
     id: bigint('id', { mode: 'number' }).primaryKey(),
-    workflowTemplateId: bigint('workflow_template_id', { mode: 'number' })
-        .references(() => wfTemplates.id)
-        .notNull(),
+    workflowTemplateId: bigint('workflow_template_id', { mode: 'number' }).notNull(),
 
     // Polymorphic relationship
     entityType: entityTypeEnum('entity_type').notNull(),
@@ -217,19 +213,15 @@ export const wfInstances = pgTable('wf_instances', {
  */
 export const wfStepInstances = pgTable('wf_step_instances', {
     id: bigint('id', { mode: 'number' }).primaryKey(),
-    workflowInstanceId: bigint('workflow_instance_id', { mode: 'number' })
-        .references(() => wfInstances.id, { onDelete: 'cascade' })
-        .notNull(),
-    workflowStepId: bigint('workflow_step_id', { mode: 'number' })
-        .references(() => wfSteps.id)
-        .notNull(),
+    workflowInstanceId: bigint('workflow_instance_id', { mode: 'number' }).notNull(),
+    workflowStepId: bigint('workflow_step_id', { mode: 'number' }).notNull(),
 
     // Status
     status: workflowStepStatusEnum('status').default('PENDING').notNull(),
     timerStatus: timerStatusEnum('timer_status').default('NOT_STARTED').notNull(),
 
     // Assignment
-    assignedToUserId: bigint('assigned_to_user_id', { mode: 'number' }).references(() => users.id),
+    assignedToUserId: bigint('assigned_to_user_id', { mode: 'number' }),
 
     // Time Tracking
     scheduledStartAt: timestamp('scheduled_start_at'),
@@ -282,15 +274,13 @@ export const wfStepInstances = pgTable('wf_step_instances', {
  */
 export const wfTimerEvents = pgTable('wf_timer_events', {
     id: bigint('id', { mode: 'number' }).primaryKey(),
-    stepInstanceId: bigint('step_instance_id', { mode: 'number' })
-        .references(() => wfStepInstances.id, { onDelete: 'cascade' })
-        .notNull(),
+    stepInstanceId: bigint('step_instance_id', { mode: 'number' }).notNull(),
 
     // Event Details
     eventType: varchar('event_type', { length: 50 }).notNull(),
     // Values: START, PAUSE, RESUME, COMPLETE, EXTEND, RESET, SKIP, CANCEL, REJECT, APPROVE
 
-    performedByUserId: bigint('performed_by_user_id', { mode: 'number' }).references(() => users.id),
+    performedByUserId: bigint('performed_by_user_id', { mode: 'number' }),
 
     // State Changes
     previousStatus: timerStatusEnum('previous_status'),
@@ -345,7 +335,7 @@ export const wfBusinessCalendar = pgTable('wf_business_calendar', {
  */
 export const wfWorkingHoursConfig = pgTable('wf_working_hours_config', {
     id: bigint('id', { mode: 'number' }).primaryKey(),
-    teamId: bigint('team_id', { mode: 'number' }).references(() => teams.id),
+    teamId: bigint('team_id', { mode: 'number' }),
     dayOfWeek: integer('day_of_week').notNull(), // 0-6
     startTime: varchar('start_time', { length: 5 }).notNull(), // "09:00"
     endTime: varchar('end_time', { length: 5 }).notNull(), // "18:00"

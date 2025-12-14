@@ -100,6 +100,13 @@
             "**/*.(t|j)s"
         ],
         "coverageDirectory": "../coverage",
-        "testEnvironment": "node"
+        "testEnvironment": "node",
+        "moduleNameMapper": {
+            "^@/(.*)$": "<rootDir>/src/$1",
+            "^@db$": "<rootDir>/src/db",
+            "^@db/(.*)$": "<rootDir>/src/db/$1",
+            "^@config$": "<rootDir>/src/config",
+            "^@config/(.*)$": "<rootDir>/src/config/$1"
+        }
     }
 }

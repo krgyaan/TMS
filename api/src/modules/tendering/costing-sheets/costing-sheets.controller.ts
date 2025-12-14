@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
 import { SubmitCostingSheetDto, UpdateCostingSheetDto } from './dto/costing-sheet.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('costing-sheets')
 export class CostingSheetsController {
@@ -42,10 +44,13 @@ export class CostingSheetsController {
     }
 
     @Post()
-    create(@Body() dto: SubmitCostingSheetDto, @Request() req: any) {
+    create(
+        @Body() dto: SubmitCostingSheetDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
         return this.costingSheetsService.create({
             ...dto,
-            submittedBy: req.user.id, // Assuming you have auth middleware
+            submittedBy: user.sub,
         });
     }
 
@@ -53,7 +58,8 @@ export class CostingSheetsController {
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateCostingSheetDto,
+        @CurrentUser() user: ValidatedUser
     ) {
-        return this.costingSheetsService.update(id, dto);
+        return this.costingSheetsService.update(id, dto, user.sub);
     }
 }

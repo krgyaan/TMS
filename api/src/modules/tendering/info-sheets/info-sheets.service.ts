@@ -14,6 +14,8 @@ import {
 } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 
 // ============================================================================
 // Types
@@ -33,7 +35,8 @@ export type TenderInfoSheetWithRelations = TenderInformation & {
 export class TenderInfoSheetsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService, // Injected
+        private readonly tenderInfosService: TenderInfosService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) { }
 
     async findByTenderId(
@@ -93,7 +96,8 @@ export class TenderInfoSheetsService {
 
     async create(
         tenderId: number,
-        payload: TenderInfoSheetPayload
+        payload: TenderInfoSheetPayload,
+        changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
@@ -106,8 +110,16 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Insert main info sheet
-        const [infoSheet] = await this.db
+        // Get current tender status before update
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+
+        // AUTO STATUS CHANGE: Update tender status to 2 (Tender Info filled) and track it
+        const newStatus = 2; // Status ID for "Tender Info filled"
+
+        await this.db.transaction(async (tx) => {
+            // Insert main info sheet
+            const [infoSheet] = await tx
             .insert(tenderInformation)
             .values({
                 tenderId,
@@ -172,10 +184,10 @@ export class TenderInfoSheetsService {
             })
             .returning();
 
-        // Insert clients
-        const clients = payload.clients ?? [];
-        if (clients.length > 0) {
-            await this.db.insert(tenderClients).values(
+            // Insert clients
+            const clients = payload.clients ?? [];
+            if (clients.length > 0) {
+                await tx.insert(tenderClients).values(
                 clients.map((client) => ({
                     tenderId,
                     clientName: client.clientName,
@@ -186,10 +198,10 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Insert technical documents
-        const technicalDocs = payload.technicalWorkOrders ?? [];
-        if (technicalDocs.length > 0) {
-            await this.db.insert(tenderTechnicalDocuments).values(
+            // Insert technical documents
+            const technicalDocs = payload.technicalWorkOrders ?? [];
+            if (technicalDocs.length > 0) {
+                await tx.insert(tenderTechnicalDocuments).values(
                 technicalDocs.map((docName) => ({
                     tenderId,
                     documentName: docName,
@@ -197,16 +209,33 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Insert financial documents
-        const financialDocs = payload.commercialDocuments ?? [];
-        if (financialDocs.length > 0) {
-            await this.db.insert(tenderFinancialDocuments).values(
+            // Insert financial documents
+            const financialDocs = payload.commercialDocuments ?? [];
+            if (financialDocs.length > 0) {
+                await tx.insert(tenderFinancialDocuments).values(
                 financialDocs.map((docName) => ({
                     tenderId,
                     documentName: docName,
                 }))
             );
         }
+
+            // Update tender status
+            await tx
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                'Tender info sheet filled',
+                tx
+            );
+        });
 
         return this.findByTenderId(
             tenderId
@@ -215,7 +244,8 @@ export class TenderInfoSheetsService {
 
     async update(
         tenderId: number,
-        payload: TenderInfoSheetPayload
+        payload: TenderInfoSheetPayload,
+        changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);

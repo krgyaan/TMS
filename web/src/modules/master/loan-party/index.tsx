@@ -12,10 +12,10 @@ import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
 import { useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
 import { useLoanParties } from '@/hooks/api/useLoanParties';
-import type { LeadType } from '@/types/api.types';
+import type { LoanParty } from '@/types/api.types';
+import { LoanPartyDrawer } from './components/LoanPartyDrawer';
+import { LoanPartyViewModal } from './components/LoanPartyViewModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Plus } from 'lucide-react';
@@ -27,17 +27,25 @@ const rowSelection: RowSelectionOptions = {
 };
 
 const LoanPartyPage = () => {
-    const { data: leadTypes, isLoading, error, refetch } = useLoanParties();
-    // const deleteLeadType = useDeleteLoanParty();
-    const navigate = useNavigate()
+    const { data: loanParties, isLoading, error, refetch } = useLoanParties();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedLoanParty, setSelectedLoanParty] = useState<LoanParty | null>(null);
 
     // Loan Party actions
-    const leadTypeActions: ActionItem<LeadType>[] = [
+    const loanPartyActions: ActionItem<LoanParty>[] = [
+        {
+            label: 'View',
+            onClick: (row) => {
+                setSelectedLoanParty(row);
+                setViewModalOpen(true);
+            },
+        },
         {
             label: 'Edit',
             onClick: (row) => {
-                console.log('Edit', row);
-                navigate(paths.master.loanParties_edit(row.id));
+                setSelectedLoanParty(row);
+                setDrawerOpen(true);
             },
         },
         {
@@ -46,7 +54,8 @@ const LoanPartyPage = () => {
             onClick: async (row) => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        // await deleteLeadType.mutateAsync(row.id);
+                        // await deleteLoanParty.mutateAsync(row.id);
+                        console.log('Delete functionality to be implemented');
                     } catch (error) {
                         console.error('Delete failed:', error);
                     }
@@ -55,7 +64,7 @@ const LoanPartyPage = () => {
         },
     ];
 
-    const [colDefs] = useState<ColDef<LeadType>[]>([
+    const [colDefs] = useState<ColDef<LoanParty>[]>([
         {
             headerName: 'S.No.',
             valueGetter: 'node.rowIndex + 1',
@@ -93,7 +102,7 @@ const LoanPartyPage = () => {
             headerName: 'Actions',
             filter: false,
             sortable: false,
-            cellRenderer: createActionColumnRenderer(leadTypeActions),
+            cellRenderer: createActionColumnRenderer(loanPartyActions),
             pinned: 'right',
             width: 100,
         },
@@ -143,24 +152,28 @@ const LoanPartyPage = () => {
     }
 
     return (
+        <>
         <Card>
             <CardHeader>
                 <CardTitle>Loan Parties</CardTitle>
                 <CardDescription>Manage loan parties</CardDescription>
                 <CardAction>
-                    <Button variant="default" asChild>
-                        <NavLink to={paths.master.leadTypes_create}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Loan Party
-                        </NavLink>
+                    <Button
+                        variant="default"
+                        onClick={() => {
+                            setSelectedLoanParty(null);
+                            setDrawerOpen(true);
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Loan Party
                     </Button>
                 </CardAction>
             </CardHeader>
             <CardContent className="h-screen px-0">
                 <DataTable
-                    data={leadTypes || []}
+                    data={loanParties || []}
                     columnDefs={colDefs}
-                    // loading={isLoading || deleteLeadType.isPending}
                     gridOptions={{
                         defaultColDef: {
                             editable: false,
@@ -181,6 +194,30 @@ const LoanPartyPage = () => {
                 />
             </CardContent>
         </Card>
+            <LoanPartyDrawer
+                open={drawerOpen}
+                onOpenChange={(open) => {
+                    setDrawerOpen(open);
+                    if (!open) {
+                        setSelectedLoanParty(null);
+                    }
+                }}
+                loanParty={selectedLoanParty}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+            <LoanPartyViewModal
+                open={viewModalOpen}
+                onOpenChange={(open) => {
+                    setViewModalOpen(open);
+                    if (!open) {
+                        setSelectedLoanParty(null);
+                    }
+                }}
+                loanParty={selectedLoanParty}
+            />
+        </>
     );
 };
 

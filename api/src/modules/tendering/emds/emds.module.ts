@@ -4,9 +4,10 @@ import { EmdsService } from '@/modules/tendering/emds/emds.service';
 import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
+import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 
 @Module({
-    imports: [TendersModule],
+    imports: [TendersModule, TenderStatusHistoryModule],
     controllers: [EmdsController],
     providers: [
         EmdsService,
