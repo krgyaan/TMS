@@ -3,12 +3,7 @@ import { createDb, createPool } from '@db';
 import { roles } from '@db/schemas/auth/roles.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { designations } from '@db/schemas/master/designations.schema';
-import { users } from '@db/schemas/auth/users.schema';
 import { sql } from 'drizzle-orm';
-import { hash } from 'argon2';
-
-const defaultAdminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
-const defaultAdminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
 
 async function main() {
     const url = process.env.DATABASE_URL;
@@ -17,24 +12,11 @@ async function main() {
     const pool = createPool(url);
     const db = createDb(pool);
 
-    await db.execute(sql`TRUNCATE TABLE ${users} RESTART IDENTITY CASCADE`);
     await db.execute(sql`TRUNCATE TABLE ${roles} RESTART IDENTITY CASCADE`);
     await db.execute(
         sql`TRUNCATE TABLE ${designations} RESTART IDENTITY CASCADE`,
     );
     await db.execute(sql`TRUNCATE TABLE ${teams} RESTART IDENTITY CASCADE`);
-
-    const adminPassword = await hash(defaultAdminPassword);
-
-    await db
-        .insert(users)
-        .values({
-            name: 'System Admin',
-            email: defaultAdminEmail,
-            password: adminPassword,
-            isActive: true,
-        })
-        .onConflictDoNothing({ target: users.email });
 
     await db
         .insert(roles)
@@ -85,7 +67,6 @@ async function main() {
     await pool.end();
 
     console.log('Seed completed');
-    console.log(`Admin user: ${defaultAdminEmail} / ${defaultAdminPassword}`);
 }
 
 main().catch((err) => {

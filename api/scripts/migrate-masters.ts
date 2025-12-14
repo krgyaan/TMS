@@ -75,6 +75,58 @@ const mysql_organizations = mysqlTable('organizations', {
     updated_at: timestamp('updated_at'),
 });
 
+const mysql_org_industries = mysqlTable('org_industries', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    name: varchar('name', { length: 255 }).notNull(),
+    description: text('description'),
+    status: mysqlEnum('status', ['0', '1']).notNull().default('1'),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysql_item_headings = mysqlTable('item_headings', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    name: varchar('name', { length: 255 }).notNull(),
+    team: varchar('team', { length: 255 }).notNull(),
+    status: mysqlEnum('status', ['0', '1']).notNull().default('1'),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysql_categories = mysqlTable('categories', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    category: varchar('category', { length: 255 }).notNull(),
+    heading: text('heading'),
+    ip: varchar('ip', { length: 255 }),
+    status: mysqlEnum('status', ['0', '1']).notNull().default('1'),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysql_followup_fors = mysqlTable('followup_fors', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    name: varchar('name', { length: 255 }).notNull(),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysql_lead_types = mysqlTable('lead_types', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    name: varchar('name', { length: 255 }),
+    status: mysqlEnum('status', ['1', '0']).notNull().default('1'),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
+const mysql_tq_types = mysqlTable('tq_types', {
+    id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+    tq_type: varchar('tq_type', { length: 255 }).notNull(),
+    ip: varchar('ip', { length: 255 }),
+    status: mysqlEnum('status', ['0', '1']).notNull().default('1'),
+    created_at: timestamp('created_at'),
+    updated_at: timestamp('updated_at'),
+});
+
 // ==================== Mappings ====================
 
 // Team mapping: MySQL enum → PostgreSQL team_id
@@ -83,91 +135,18 @@ const TEAM_MAPPING: Record<string, number> = {
     'dc': 1,
     'AC': 2,
     'ac': 2,
-};
-
-// Item heading mapping: MySQL heading name → PostgreSQL heading_id
-const HEADING_MAPPING: Record<string, number> = {
-    'Charger': 1,
-    'Ni-Cd Battery': 2,
-    'VRLA': 3,
-    'Solar': 4,
-    'UPS': 5,
-    'BESS': 6,
-    'Service': 7,
-    'OPZs': 8,
-    'VRV': 9,
-    'Misc': 10,
-    'Chiller & VAM': 11,
-    'Unitary': 12,
-    'AHU': 13,
-    'Precision': 14,
-    'Package-Ductable': 15,
-    'FLP': 16,
-    'Space Maker': 17,
-    'SMF': 18,
-    'Pipeline': 19,
-    'DC AMC': 20,
-    'DC Spares': 21,
-    'Spares': 21,  // Map "Spares" to "DC Spares"
-    'Installation, Testing & Commissioning': 22,
-};
-
-// Industry mapping: MySQL industry name → PostgreSQL industry_id
-const INDUSTRY_MAPPING: Record<string, number> = {
-    'Industry': 1,
-    'Oil & Gas': 2,
-    'IndianOil Institute of Petroleum Management': 3,
-    'IndianOil Institute of Petroleum Management,': 3,
-    'Film & Television Education': 4,
-    'Biju Pattanaik Film & Television Institute of Odissa': 5,
-    'Defence': 6,
-    'Scientific R & D': 7,
-    'Education': 8,
-    'Railways': 9,
-    'Law Enforcement': 10,
-    'Department Of Heavy Industry': 11,
-    'Urban Development / Infrastructure Industry': 12,
-    'Steel Authority of India Limited': 13,
-    'Agricultural Research And Development': 14,
-    'Scientific & Industrial Research': 15,
-    'Government Security and Currency Production': 16,
-    'Paper & Forest Products': 17,
-    'Manganese Ore Mining': 18,
-    'research and development (R&D)': 19,
-    'science popularization and museum management': 20,
-    'governmental forestry and wildlife management sector': 21,
-    'Energy and Renewable Energy': 22,
-    'Electronics and Instrumentation': 23,
-    'Municipal Administration': 24,
-    'Media Regulation and Monitoring': 25,
-    'Logistics': 26,
-    'Power / Energy': 27,
-    'Insurance': 28,
-    'Environment': 29,
-    'Taxation': 30,
-    'Healthcare': 31,
-    'Banking': 32,
-    'port operations and logistics': 33,
-    'Dairy Industry': 34,
-    'Automotive Components': 35,
-    'Consumer protection': 36,
-    'Mining': 37,
-    'Telecommunications': 38,
-    'Mass Media And Broadcasting': 39,
-    'Facility Management': 40,
-    'Government-Oriented': 41,
-    'Nuclear': 42,
-    'Ministry of Finance': 43,
-    'Electric power distribution': 44,
-    'Government Audit & Accounts': 45,
-    'Construction': 46,
-    'Electronics development and technology': 47,
-    'Hospitality and Travel and Tourism': 48,
-    'Airport': 49,
-    'Water Utilities': 50,
-    'Publishing Industries': 52,
-    'Non-IT': 0,  // No match - will be null
-    'IT': 0,      // No match - will be null
+    'Operations': 3,
+    'operations': 3,
+    'Services': 4,
+    'services': 4,
+    'Accounts': 5,
+    'accounts': 5,
+    'Business Development': 6,
+    'business development': 6,
+    'Private': 7,
+    'private': 7,
+    'HR': 8,
+    'hr': 8,
 };
 
 // ==================== Helper Functions ====================
@@ -190,38 +169,18 @@ const safeString = (val: string | null | undefined, maxLength?: number): string 
     return maxLength ? str.substring(0, maxLength) : str;
 };
 
-const getIndustryId = (industryName: string | null): number | null => {
-    if (!industryName) return null;
-    const trimmed = industryName.trim();
+const getTeamId = (teamName: string | null): number | null => {
+    if (!teamName) return null;
+    const trimmed = teamName.trim();
 
     // Direct match
-    if (INDUSTRY_MAPPING[trimmed] !== undefined) {
-        return INDUSTRY_MAPPING[trimmed];
+    if (TEAM_MAPPING[trimmed] !== undefined) {
+        return TEAM_MAPPING[trimmed];
     }
 
     // Case-insensitive match
     const lowerTrimmed = trimmed.toLowerCase();
-    for (const [key, value] of Object.entries(INDUSTRY_MAPPING)) {
-        if (key.toLowerCase() === lowerTrimmed) {
-            return value;
-        }
-    }
-
-    return null;
-};
-
-const getHeadingId = (headingName: string | null): number | null => {
-    if (!headingName) return null;
-    const trimmed = headingName.trim();
-
-    // Direct match
-    if (HEADING_MAPPING[trimmed] !== undefined) {
-        return HEADING_MAPPING[trimmed];
-    }
-
-    // Case-insensitive match
-    const lowerTrimmed = trimmed.toLowerCase();
-    for (const [key, value] of Object.entries(HEADING_MAPPING)) {
+    for (const [key, value] of Object.entries(TEAM_MAPPING)) {
         if (key.toLowerCase() === lowerTrimmed) {
             return value;
         }
@@ -321,7 +280,7 @@ async function migrateWebsites(): Promise<{ migrated: number; skipped: number; e
             console.log(`  ✓ Migrated: ID ${r.id} - ${r.name}`);
 
         } catch (error) {
-            console.error(`  ❌ Error migrating website ID ${r.id}:`, error);
+            console.error(`  ❌ Error migrating website ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
             errors++;
         }
     }
@@ -361,11 +320,7 @@ async function migrateItems(): Promise<{ migrated: number; skipped: number; erro
             const teamId = TEAM_MAPPING[r.team] || null;
 
             // Map heading to heading_id
-            const headingId = getHeadingId(r.heading);
-
-            if (r.heading && !headingId) {
-                unmatchedHeadings.add(r.heading);
-            }
+            const headingId = r.heading || null;
 
             // Insert with explicit ID
             await db.execute(sql`
@@ -385,7 +340,7 @@ async function migrateItems(): Promise<{ migrated: number; skipped: number; erro
             console.log(`  ✓ Migrated: ID ${r.id} - ${r.name} (team: ${r.team} → ${teamId}, heading: ${r.heading} → ${headingId})`);
 
         } catch (error) {
-            console.error(`  ❌ Error migrating item ID ${r.id}:`, error);
+            console.error(`  ❌ Error migrating item ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
             errors++;
         }
     }
@@ -445,7 +400,7 @@ async function migrateLocations(): Promise<{ migrated: number; skipped: number; 
             migrated++;
 
         } catch (error) {
-            console.error(`  ❌ Error migrating location ID ${r.id}:`, error);
+            console.error(`  ❌ Error migrating location ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
             errors++;
         }
     }
@@ -487,11 +442,7 @@ async function migrateOrganizations(): Promise<{ migrated: number; skipped: numb
             const name = safeString(r.full_form, 255) || acronym || 'Unknown';
 
             // Map industry to industry_id
-            const industryId = getIndustryId(r.industry);
-
-            if (r.industry && !industryId) {
-                unmatchedIndustries.add(r.industry);
-            }
+            const industryId = r.industry || null;
 
             // Insert with explicit ID
             await db.execute(sql`
@@ -510,7 +461,7 @@ async function migrateOrganizations(): Promise<{ migrated: number; skipped: numb
             migrated++;
 
         } catch (error) {
-            console.error(`  ❌ Error migrating organization ID ${r.id}:`, error);
+            console.error(`  ❌ Error migrating organization ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
             errors++;
         }
     }
@@ -531,6 +482,329 @@ async function migrateOrganizations(): Promise<{ migrated: number; skipped: numb
     return { migrated, skipped, errors };
 }
 
+// ==================== NEW Migration Functions ====================
+
+async function migrateIndustries(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating Industries (org_industries → industries) ---');
+
+    const rows = await mysqlDb.select().from(mysql_org_industries);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM industries WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            // Insert with explicit ID
+            await db.execute(sql`
+                INSERT INTO industries (id, name, description, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.name, 100) || 'Unknown'},
+                    ${safeString(r.description)},
+                    ${parseBoolean(r.status)},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.name}`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating industry ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('industries_id_seq', COALESCE((SELECT MAX(id) FROM industries), 1))`);
+    console.log('  ✅ Fixed industries_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
+async function migrateItemHeadings(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating Item Headings ---');
+
+    const rows = await mysqlDb.select().from(mysql_item_headings);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    const unmatchedTeams = new Set<string>();
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM item_headings WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            // Map team varchar to team_id
+            const teamId = getTeamId(r.team);
+
+            if (r.team && !teamId) {
+                unmatchedTeams.add(r.team);
+            }
+
+            // Insert with explicit ID
+            await db.execute(sql`
+                INSERT INTO item_headings (id, name, team_id, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.name, 100) || 'Unknown'},
+                    ${teamId},
+                    ${parseBoolean(r.status)},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.name} (team: ${r.team} → ${teamId})`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating item_heading ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    if (unmatchedTeams.size > 0) {
+        console.log(`\n  ⚠️ Unmatched teams (set to NULL):`);
+        unmatchedTeams.forEach(t => console.log(`     - "${t}"`));
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('item_headings_id_seq', COALESCE((SELECT MAX(id) FROM item_headings), 1))`);
+    console.log('  ✅ Fixed item_headings_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
+async function migrateImprestCategories(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating Imprest Categories (categories → imprest_categories) ---');
+
+    const rows = await mysqlDb.select().from(mysql_categories);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM imprest_categories WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            // MySQL category → PostgreSQL name
+            // MySQL heading → PostgreSQL heading
+            // ip is skipped
+
+            await db.execute(sql`
+                INSERT INTO imprest_categories (id, name, heading, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.category, 100) || 'Unknown'},
+                    ${safeString(r.heading, 100)},
+                    ${parseBoolean(r.status)},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.category}`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating category ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('imprest_categories_id_seq', COALESCE((SELECT MAX(id) FROM imprest_categories), 1))`);
+    console.log('  ✅ Fixed imprest_categories_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
+async function migrateFollowupCategories(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating Followup Categories (followup_fors → followup_categories) ---');
+
+    const rows = await mysqlDb.select().from(mysql_followup_fors);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM followup_categories WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            // MySQL table has no status column, default to true
+            await db.execute(sql`
+                INSERT INTO followup_categories (id, name, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.name, 100) || 'Unknown'},
+                    ${true},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.name}`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating followup_for ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('followup_categories_id_seq', COALESCE((SELECT MAX(id) FROM followup_categories), 1))`);
+    console.log('  ✅ Fixed followup_categories_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
+async function migrateLeadTypes(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating Lead Types ---');
+
+    const rows = await mysqlDb.select().from(mysql_lead_types);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM lead_types WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            await db.execute(sql`
+                INSERT INTO lead_types (id, name, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.name, 255)},
+                    ${parseBoolean(r.status)},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.name}`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating lead_type ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('lead_types_id_seq', COALESCE((SELECT MAX(id) FROM lead_types), 1))`);
+    console.log('  ✅ Fixed lead_types_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
+async function migrateTqTypes(): Promise<{ migrated: number; skipped: number; errors: number }> {
+    console.log('\n--- Migrating TQ Types ---');
+
+    const rows = await mysqlDb.select().from(mysql_tq_types);
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const r of rows) {
+        try {
+            // Check if ID already exists
+            const existing = await db.execute(
+                sql`SELECT id FROM tq_types WHERE id = ${r.id}`
+            );
+
+            if ((existing as any).rows?.length > 0) {
+                console.log(`  ⚠️ Skipped ID ${r.id}: Already exists`);
+                skipped++;
+                continue;
+            }
+
+            // MySQL tq_type → PostgreSQL name
+            // ip is skipped
+
+            await db.execute(sql`
+                INSERT INTO tq_types (id, name, status, created_at, updated_at)
+                VALUES (
+                    ${r.id},
+                    ${safeString(r.tq_type, 100) || 'Unknown'},
+                    ${parseBoolean(r.status)},
+                    ${parseDate(r.created_at) || new Date()},
+                    ${parseDate(r.updated_at) || new Date()}
+                )
+            `);
+
+            migrated++;
+            console.log(`  ✓ Migrated: ID ${r.id} - ${r.tq_type}`);
+
+        } catch (error) {
+            console.error(`  ❌ Error migrating tq_type ID ${r.id}:`, `Query:${error.query}\nCause:${error.cause?.message}`);
+            errors++;
+        }
+    }
+
+    // Fix sequence
+    await db.execute(sql`SELECT setval('tq_types_id_seq', COALESCE((SELECT MAX(id) FROM tq_types), 1))`);
+    console.log('  ✅ Fixed tq_types_id_seq');
+
+    console.log(`\n  Results: Migrated: ${migrated}, Skipped: ${skipped}, Errors: ${errors}`);
+    return { migrated, skipped, errors };
+}
+
 // ==================== Verification ====================
 
 async function verifyMigration() {
@@ -538,16 +812,28 @@ async function verifyMigration() {
     console.log('MIGRATION VERIFICATION');
     console.log('========================================\n');
 
-    const tables = ['statuses', 'websites', 'items', 'locations', 'organizations'];
+    const tables = [
+        { mysql: 'statuses', pg: 'statuses' },
+        { mysql: 'websites', pg: 'websites' },
+        { mysql: 'items', pg: 'items' },
+        { mysql: 'locations', pg: 'locations' },
+        { mysql: 'organizations', pg: 'organizations' },
+        { mysql: 'org_industries', pg: 'industries' },
+        { mysql: 'item_headings', pg: 'item_headings' },
+        { mysql: 'categories', pg: 'imprest_categories' },
+        { mysql: 'followup_fors', pg: 'followup_categories' },
+        { mysql: 'lead_types', pg: 'lead_types' },
+        { mysql: 'tq_types', pg: 'tq_types' },
+    ];
 
-    for (const table of tables) {
-        const mysqlCount = await mysqlDb.execute(sql.raw(`SELECT COUNT(*) as count FROM ${table}`));
-        const pgResult = await db.execute(sql.raw(`SELECT COUNT(*) as count, MIN(id) as min_id, MAX(id) as max_id FROM ${table}`));
+    for (const { mysql, pg } of tables) {
+        const mysqlCount = await mysqlDb.execute(sql.raw(`SELECT COUNT(*) as count FROM ${mysql}`));
+        const pgResult = await db.execute(sql.raw(`SELECT COUNT(*) as count, MIN(id) as min_id, MAX(id) as max_id FROM ${pg}`));
 
         const mysqlTotal = (mysqlCount as any)[0]?.count || 0;
         const pgRow = (pgResult as any).rows?.[0] || {};
 
-        console.log(`${table}:`);
+        console.log(`${mysql} → ${pg}:`);
         console.log(`  MySQL: ${mysqlTotal} records`);
         console.log(`  PostgreSQL: ${pgRow.count} records (IDs: ${pgRow.min_id} - ${pgRow.max_id})`);
         console.log('');
@@ -567,12 +853,22 @@ async function preMigrationCheck(): Promise<boolean> {
         { name: 'items', mysql: mysql_items },
         { name: 'locations', mysql: mysql_locations },
         { name: 'organizations', mysql: mysql_organizations },
+        { name: 'org_industries', mysql: mysql_org_industries },
+        { name: 'item_headings', mysql: mysql_item_headings },
+        { name: 'categories', mysql: mysql_categories },
+        { name: 'followup_fors', mysql: mysql_followup_fors },
+        { name: 'lead_types', mysql: mysql_lead_types },
+        { name: 'tq_types', mysql: mysql_tq_types },
     ];
 
     for (const { name } of tables) {
-        const result = await mysqlDb.execute(sql.raw(`SELECT MIN(id) as min_id, MAX(id) as max_id, COUNT(*) as total FROM ${name}`));
-        const row = (result as any)[0] || {};
-        console.log(`  ${name}: ${row.total} records (IDs: ${row.min_id} - ${row.max_id})`);
+        try {
+            const result = await mysqlDb.execute(sql.raw(`SELECT MIN(id) as min_id, MAX(id) as max_id, COUNT(*) as total FROM ${name}`));
+            const row = (result as any)[0] || {};
+            console.log(`  ${name}: ${row.total} records (IDs: ${row.min_id} - ${row.max_id})`);
+        } catch (error) {
+            console.log(`  ${name}: ❌ Table not found or error`);
+        }
     }
 
     // Check PostgreSQL lookup tables exist
@@ -606,6 +902,12 @@ async function runMigration() {
     console.log('  3. items (with team_id and heading_id mapping)');
     console.log('  4. locations');
     console.log('  5. organizations (with industry_id mapping)');
+    console.log('  6. org_industries → industries');
+    console.log('  7. item_headings (with team_id mapping)');
+    console.log('  8. categories → imprest_categories');
+    console.log('  9. followup_fors → followup_categories');
+    console.log('  10. lead_types');
+    console.log('  11. tq_types');
 
     try {
         // Pre-migration check
@@ -614,11 +916,20 @@ async function runMigration() {
         // Migrate each table
         const results: Record<string, { migrated: number; skipped: number; errors: number }> = {};
 
+        // Original tables
         results.statuses = await migrateStatuses();
         results.websites = await migrateWebsites();
         results.items = await migrateItems();
         results.locations = await migrateLocations();
         results.organizations = await migrateOrganizations();
+
+        // New tables
+        results.industries = await migrateIndustries();
+        results.item_headings = await migrateItemHeadings();
+        results.imprest_categories = await migrateImprestCategories();
+        results.followup_categories = await migrateFollowupCategories();
+        results.lead_types = await migrateLeadTypes();
+        results.tq_types = await migrateTqTypes();
 
         // Verification
         await verifyMigration();
