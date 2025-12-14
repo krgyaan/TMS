@@ -358,7 +358,8 @@ export class PhysicalDocsService {
                 newStatus,
                 changedBy,
                 prevStatus,
-                'Physical docs submitted'
+                'Physical docs submitted',
+                tx
             );
 
             return {

@@ -28,8 +28,9 @@ export type TenderStatusHistoryWithNames = {
 export class TenderStatusHistoryService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    async create(data: NewTenderStatusHistory) {
-        const rows = await this.db
+    async create(data: NewTenderStatusHistory, tx?: DbInstance) {
+        const db = tx || this.db;
+        const rows = await db
             .insert(tenderStatusHistory)
             .values(data)
             .returning();
@@ -44,7 +45,8 @@ export class TenderStatusHistoryService {
         newStatus: number,
         changedBy: number,
         prevStatus?: number | null,
-        comment?: string | null
+        comment?: string | null,
+        tx?: DbInstance
     ): Promise<void> {
         await this.create({
             tenderId,
@@ -52,7 +54,7 @@ export class TenderStatusHistoryService {
             newStatus,
             comment: comment ?? null,
             changedBy,
-        });
+        }, tx);
     }
 
     /**

@@ -301,7 +301,8 @@ export class TqManagementService {
                 newStatus,
                 data.receivedBy,
                 prevStatus,
-                'TQ received'
+                'TQ received',
+                tx
             );
 
             return tqRecord;
@@ -357,7 +358,8 @@ export class TqManagementService {
                 newStatus,
                 data.repliedBy,
                 prevStatus,
-                'TQ replied'
+                'TQ replied',
+                tx
             );
 
             return updated;
@@ -410,7 +412,8 @@ export class TqManagementService {
                 newStatus,
                 changedBy,
                 prevStatus,
-                'TQ missed'
+                'TQ missed',
+                tx
             );
 
             return updated;
@@ -453,7 +456,8 @@ export class TqManagementService {
                 newStatus,
                 userId,
                 prevStatus,
-                qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received'
+                qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received',
+                tx
             );
 
             return tqRecord;

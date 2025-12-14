@@ -273,7 +273,8 @@ export class CostingSheetsService {
                 newStatus,
                 data.submittedBy,
                 prevStatus,
-                'Price bid ready'
+                'Price bid ready',
+                tx
             );
 
             return costingSheet;
@@ -327,7 +328,8 @@ export class CostingSheetsService {
                 newStatus,
                 changedBy,
                 prevStatus,
-                'Price bid ready'
+                'Price bid ready',
+                tx
             );
 
             return updated;

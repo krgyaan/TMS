@@ -532,7 +532,8 @@ export class ReverseAuctionService {
                     newStatus,
                     changedBy,
                     prevStatus,
-                    statusComment
+                    statusComment,
+                    tx
                 );
             }
 
@@ -608,7 +609,8 @@ export class ReverseAuctionService {
                     newTenderStatus,
                     changedBy,
                     prevStatus,
-                    statusComment
+                    statusComment,
+                    tx
                 );
             }
 

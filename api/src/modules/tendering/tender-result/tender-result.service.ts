@@ -480,7 +480,8 @@ export class TenderResultService {
                     newStatus,
                     changedBy,
                     prevStatus,
-                    statusComment
+                    statusComment,
+                    tx
                 );
             }
 

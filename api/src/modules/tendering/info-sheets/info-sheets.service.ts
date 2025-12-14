@@ -114,8 +114,12 @@ export class TenderInfoSheetsService {
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
 
-        // Insert main info sheet
-        const [infoSheet] = await this.db
+        // AUTO STATUS CHANGE: Update tender status to 2 (Tender Info filled) and track it
+        const newStatus = 2; // Status ID for "Tender Info filled"
+
+        await this.db.transaction(async (tx) => {
+            // Insert main info sheet
+            const [infoSheet] = await tx
             .insert(tenderInformation)
             .values({
                 tenderId,
@@ -180,10 +184,10 @@ export class TenderInfoSheetsService {
             })
             .returning();
 
-        // Insert clients
-        const clients = payload.clients ?? [];
-        if (clients.length > 0) {
-            await this.db.insert(tenderClients).values(
+            // Insert clients
+            const clients = payload.clients ?? [];
+            if (clients.length > 0) {
+                await tx.insert(tenderClients).values(
                 clients.map((client) => ({
                     tenderId,
                     clientName: client.clientName,
@@ -194,10 +198,10 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Insert technical documents
-        const technicalDocs = payload.technicalWorkOrders ?? [];
-        if (technicalDocs.length > 0) {
-            await this.db.insert(tenderTechnicalDocuments).values(
+            // Insert technical documents
+            const technicalDocs = payload.technicalWorkOrders ?? [];
+            if (technicalDocs.length > 0) {
+                await tx.insert(tenderTechnicalDocuments).values(
                 technicalDocs.map((docName) => ({
                     tenderId,
                     documentName: docName,
@@ -205,10 +209,10 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Insert financial documents
-        const financialDocs = payload.commercialDocuments ?? [];
-        if (financialDocs.length > 0) {
-            await this.db.insert(tenderFinancialDocuments).values(
+            // Insert financial documents
+            const financialDocs = payload.commercialDocuments ?? [];
+            if (financialDocs.length > 0) {
+                await tx.insert(tenderFinancialDocuments).values(
                 financialDocs.map((docName) => ({
                     tenderId,
                     documentName: docName,
@@ -216,20 +220,20 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // AUTO STATUS CHANGE: Update tender status to 2 (Tender Info filled) and track it
-        const newStatus = 2; // Status ID for "Tender Info filled"
-        await this.db.transaction(async (tx) => {
+            // Update tender status
             await tx
                 .update(tenderInfos)
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, tenderId));
 
+            // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
                 tenderId,
                 newStatus,
                 changedBy,
                 prevStatus,
-                'Tender info sheet filled'
+                'Tender info sheet filled',
+                tx
             );
         });
 

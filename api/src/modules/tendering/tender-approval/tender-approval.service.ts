@@ -341,7 +341,8 @@ export class TenderApprovalService {
                     newStatus,
                     changedBy,
                     prevStatus,
-                    statusComment
+                    statusComment,
+                    tx
                 );
             }
         });

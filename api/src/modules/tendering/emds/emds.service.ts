@@ -639,7 +639,8 @@ export class EmdsService {
                     newStatus,
                     userId,
                     prevStatus,
-                    'EMD requested'
+                    'EMD requested',
+                    tx
                 );
             }
         });
