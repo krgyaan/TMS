@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { TenderApprovalView } from './components/TenderApprovalView';
+import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -11,8 +11,10 @@ import { paths } from '@/app/routes/paths';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { TenderWithRelations } from '@/types/api.types';
 import { TenderView } from '../tenders/components/TenderView';
+import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
+import { PhysicalDocsView } from './components/PhysicalDocsView';
 
-export default function TenderApprovalShowPage() {
+export default function PhysicalDocsShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const parsedId = id ? Number(id) : NaN;
@@ -21,6 +23,7 @@ export default function TenderApprovalShowPage() {
     const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
 
     const isLoading = tenderLoading || approvalLoading;
 
@@ -54,13 +57,14 @@ export default function TenderApprovalShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="approval" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-3 gap-2">
+            <Tabs defaultValue="physical-docs" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-4 gap-2">
                     <TabsTrigger value="tender">Tender</TabsTrigger>
                     <TabsTrigger value="info-sheet" disabled={!hasInfoSheet && !infoSheetLoading}>
                         Info Sheet
                     </TabsTrigger>
                     <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                 </TabsList>
 
                 {/* Tender */}
@@ -104,6 +108,21 @@ export default function TenderApprovalShowPage() {
                         onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
                         onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
+                </TabsContent>
+
+                {/* Physical Docs */}
+                <TabsContent value="physical-docs">
+                    {physicalDocLoading ? (
+                        <PhysicalDocsView isLoading={true} physicalDoc={null} />
+                    ) : physicalDoc ? (
+                        <PhysicalDocsView
+                            physicalDoc={physicalDoc}
+                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
+                            onBack={() => navigate(paths.tendering.physicalDocs)}
+                        />
+                    ) : (
+                        <PhysicalDocsView isLoading={false} physicalDoc={null} />
+                    )}
                 </TabsContent>
             </Tabs>
         </div>

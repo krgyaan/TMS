@@ -108,32 +108,16 @@ export function PhysicalDocsView({
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Physical Doc ID
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                <Badge variant="outline">{physicalDoc.id}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Tender ID
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                <Badge variant="outline">{physicalDoc.tenderId}</Badge>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Courier Number
                             </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
+                            <TableCell className="text-sm">
                                 <Badge variant="secondary">{physicalDoc.courierNo}</Badge>
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Submitted Documents
                             </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
+                            <TableCell className="text-sm">
                                 {physicalDoc.submittedDocs ? (
                                     <div className="bg-muted/30 p-3 rounded-md">
                                         {physicalDoc.submittedDocs}

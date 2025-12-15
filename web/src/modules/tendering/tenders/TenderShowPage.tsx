@@ -40,6 +40,15 @@ export default function TenderShowPage() {
     const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId ?? 0);
     const { data: tenderResult, isLoading: resultLoading } = useTenderResultByTenderId(tenderId);
 
+    // Determine which tabs have data
+    const hasRfq = !rfqLoading && !!rfq;
+    const hasPhysicalDoc = !physicalDocLoading && !!physicalDoc;
+    const hasPaymentRequests = !paymentRequestsLoading && paymentRequests && paymentRequests.length > 0;
+    const hasChecklist = !checklistLoading && !!checklist;
+    const hasCostingSheet = !costingSheetLoading && !!costingSheet;
+    const hasBidSubmission = !bidSubmissionLoading && !!bidSubmission;
+    const hasTenderResult = !resultLoading && !!tenderResult;
+
     if (!tenderId || error || (!isLoading && !tender)) {
         return (
             <Alert variant="destructive">
@@ -64,13 +73,27 @@ export default function TenderShowPage() {
             <Tabs defaultValue="tender" className="space-y-4">
                 <TabsList className="grid w-full md:grid-cols-5 lg:grid-cols-8 gap-2">
                     <TabsTrigger value="tender">Tender Details</TabsTrigger>
-                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="rfq">RFQ & Response</TabsTrigger>
-                    <TabsTrigger value="emd-fees">EMD/Tender Fees</TabsTrigger>
-                    <TabsTrigger value="checklist">Checklist</TabsTrigger>
-                    <TabsTrigger value="costing">Costing Sheet/Approval</TabsTrigger>
-                    <TabsTrigger value="bid">Bid Submission</TabsTrigger>
-                    <TabsTrigger value="result">Tender Result</TabsTrigger>
+                    <TabsTrigger value="physical-docs" disabled={!hasPhysicalDoc && !physicalDocLoading}>
+                        Physical Docs
+                    </TabsTrigger>
+                    <TabsTrigger value="rfq" disabled={!hasRfq && !rfqLoading}>
+                        RFQ & Response
+                    </TabsTrigger>
+                    <TabsTrigger value="emd-fees" disabled={!hasPaymentRequests && !paymentRequestsLoading}>
+                        EMD/Tender Fees
+                    </TabsTrigger>
+                    <TabsTrigger value="checklist" disabled={!hasChecklist && !checklistLoading}>
+                        Checklist
+                    </TabsTrigger>
+                    <TabsTrigger value="costing" disabled={!hasCostingSheet && !costingSheetLoading}>
+                        Costing Sheet/Approval
+                    </TabsTrigger>
+                    <TabsTrigger value="bid" disabled={!hasBidSubmission && !bidSubmissionLoading}>
+                        Bid Submission
+                    </TabsTrigger>
+                    <TabsTrigger value="result" disabled={!hasTenderResult && !resultLoading}>
+                        Tender Result
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* Tender Details */}
@@ -88,7 +111,6 @@ export default function TenderShowPage() {
                     ) : infoSheet ? (
                         <InfoSheetView
                             infoSheet={infoSheet}
-                            tender={tender ?? null}
                             onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
                         />
                     ) : infoSheetError ? (

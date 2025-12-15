@@ -5,13 +5,12 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
 import { ArrowLeft, FileText, Pencil } from "lucide-react"
-import type { TenderInfoSheet, TenderInfoWithNames } from "@/types/api.types"
+import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
-    tender?: TenderInfoWithNames | null
     isLoading?: boolean
     onEdit?: () => void
     onBack?: () => void
@@ -32,25 +31,30 @@ const formatPercentage = (value?: number | null) => {
     return `${value}%`
 }
 
-const formatDocuments = (documents: string[] = []) => {
+const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
     if (!documents.length) {
         return <span className="text-muted-foreground">No documents listed</span>
     }
 
     return (
         <div className="flex flex-wrap gap-2">
-            {documents.map((doc) => (
-                <Badge key={doc} variant="outline">
-                    {doc}
-                </Badge>
-            ))}
+            {documents.map((doc, index) => {
+                // Handle both string arrays and object arrays
+                const docName = typeof doc === 'string' ? doc : doc.documentName;
+                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+
+                return (
+                    <Badge key={docKey} variant="outline">
+                        {docName}
+                    </Badge>
+                );
+            })}
         </div>
     )
 }
 
 export const InfoSheetView = ({
     infoSheet,
-    tender,
     isLoading,
     onEdit,
     onBack,
@@ -112,39 +116,6 @@ export const InfoSheetView = ({
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Tender Summary */}
-                {tender && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Tender Summary
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Tender Name
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold" colSpan={3}>
-                                        {tender.tenderName}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Tender No
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {tender.tenderNo}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Organization
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {tender.organizationName || '—'}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
                         {/* TE Evaluation */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">
@@ -170,7 +141,7 @@ export const InfoSheetView = ({
                                 TE Final Remark
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatValue(infoSheet.teFinalRemark ?? infoSheet.teRemark)}
+                                {formatValue(infoSheet.teFinalRemark)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -178,7 +149,7 @@ export const InfoSheetView = ({
                                 Rejection Remarks
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatValue(infoSheet.teRejectionRemarks ?? infoSheet.rejectionRemark)}
+                                {formatValue(infoSheet.teRejectionRemarks)}
                             </TableCell>
                         </TableRow>
 
@@ -210,7 +181,7 @@ export const InfoSheetView = ({
                                             Processing Fee Mode
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {infoSheet.processingFeeMode}
+                                            {infoSheet.processingFeeMode.join(', ')}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -237,13 +208,13 @@ export const InfoSheetView = ({
                                 {infoSheet.tenderFeeAmount ? formatINR(Number(infoSheet.tenderFeeAmount)) : '—'}
                             </TableCell>
                         </TableRow>
-                        {infoSheet.tenderFeeModes && infoSheet.tenderFeeModes.length > 0 && (
+                        {infoSheet.tenderFeeMode && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Fee Mode
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {infoSheet.tenderFeeModes.join(', ')}
+                                    {infoSheet.tenderFeeMode.join(', ')}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -261,13 +232,13 @@ export const InfoSheetView = ({
                                 {infoSheet.emdAmount ? formatINR(Number(infoSheet.emdAmount)) : '—'}
                             </TableCell>
                         </TableRow>
-                        {infoSheet.emdModes && infoSheet.emdModes.length > 0 && (
+                        {infoSheet.emdMode && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     EMD Mode
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {infoSheet.emdModes.join(', ')}
+                                    {infoSheet.emdMode.join(', ')}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -285,7 +256,7 @@ export const InfoSheetView = ({
                                 {formatYesNo(infoSheet.physicalDocsRequired)}
                             </TableCell>
                         </TableRow>
-                        {infoSheet.physicalDocsDeadline && (
+                        {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Physical Docs Deadline
@@ -398,7 +369,7 @@ export const InfoSheetView = ({
                                 PBG Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatValue(infoSheet.pbgMode ?? infoSheet.pbgForm)}
+                                {formatValue(infoSheet.pbgMode)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -406,7 +377,7 @@ export const InfoSheetView = ({
                                 PBG Percentage
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatPercentage(infoSheet.pbgPercentage)}
+                                {formatPercentage(Number(infoSheet.pbgPercentage))}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 PBG Duration (Months)
@@ -426,7 +397,7 @@ export const InfoSheetView = ({
                                 Security Deposit Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatValue(infoSheet.sdMode ?? infoSheet.sdForm)}
+                                {formatValue(infoSheet.sdMode)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -434,7 +405,7 @@ export const InfoSheetView = ({
                                 Security Deposit %
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatPercentage(infoSheet.sdPercentage ?? infoSheet.securityDepositPercentage)}
+                                {formatPercentage(Number(infoSheet.sdPercentage))}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 SD Duration (Months)
@@ -463,7 +434,7 @@ export const InfoSheetView = ({
                                         LD Percentage Per Week
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {formatPercentage(infoSheet.ldPercentagePerWeek)}
+                                        {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
                                     </TableCell>
                                 </TableRow>
                                 {infoSheet.maxLdPercentage && (
@@ -472,7 +443,7 @@ export const InfoSheetView = ({
                                             Max LD Percentage
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {formatPercentage(infoSheet.maxLdPercentage)}
+                                            {formatPercentage(Number(infoSheet.maxLdPercentage))}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -490,7 +461,7 @@ export const InfoSheetView = ({
                                 Company Age (Years)
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatValue(infoSheet.techEligibilityAge ?? infoSheet.techEligibilityAgeYears)}
+                                {formatValue(infoSheet.techEligibilityAge)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Bid Validity (Days)
@@ -501,95 +472,51 @@ export const InfoSheetView = ({
                         </TableRow>
 
                         {/* Work Orders */}
-                        {(infoSheet.workOrderValue1Required || infoSheet.workOrderValue2Required || infoSheet.workOrderValue3Required) && (
+                        {(infoSheet.workValueType) && (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Work Orders
+                                        Eligibility Criteria
                                     </TableCell>
                                 </TableRow>
-                                {infoSheet.workOrderValue1Required && (
+                                {infoSheet.workValueType === 'WORKS_VALUES' && (
                                     <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Work Order 1 Required
+                                                Value of 1st Work Order
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {formatYesNo(infoSheet.workOrderValue1Required)}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Order Value 1
-                                            </TableCell>
-                                            <TableCell className="text-sm font-semibold">
                                                 {infoSheet.orderValue1 ? formatINR(Number(infoSheet.orderValue1)) : '—'}
                                             </TableCell>
                                         </TableRow>
-                                        {infoSheet.wo1Custom && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Work Order 1 Custom
-                                                </TableCell>
-                                                <TableCell className="text-sm" colSpan={3}>
-                                                    {infoSheet.wo1Custom}
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </>
-                                )}
-                                {infoSheet.workOrderValue2Required && (
-                                    <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Work Order 2 Required
+                                                Value of 2nd Work Order
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {formatYesNo(infoSheet.workOrderValue2Required)}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Order Value 2
-                                            </TableCell>
-                                            <TableCell className="text-sm font-semibold">
                                                 {infoSheet.orderValue2 ? formatINR(Number(infoSheet.orderValue2)) : '—'}
                                             </TableCell>
                                         </TableRow>
-                                        {infoSheet.wo2Custom && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Work Order 2 Custom
-                                                </TableCell>
-                                                <TableCell className="text-sm" colSpan={3}>
-                                                    {infoSheet.wo2Custom}
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </>
-                                )}
-                                {infoSheet.workOrderValue3Required && (
-                                    <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Work Order 3 Required
+                                                Value of 3rd Work Order
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {formatYesNo(infoSheet.workOrderValue3Required)}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Order Value 3
-                                            </TableCell>
-                                            <TableCell className="text-sm font-semibold">
                                                 {infoSheet.orderValue3 ? formatINR(Number(infoSheet.orderValue3)) : '—'}
                                             </TableCell>
                                         </TableRow>
-                                        {infoSheet.wo3Custom && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Work Order 3 Custom
-                                                </TableCell>
-                                                <TableCell className="text-sm" colSpan={3}>
-                                                    {infoSheet.wo3Custom}
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
+                                    </>
+                                )}
+                                {infoSheet.workValueType === 'CUSTOM' && (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Custom Eligibility Criteria
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {infoSheet.customEligibilityCriteria || '—'}
+                                            </TableCell>
+                                        </TableRow>
                                     </>
                                 )}
                             </>
@@ -690,14 +617,14 @@ export const InfoSheetView = ({
                         )}
 
                         {/* Client Contacts */}
-                        {infoSheet.clients && infoSheet.clients.length > 0 && (
+                        {infoSheet.clients && infoSheet.clients.length > 0 ? (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Client Contacts
                                     </TableCell>
                                 </TableRow>
-                        {infoSheet.clients.map((client, idx) => (
+                                {infoSheet.clients.map((client, idx) => (
                                     <React.Fragment key={`${client.clientName}-${idx}`}>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
@@ -730,7 +657,7 @@ export const InfoSheetView = ({
                                     </React.Fragment>
                                 ))}
                             </>
-                        )}
+                        ) : null}
 
                         {/* Documents */}
                         <TableRow className="bg-muted/50">
@@ -743,7 +670,7 @@ export const InfoSheetView = ({
                                 Technical Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                            {formatDocuments(infoSheet.technicalWorkOrders)}
+                                {formatDocuments(infoSheet.technicalWorkOrders || [])}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -751,7 +678,7 @@ export const InfoSheetView = ({
                                 Financial Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                            {formatDocuments(infoSheet.commercialDocuments)}
+                                {formatDocuments(infoSheet.commercialDocuments || [])}
                             </TableCell>
                         </TableRow>
                     </TableBody>

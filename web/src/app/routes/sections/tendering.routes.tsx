@@ -15,7 +15,7 @@ const InfoSheet_Edit = lazy(() => import('@/modules/tendering/info-sheet/TenderI
 const Tendering_PhysicalDocs = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsListPage'));
 const Tendering_PhysicalDocs_Create = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsCreatePage'));
 const Tendering_PhysicalDocs_Edit = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsEditPage'));
-const Tendering_PhysicalDocs_Show = lazy(() => import('@/modules/tendering/physical-docs/show'));
+const Tendering_PhysicalDocs_Show = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsShowPage'));
 const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs/RfqListPage'));
 const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/RfqCreatePage'));
 const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/RfqEditPage'));

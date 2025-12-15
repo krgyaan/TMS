@@ -10,10 +10,10 @@ import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { usePhysicalDocs, useDeletePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { usePhysicalDocs } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 
 const PhysicalDocsListPage = () => {
@@ -46,8 +46,6 @@ const PhysicalDocsListPage = () => {
     const tabsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const deleteMutation = useDeletePhysicalDoc();
-
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRow>[] = [
         {
             label: 'Send',
@@ -60,17 +58,7 @@ const PhysicalDocsListPage = () => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
-        },
-        {
-            label: 'Delete',
-            onClick: (row: PhysicalDocsDashboardRow) => {
-                if (row.physicalDocs && confirm('Are you sure you want to delete this physical doc submission?')) {
-                    deleteMutation.mutate(row.physicalDocs);
-                }
-            },
-            icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: PhysicalDocsDashboardRow) => row.physicalDocs !== null,
-        },
+        }
     ];
 
     const tabsConfig = useMemo(() => {
@@ -130,6 +118,11 @@ const PhysicalDocsListPage = () => {
             flex: 1,
             minWidth: 120,
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            cellRenderer: (params: any) => (
+                <Badge variant={params.value ? 'default' : 'secondary'}>
+                    {params.value}
+                </Badge>
+            ),
             sortable: true,
             filter: true,
         },

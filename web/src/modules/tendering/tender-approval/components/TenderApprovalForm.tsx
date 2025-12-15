@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -19,114 +18,18 @@ import { paths } from '@/app/routes/paths';
 import { useCreateTenderApproval, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { useStatuses } from '@/hooks/api/useStatuses';
-import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/constants/tenderApprovalOptions';
-import type {
-    SaveTenderApprovalDto,
-    TenderApproval,
-    TenderWithRelations
-} from '@/types/api.types';
+import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
+import type { TenderWithRelations } from '@/types/api.types';
+import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
+import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
+import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
+import { dummyFinancialDocuments, dummyTechnicalDocuments } from '../../info-sheet/helpers/tenderInfoSheet.types';
 
 interface TenderApprovalFormProps {
     tenderId: number;
     relationships: TenderWithRelations | undefined;
     isLoading?: boolean;
 }
-
-const TenderApprovalFormSchema = z.object({
-    tlDecision: z.enum(['0', '1', '2', '3']),
-    rfqTo: z.array(z.string()).optional(),
-    tenderFeeMode: z.string().optional(),
-    emdMode: z.string().optional(),
-    approvePqrSelection: z.enum(['1', '2']).optional(),
-    approveFinanceDocSelection: z.enum(['1', '2']).optional(),
-    tenderStatus: z.string().optional(),
-    oemNotAllowed: z.string().optional(),
-    remarks: z.string().max(1000).optional(),
-    incompleteFields: z.array(z.object({
-        fieldName: z.string(),
-        comment: z.string(),
-    })).optional(),
-}).refine((data) => {
-    // If incomplete status, must have at least 1 incomplete field
-    if (data.tlDecision === '3') {
-        return Array.isArray(data.incompleteFields) && data.incompleteFields.length > 0;
-    }
-    return true;
-}, {
-    message: "Please select at least one field to mark as incomplete",
-    path: ["incompleteFields"],
-});
-
-type FormValues = z.infer<typeof TenderApprovalFormSchema>;
-
-const getInitialValues = (approval?: TenderApproval | null): FormValues => {
-    if (!approval) {
-        return {
-            tlDecision: '0',
-            rfqTo: [],
-            tenderFeeMode: undefined,
-            emdMode: undefined,
-            approvePqrSelection: undefined,
-            approveFinanceDocSelection: undefined,
-            tenderStatus: undefined,
-            oemNotAllowed: undefined,
-            remarks: undefined,
-            incompleteFields: [],
-        };
-    }
-
-    return {
-        tlDecision: approval.tlStatus as '0' | '1' | '2' | '3',
-        rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
-        tenderFeeMode: approval.tenderFeeMode ?? undefined,
-        emdMode: approval.emdMode ?? undefined,
-        approvePqrSelection: approval.approvePqrSelection ?? undefined,
-        approveFinanceDocSelection: approval.approveFinanceDocSelection ?? undefined,
-        tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
-        oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
-        remarks: approval.tlRejectionRemarks ?? undefined,
-        incompleteFields: approval.incompleteFields ?? [],
-    };
-};
-
-const mapFormToPayload = (values: FormValues): SaveTenderApprovalDto => {
-    const basePayload: SaveTenderApprovalDto = {
-        tlStatus: values.tlDecision as '0' | '1' | '2' | '3',
-    };
-
-    // For Approved status (1)
-    if (values.tlDecision === '1') {
-        return {
-            ...basePayload,
-            rfqTo: values.rfqTo?.map(id => Number(id)) ?? [],
-            tenderFeeMode: values.tenderFeeMode,
-            emdMode: values.emdMode,
-            approvePqrSelection: values.approvePqrSelection as '1' | '2' | undefined,
-            approveFinanceDocSelection: values.approveFinanceDocSelection as '1' | '2' | undefined,
-        };
-    }
-
-    // For Rejected status (2)
-    if (values.tlDecision === '2') {
-        return {
-            ...basePayload,
-            tenderStatus: values.tenderStatus ? Number(values.tenderStatus) : undefined,
-            oemNotAllowed: values.oemNotAllowed ? String(values.oemNotAllowed) : undefined,
-            tlRejectionRemarks: values.remarks,
-        };
-    }
-
-    // For Incomplete status (3)
-    if (values.tlDecision === '3') {
-        return {
-            ...basePayload,
-            incompleteFields: values.incompleteFields,
-        };
-    }
-
-    // Default/Pending status (0)
-    return basePayload;
-};
 
 const FormLoadingSkeleton = () => (
     <Card className="max-w-5xl mx-auto">
@@ -162,6 +65,28 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
     );
 };
 
+const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+    if (!documents.length) {
+        return <span className="text-muted-foreground">No documents listed</span>
+    }
+
+    return (
+        <div className="flex flex-wrap gap-2">
+            {documents.map((doc, index) => {
+                // Handle both string arrays and object arrays
+                const docName = typeof doc === 'string' ? doc : doc.documentName;
+                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+
+                return (
+                    <Badge key={docKey} variant="outline">
+                        {docName}
+                    </Badge>
+                );
+            })}
+        </div>
+    )
+}
+
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     // ✅ ALL HOOKS FIRST (UNCONDITIONAL)
     const navigate = useNavigate();
@@ -180,7 +105,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const mode = approval ? 'edit' : 'create';
 
     // Form hooks (now safe - always called)
-    const form = useForm<FormValues>({
+    const form = useForm<TenderApprovalFormValues>({
         resolver: zodResolver(TenderApprovalFormSchema),
         defaultValues: getInitialValues(approval),
     });
@@ -199,6 +124,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     const tlDecision = form.watch('tlDecision');
     const tenderStatus = form.watch('tenderStatus');
+    const techDocs = form.watch('approvePqrSelection');
+    const finDocs = form.watch('approveFinanceDocSelection');
 
     const vendorOrgOptions = useMemo(() =>
         vendorOrganizations?.map(org => ({ value: String(org.id), label: org.name })) ?? [],
@@ -211,12 +138,12 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     );
 
     const tenderFeeModeOptions = useMemo(() =>
-        infoSheet?.tenderFeeModes?.map(mode => ({ value: mode, label: mode })) ?? [],
+        infoSheet?.tenderFeeMode?.map(mode => ({ value: mode, label: mode })) ?? [],
         [infoSheet]
     );
 
     const emdModeOptions = useMemo(() =>
-        infoSheet?.emdModes?.map(mode => ({ value: mode, label: mode })) ?? [],
+        infoSheet?.emdMode?.map(mode => ({ value: mode, label: mode })) ?? [],
         [infoSheet]
     );
 
@@ -226,7 +153,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         return statusName?.includes('not allowed by oem');
     }, [statuses, tenderStatus]);
 
-    const handleSubmit: SubmitHandler<FormValues> = async (values) => {
+    const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
         console.log('🚀 Submit called with values:', values);
         try {
             const payload = mapFormToPayload(values);
@@ -288,10 +215,10 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         )}
                                     </div>
                                 </div>
-                                {infoSheet.teRemark && (
+                                {infoSheet.teFinalRemark && (
                                     <div className="flex-1">
                                         <p className="text-sm font-medium text-muted-foreground">Remarks</p>
-                                        <p className="text-sm mt-1">{infoSheet.teRemark}</p>
+                                        <p className="text-sm mt-1">{infoSheet.teFinalRemark}</p>
                                     </div>
                                 )}
                             </div>
@@ -344,11 +271,22 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 options={documentApprovalOptions}
                                                 placeholder="Select PQR/Technical Docs approval"
                                             />
-                                            {infoSheet.technicalWorkOrders?.length > 0 && (
+                                            {infoSheet.technicalWorkOrders && infoSheet.technicalWorkOrders?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {infoSheet.technicalWorkOrders.join(', ')}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [])}
                                                 </div>
                                             )}
+                                            {
+                                                techDocs === '2' && (
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="alternativeTechnicalDocs"
+                                                        label="Alternative Technical Docs"
+                                                        options={dummyTechnicalDocuments}
+                                                        placeholder="Select documents"
+                                                    />
+                                                )
+                                            }
                                         </div>
                                         <div className="space-y-2">
                                             <SelectField
@@ -358,11 +296,22 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 options={documentApprovalOptions}
                                                 placeholder="Select Finance Docs approval"
                                             />
-                                            {infoSheet.commercialDocuments?.length > 0 && (
+                                            {infoSheet.commercialDocuments && infoSheet.commercialDocuments?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {infoSheet.commercialDocuments.join(', ')}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [])}
                                                 </div>
                                             )}
+                                            {
+                                                finDocs === '2' && (
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="alternativeFinancialDocs"
+                                                        label="Alternative Financial Docs"
+                                                        options={dummyFinancialDocuments}
+                                                        placeholder="Select documents"
+                                                    />
+                                                )
+                                            }
                                         </div>
                                     </div>
                                 </div>

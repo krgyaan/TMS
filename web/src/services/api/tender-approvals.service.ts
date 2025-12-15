@@ -38,7 +38,7 @@ class TenderApprovalsService extends BaseApiService {
     }
 
     async update(tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> {
-        return this.post<TenderApproval>(`/${tenderId}/approval`, data);
+        return this.put<TenderApproval>(`/${tenderId}/approval`, data);
     }
 }
 

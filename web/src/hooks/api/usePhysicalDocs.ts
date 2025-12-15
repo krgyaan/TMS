@@ -55,7 +55,17 @@ export const usePhysicalDoc = (id: number | null) => {
 export const usePhysicalDocByTenderId = (tenderId: number | null) => {
     return useQuery({
         queryKey: physicalDocsKey.byTender(tenderId ?? 0),
-        queryFn: () => physicalDocsService.getByTenderId(tenderId ?? 0),
+        queryFn: async () => {
+            try {
+                return await physicalDocsService.getByTenderId(tenderId ?? 0);
+            } catch (error: any) {
+                // Handle 404 gracefully - return null if resource doesn't exist
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
         enabled: !!tenderId,
     });
 };
@@ -84,21 +94,6 @@ export const useUpdatePhysicalDoc = () => {
             queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
             queryClient.invalidateQueries({ queryKey: physicalDocsKey.detail(data.id) });
             toast.success("Physical doc updated successfully");
-        },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
-
-export const useDeletePhysicalDoc = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (id: number) => physicalDocsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
-            toast.success("Physical doc deleted successfully");
         },
         onError: error => {
             toast.error(handleQueryError(error));

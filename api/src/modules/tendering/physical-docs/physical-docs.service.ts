@@ -53,6 +53,8 @@ export type PhysicalDocWithPersons = {
     tenderId: number;
     courierNo: number;
     submittedDocs: string | null;
+    createdAt: string | Date;
+    updatedAt: string | Date;
     persons: PhysicalDocPerson[];
 };
 
@@ -65,6 +67,7 @@ export class PhysicalDocsService {
     ) { }
 
     async findAll(filters?: PhysicalDocFilters): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
+        console.log("Filters:", filters);
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
@@ -73,7 +76,7 @@ export class PhysicalDocsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            eq(tenderInformation.physicalDocsRequired, 'Yes'),
+            eq(tenderInformation.physicalDocsRequired, 'YES'),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
         ];
 
@@ -94,8 +97,8 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(
+            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .innerJoin(
                 tenderInformation,
                 eq(tenderInfos.id, tenderInformation.tenderId)
             )
@@ -152,8 +155,8 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(
+            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .innerJoin(
                 tenderInformation,
                 eq(tenderInfos.id, tenderInformation.tenderId)
             )
@@ -211,6 +214,8 @@ export class PhysicalDocsService {
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
             submittedDocs: physicalDoc.submittedDocs,
+            createdAt: physicalDoc.createdAt || '',
+            updatedAt: physicalDoc.updatedAt || '',
             persons: persons.map((p) => ({
                 id: p.id,
                 name: p.name,
@@ -272,6 +277,8 @@ export class PhysicalDocsService {
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
             submittedDocs: physicalDoc.submittedDocs,
+            createdAt: physicalDoc.createdAt || '',
+            updatedAt: physicalDoc.updatedAt || '',
             persons: persons.map((p) => ({
                 id: p.id,
                 name: p.name,
@@ -367,6 +374,8 @@ export class PhysicalDocsService {
                 tenderId: physicalDoc.tenderId,
                 courierNo: physicalDoc.courierNo,
                 submittedDocs: physicalDoc.submittedDocs,
+                createdAt: physicalDoc.createdAt || '',
+                updatedAt: physicalDoc.updatedAt || '',
                 persons,
             };
         });
@@ -476,6 +485,8 @@ export class PhysicalDocsService {
                 tenderId: physicalDoc.tenderId,
                 courierNo: physicalDoc.courierNo,
                 submittedDocs: physicalDoc.submittedDocs,
+                createdAt: physicalDoc.createdAt || '',
+                updatedAt: physicalDoc.updatedAt || '',
                 persons,
             };
         });
