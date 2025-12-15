@@ -16,10 +16,11 @@ import { MailerService } from "@/mailer/mailer.service";
 // Status constants
 export const COURIER_STATUS = {
     PENDING: 0,
-    DISPATCHED: 1,
-    NOT_DELIVERED: 2,
-    DELIVERED: 3,
-    REJECTED: 4,
+    IN_TRANSIT: 1,
+    DISPATCHED: 2,
+    NOT_DELIVERED: 3,
+    DELIVERED: 4,
+    REJECTED: 5,
 } as const;
 
 interface CourierDoc {
@@ -34,117 +35,103 @@ export class CourierService {
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailer: MailerService
-    ) { }
+    ) {}
 
     private validateDispatchData(dispatchData: DispatchCourierDto): void {
-        if (!dispatchData.courier_provider?.trim()) {
+        if (!dispatchData.courierProvider?.trim()) {
             throw new BadRequestException("Courier provider is required");
         }
-        if (!dispatchData.docket_no?.trim()) {
+        if (!dispatchData.docketNo?.trim()) {
             throw new BadRequestException("Docket number is required");
         }
-        if (!dispatchData.pickup_date) {
+        if (!dispatchData.pickupDate) {
             throw new BadRequestException("Pickup date is required");
         }
 
-        // Validate pickup_date is a valid date
-        const pickupDate = new Date(dispatchData.pickup_date);
+        const pickupDate = new Date(dispatchData.pickupDate);
         if (isNaN(pickupDate.getTime())) {
             throw new BadRequestException("Invalid pickup date format");
         }
     }
 
     async create(data: CreateCourierDto, userId: number) {
-        const result = await this.db
-            .insert(couriers)
-            .values({
-                to_org: data.to_org,
-                to_name: data.to_name,
-                to_addr: data.to_addr,
-                to_pin: data.to_pin,
-                to_mobile: data.to_mobile,
-                emp_from: data.emp_from,
-                urgency: data.urgency,
-                user_id: userId,
-                del_date: new Date(data.del_date),
-                courier_docs: [],
-                status: COURIER_STATUS.PENDING,
-            })
-            .returning();
+        const values = {
+            toOrg: data.toOrg,
+            toName: data.toName,
+            toAddr: data.toAddr,
+            toPin: data.toPin,
+            toMobile: data.toMobile,
+            empFrom: data.empFrom,
+            urgency: data.urgency,
+            userId,
+            delDate: new Date(data.delDate),
+            courierDocs: [],
+            status: COURIER_STATUS.PENDING,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
 
-        const mail = await this.mailer.sendMail({
-            to: "abhijeetgaur.dev@gmail.com",
-            subject: "Welcome!",
-            html: "<h1>Hello!</h1><p>You are registered.</p>",
-        });
+        const result = await this.db.insert(couriers).values(values).returning();
 
-        console.log(mail);
+        // optional welcome/notification mail (kept from original)
+        try {
+            const mail = await this.mailer.sendMail({
+                to: "abhijeetgaur.dev@gmail.com",
+                subject: "New courier created",
+                html: `<h1>Courier Created</h1><p>Courier ID: ${result[0].id}</p>`,
+            });
+            console.log("Notification mail sent:", mail);
+        } catch (e) {
+            console.warn("Failed to send mail:", e);
+        }
 
         return result[0];
     }
 
-    // Get all couriers with user info (for dashboard)
+    // Get all couriers (dashboard)
     async findAll() {
-        return this.db
-            .select({
-                id: couriers.id,
-                user_id: couriers.user_id,
-                to_org: couriers.to_org,
-                to_name: couriers.to_name,
-                to_addr: couriers.to_addr,
-                to_pin: couriers.to_pin,
-                to_mobile: couriers.to_mobile,
-                emp_from: couriers.emp_from,
-                del_date: couriers.del_date,
-                urgency: couriers.urgency,
-                courier_docs: couriers.courier_docs,
-                status: couriers.status,
-                tracking_number: couriers.tracking_number,
-                courier_provider: couriers.courier_provider,
-                pickup_date: couriers.pickup_date,
-                docket_no: couriers.docket_no,
-                delivery_date: couriers.delivery_date,
-                delivery_pod: couriers.delivery_pod,
-                within_time: couriers.within_time,
-                created_at: couriers.created_at,
-                updated_at: couriers.updated_at,
-            })
-            .from(couriers)
-            .orderBy(desc(couriers.created_at));
+        return this.db.query.couriers.findMany({
+            orderBy: (courier, { desc }) => desc(courier.createdAt),
+            with: {
+                empFromUser: true,
+            },
+        });
     }
-
     // Get couriers by status
     async findByStatus(status: number) {
-        return this.db.select().from(couriers).where(eq(couriers.status, status)).orderBy(desc(couriers.created_at));
+        return this.db.select().from(couriers).where(eq(couriers.status, status)).orderBy(desc(couriers.createdAt));
     }
 
-    // Get couriers grouped by status (for dashboard tabs)
+    // Grouped by status
     async findAllGroupedByStatus() {
         const allCouriers = await this.findAll();
 
-        return {
+        const byStatus = {
             pending: allCouriers.filter(c => c.status === COURIER_STATUS.PENDING),
             dispatched: allCouriers.filter(c => c.status === COURIER_STATUS.DISPATCHED),
             not_delivered: allCouriers.filter(c => c.status === COURIER_STATUS.NOT_DELIVERED),
             delivered: allCouriers.filter(c => c.status === COURIER_STATUS.DELIVERED),
             rejected: allCouriers.filter(c => c.status === COURIER_STATUS.REJECTED),
+        };
+
+        return {
+            ...byStatus,
             counts: {
-                pending: allCouriers.filter(c => c.status === COURIER_STATUS.PENDING).length,
-                dispatched: allCouriers.filter(c => c.status === COURIER_STATUS.DISPATCHED).length,
-                not_delivered: allCouriers.filter(c => c.status === COURIER_STATUS.NOT_DELIVERED).length,
-                delivered: allCouriers.filter(c => c.status === COURIER_STATUS.DELIVERED).length,
-                rejected: allCouriers.filter(c => c.status === COURIER_STATUS.REJECTED).length,
+                pending: byStatus.pending.length,
+                dispatched: byStatus.dispatched.length,
+                not_delivered: byStatus.not_delivered.length,
+                delivered: byStatus.delivered.length,
+                rejected: byStatus.rejected.length,
             },
         };
     }
 
     async findAllByUser(userId: number) {
-        return this.db.select().from(couriers).where(eq(couriers.user_id, userId)).orderBy(desc(couriers.created_at));
+        return this.db.select().from(couriers).where(eq(couriers.userId, userId)).orderBy(desc(couriers.createdAt));
     }
 
     async findOne(id: number) {
         const result = await this.db.select().from(couriers).where(eq(couriers.id, id)).limit(1);
-
         return result[0] ?? null;
     }
 
@@ -152,31 +139,32 @@ export class CourierService {
         const result = await this.db
             .select({
                 id: couriers.id,
-                user_id: couriers.user_id,
-                to_org: couriers.to_org,
-                to_name: couriers.to_name,
-                to_addr: couriers.to_addr,
-                to_pin: couriers.to_pin,
-                to_mobile: couriers.to_mobile,
-                emp_from: couriers.emp_from,
-                del_date: couriers.del_date,
+                userId: couriers.userId,
+                toOrg: couriers.toOrg,
+                toName: couriers.toName,
+                toAddr: couriers.toAddr,
+                toPin: couriers.toPin,
+                toMobile: couriers.toMobile,
+                empFrom: couriers.empFrom,
+                delDate: couriers.delDate,
                 urgency: couriers.urgency,
-                courier_provider: couriers.courier_provider,
-                pickup_date: couriers.pickup_date,
-                docket_no: couriers.docket_no,
-                delivery_date: couriers.delivery_date,
-                delivery_pod: couriers.delivery_pod,
-                within_time: couriers.within_time,
-                courier_docs: couriers.courier_docs,
+                courierProvider: couriers.courierProvider,
+                pickupDate: couriers.pickupDate,
+                docketNo: couriers.docketNo,
+                docketSlip: couriers.docketSlip,
+                deliveryDate: couriers.deliveryDate,
+                deliveryPod: couriers.deliveryPod,
+                withinTime: couriers.withinTime,
+                courierDocs: couriers.courierDocs,
                 status: couriers.status,
-                tracking_number: couriers.tracking_number,
-                created_at: couriers.created_at,
-                updated_at: couriers.updated_at,
-                created_by_name: users.name,
-                created_by_email: users.email,
+                trackingNumber: couriers.trackingNumber,
+                createdAt: couriers.createdAt,
+                updatedAt: couriers.updatedAt,
+                createdByName: users.name,
+                createdByEmail: users.email,
             })
             .from(couriers)
-            .leftJoin(users, eq(couriers.user_id, users.id))
+            .leftJoin(users, eq(couriers.userId, users.id))
             .where(eq(couriers.id, id))
             .limit(1);
 
@@ -184,7 +172,7 @@ export class CourierService {
             throw new NotFoundException("Courier not found");
         }
 
-        // Get sender (emp_from) details
+        // sender info (empFrom)
         const sender = await this.db
             .select({
                 id: users.id,
@@ -192,7 +180,7 @@ export class CourierService {
                 email: users.email,
             })
             .from(users)
-            .where(eq(users.id, result[0].emp_from))
+            .where(eq(users.id, result[0].empFrom))
             .limit(1);
 
         return {
@@ -208,162 +196,130 @@ export class CourierService {
             throw new NotFoundException("Courier not found");
         }
 
-        if (existing.user_id !== userId) {
+        if (existing.userId !== userId) {
             throw new ForbiddenException("Not authorized to update this courier");
         }
 
-        const updateData: Record<string, any> = {
-            updated_at: new Date(),
-        };
+        const updateData: Record<string, any> = { updatedAt: new Date() };
 
-        if (data.to_org !== undefined) updateData.to_org = data.to_org;
-        if (data.to_name !== undefined) updateData.to_name = data.to_name;
-        if (data.to_addr !== undefined) updateData.to_addr = data.to_addr;
-        if (data.to_pin !== undefined) updateData.to_pin = data.to_pin;
-        if (data.to_mobile !== undefined) updateData.to_mobile = data.to_mobile;
-        if (data.emp_from !== undefined) updateData.emp_from = data.emp_from;
+        if (data.toOrg !== undefined) updateData.toOrg = data.toOrg;
+        if (data.toName !== undefined) updateData.toName = data.toName;
+        if (data.toAddr !== undefined) updateData.toAddr = data.toAddr;
+        if (data.toPin !== undefined) updateData.toPin = data.toPin;
+        if (data.toMobile !== undefined) updateData.toMobile = data.toMobile;
+        if (data.empFrom !== undefined) updateData.empFrom = data.empFrom;
         if (data.urgency !== undefined) updateData.urgency = data.urgency;
-        if (data.del_date !== undefined) updateData.del_date = new Date(data.del_date);
+        if (data.delDate !== undefined) updateData.delDate = new Date(data.delDate);
 
         const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
 
         return result[0];
     }
 
-    // Update courier status
+    // Update status (delivery info)
     async updateStatus(
         id: number,
         statusData: {
             status: number;
-            delivery_date?: string;
-            within_time?: boolean;
+            deliveryDate?: string;
+            withinTime?: boolean;
         },
         userId: number
     ) {
         const existing = await this.findOne(id);
-
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
+        if (!existing) throw new NotFoundException("Courier not found");
 
         const updateData: Record<string, any> = {
             status: statusData.status,
-            updated_at: new Date(),
+            updatedAt: new Date(),
         };
 
-        // If delivered, add delivery info
         if (statusData.status === COURIER_STATUS.DELIVERED) {
-            if (statusData.delivery_date) {
-                updateData.delivery_date = new Date(statusData.delivery_date);
-            }
-            if (statusData.within_time !== undefined) {
-                updateData.within_time = statusData.within_time;
-            }
+            if (statusData.deliveryDate) updateData.deliveryDate = new Date(statusData.deliveryDate);
+            if (statusData.withinTime !== undefined) updateData.withinTime = statusData.withinTime;
         }
 
         const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
-
         return result[0];
     }
 
     /**
-     * Dispatch with docket slip file (POST endpoint)
+     * Dispatch with optional docket slip file (POST endpoint)
      */
     async createDispatch(id: number, dispatchData: DispatchCourierDto, file: Express.Multer.File | undefined, userId: number) {
         const existing = await this.findOne(id);
-
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
+        if (!existing) throw new NotFoundException("Courier not found");
 
         // Validate dispatch data
         this.validateDispatchData(dispatchData);
 
-        // Prepare update data
         const updateData: Record<string, any> = {
-            courier_provider: dispatchData.courier_provider.trim(),
-            docket_no: dispatchData.docket_no.trim(),
-            pickup_date: new Date(dispatchData.pickup_date),
+            courierProvider: dispatchData.courierProvider.trim(),
+            docketNo: dispatchData.docketNo.trim(),
+            pickupDate: new Date(dispatchData.pickupDate),
             status: COURIER_STATUS.DISPATCHED,
-            updated_at: new Date(),
+            updatedAt: new Date(),
         };
 
-        console.log("FILE RECEIVED:", file);
-
-        // If file is uploaded, add it to courier_docs
+        // If file present, add doc to courierDocs
         if (file) {
-            console.log("FILE RECEIVED:", file);
             const newDoc: CourierDoc = {
                 url: `/uploads/couriers/docket-slips/${file.filename}`,
                 name: file.originalname,
                 type: file.mimetype.startsWith("image/") ? "image" : "file",
             };
 
-            const existingDocs = (existing.courier_docs as CourierDoc[]) || [];
-            updateData.courier_docs = [...existingDocs, newDoc];
+            // existing.courierDocs may be JSONB array or null
+            const existingDocs = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
+            updateData.courierDocs = [...existingDocs, newDoc];
         }
 
         const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
-
-        console.log(result);
         return result[0];
     }
 
-    // Update dispatch info
+    // Update dispatch info without file
     async updateDispatch(
         id: number,
         dispatchData: {
-            courier_provider: string;
-            docket_no: string;
-            pickup_date: string;
+            courierProvider: string;
+            docketNo: string;
+            pickupDate: string;
         },
         userId: number
     ) {
         const existing = await this.findOne(id);
+        if (!existing) throw new NotFoundException("Courier not found");
 
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
+        const updateData = {
+            courierProvider: dispatchData.courierProvider,
+            docketNo: dispatchData.docketNo,
+            pickupDate: new Date(dispatchData.pickupDate),
+            status: COURIER_STATUS.DISPATCHED,
+            updatedAt: new Date(),
+        };
 
-        const result = await this.db
-            .update(couriers)
-            .set({
-                courier_provider: dispatchData.courier_provider,
-                docket_no: dispatchData.docket_no,
-                pickup_date: new Date(dispatchData.pickup_date),
-                status: COURIER_STATUS.DISPATCHED,
-                updated_at: new Date(),
-            })
-            .where(eq(couriers.id, id))
-            .returning();
-
+        const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
         return result[0];
     }
 
     async delete(id: number, userId: number) {
         const existing = await this.findOne(id);
+        if (!existing) throw new NotFoundException("Courier not found");
 
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
-
-        if (existing.user_id !== userId) {
+        if (existing.userId !== userId) {
             throw new ForbiddenException("Not authorized to delete this courier");
         }
 
         await this.db.delete(couriers).where(eq(couriers.id, id));
-
         return { success: true };
     }
 
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
+        if (!existing) throw new NotFoundException("Courier not found");
 
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
-
-        if (existing.user_id !== userId) {
+        if (existing.userId !== userId) {
             throw new ForbiddenException("Not authorized");
         }
 
@@ -373,14 +329,14 @@ export class CourierService {
             type: file.mimetype.startsWith("image") ? "image" : "file",
         }));
 
-        const existingDocs = (existing.courier_docs as any[]) || [];
+        const existingDocs = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
         const updatedDocs = [...existingDocs, ...newDocs];
 
         const result = await this.db
             .update(couriers)
             .set({
-                courier_docs: updatedDocs,
-                updated_at: new Date(),
+                courierDocs: updatedDocs,
+                updatedAt: new Date(),
             })
             .where(eq(couriers.id, id))
             .returning();
@@ -391,16 +347,14 @@ export class CourierService {
     // Upload delivery POD
     async uploadDeliveryPod(id: number, file: Express.Multer.File, userId: number) {
         const existing = await this.findOne(id);
+        if (!existing) throw new NotFoundException("Courier not found");
 
-        if (!existing) {
-            throw new NotFoundException("Courier not found");
-        }
-
+        // Optionally you might want to check permissions
         const result = await this.db
             .update(couriers)
             .set({
-                delivery_pod: `/uploads/couriers/pod/${file.filename}`,
-                updated_at: new Date(),
+                deliveryPod: `/uploads/couriers/pod/${file.filename}`,
+                updatedAt: new Date(),
             })
             .where(eq(couriers.id, id))
             .returning();
