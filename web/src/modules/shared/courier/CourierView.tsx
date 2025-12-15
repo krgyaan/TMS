@@ -222,7 +222,7 @@ const CourierViewPage: React.FC = () => {
         );
     }
 
-    const documents = courier.courier_docs || [];
+    const documents = courier.courierDocs || [];
 
     return (
         <div className={`min-h-screen ${MODERN_STYLES.gradient} py-8 px-4 sm:px-6`}>
@@ -247,19 +247,19 @@ const CourierViewPage: React.FC = () => {
                                 <div className="flex items-center gap-4 mt-2">
                                     <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                                         <CalendarDays className="h-3.5 w-3.5" />
-                                        Created: {formatDate(courier.created_at)}
+                                        Created: {formatDate(courier.createdAt)}
                                     </span>
                                     <span className="text-sm font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">ID: #{courier.id || "N/A"}</span>
                                 </div>
                             </div>
                         </div>
-                        <Button
+                        {/* <Button
                             onClick={() => navigate(paths.shared.courierEdit(courier.id))}
                             className="flex items-center gap-2 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all"
                         >
                             <Pencil className="h-4 w-4" />
                             Edit
-                        </Button>
+                        </Button> */}
                     </div>
 
                     <Separator className="my-4" />
@@ -270,7 +270,7 @@ const CourierViewPage: React.FC = () => {
                     {/* Left Column: Recipient Information */}
                     <div className="space-y-6">
                         <Card className={`${MODERN_STYLES.cardShadow} ${MODERN_STYLES.border} h-full`}>
-                            <CardHeader className="pb-4 border-b">
+                            <CardHeader className="pb-2 border-b">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2.5 rounded-xl bg-primary/10">
@@ -289,21 +289,21 @@ const CourierViewPage: React.FC = () => {
                             </CardHeader>
 
                             <CardContent className="p-6">
-                                <div className="space-y-1">
-                                    <InfoRow icon={Building} label="Organization / Company" value={courier.to_org || "Not specified"} isImportant copyable />
+                                <div className="">
+                                    <InfoRow icon={Building} label="Organization / Company" value={courier.toOrg || "Not specified"} isImportant copyable />
 
-                                    <InfoRow icon={User} label="Contact Person" value={courier.to_name} copyable />
+                                    <InfoRow icon={User} label="Contact Person" value={courier.toName} copyable />
 
                                     <InfoRow
                                         icon={MapPin}
                                         label="Delivery Address"
                                         value={
                                             <div className="space-y-2">
-                                                <div>{courier.to_addr || "Address not provided"}</div>
-                                                {courier.to_pin && (
+                                                <div>{courier.toAddr || "Address not provided"}</div>
+                                                {courier.toPin && (
                                                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 w-fit">
                                                         <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span className="font-mono font-medium">{courier.to_pin}</span>
+                                                        <span className="font-mono font-medium">{courier.toPin}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -315,15 +315,15 @@ const CourierViewPage: React.FC = () => {
                                         icon={Phone}
                                         label="Contact Number"
                                         value={
-                                            courier.to_mobile ? (
+                                            courier.toMobile ? (
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
                                                         <Phone className="h-4 w-4 text-primary" />
-                                                        <span className="font-mono font-semibold text-base">{courier.to_mobile}</span>
+                                                        <span className="font-mono font-semibold text-base">{courier.toMobile}</span>
                                                     </div>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => window.open(`tel:${courier.to_mobile}`, "_blank")}>
+                                                    {/* <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => window.open(`tel:${courier.toMobile}`, "_blank")}>
                                                         <Phone className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    </Button> */}
                                                 </div>
                                             ) : (
                                                 "Not provided"
@@ -340,21 +340,21 @@ const CourierViewPage: React.FC = () => {
                                 </div>
 
                                 {/* Contact Actions */}
-                                {courier.to_mobile && (
+                                {/* {courier.toMobile && (
                                     <div className="mt-8 pt-6 border-t border-muted/20">
                                         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Quick Actions</h4>
                                         <div className="flex flex-wrap gap-2">
-                                            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`tel:${courier.to_mobile}`, "_blank")}>
+                                            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`tel:${courier.toMobile}`, "_blank")}>
                                                 <Phone className="h-4 w-4" />
                                                 Call Recipient
                                             </Button>
-                                            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`sms:${courier.to_mobile}`, "_blank")}>
+                                            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`sms:${courier.toMobile}`, "_blank")}>
                                                 <Mail className="h-4 w-4" />
                                                 Send SMS
                                             </Button>
                                         </div>
                                     </div>
-                                )}
+                                )} */}
                             </CardContent>
                         </Card>
                     </div>
@@ -375,7 +375,7 @@ const CourierViewPage: React.FC = () => {
                                     </div>
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                         <FileText className="h-3.5 w-3.5" />
-                                        {documents.length + (courier.docket_slip ? 1 : 0) + (courier.delivery_pod ? 1 : 0)} files
+                                        {documents.length + (courier.docketSlip ? 1 : 0) + (courier.deliveryPod ? 1 : 0)} files
                                     </div>
                                 </div>
                             </CardHeader>
@@ -387,7 +387,7 @@ const CourierViewPage: React.FC = () => {
                                         <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Essential Documents</h3>
                                         <div className="space-y-4">
                                             <DocumentCard
-                                                url={courier.docket_slip}
+                                                url={courier.docketSlip}
                                                 title="Docket Slip"
                                                 description="Official shipping documentation with tracking details"
                                                 icon={Package}
@@ -395,7 +395,7 @@ const CourierViewPage: React.FC = () => {
                                             />
 
                                             <DocumentCard
-                                                url={courier.delivery_pod}
+                                                url={courier.deliveryPod}
                                                 title="Proof of Delivery"
                                                 description="Signed confirmation of successful delivery"
                                                 icon={CheckCircle}
@@ -403,7 +403,6 @@ const CourierViewPage: React.FC = () => {
                                             />
                                         </div>
                                     </div>
-
                                     {/* Supporting Documents */}
                                     <div>
                                         <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Supporting Documents</h3>
@@ -427,21 +426,19 @@ const CourierViewPage: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-
                                     {/* Document Summary */}
                                     <div className="pt-4 border-t border-muted/20">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Total Documents</span>
-                                            <span className="font-semibold">{documents.length + (courier.docket_slip ? 1 : 0) + (courier.delivery_pod ? 1 : 0)}</span>
+                                            <span className="font-semibold">{documents.length + (courier.docketSlip ? 1 : 0) + (courier.deliveryPod ? 1 : 0)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm mt-2">
                                             <span className="text-muted-foreground">Essential Documents</span>
-                                            <span className="font-semibold">{(courier.docket_slip ? 1 : 0) + (courier.delivery_pod ? 1 : 0)}/2</span>
+                                            <span className="font-semibold">{(courier.docketSlip ? 1 : 0) + (courier.deliveryPod ? 1 : 0)}/2</span>
                                         </div>
                                     </div>
-
                                     {/* Bulk Actions */}
-                                    {(documents.length > 0 || courier.docket_slip || courier.delivery_pod) && (
+                                    {/* {(documents.length > 0 || courier.docketSlip || courier.deliveryPod) && (
                                         <div className="mt-6 pt-4 border-t border-muted/20">
                                             <h4 className="text-sm font-semibold text-muted-foreground mb-3">Bulk Actions</h4>
                                             <div className="flex flex-wrap gap-2">
@@ -451,7 +448,7 @@ const CourierViewPage: React.FC = () => {
                                                     className="gap-2"
                                                     onClick={() => {
                                                         // Export all documents logic
-                                                        const allUrls = [courier.docket_slip, courier.delivery_pod, ...documents.map(d => d.url)].filter(Boolean);
+                                                        const allUrls = [courier.docketSlip, courier.deliveryPod, ...documents.map(d => d.url)].filter(Boolean);
 
                                                         // Implementation for downloading all documents
                                                         console.log("Exporting all documents:", allUrls);
@@ -474,7 +471,7 @@ const CourierViewPage: React.FC = () => {
                                                 </Button>
                                             </div>
                                         </div>
-                                    )}
+                                    )} */}
                                 </div>
                             </CardContent>
                         </Card>

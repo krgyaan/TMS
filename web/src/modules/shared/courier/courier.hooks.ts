@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { courierApi } from "@/modules/shared/courier/courier.service";
-import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput } from "@/modules/shared/courier/courier.types";
+import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput, Courier } from "@/modules/shared/courier/courier.types";
 
 // Query keys
 export const courierKeys = {
@@ -58,7 +58,7 @@ export const useCouriersByStatus = (status: number) => {
  * Get single courier
  */
 export const useCourier = (id: number) => {
-    return useQuery({
+    return useQuery<Courier>({
         queryKey: courierKeys.detail(id),
         queryFn: () => courierApi.getById(id),
         enabled: !!id,
@@ -147,20 +147,20 @@ export const useCreateCourierDispatch = () => {
 /**
  * Update dispatch info
  */
-export const useUpdateCourierDispatch = () => {
-    const queryClient = useQueryClient();
+// export const useUpdateCourierDispatch = () => {
+//     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateDispatchInput }) => courierApi.updateDispatch(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: courierKeys.all });
-            toast.success("Dispatch info updated successfully");
-        },
-        onError: (error: any) => {
-            toast.error(error.response?.data?.message || "Failed to update dispatch info");
-        },
-    });
-};
+//     return useMutation({
+//         mutationFn: ({ id, data }: { id: number; data: UpdateDispatchInput }) => courierApi.updateDispatch(id, data),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: courierKeys.all });
+//             toast.success("Dispatch info updated successfully");
+//         },
+//         onError: (error: any) => {
+//             toast.error(error.response?.data?.message || "Failed to update dispatch info");
+//         },
+//     });
+// };
 
 /**
  * Upload courier documents

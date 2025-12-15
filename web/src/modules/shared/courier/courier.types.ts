@@ -15,12 +15,14 @@ export type CourierDoc = {
 export type Courier = {
     id: number;
     userId: number;
+
     toOrg: string;
     toName: string;
     toAddr: string;
     toPin: string;
     toMobile: string;
-    empFrom: number | null; // allow null because relation may be missing
+
+    empFrom: number | null;
     delDate: string;
     urgency: number;
 
@@ -28,19 +30,26 @@ export type Courier = {
     pickupDate: string | null;
     docketNo: string | null;
 
+    // ✅ NEW
+    docketSlip: string | null;
+
     deliveryDate: string | null;
     deliveryPod: string | null;
     withinTime: boolean | null;
 
-    courierDocs: CourierDoc[] | null;
+    // ✅ FIXED (matches API)
+    courierDocs: string[] | null;
 
     status: number;
     trackingNumber: string | null;
 
+    // 🟡 Optional / future backend support
+    notes?: string | null;
+
     createdAt: string;
     updatedAt: string;
 
-    // Optional relational fields (automatically null if missing)
+    // Relations
     empFromUser?: UserMini | null;
     createdByUser?: UserMini | null;
 };
