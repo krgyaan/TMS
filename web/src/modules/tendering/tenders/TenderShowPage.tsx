@@ -1,8 +1,22 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTender } from '@/hooks/api/useTenders';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
+import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
+import { useTenderResultByTenderId, type ResultDashboardRow } from '@/hooks/api/useTenderResults';
 import { TenderView } from './components/TenderView';
-import { InfoSheetView } from '../info-sheet/components/InfoSheetView';
+import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
+import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
+import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
+import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { CostingSheetShow } from '@/modules/tendering/costing-sheets/components/CostingSheetShow';
+import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
+import { TenderResultShow } from '@/modules/tendering/results/components/TenderResultShow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,12 +28,17 @@ export default function TenderShowPage() {
     const navigate = useNavigate();
     const parsedId = id ? Number(id) : NaN;
     const tenderId = Number.isNaN(parsedId) ? null : parsedId;
+
+    // Fetch all data
     const { data: tender, isLoading, error } = useTender(tenderId);
-    const {
-        data: infoSheet,
-        isLoading: infoSheetLoading,
-        error: infoSheetError,
-    } = useInfoSheet(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
+    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
+    const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: checklist, isLoading: checklistLoading } = useDocumentChecklistByTender(tenderId ?? 0);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId ?? 0);
+    const { data: tenderResult, isLoading: resultLoading } = useTenderResultByTenderId(tenderId);
 
     if (!tenderId || error || (!isLoading && !tender)) {
         return (
@@ -43,23 +62,27 @@ export default function TenderShowPage() {
     return (
         <div className="space-y-6">
             <Tabs defaultValue="tender" className="space-y-4">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsList className="grid w-full md:grid-cols-5 lg:grid-cols-8 gap-2">
                     <TabsTrigger value="tender">Tender Details</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet Details</TabsTrigger>
+                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
+                    <TabsTrigger value="rfq">RFQ & Response</TabsTrigger>
+                    <TabsTrigger value="emd-fees">EMD/Tender Fees</TabsTrigger>
+                    <TabsTrigger value="checklist">Checklist</TabsTrigger>
+                    <TabsTrigger value="costing">Costing Sheet/Approval</TabsTrigger>
+                    <TabsTrigger value="bid">Bid Submission</TabsTrigger>
+                    <TabsTrigger value="result">Tender Result</TabsTrigger>
                 </TabsList>
 
+                {/* Tender Details */}
                 <TabsContent value="tender">
                     <TenderView
                         tender={tender!}
                         isLoading={isLoading}
                         showEditButton
-                        showBackButton
+                        showBackButton={false}
                         onEdit={() => navigate(paths.tendering.tenderEdit(tenderId!))}
                         onBack={() => navigate(paths.tendering.tenders)}
                     />
-                </TabsContent>
-
-                <TabsContent value="info-sheet" className="space-y-4">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
@@ -80,8 +103,167 @@ export default function TenderShowPage() {
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
                                 No info sheet exists for this tender yet.
-                                <Button className="mt-4" onClick={() => navigate(paths.tendering.infoSheetCreate(tenderId!))}>
-                                    Fill Info Sheet
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* RFQ */}
+                <TabsContent value="rfq">
+                    {rfqLoading ? (
+                        <RfqView rfq={{} as any} isLoading />
+                    ) : rfq ? (
+                        <RfqView
+                            rfq={rfq}
+                            tender={tender ?? undefined}
+                            onEdit={() => navigate(paths.tendering.rfqsEdit(tenderId!))}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No RFQ exists for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.rfqsCreate(tenderId!))}>
+                                    Create RFQ
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Physical Docs */}
+                <TabsContent value="physical-docs">
+                    {physicalDocLoading ? (
+                        <PhysicalDocsView physicalDoc={null} isLoading />
+                    ) : physicalDoc ? (
+                        <PhysicalDocsView
+                            physicalDoc={physicalDoc}
+                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
+                        />
+                    ) : (
+                        <PhysicalDocsView
+                            physicalDoc={null}
+                            onEdit={() => navigate(paths.tendering.physicalDocsCreate(tenderId!))}
+                        />
+                    )}
+                </TabsContent>
+
+                {/* EMD/Tender Fees */}
+                <TabsContent value="emd-fees">
+                    {paymentRequestsLoading ? (
+                        <EmdTenderFeeShow paymentRequests={null} isLoading />
+                    ) : paymentRequests && paymentRequests.length > 0 ? (
+                        <EmdTenderFeeShow
+                            paymentRequests={paymentRequests}
+                            tender={tender ?? null}
+                            onEdit={() => navigate(paths.tendering.emdsTenderFeesEdit(tenderId!))}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No payment requests available for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.emdsTenderFeesCreate(tenderId!))}>
+                                    Create Payment Request
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Document Checklist */}
+                <TabsContent value="checklist">
+                    {checklistLoading ? (
+                        <DocumentChecklistView checklist={null} isLoading />
+                    ) : checklist ? (
+                        <DocumentChecklistView
+                            checklist={checklist}
+                            onEdit={() => navigate(paths.tendering.documentChecklistEdit(tenderId!))}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No document checklist exists for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.documentChecklistCreate(tenderId!))}>
+                                    Create Checklist
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Costing Sheet */}
+                <TabsContent value="costing">
+                    {costingSheetLoading ? (
+                        <CostingSheetShow costingSheet={null} isLoading />
+                    ) : costingSheet ? (
+                        <CostingSheetShow
+                            costingSheet={costingSheet}
+                            onEdit={() => navigate(paths.tendering.costingSheetEdit(tenderId!))}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No costing sheet exists for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.costingSheetSubmit(tenderId!))}>
+                                    Submit Costing Sheet
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Bid Submission */}
+                <TabsContent value="bid">
+                    {bidSubmissionLoading ? (
+                        <BidSubmissionView bidSubmission={null} isLoading />
+                    ) : bidSubmission ? (
+                        <BidSubmissionView
+                            bidSubmission={bidSubmission}
+                            onEdit={() => {
+                                if (bidSubmission.status === 'Tender Missed') {
+                                    navigate(paths.tendering.bidEditMissed(bidSubmission.id));
+                                } else {
+                                    navigate(paths.tendering.bidEdit(bidSubmission.id));
+                                }
+                            }}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No bid submission exists for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.bidSubmit(tenderId!))}>
+                                    Submit Bid
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Result */}
+                <TabsContent value="result">
+                    {resultLoading ? (
+                        <TenderResultShow result={{} as ResultDashboardRow} isLoading />
+                    ) : tenderResult ? (
+                        <TenderResultShow
+                            result={tenderResult as any}
+                            onEdit={() => {
+                                // Result edit needs result ID, which we'd need to get from tenderResult
+                                if ((tenderResult as any)?.id) {
+                                    navigate(paths.tendering.resultsEdit((tenderResult as any).id));
+                                }
+                            }}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No result available for this tender yet.
+                                <Button className="mt-4" onClick={() => navigate(paths.tendering.resultsUpload(tenderId!))}>
+                                    Upload Result
                                 </Button>
                             </AlertDescription>
                         </Alert>

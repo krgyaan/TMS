@@ -80,6 +80,15 @@ export const useTenderResult = (id: number) => {
     });
 };
 
+// Fetch result by tender ID
+export const useTenderResultByTenderId = (tenderId: number | null) => {
+    return useQuery<ResultDashboardRow>({
+        queryKey: [RESULT_QUERY_KEY, 'by-tender', tenderId],
+        queryFn: () => tenderResultService.getByTenderId(tenderId!),
+        enabled: !!tenderId,
+    });
+};
+
 // Upload result mutation (for non-RA tenders)
 export const useUploadResult = () => {
     const queryClient = useQueryClient();

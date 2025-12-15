@@ -2,6 +2,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import type { TenderInfoWithNames } from "@/types/api.types";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -130,288 +131,393 @@ export const EmdTenderFeeShow = ({
                     )}
                 </CardAction>
             </CardHeader>
-            <CardContent className="space-y-8">
-                {tender && (
-                    <div className="rounded-lg border p-4">
-                        <p className="text-sm text-muted-foreground uppercase tracking-wide">Tender Summary</p>
-                        <p className="text-base font-semibold mt-1">{tender.tenderName}</p>
-                        <p className="text-sm text-muted-foreground">
-                            Tender No: {tender.tenderNo} • Organization: {tender.organizationName ?? "—"}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Due Date: {tender.dueDate ? formatDateTime(tender.dueDate) : "—"}
-                        </p>
-                    </div>
-                )}
-
-                {/* EMD Section */}
-                {emdRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">EMD Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(emdRequest.status)}>
-                                {emdRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(emdRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(emdRequest.dueDate)}</p>
-                            </div>
-                            {emdRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(emdRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {emdRequest.instruments && emdRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {emdRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.payableAt && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Payable At</p>
-                                                    <p>{formatValue(instrument.payableAt)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.issueDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Issue Date</p>
-                                                    <p>{formatDate(instrument.issueDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.expiryDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Expiry Date</p>
-                                                    <p>{formatDate(instrument.expiryDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.claimExpiryDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Claim Expiry Date</p>
-                                                    <p>{formatDate(instrument.claimExpiryDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.courierAddress && (
-                                                <div className="md:col-span-2">
-                                                    <p className="text-xs text-muted-foreground">Courier Address</p>
-                                                    <p>{formatValue(instrument.courierAddress)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* Tender Summary */}
+                        {tender && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Tender Summary
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Tender Name
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold" colSpan={3}>
+                                        {tender.tenderName}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Tender No
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {tender.tenderNo}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Organization
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {tender.organizationName ?? "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {tender.dueDate ? formatDateTime(tender.dueDate) : "—"}
+                                    </TableCell>
+                                </TableRow>
+                            </>
                         )}
-                    </section>
-                )}
 
-                {/* Tender Fee Section */}
-                {tenderFeeRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">Tender Fee Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status)}>
-                                {tenderFeeRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(tenderFeeRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(tenderFeeRequest.dueDate)}</p>
-                            </div>
-                            {tenderFeeRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(tenderFeeRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {tenderFeeRequest.instruments && tenderFeeRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {tenderFeeRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.payableAt && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Payable At</p>
-                                                    <p>{formatValue(instrument.payableAt)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {/* Processing Fee Section */}
-                {processingFeeRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">Processing Fee Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(processingFeeRequest.status)}>
-                                {processingFeeRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(processingFeeRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(processingFeeRequest.dueDate)}</p>
-                            </div>
-                            {processingFeeRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(processingFeeRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {processingFeeRequest.instruments && processingFeeRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {processingFeeRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {/* Timeline/Status History Section */}
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Status Timeline</h3>
-                    <div className="space-y-2">
-                        {paymentRequests.map((request, idx) => (
-                            <div key={request.id || idx} className="flex items-center gap-4 text-sm">
-                                <Badge variant={getStatusBadgeVariant(request.status)}>
-                                    {request.purpose}
-                                </Badge>
-                                <span className="text-muted-foreground">→</span>
-                                <Badge variant={getStatusBadgeVariant(request.status)}>
-                                    {request.status}
-                                </Badge>
-                                {request.dueDate && (
-                                    <>
-                                        <span className="text-muted-foreground">•</span>
-                                        <span className="text-muted-foreground">
-                                            Due: {formatDate(request.dueDate)}
-                                        </span>
-                                    </>
+                        {/* EMD Section */}
+                        {emdRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        EMD Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>
+                                            {emdRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatCurrency(emdRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDate(emdRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2}>
+                                        {/* Empty */}
+                                    </TableCell>
+                                </TableRow>
+                                {emdRequest.remarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatValue(emdRequest.remarks)}
+                                        </TableCell>
+                                    </TableRow>
                                 )}
-                            </div>
+                            </>
+                        )}
+
+                        {/* Tender Fee Section */}
+                        {tenderFeeRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Tender Fee Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>
+                                            {tenderFeeRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatCurrency(tenderFeeRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDate(tenderFeeRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2}>
+                                        {/* Empty */}
+                                    </TableCell>
+                                </TableRow>
+                                {tenderFeeRequest.remarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatValue(tenderFeeRequest.remarks)}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+
+                        {/* Processing Fee Section */}
+                        {processingFeeRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Processing Fee Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>
+                                            {processingFeeRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatCurrency(processingFeeRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDate(processingFeeRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2}>
+                                        {/* Empty */}
+                                    </TableCell>
+                                </TableRow>
+                                {processingFeeRequest.remarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatValue(processingFeeRequest.remarks)}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+
+                        {/* Timeline/Status History Section */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Status Timeline
+                            </TableCell>
+                        </TableRow>
+                        {paymentRequests.map((request, idx) => (
+                            <TableRow key={request.id || idx} className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    {request.purpose}
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant={getStatusBadgeVariant(request.status) as any}>
+                                        {request.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Due Date
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {request.dueDate ? formatDate(request.dueDate) : '—'}
+                                </TableCell>
+                            </TableRow>
                         ))}
+                    </TableBody>
+                </Table>
+
+                {/* Instrument Details - Displayed outside table for better readability */}
+                {(emdRequest?.instruments || tenderFeeRequest?.instruments || processingFeeRequest?.instruments) && (
+                    <div className="mt-8 space-y-6">
+                        {emdRequest?.instruments && emdRequest.instruments.length > 0 && (
+                            <div>
+                                <h4 className="font-semibold text-base mb-4">EMD Instrument Details</h4>
+                                <div className="space-y-4">
+                                    {emdRequest.instruments.map((instrument, idx) => (
+                                        <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-sm">{instrument.instrumentType}</p>
+                                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
+                                                    {instrument.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Amount</p>
+                                                    <p>{formatCurrency(instrument.amount)}</p>
+                                                </div>
+                                                {instrument.favouring && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Favouring</p>
+                                                        <p>{formatValue(instrument.favouring)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.payableAt && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Payable At</p>
+                                                        <p>{formatValue(instrument.payableAt)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.issueDate && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Issue Date</p>
+                                                        <p>{formatDate(instrument.issueDate)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.expiryDate && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Expiry Date</p>
+                                                        <p>{formatDate(instrument.expiryDate)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.claimExpiryDate && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Claim Expiry Date</p>
+                                                        <p>{formatDate(instrument.claimExpiryDate)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.courierAddress && (
+                                                    <div className="md:col-span-2">
+                                                        <p className="text-xs text-muted-foreground">Courier Address</p>
+                                                        <p>{formatValue(instrument.courierAddress)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.details && (
+                                                    <div className="md:col-span-2 space-y-2">
+                                                        {Object.entries(instrument.details).map(([key, value]) => (
+                                                            value && (
+                                                                <div key={key}>
+                                                                    <p className="text-xs text-muted-foreground capitalize">
+                                                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                                    </p>
+                                                                    <p className="text-sm">{String(value)}</p>
+                                                                </div>
+                                                            )
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {tenderFeeRequest?.instruments && tenderFeeRequest.instruments.length > 0 && (
+                            <div>
+                                <h4 className="font-semibold text-base mb-4">Tender Fee Instrument Details</h4>
+                                <div className="space-y-4">
+                                    {tenderFeeRequest.instruments.map((instrument, idx) => (
+                                        <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-sm">{instrument.instrumentType}</p>
+                                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
+                                                    {instrument.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Amount</p>
+                                                    <p>{formatCurrency(instrument.amount)}</p>
+                                                </div>
+                                                {instrument.favouring && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Favouring</p>
+                                                        <p>{formatValue(instrument.favouring)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.payableAt && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Payable At</p>
+                                                        <p>{formatValue(instrument.payableAt)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.details && (
+                                                    <div className="md:col-span-2 space-y-2">
+                                                        {Object.entries(instrument.details).map(([key, value]) => (
+                                                            value && (
+                                                                <div key={key}>
+                                                                    <p className="text-xs text-muted-foreground capitalize">
+                                                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                                    </p>
+                                                                    <p className="text-sm">{String(value)}</p>
+                                                                </div>
+                                                            )
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {processingFeeRequest?.instruments && processingFeeRequest.instruments.length > 0 && (
+                            <div>
+                                <h4 className="font-semibold text-base mb-4">Processing Fee Instrument Details</h4>
+                                <div className="space-y-4">
+                                    {processingFeeRequest.instruments.map((instrument, idx) => (
+                                        <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-sm">{instrument.instrumentType}</p>
+                                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
+                                                    {instrument.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Amount</p>
+                                                    <p>{formatCurrency(instrument.amount)}</p>
+                                                </div>
+                                                {instrument.favouring && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Favouring</p>
+                                                        <p>{formatValue(instrument.favouring)}</p>
+                                                    </div>
+                                                )}
+                                                {instrument.details && (
+                                                    <div className="md:col-span-2 space-y-2">
+                                                        {Object.entries(instrument.details).map(([key, value]) => (
+                                                            value && (
+                                                                <div key={key}>
+                                                                    <p className="text-xs text-muted-foreground capitalize">
+                                                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                                    </p>
+                                                                    <p className="text-sm">{String(value)}</p>
+                                                                </div>
+                                                            )
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </section>
+                )}
             </CardContent>
         </Card>
     );
