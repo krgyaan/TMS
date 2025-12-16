@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderQuery, TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto, PaginatedResult } from '@/types/api.types';
+import type { TenderQuery, TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto, PaginatedResult, TqManagementDashboardCounts } from '@/types/api.types';
 
 export type TqManagementFilters = {
     tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
@@ -59,6 +59,11 @@ export const tqManagementService = {
 
     updateTqReceived: async (id: number, data: CreateTqReceivedDto): Promise<TenderQuery> => {
         const response = await axiosInstance.patch<TenderQuery>(`/tq-management/${id}/received`, data);
+        return response.data;
+    },
+
+    getDashboardCounts: async (): Promise<TqManagementDashboardCounts> => {
+        const response = await axiosInstance.get<TqManagementDashboardCounts>('/tq-management/counts');
         return response.data;
     },
 };

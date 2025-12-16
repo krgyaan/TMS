@@ -3,6 +3,18 @@ import { EmdTenderFeeShow } from "./components/EmdTenderFeeShow";
 import { usePaymentRequestsByTender } from "@/hooks/api/useEmds";
 import { useTender } from "@/hooks/api/useTenders";
 import { paths } from "@/app/routes/paths";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TenderView } from "../tenders/components/TenderView";
+import { InfoSheetView } from "../info-sheet/components/InfoSheetView";
+import { TenderApprovalView } from "../tender-approval/components/TenderApprovalView";
+import type { TenderWithRelations } from "@/types/api.types";
+import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
+import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
+import { PhysicalDocsView } from "../physical-docs/components/PhysicalDocsView";
 
 export default function EmdShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -11,30 +23,129 @@ export default function EmdShowPage() {
     if (!id) {
         return <div>Invalid tender ID</div>;
     }
+    const parsedId = id ? Number(id) : NaN;
+    const tenderId = Number.isNaN(parsedId) ? null : parsedId;
 
-    const tenderId = Number(id);
     const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
-    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
 
-    const isLoading = requestsLoading || tenderLoading;
 
-    const handleEdit = () => {
-        navigate(paths.tendering.emdsTenderFeesEdit(tenderId));
-    };
+    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
 
-    const handleBack = () => {
-        navigate(paths.tendering.emdsTenderFees);
+    const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading;
+
+    // Determine which tabs have data
+    const hasInfoSheet = !infoSheetLoading && !!infoSheet;
+
+    if (!tenderId || tenderError || (!tenderLoading && !tender) || (!approvalLoading && !approval) || (!infoSheetLoading && !infoSheet) || (!physicalDocLoading && !physicalDoc) || (!requestsLoading && !paymentRequests)) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                    Tender not found or failed to load.
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-4"
+                        onClick={() => navigate(paths.tendering.emdsTenderFees)}
+                    >
+                        Back to List
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    // Combine tender and approval into TenderWithRelations
+    const tenderWithRelations: TenderWithRelations = {
+        ...tender!,
+        approval: approval || null,
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <EmdTenderFeeShow
-                paymentRequests={paymentRequests || null}
-                tender={tender || null}
-                isLoading={isLoading}
-                onEdit={handleEdit}
-                onBack={handleBack}
-            />
+        <div className="space-y-6">
+            <Tabs defaultValue="emds-tenderfees" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-5 gap-2">
+                    <TabsTrigger value="tender">Tender</TabsTrigger>
+                    <TabsTrigger value="info-sheet" disabled={!hasInfoSheet && !infoSheetLoading}>
+                        Info Sheet
+                    </TabsTrigger>
+                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
+                </TabsList>
+
+                {/* Tender */}
+                <TabsContent value="tender">
+                    <TenderView
+                        tender={tenderWithRelations}
+                        isLoading={isLoading}
+                        showEditButton
+                        showBackButton
+                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
+                        onBack={() => navigate(paths.tendering.tenderApproval)}
+                    />
+                </TabsContent>
+
+                {/* Info Sheet */}
+                <TabsContent value="info-sheet">
+                    {infoSheetLoading ? (
+                        <InfoSheetView isLoading />
+                    ) : infoSheet ? (
+                        <InfoSheetView
+                            infoSheet={infoSheet}
+                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                No info sheet exists for this tender yet.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </TabsContent>
+
+                {/* Tender Approval */}
+                <TabsContent value="approval">
+                    <TenderApprovalView
+                        tender={tenderWithRelations}
+                        isLoading={isLoading}
+                        showEditButton
+                        showBackButton
+                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
+                        onBack={() => navigate(paths.tendering.tenderApproval)}
+                    />
+                </TabsContent>
+
+                {/* Physical Docs */}
+                <TabsContent value="physical-docs">
+                    {physicalDocLoading ? (
+                        <PhysicalDocsView isLoading={true} physicalDoc={null} />
+                    ) : physicalDoc ? (
+                        <PhysicalDocsView
+                            physicalDoc={physicalDoc}
+                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
+                            onBack={() => navigate(paths.tendering.physicalDocs)}
+                        />
+                    ) : (
+                        <PhysicalDocsView isLoading={false} physicalDoc={null} />
+                    )}
+                </TabsContent>
+
+                {/* EMD & Tender Fees */}
+                <TabsContent value="emds-tenderfees">
+                    <EmdTenderFeeShow
+                        paymentRequests={paymentRequests || null}
+                        tender={tender || null}
+                        isLoading={isLoading}
+                        onEdit={() => navigate(paths.tendering.emdsTenderFeesEdit(tenderId!))}
+                        onBack={() => navigate(paths.tendering.emdsTenderFees)}
+                    />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

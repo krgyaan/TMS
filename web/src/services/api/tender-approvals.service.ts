@@ -5,6 +5,7 @@ import type {
     TenderApprovalRow,
     PaginatedResult,
     TenderApprovalFilters,
+    TenderApprovalDashboardCounts,
 } from '@/types/api.types';
 
 class TenderApprovalsService extends BaseApiService {
@@ -39,6 +40,10 @@ class TenderApprovalsService extends BaseApiService {
 
     async update(tenderId: number, data: SaveTenderApprovalDto): Promise<TenderApproval> {
         return this.put<TenderApproval>(`/${tenderId}/approval`, data);
+    }
+
+    async getDashboardCounts(): Promise<TenderApprovalDashboardCounts> {
+        return this.get<TenderApprovalDashboardCounts>('/counts');
     }
 }
 

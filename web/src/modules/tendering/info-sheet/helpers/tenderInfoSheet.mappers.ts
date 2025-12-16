@@ -13,6 +13,25 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
+    if (!val || !Array.isArray(val)) return [];
+    return val.map(item => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+            // Try to extract id, value, or first string/number property
+            if ('id' in item && item.id != null) return String(item.id);
+            if ('value' in item && item.value != null) return String(item.value);
+            // Fallback: try to find first string/number property
+            for (const [key, value] of Object.entries(item)) {
+                if (typeof value === 'string' || typeof value === 'number') {
+                    return String(value);
+                }
+            }
+        }
+        return String(item);
+    });
+};
+
 // Default form values
 export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderInfoSheetFormValues => ({
     teRecommendation: 'YES',
@@ -158,8 +177,8 @@ export const mapResponseToForm = (
         orderValue3: toNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
-        technicalWorkOrders: data.technicalWorkOrders ?? [],
-        commercialDocuments: data.commercialDocuments ?? [],
+        technicalWorkOrders: toStringArray(data.technicalWorkOrders),
+        commercialDocuments: toStringArray(data.commercialDocuments),
 
         avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
         avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
@@ -262,8 +281,8 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             ? (values.customEligibilityCriteria || null)
             : null,
 
-        technicalWorkOrders: values.technicalWorkOrders?.length ? values.technicalWorkOrders : null,
-        commercialDocuments: values.commercialDocuments?.length ? values.commercialDocuments : null,
+        technicalWorkOrders: values.technicalWorkOrders?.length ? toStringArray(values.technicalWorkOrders) : null,
+        commercialDocuments: values.commercialDocuments?.length ? toStringArray(values.commercialDocuments) : null,
 
         avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null,
         avgAnnualTurnoverValue: values.avgAnnualTurnoverCriteria === 'AMOUNT'

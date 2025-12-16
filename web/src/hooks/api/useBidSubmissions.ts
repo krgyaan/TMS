@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bidSubmissionsService, type BidSubmissionDashboardRow, type BidSubmissionListParams } from '@/services/api/bid-submissions.service';
 import { toast } from 'sonner';
-import type { PaginatedResult } from '@/types/api.types';
+import type { PaginatedResult, BidSubmissionDashboardCounts } from '@/types/api.types';
 
 export const bidSubmissionsKey = {
     all: ['bid-submissions'] as const,
@@ -9,6 +9,7 @@ export const bidSubmissionsKey = {
     detail: (id: number) => [...bidSubmissionsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...bidSubmissionsKey.all, 'byTender', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...bidSubmissionsKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...bidSubmissionsKey.all, 'dashboard-counts'] as const,
 };
 
 export const useBidSubmissions = (
@@ -107,6 +108,14 @@ export const useUpdateBidSubmission = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to update bid submission');
         },
+    });
+};
+
+export const useBidSubmissionsDashboardCounts = () => {
+    return useQuery<BidSubmissionDashboardCounts>({
+        queryKey: bidSubmissionsKey.dashboardCounts(),
+        queryFn: () => bidSubmissionsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };
 

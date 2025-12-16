@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tqManagementService, type TqManagementDashboardRow } from '@/services/api/tq-management.service';
 import { toast } from 'sonner';
+import type { TqManagementDashboardCounts } from '@/types/api.types';
 
 export const tqManagementKey = {
     all: ['tq-management'] as const,
@@ -8,6 +9,7 @@ export const tqManagementKey = {
     detail: (id: number) => [...tqManagementKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...tqManagementKey.all, 'byTender', tenderId] as const,
     items: (id: number) => [...tqManagementKey.all, 'items', id] as const,
+    dashboardCounts: () => [...tqManagementKey.all, 'dashboard-counts'] as const,
 };
 
 export type TqManagementFilters = {
@@ -124,6 +126,14 @@ export const useUpdateTqReceived = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to update TQ');
         },
+    });
+};
+
+export const useTqManagementDashboardCounts = () => {
+    return useQuery<TqManagementDashboardCounts>({
+        queryKey: tqManagementKey.dashboardCounts(),
+        queryFn: () => tqManagementService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };
 

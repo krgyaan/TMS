@@ -1113,6 +1113,7 @@ export interface ResultDashboardCounts {
     pending: number;
     won: number;
     lost: number;
+    disqualified: number;
     total: number;
 }
 
@@ -1261,15 +1262,53 @@ export interface EmdDashboardCounts {
     total: number;
 }
 
-export interface EmdDashboardResponse {
-    data: EmdDashboardRow[];
-    counts: EmdDashboardCounts;
-    meta?: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
+export interface BidSubmissionDashboardCounts {
+    pending: number;
+    submitted: number;
+    missed: number;
+    total: number;
+}
+
+export interface CostingApprovalDashboardCounts {
+    pending: number;
+    approved: number;
+    rejected: number;
+    total: number;
+}
+
+export interface TenderApprovalDashboardCounts {
+    pending: number;
+    approved: number;
+    rejected: number;
+    incomplete: number;
+    total: number;
+}
+
+export interface TqManagementDashboardCounts {
+    awaited: number;
+    received: number;
+    replied: number;
+    missed: number;
+    noTq: number;
+    total: number;
+}
+
+export interface PhysicalDocsDashboardCounts {
+    pending: number;
+    sent: number;
+    total: number;
+}
+
+export interface DocumentChecklistsDashboardCounts {
+    pending: number;
+    submitted: number;
+    total: number;
+}
+export interface CostingSheetDashboardCounts {
+    pending: number;
+    submitted: number;
+    rejected: number;
+    total: number;
 }
 
 export type CreatePaymentRequestDto = {
@@ -1365,3 +1404,73 @@ export interface UpdateRfqDto {
         qty?: number;
     }>;
 }
+
+// Add to existing types file
+
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string | null;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    amountRequired: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    instrumentId: number | null;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    displayStatus: string;
+    createdAt: string | null;
+}
+
+export interface EmdDashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type EmdDashboardResponse = PendingTabResponse | RequestTabResponse;

@@ -22,7 +22,7 @@ const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/RfqEditP
 const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/show'));
 const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdListPage'));
 const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
-const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/edit'));
+const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdEditPage'));
 const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdShowPage'));
 const Tendering_DocumentChecklist = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistListPage'));
 const Tendering_DocumentChecklist_Create = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistCreatePage'));

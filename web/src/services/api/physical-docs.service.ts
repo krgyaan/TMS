@@ -6,6 +6,7 @@ import type {
     UpdatePhysicalDocsDto,
     PaginatedResult,
     PhysicalDocsListParams,
+    PhysicalDocsDashboardCounts,
 } from '@/types/api.types';
 
 class PhysicalDocsService extends BaseApiService {
@@ -56,6 +57,10 @@ class PhysicalDocsService extends BaseApiService {
 
     async remove(id: number): Promise<void> {
         return this.delete<void>(`/${id}`);
+    }
+
+    async getDashboardCounts(): Promise<PhysicalDocsDashboardCounts> {
+        return this.get<PhysicalDocsDashboardCounts>('/counts');
     }
 }
 

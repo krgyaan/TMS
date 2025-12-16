@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderDocumentChecklistDashboardRow, PaginatedResult } from '@/types/api.types';
+import type { DocumentChecklistsDashboardCounts, TenderDocumentChecklistDashboardRow, PaginatedResult } from '@/types/api.types';
 
 export type ExtraDocument = {
     name: string;
@@ -54,6 +54,10 @@ export const documentChecklistService = {
         return response.data;
     },
 
+    getDashboardCounts: async (): Promise<DocumentChecklistsDashboardCounts> => {
+        const response = await axiosInstance.get<DocumentChecklistsDashboardCounts>('/document-checklists/counts');
+        return response.data;
+    },
 
     getByTenderId: async (tenderId: number): Promise<TenderDocumentChecklist | null> => {
         const response = await axiosInstance.get<TenderDocumentChecklist>(

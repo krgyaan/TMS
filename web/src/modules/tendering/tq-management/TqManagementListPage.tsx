@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useTqManagement, useMarkAsNoTq } from '@/hooks/api/useTqManagement';
+import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts } from '@/hooks/api/useTqManagement';
 import type { TqManagementDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
@@ -59,6 +59,8 @@ const TqManagementListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
     });
+
+    const { data: counts } = useTqManagementDashboardCounts();
 
     const tqManagementData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -174,30 +176,30 @@ const TqManagementListPage = () => {
             {
                 key: 'awaited' as TabKey,
                 name: 'TQ Awaited',
-                count: activeTab === 'awaited' ? totalRows : 0,
+                count: counts?.awaited ?? 0,
             },
             {
                 key: 'received' as TabKey,
                 name: 'TQ Received',
-                count: activeTab === 'received' ? totalRows : 0,
+                count: counts?.received ?? 0,
             },
             {
                 key: 'replied' as TabKey,
                 name: 'TQ Replied',
-                count: activeTab === 'replied' ? totalRows : 0,
+                count: counts?.replied ?? 0,
             },
             {
                 key: 'missed' as TabKey,
                 name: 'TQ Missed',
-                count: activeTab === 'missed' ? totalRows : 0,
+                count: counts?.missed ?? 0,
             },
             {
                 key: 'noTq' as TabKey,
                 name: 'No TQ',
-                count: activeTab === 'noTq' ? totalRows : 0,
+                count: counts?.noTq ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<TqManagementDashboardRow>[]>(() => [
         tenderNameCol<TqManagementDashboardRow>('tenderNo', {
@@ -342,9 +344,11 @@ const TqManagementListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>

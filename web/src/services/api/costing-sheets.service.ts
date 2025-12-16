@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, PaginatedResult } from '@/types/api.types';
+import type { TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, PaginatedResult, CostingSheetDashboardCounts } from '@/types/api.types';
 
 export type CostingSheetListParams = {
     costingStatus?: 'pending' | 'submitted' | 'rejected';
@@ -52,6 +52,11 @@ export const costingSheetsService = {
 
     update: async (id: number, data: UpdateCostingSheetDto): Promise<TenderCostingSheet> => {
         const response = await axiosInstance.patch<TenderCostingSheet>(`/costing-sheets/${id}`, data);
+        return response.data;
+    },
+
+    getDashboardCounts: async (): Promise<CostingSheetDashboardCounts> => {
+        const response = await axiosInstance.get<CostingSheetDashboardCounts>('/costing-sheets/counts');
         return response.data;
     },
 };

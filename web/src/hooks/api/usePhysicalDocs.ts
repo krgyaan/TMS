@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams } from '@/types/api.types'
+import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams, PhysicalDocsDashboardCounts } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
@@ -11,6 +11,7 @@ export const physicalDocsKey = {
     details: () => [...physicalDocsKey.all, 'detail'] as const,
     detail: (id: number) => [...physicalDocsKey.details(), id] as const,
     byTender: (tenderId: number) => [...physicalDocsKey.all, "by-tender", tenderId] as const,
+    dashboardCounts: () => [...physicalDocsKey.all, 'dashboard-counts'] as const,
 };
 
 export const usePhysicalDocs = (
@@ -98,5 +99,13 @@ export const useUpdatePhysicalDoc = () => {
         onError: error => {
             toast.error(handleQueryError(error));
         },
+    });
+};
+
+export const usePhysicalDocsDashboardCounts = () => {
+    return useQuery<PhysicalDocsDashboardCounts>({
+        queryKey: physicalDocsKey.dashboardCounts(),
+        queryFn: () => physicalDocsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };

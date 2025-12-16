@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService, type CostingSheetListParams } from '@/services/api/costing-sheets.service';
-import type { CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
+import type { CostingSheetDashboardRow, PaginatedResult, CostingSheetDashboardCounts } from '@/types/api.types';
 import { toast } from 'sonner';
 
 export const costingSheetsKey = {
@@ -9,6 +9,7 @@ export const costingSheetsKey = {
     detail: (id: number) => [...costingSheetsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...costingSheetsKey.all, 'byTender', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...costingSheetsKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...costingSheetsKey.all, 'dashboard-counts'] as const,
 };
 
 export const useCostingSheets = (
@@ -86,6 +87,14 @@ export const useUpdateCostingSheet = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to update costing sheet');
         },
+    });
+};
+
+export const useCostingSheetsDashboardCounts = () => {
+    return useQuery<CostingSheetDashboardCounts>({
+        queryKey: costingSheetsKey.dashboardCounts(),
+        queryFn: () => costingSheetsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };
 

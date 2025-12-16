@@ -192,6 +192,21 @@ export class PhysicalDocsService {
         };
     }
 
+    async getDashboardCounts(): Promise<{ pending: number; sent: number; total: number }> {
+        const [pendingCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(physicalDocs)
+            .where(isNull(physicalDocs.id));
+        const pending = Number(pendingCountResult?.count || 0);
+        const [sentCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(physicalDocs)
+            .where(isNotNull(physicalDocs.id));
+        const sent = Number(sentCountResult?.count || 0);
+        const total = pending + sent;
+        return { pending, sent, total };
+    }
+
     async findById(id: number): Promise<PhysicalDocWithPersons | null> {
         const [physicalDoc] = await this.db
             .select()
@@ -288,10 +303,6 @@ export class PhysicalDocsService {
         };
     }
 
-    /**
-     * Get physical doc with tender details
-     * Uses shared tender service method
-     */
     async findByIdWithTender(id: number) {
         const physicalDoc = await this.findById(id);
         if (!physicalDoc) {
@@ -501,4 +512,5 @@ export class PhysicalDocsService {
             throw new NotFoundException(`Physical doc with ID ${id} not found`);
         }
     }
+
 }

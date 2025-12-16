@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { usePhysicalDocs } from '@/hooks/api/usePhysicalDocs';
+import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 
 const PhysicalDocsListPage = () => {
@@ -43,6 +43,8 @@ const PhysicalDocsListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = usePhysicalDocsDashboardCounts();
+
     const tabsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
@@ -66,15 +68,15 @@ const PhysicalDocsListPage = () => {
             {
                 key: 'pending' as const,
                 name: 'Pending',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'sent' as const,
                 name: 'Sent',
-                count: activeTab === 'sent' ? totalRows : 0,
+                count: counts?.sent ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<PhysicalDocsDashboardRow>[]>(() => [
         tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
@@ -207,9 +209,11 @@ const PhysicalDocsListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>

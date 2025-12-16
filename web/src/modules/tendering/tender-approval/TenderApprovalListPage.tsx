@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useTenderApprovals } from '@/hooks/api/useTenderApprovals';
+import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/api/useTenderApprovals';
 import type { TenderApprovalRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -46,6 +46,8 @@ const TenderApprovalListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = useTenderApprovalsDashboardCounts();
+
     const approvalData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
@@ -77,12 +79,31 @@ const TenderApprovalListPage = () => {
     ];
 
     const tabsConfig = useMemo(() => {
-        return Object.entries(TABS_NAMES).map(([key, name]) => ({
-            key: key as '0' | '1' | '2' | '3',
-            name,
-            count: activeTab === key ? totalRows : 0,
-        }));
-    }, [apiResponse, activeTab, totalRows]);
+        return Object.entries(TABS_NAMES).map(([key, name]) => {
+            let count = 0;
+            if (counts) {
+                switch (key) {
+                    case '0':
+                        count = counts.pending ?? 0;
+                        break;
+                    case '1':
+                        count = counts.approved ?? 0;
+                        break;
+                    case '2':
+                        count = counts.rejected ?? 0;
+                        break;
+                    case '3':
+                        count = counts.incomplete ?? 0;
+                        break;
+                }
+            }
+            return {
+                key: key as '0' | '1' | '2' | '3',
+                name,
+                count,
+            };
+        });
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
         tenderNameCol<TenderApprovalRow>('tenderNo', {
@@ -262,9 +283,11 @@ const TenderApprovalListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>

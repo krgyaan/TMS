@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { TenderCostingSheet, PaginatedResult } from '@/types/api.types';
+import type { TenderCostingSheet, PaginatedResult, CostingApprovalDashboardCounts } from '@/types/api.types';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -92,6 +92,11 @@ export const costingApprovalsService = {
             `/costing-approvals/${id}`,
             data
         );
+        return response.data;
+    },
+
+    getDashboardCounts: async (): Promise<CostingApprovalDashboardCounts> => {
+        const response = await axiosInstance.get<CostingApprovalDashboardCounts>('/costing-approvals/counts');
         return response.data;
     },
 };

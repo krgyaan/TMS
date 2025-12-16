@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useResultDashboard } from '@/hooks/api/useTenderResults';
+import { useResultDashboard, useResultDashboardCounts } from '@/hooks/api/useTenderResults';
 import type { ResultDashboardRow, ResultDashboardType } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
@@ -110,6 +110,8 @@ const TenderResultListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
 
     );
+
+    const { data: counts } = useResultDashboardCounts();
 
     const resultData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -302,11 +304,30 @@ const TenderResultListPage = () => {
     );
 
     const tabsWithData = useMemo(() => {
-        return TABS_CONFIG.map((tab) => ({
-            ...tab,
-            count: activeTab === tab.key ? totalRows : 0,
-        }));
-    }, [activeTab, totalRows, TABS_CONFIG]);
+        return TABS_CONFIG.map((tab) => {
+            let count = 0;
+            if (counts) {
+                switch (tab.key) {
+                    case 'pending':
+                        count = counts.pending ?? 0;
+                        break;
+                    case 'won':
+                        count = counts.won ?? 0;
+                        break;
+                    case 'lost':
+                        count = counts.lost ?? 0;
+                        break;
+                    case 'disqualified':
+                        count = counts.disqualified ?? 0;
+                        break;
+                }
+            }
+            return {
+                ...tab,
+                count,
+            };
+        });
+    }, [counts]);
 
     if (isLoading) {
         return (
@@ -374,9 +395,11 @@ const TenderResultListPage = () => {
                                 >
                                     {tab.icon}
                                     <span className="font-semibold text-sm">{tab.name}</span>
-                                    <Badge variant="secondary" className="text-xs ml-1">
-                                        {tab.count}
-                                    </Badge>
+                                    {tab.count > 0 && (
+                                        <Badge variant="secondary" className="text-xs ml-1">
+                                            {tab.count}
+                                        </Badge>
+                                    )}
                                 </TabsTrigger>
                             ))}
                         </TabsList>

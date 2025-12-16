@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { BidSubmission, PaginatedResult } from '@/types/api.types';
+import type { BidSubmission, PaginatedResult, BidSubmissionDashboardCounts } from '@/types/api.types';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -100,6 +100,11 @@ export const bidSubmissionsService = {
 
     update: async (id: number, data: UpdateBidSubmissionDto): Promise<BidSubmission> => {
         const response = await axiosInstance.patch<BidSubmission>(`/bid-submissions/${id}`, data);
+        return response.data;
+    },
+
+    getDashboardCounts: async (): Promise<BidSubmissionDashboardCounts> => {
+        const response = await axiosInstance.get<BidSubmissionDashboardCounts>('/bid-submissions/counts');
         return response.data;
     },
 };

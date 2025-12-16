@@ -13,7 +13,7 @@ import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink } fr
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useCostingApprovals, type CostingApprovalDashboardRow } from '@/hooks/api/useCostingApprovals';
+import { useCostingApprovals, useCostingApprovalsDashboardCounts, type CostingApprovalDashboardRow } from '@/hooks/api/useCostingApprovals';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'pending' | 'approved' | 'rejected';
@@ -44,6 +44,8 @@ const CostingApprovalListPage = () => {
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
+
+    const { data: counts } = useCostingApprovalsDashboardCounts();
 
     const costingApprovalsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -87,20 +89,20 @@ const CostingApprovalListPage = () => {
             {
                 key: 'pending' as TabKey,
                 name: 'Pending Approval',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'approved' as TabKey,
                 name: 'Approved',
-                count: activeTab === 'approved' ? totalRows : 0,
+                count: counts?.approved ?? 0,
             },
             {
                 key: 'rejected' as TabKey,
                 name: 'Rejected',
-                count: activeTab === 'rejected' ? totalRows : 0,
+                count: counts?.rejected ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingApprovalDashboardRow>[]>(() => [
         tenderNameCol<CostingApprovalDashboardRow>('tenderNo', {
@@ -296,9 +298,11 @@ const CostingApprovalListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>
