@@ -30,7 +30,7 @@ export class FollowUpService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
-    ) { }
+    ) {}
 
     // ========================
     // CREATE
@@ -196,21 +196,19 @@ export class FollowUpService {
     // FIND ONE
     // ========================
     async findOne(id: number): Promise<FollowUpDetailsDto> {
-        const result = await this.db
-            .select()
-            .from(followUps)
-            .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
-            .limit(1)
-            .then(rows => rows[0] ?? null);
+        const result = await this.db.query.followUps.findFirst({
+            where: and(eq(followUps.id, id), isNull(followUps.deletedAt)),
+            with: {
+                contacts: true, // ✅ THIS IS THE MISSING PIECE
+            },
+        });
 
         if (!result) {
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
 
-        // Normalize timestamps (timestamptz)
         const formatDateTime = (d?: Date | null) => (d ? d.toISOString() : null);
 
-        // Normalize DATE columns (Postgres date → YYYY-MM-DD)
         const formatDateOnly = (d?: string | Date | null) => {
             if (!d) return null;
             const dateObj = d instanceof Date ? d : new Date(d);
@@ -230,28 +228,24 @@ export class FollowUpService {
             assignedToId: result.assignedToId ?? null,
             details: result.details ?? null,
 
-            // assignment_status (varchar)
             status: result.assignmentStatus ?? "assigned",
 
-            // numeric smallint fields
             frequency: result.frequency ?? null,
             stopReason: result.stopReason ?? null,
 
-            // date fields
             startFrom: formatDateOnly(result.startFrom),
             nextFollowUpDate: formatDateOnly(result.nextFollowUpDate),
 
-            // stop info
             proofText: result.proofText ?? null,
             proofImagePath: result.proofImagePath ?? null,
             stopRemarks: result.stopRemarks ?? null,
 
-            // JSON fields (always arrays)
-            contacts: Array.isArray(result.contacts) ? result.contacts : [],
+            // ✅ CORRECT SOURCE
+            contacts: result.contacts ?? [],
+
             attachments: Array.isArray(result.attachments) ? result.attachments : [],
             followUpHistory: Array.isArray(result.followUpHistory) ? result.followUpHistory : [],
 
-            // audit timestamps
             createdAt: formatDateTime(result.createdAt),
             updatedAt: formatDateTime(result.updatedAt),
         };

@@ -25,21 +25,22 @@ import { ArrowLeft, Plus, Trash2, FileText, User, Calendar, Clock, Building, Dol
 import { useFollowUp, useUpdateFollowUp } from "./follow-up.hooks";
 import { toast } from "sonner";
 import { useUsers } from "@/hooks/api/useUsers";
+import { paths } from "@/app/routes/paths";
 
-const FREQUENCIES: Record<string, string> = {
-    daily: "Daily",
-    alternate: "Alternate Days",
-    weekly: "Weekly",
-    biweekly: "Biweekly",
-    monthly: "Monthly",
-    stopped: "Stop",
+export const FREQUENCY_LABELS: Record<number, string> = {
+    1: "Daily",
+    2: "Alternate Days",
+    3: "Weekly",
+    4: "Bi-Weekly",
+    5: "Monthly",
+    6: "Stopped",
 };
 
-const STOP_REASONS: Record<string, string> = {
-    party_angry: "The person is getting angry/or has requested to stop",
-    objective_achieved: "Followup Objective achieved",
-    not_reachable: "External Followup Initiated",
-    other: "Remarks",
+export const STOP_REASON_LABELS: Record<number, string> = {
+    1: "Party Angry / Not Interested",
+    2: "Objective Achieved",
+    3: "Not Reachable",
+    4: "Other",
 };
 
 const FollowUpEditPage: React.FC = () => {
@@ -55,13 +56,17 @@ const FollowUpEditPage: React.FC = () => {
     /* ✅ RHF SETUP */
     const form = useForm<UpdateFollowUpDto>({
         resolver: zodResolver(UpdateFollowUpSchema),
+        defaultValues: {
+            frequency: undefined,
+            stopReason: undefined,
+        },
     });
 
     /* ✅ NON-FORM UI STATE */
     const [persons, setPersons] = useState<Array<{ name: string; phone: string; email: string }>>([]);
     const [existingPersons, setExistingPersons] = useState<any[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
-    const [files, setFiles] = useState<File[]>([]); // kept as in original, even if only used in onDropFiles
+    const [files, setFiles] = useState<File[]>([]);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -86,7 +91,7 @@ const FollowUpEditPage: React.FC = () => {
         });
     }, [followup, form]);
 
-    /* ✅ PERSON HANDLERS (UNCHANGED UI) */
+    /* ✅ PERSON HANDLERS */
     const addPersonRow = () => setPersons(p => [...p, { name: "", phone: "", email: "" }]);
 
     const updatePersonRow = (idx: number, field: keyof (typeof persons)[number], value: string) => {
@@ -103,7 +108,7 @@ const FollowUpEditPage: React.FC = () => {
         setExistingPersons(prev => prev.filter(p => p.id !== personId));
     };
 
-    /* ✅ FILE UPLOAD (UNCHANGED UI, kept as in original) */
+    /* ✅ FILE UPLOAD */
     const onDropFiles = useCallback(
         (incoming: FileList | null) => {
             if (!incoming) return;
@@ -130,7 +135,7 @@ const FollowUpEditPage: React.FC = () => {
         setExistingAttachments(a => a.filter(x => x !== name));
     };
 
-    /* ✅ SUBMIT HANDLER — REAL API */
+    /* ✅ SUBMIT HANDLER */
     const onSubmit = () => {
         const values = form.getValues();
 
@@ -151,7 +156,7 @@ const FollowUpEditPage: React.FC = () => {
             {
                 onSuccess: () => {
                     toast.success("Followup updated successfully!");
-                    // navigate(-1);
+                    navigate(paths.shared.followUp);
                 },
                 onError: (err: any) => {
                     toast.error(err?.message || "Failed to update followup");
@@ -160,184 +165,142 @@ const FollowUpEditPage: React.FC = () => {
         );
     };
 
+    const frequency = form.watch("frequency");
+    const stopReason = form.watch("stopReason");
+
+    useEffect(() => {
+        if (frequency !== 6) {
+            form.setValue("stopReason", null);
+            form.setValue("proofText", null);
+            form.setValue("stopRemarks", null);
+        }
+    }, [frequency, form]);
+
     if (isLoading) return <div className="p-6">Loading...</div>;
     if (!followup) return <div className="p-6 text-red-500">Follow up details not found</div>;
 
-    const frequency = form.watch("frequency");
-    const stopReason = form.watch("stopReason");
-    console.log("EMPLOYEES:", employees);
-
     return (
-        <div className="min-h-screen bg-background py-8 px-4 md:px-6 lg:px-8">
-            <div className="max-w-6xl mx-auto">
+        <div className="min-h-screen bg-background p-4">
+            <div className="mx-auto">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-8">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(-1)}
-                        className="h-11 w-11 rounded-xl border border-border bg-card hover:bg-accent transition-all duration-200"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
+                <div className="flex items-center gap-3 mb-6">
+                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-10 w-10">
+                        <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex-1">
-                        <h1 className="text-xl font-bold text-foreground">Edit Followup</h1>
-                        <p className="text-sm text-muted-foreground mt-2">Update followup details and contact information</p>
+                        <h1 className="text-2xl font-semibold">Edit Followup</h1>
+                        <p className="text-muted-foreground">Update followup details and contact information</p>
                     </div>
-                    <Badge variant="secondary" className="px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
+                    <Badge variant="secondary" className="px-3 py-1">
                         ID: #{followup.id}
                     </Badge>
                 </div>
 
-                <Card className="shadow-lg border-border/50 backdrop-blur-sm bg-card/50 p-3 ">
-                    <CardHeader className=" border-b border-border">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-primary/10">
-                                <MessageSquare className="h-3 w-3 text-primary" />
-                            </div>
-                            <div>
-                                <CardTitle className="text-lg font-bold text-foreground">Followup Details</CardTitle>
-                                <CardDescription className="text-sm text-muted-foreground mt-1">Manage followups</CardDescription>
-                            </div>
-                        </div>
+                <Card className="shadow-sm">
+                    <CardHeader className="pb-3">
+                        <CardTitle>Followup Details</CardTitle>
+                        <CardDescription>Manage followup information</CardDescription>
                     </CardHeader>
 
-                    <CardContent className="space-y-8">
-                        <section className="space-y-3">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                    <Calendar className="h-3 w-3 text-primary" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Followup Information</h3>
-                            </div>
+                    <CardContent className="space-y-6">
+                        {/* Followup Information */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-medium flex items-center gap-2">
+                                <Building className="h-4 w-4" />
+                                Followup Information
+                            </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2">
-                                        <Building className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground">Area</Label>
-                                    </div>
-                                    <div className="p-2 rounded-lg border border-border bg-background/50 text-foreground font-medium text-sm">{followup.area}</div>
+                                <div className="space-y-2">
+                                    <Label>Area</Label>
+                                    <div className="p-2 border rounded-md bg-muted/50">{followup.area ?? "-"}</div>
                                 </div>
 
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2">
-                                        <Building className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground">Organization</Label>
-                                    </div>
-                                    <div className="p-2 rounded-lg border border-border bg-background/50 text-foreground font-medium text-sm">{followup.party_name}</div>
+                                <div className="space-y-2">
+                                    <Label>Organization</Label>
+                                    <div className="p-2 border rounded-md bg-muted/50">{followup?.partyName ?? "-"}</div>
                                 </div>
 
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2">
-                                        <DollarSign className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground">Amount</Label>
-                                    </div>
-                                    <div className="p-2 rounded-lg border border-border bg-background/50 text-foreground font-semibold text-primary font-sm">
-                                        ₹{followup.amount.toLocaleString()}
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label>Amount</Label>
+                                    <div className="p-2 border rounded-md bg-muted/50 font-semibold">₹{followup.amount?.toLocaleString() ?? "-"}</div>
                                 </div>
 
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2">
-                                        <UserCheck className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground" htmlFor="assignedto">
-                                            Assigned To<span className="text-red-500">*</span>
-                                        </Label>
-                                        <Select
-                                            value={form.watch("assignedToId") ? String(form.watch("assignedToId")) : ""}
-                                            onValueChange={value => form.setValue("assignedToId", Number(value))}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder={employeesLoading ? "Loading employees..." : "Select Employee"} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {employees.map(employee => (
-                                                    <SelectItem key={employee.id} value={String(employee.id)}>
-                                                        {employee.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {/* {errors.emp_from && <p className="text-sm text-destructive">{errors.emp_from.message}</p>} */}
-                                    </div>
-                                    <div className="p-2 rounded-lg border border-border bg-background/50 text-foreground font-medium font-sm">
-                                        {employees.find(e => e.id === form.watch("assignedToId"))?.name ?? "Not Assigned"}
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="assignedto">Assigned To</Label>
+
+                                    <Select
+                                        value={form.watch("assignedToId") ? String(form.watch("assignedToId")) : undefined}
+                                        onValueChange={value => form.setValue("assignedToId", Number(value))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={employeesLoading ? "Loading..." : "Select Employee"} />
+                                        </SelectTrigger>
+
+                                        <SelectContent>
+                                            {employees.map(employee => (
+                                                <SelectItem key={employee.id} value={String(employee.id)}>
+                                                    {employee.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2">
-                                        <Target className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground">Followup For</Label>
-                                    </div>
-                                    <div className="p-2 rounded-lg border border-border bg-background/50 text-foreground font-sm">{followup.followup_for}</div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Followup For</Label>
+                                    <div className="p-2 border rounded-md bg-muted/50">{followup.followupFor ?? "-"}</div>
                                 </div>
 
-                                <div className="space-y-3 p-2 rounded-xl border border-border bg-card/50">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                                        <Label className="text-sm font-medium text-foreground">Next Follow-up Date</Label>
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label>Next Follow-up Date</Label>
                                     <DatePicker
-                                        calendarClassName="min-h-[320px] shadow-xl border border-border bg-card"
-                                        label="Select date"
-                                        date={form.watch("startFrom")}
-                                        onChange={date => form.setValue("startFrom", date)}
+                                        date={form.watch("startFrom") ? new Date(form.watch("startFrom")!) : undefined}
+                                        onChange={date => form.setValue("startFrom", date ? date.toISOString().slice(0, 10) : undefined)}
                                     />
-                                    <small className="text-xs text-muted-foreground mt-2 block">Must be today or a future date</small>
+
+                                    <p className="text-xs text-muted-foreground">Must be today or a future date</p>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <section className="space-y-3">
+                        {/* Contact Details */}
+                        <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-primary/10">
-                                        <User className="h-3 w-3 text-primary" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-foreground">Contact Details</h3>
-                                </div>
-                                <Button
-                                    onClick={addPersonRow}
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md transition-all duration-200 rounded-xl"
-                                >
-                                    <Plus className="h-3 w-3 mr-2" />
+                                <h3 className="text-lg font-medium flex items-center gap-2">
+                                    <User className="h-4 w-4" />
+                                    Contact Details
+                                </h3>
+                                <Button onClick={addPersonRow} size="sm">
+                                    <Plus className="h-4 w-4 mr-1" />
                                     Add Person
                                 </Button>
                             </div>
 
                             {/* Existing Persons */}
                             {existingPersons.length > 0 && (
-                                <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-                                    <h4 className="font-semibold text-foreground">Existing Contacts</h4>
-                                    <div className="grid gap-3">
+                                <div className="space-y-3">
+                                    <h4 className="font-medium">Existing Contacts</h4>
+                                    <div className="space-y-2">
                                         {existingPersons.map(p => (
-                                            <div
-                                                key={p.id}
-                                                className="flex items-center justify-between p-4 rounded-lg border border-border bg-background/50 hover:bg-accent/50 transition-colors duration-200"
-                                            >
-                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div key={p.id} className="flex items-center justify-between p-3 border rounded-md">
+                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                                     <div>
-                                                        <div className="text-sm font-medium text-foreground">{p.name}</div>
+                                                        <div className="font-medium">{p.name}</div>
                                                         <div className="text-xs text-muted-foreground">Name</div>
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm text-foreground">{p.phone}</div>
+                                                        <div>{p.phone}</div>
                                                         <div className="text-xs text-muted-foreground">Phone</div>
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm text-foreground">{p.email}</div>
+                                                        <div>{p.email}</div>
                                                         <div className="text-xs text-muted-foreground">Email</div>
                                                     </div>
                                                 </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => removeExistingPerson(p.id)}
-                                                    className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 ml-4 rounded-lg"
-                                                >
+                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(p.id)} className="text-destructive">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -348,45 +311,26 @@ const FollowUpEditPage: React.FC = () => {
 
                             {/* New Persons */}
                             {persons.length > 0 && (
-                                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-4">
-                                    <h4 className="text-lg font-semibold text-foreground">New Contacts</h4>
-                                    <div className="space-y-4">
+                                <div className="space-y-3">
+                                    <h4 className="font-medium">New Contacts</h4>
+                                    <div className="space-y-3">
                                         {persons.map((row, idx) => (
-                                            <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-2 rounded-lg border border-primary/20 bg-card">
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-medium text-foreground">Name</Label>
-                                                    <Input
-                                                        placeholder="Enter name"
-                                                        value={row.name}
-                                                        onChange={e => updatePersonRow(idx, "name", e.target.value)}
-                                                        className="border-border focus:border-primary rounded-lg"
-                                                    />
+                                            <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-md">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Name</Label>
+                                                    <Input placeholder="Enter name" value={row.name} onChange={e => updatePersonRow(idx, "name", e.target.value)} />
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-medium text-foreground">Phone</Label>
-                                                    <Input
-                                                        placeholder="Enter phone"
-                                                        value={row.phone}
-                                                        onChange={e => updatePersonRow(idx, "phone", e.target.value)}
-                                                        className="border-border focus:border-primary rounded-lg"
-                                                    />
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Phone</Label>
+                                                    <Input placeholder="Enter phone" value={row.phone} onChange={e => updatePersonRow(idx, "phone", e.target.value)} />
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-medium text-foreground">Email</Label>
-                                                    <Input
-                                                        placeholder="Enter email"
-                                                        value={row.email}
-                                                        onChange={e => updatePersonRow(idx, "email", e.target.value)}
-                                                        className="border-border focus:border-primary rounded-lg"
-                                                    />
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Email</Label>
+                                                    <Input placeholder="Enter email" value={row.email} onChange={e => updatePersonRow(idx, "email", e.target.value)} />
                                                 </div>
                                                 <div className="flex items-end">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => removeNewPersonRow(idx)}
-                                                        className="border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive w-full rounded-lg"
-                                                    >
-                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                    <Button variant="outline" size="sm" onClick={() => removeNewPersonRow(idx)} className="text-destructive w-full">
+                                                        <Trash2 className="h-4 w-4 mr-1" />
                                                         Remove
                                                     </Button>
                                                 </div>
@@ -395,69 +339,67 @@ const FollowUpEditPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </section>
+                        </div>
 
-                        {/* -----------------------------
-            FREQUENCY + STOP SECTION
-            ------------------------------ */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                    <Clock className="h-3 w-3 text-primary" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Followup Scheduling</h3>
-                            </div>
+                        {/* Followup Scheduling */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-medium flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Followup Scheduling
+                            </h3>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <div className="space-y-3 p-3 rounded-xl border border-border bg-card/50">
-                                    <Label className="text-sm font-medium text-foreground">Followup Frequency</Label>
-                                    <Select value={frequency} onValueChange={val => form.setValue("frequency", val as any)}>
-                                        <SelectTrigger className="border-border focus:ring-primary focus:border-primary rounded-lg w-full">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Followup Frequency</Label>
+                                    <Select value={frequency != null ? String(frequency) : undefined} onValueChange={val => form.setValue("frequency", Number(val))}>
+                                        <SelectTrigger>
                                             <SelectValue placeholder="Choose frequency" />
                                         </SelectTrigger>
-                                        <SelectContent className="border-border bg-card rounded-xl">
-                                            {Object.entries(FREQUENCIES).map(([k, v]) => (
-                                                <SelectItem key={k} value={k} className="focus:bg-accent rounded-lg">
-                                                    {v}
+
+                                        <SelectContent>
+                                            {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                {frequency === "stopped" && (
+                                {frequency === 6 && (
                                     <>
-                                        <div className="space-y-3 p-4 rounded-xl border border-border bg-card/50">
-                                            <Label className="text-sm font-medium text-foreground">Stop Reason</Label>
-                                            <Select value={stopReason} onValueChange={val => form.setValue("stopReason", val as any)}>
-                                                <SelectTrigger className="border-border focus:ring-destructive focus:border-destructive rounded-lg">
+                                        {/* Stop Reason */}
+                                        <div className="space-y-2 w-full">
+                                            <Label>Stop Reason</Label>
+
+                                            <Select value={stopReason != null ? String(stopReason) : undefined} onValueChange={val => form.setValue("stopReason", Number(val))}>
+                                                <SelectTrigger className="w-full">
                                                     <SelectValue placeholder="Select reason" />
                                                 </SelectTrigger>
-                                                <SelectContent className="border-border bg-card rounded-xl">
-                                                    {Object.entries(STOP_REASONS).map(([k, v]) => (
-                                                        <SelectItem key={k} value={k} className="focus:bg-destructive/10 rounded-lg">
-                                                            {v}
+
+                                                <SelectContent>
+                                                    {Object.entries(STOP_REASON_LABELS).map(([value, label]) => (
+                                                        <SelectItem key={value} value={value}>
+                                                            {label}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
 
-                                        <div className="space-y-3 p-4 rounded-xl border border-border bg-card/50">
-                                            {(stopReason === "objective_achieved" || stopReason === "other") && (
+                                        {/* Proof / Remarks */}
+                                        <div className="space-y-2 w-full">
+                                            {(stopReason === 2 || stopReason === 4) && (
                                                 <>
-                                                    <Label className="text-sm font-medium text-foreground">
-                                                        {stopReason === "objective_achieved" ? "Proof Details" : "Remarks"}
-                                                    </Label>
+                                                    <Label>{stopReason === 2 ? "Proof Details" : "Remarks"}</Label>
+
                                                     <Textarea
-                                                        value={stopReason === "objective_achieved" ? form.watch("proofText") || "" : form.watch("stopRemarks") || ""}
+                                                        value={stopReason === 2 ? form.watch("proofText") || "" : form.watch("stopRemarks") || ""}
                                                         onChange={e =>
-                                                            stopReason === "objective_achieved"
-                                                                ? form.setValue("proofText", e.target.value as any)
-                                                                : form.setValue("stopRemarks", e.target.value as any)
+                                                            stopReason === 2 ? form.setValue("proofText", e.target.value) : form.setValue("stopRemarks", e.target.value)
                                                         }
-                                                        placeholder={stopReason === "objective_achieved" ? "Provide proof of objective achievement..." : "Enter remarks..."}
-                                                        className="min-h-[100px] border-border focus:border-destructive rounded-lg"
+                                                        placeholder={stopReason === 2 ? "Provide proof of objective achievement..." : "Enter remarks..."}
+                                                        className="min-h-[80px]"
                                                     />
                                                 </>
                                             )}
@@ -465,31 +407,23 @@ const FollowUpEditPage: React.FC = () => {
                                     </>
                                 )}
                             </div>
-                        </section>
+                        </div>
 
-                        {/* -----------------------------
-                            DETAILED REQUEST / TIPTAP
-                        ------------------------------ */}
-                        <section className="space-y-4">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                    <FileText className="h-5 w-5 text-primary" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Detailed Request</h3>
-                            </div>
+                        {/* Detailed Request */}
+                        <div className="space-y-3">
+                            <h3 className="text-lg font-medium flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                Detailed Request
+                            </h3>
                             <TiptapEditor value={form.watch("details") || ""} onChange={val => form.setValue("details", val as any)} />
-                        </section>
+                        </div>
 
-                        {/* -----------------------------
-                        ATTACHMENTS
-                        ------------------------------ */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                    <FileText className="h-5 w-5 text-primary" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Attachments</h3>
-                            </div>
+                        {/* Attachments */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-medium flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                Attachments
+                            </h3>
 
                             <MockUploadDropzone
                                 maxFiles={5}
@@ -501,28 +435,18 @@ const FollowUpEditPage: React.FC = () => {
                             />
 
                             {existingAttachments.length > 0 && (
-                                <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                                    <h4 className="text-lg font-semibold text-foreground">Current Attachments</h4>
-                                    <div className="grid gap-2">
+                                <div className="space-y-3">
+                                    <h4 className="font-medium">Current Attachments</h4>
+                                    <div className="space-y-2">
                                         {existingAttachments.map(file => (
-                                            <div key={file} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background/50">
-                                                <div className="flex items-center gap-3">
+                                            <div key={file} className="flex items-center justify-between p-2 border rounded-md">
+                                                <div className="flex items-center gap-2">
                                                     <FileText className="h-4 w-4 text-muted-foreground" />
-                                                    <a
-                                                        className="text-sm text-foreground hover:text-primary hover:underline transition-colors"
-                                                        href={file}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
+                                                    <a className="text-sm hover:text-primary hover:underline" href={file} target="_blank" rel="noreferrer">
                                                         {file}
                                                     </a>
                                                 </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => removeExistingAttachment(file)}
-                                                    className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 rounded-lg"
-                                                >
+                                                <Button size="sm" variant="ghost" onClick={() => removeExistingAttachment(file)} className="text-destructive">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -530,28 +454,21 @@ const FollowUpEditPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </section>
+                        </div>
 
-                        {/* -----------------------------
-            COMMENT (READONLY)
-            ------------------------------ */}
-                        <section className="space-y-3 p-4 rounded-xl border border-border bg-card/50">
-                            <Label className="text-sm font-medium text-foreground">Previous Comment</Label>
-                            <Textarea value={followup.comment ?? ""} readOnly className="bg-background/50 border-border text-foreground rounded-lg min-h-[100px] resize-none" />
-                        </section>
+                        {/* Previous Comment */}
+                        {/* <div className="space-y-2">
+                            <Label>Previous Comment</Label>
+                            <Textarea value={followup.comment ?? ""} readOnly className="bg-muted/50 min-h-[80px]" />
+                        </div> */}
 
-                        {/* SUBMIT */}
-                        <div className="pt-6 border-t border-border">
-                            <div className="flex gap-4 justify-end">
-                                <Button variant="outline" onClick={() => navigate(-1)} className="rounded-lg border-border">
+                        {/* Submit */}
+                        <div className="pt-4 border-t">
+                            <div className="flex gap-3 justify-end">
+                                <Button variant="outline" onClick={() => navigate(-1)}>
                                     Cancel
                                 </Button>
-                                <Button
-                                    onClick={onSubmit}
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md transition-all duration-200 rounded-lg px-8"
-                                >
-                                    Update Followup
-                                </Button>
+                                <Button onClick={onSubmit}>Update Followup</Button>
                             </div>
                         </div>
                     </CardContent>

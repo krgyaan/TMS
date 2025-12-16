@@ -1,7 +1,5 @@
 import React from "react";
-import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
-
-import { Button } from "@/components/ui/button";
+import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import { Separator } from "@/components/ui/separator";
 import { EditorContent, useEditor } from "@tiptap/react";
 
@@ -14,9 +12,11 @@ import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 
-import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Quote, Link2, Unlink, ImageIcon, Undo, Redo, Heading2 } from "lucide-react";
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Link2, Unlink, Undo, Redo } from "lucide-react";
 
-import "@/tiptap.css"; // ← your styling
+import "@/tiptap.css";
+
+const iconClass = "h-4 w-4";
 
 export function TiptapEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
     const editor = useEditor({
@@ -39,96 +39,90 @@ export function TiptapEditor({ value, onChange }: { value: string; onChange: (ht
     if (!editor) return <div>Loading editor…</div>;
 
     return (
-        <div className="space-y-2 w-full">
-            {/* SHADCN MENUBAR — CLEAN + MODERN */}
-            <Menubar className="rounded-md border bg-muted">
+        <div className="space-y-1.5 w-full">
+            {/* COMPACT TOOLBAR */}
+            <Menubar className="h-9 rounded-md border bg-muted px-1">
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <Bold className={editor.isActive("bold") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleBold().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <Bold className={`${iconClass} ${editor.isActive("bold") ? "text-primary" : ""}`} onClick={() => editor.chain().focus().toggleBold().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <Italic className={editor.isActive("italic") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleItalic().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <Italic className={`${iconClass} ${editor.isActive("italic") ? "text-primary" : ""}`} onClick={() => editor.chain().focus().toggleItalic().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <UnderlineIcon className={editor.isActive("underline") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleUnderline().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <UnderlineIcon
+                            className={`${iconClass} ${editor.isActive("underline") ? "text-primary" : ""}`}
+                            onClick={() => editor.chain().focus().toggleUnderline().run()}
+                        />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <Strikethrough className={editor.isActive("strike") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleStrike().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <Strikethrough className={`${iconClass} ${editor.isActive("strike") ? "text-primary" : ""}`} onClick={() => editor.chain().focus().toggleStrike().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
-                <Separator orientation="vertical" className="mx-1" />
+                <Separator orientation="vertical" className="mx-1 h-5" />
 
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <List className={editor.isActive("bulletList") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleBulletList().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <List className={`${iconClass} ${editor.isActive("bulletList") ? "text-primary" : ""}`} onClick={() => editor.chain().focus().toggleBulletList().run()} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger>
-                        <ListOrdered className={editor.isActive("orderedList") ? "text-primary" : ""} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+                    <MenubarTrigger className="px-2 py-1">
+                        <ListOrdered
+                            className={`${iconClass} ${editor.isActive("orderedList") ? "text-primary" : ""}`}
+                            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                        />
                     </MenubarTrigger>
                 </MenubarMenu>
 
-                <Separator orientation="vertical" className="mx-1" />
+                <Separator orientation="vertical" className="mx-1 h-5" />
 
                 <MenubarMenu>
                     <MenubarTrigger
+                        className="px-2 py-1"
                         onClick={() => {
                             const url = prompt("Enter URL");
                             if (url) editor.chain().focus().setLink({ href: url }).run();
                         }}
                     >
-                        <Link2 className={editor.isActive("link") ? "text-primary" : ""} />
+                        <Link2 className={`${iconClass} ${editor.isActive("link") ? "text-primary" : ""}`} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger onClick={() => editor.chain().focus().unsetLink().run()}>
-                        <Unlink />
+                    <MenubarTrigger className="px-2 py-1" onClick={() => editor.chain().focus().unsetLink().run()}>
+                        <Unlink className={iconClass} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
-                <Separator orientation="vertical" className="mx-1" />
-
-                {/* <MenubarMenu>
-                    <MenubarTrigger
-                        onClick={() => {
-                            const url = prompt("Image URL?");
-                            if (url) editor.chain().focus().setImage({ src: url }).run();
-                        }}
-                    >
-                        <ImageIcon />
-                    </MenubarTrigger>
-                </MenubarMenu> */}
-
-                <Separator orientation="vertical" className="mx-1" />
+                <Separator orientation="vertical" className="mx-1 h-5" />
 
                 <MenubarMenu>
-                    <MenubarTrigger onClick={() => editor.chain().focus().undo().run()}>
-                        <Undo />
+                    <MenubarTrigger className="px-2 py-1" onClick={() => editor.chain().focus().undo().run()}>
+                        <Undo className={iconClass} />
                     </MenubarTrigger>
                 </MenubarMenu>
 
                 <MenubarMenu>
-                    <MenubarTrigger onClick={() => editor.chain().focus().redo().run()}>
-                        <Redo />
+                    <MenubarTrigger className="px-2 py-1" onClick={() => editor.chain().focus().redo().run()}>
+                        <Redo className={iconClass} />
                     </MenubarTrigger>
                 </MenubarMenu>
             </Menubar>
 
-            {/* EDITOR */}
-            <div className="border rounded-md p-3 bg-card min-h-[250px]">
+            {/* COMPACT EDITOR */}
+            <div className="border rounded-md p-2 bg-card min-h-[180px]">
                 <EditorContent editor={editor} className="tiptap" />
             </div>
         </div>
