@@ -2,20 +2,43 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getMyImprests, createImprest, updateImprest, deleteImprest, uploadImprestProofs, type CreateImprestInput } from "./imprest.api";
+import {
+    getMyImprests,
+    createImprest,
+    updateImprest,
+    deleteImprest,
+    uploadImprestProofs,
+    type CreateImprestInput,
+    getUserImprests,
+    getImprestVouchers,
+    getImprestVoucherById,
+    accountApproveVoucher,
+    adminApproveVoucher,
+} from "./imprest.api";
+import type { ImprestVoucherRow } from "./imprest.types";
 
 // ---------------- Query Keys ----------------
 export const imprestKeys = {
     root: ["employee-imprest"] as const,
-    list: () => [...imprestKeys.root, "list"] as const,
+
+    list: (userId?: number) => [...imprestKeys.root, "list", userId ?? "me"] as const,
+
     detail: (id: number) => [...imprestKeys.root, "detail", id] as const,
 };
 
+export const imprestVoucherKeys = {
+    root: ["imprest-vouchers"] as const,
+
+    list: (userId?: number) => [...imprestVoucherKeys.root, "list", userId ?? "all"] as const,
+
+    detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
+};
 // ---------------- LIST ----------------
-export const useImprestList = () => {
+export const useImprestList = (userId?: number) => {
     return useQuery({
-        queryKey: imprestKeys.list(),
-        queryFn: getMyImprests,
+        queryKey: imprestKeys.list(userId), // IMPORTANT
+        queryFn: () => (userId ? getUserImprests(userId) : getMyImprests()),
+        enabled: userId === undefined || !!userId,
     });
 };
 
@@ -63,6 +86,57 @@ export const useDeleteImprest = () => {
         },
 
         onError: () => toast.error("Failed to delete imprest"),
+    });
+};
+
+// ---------------- LIST ----------------
+export const useImprestVoucherList = (userId?: number) => {
+    return useQuery({
+        queryKey: imprestVoucherKeys.list(userId),
+        queryFn: () => getImprestVouchers({ userId }),
+    });
+};
+
+// ---------------- DETAIL ----------------
+export const useImprestVoucherView = (id: number) => {
+    return useQuery({
+        queryKey: imprestVoucherKeys.detail(id),
+        queryFn: () => getImprestVoucherById(id),
+        enabled: !!id,
+    });
+};
+
+// ---------------- ACCOUNT APPROVE ----------------
+export const useAccountApproveVoucher = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: accountApproveVoucher,
+
+        onSuccess: () => {
+            toast.success("Voucher updated successfully");
+            qc.invalidateQueries({ queryKey: imprestVoucherKeys.root });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update voucher"),
+    });
+};
+
+// ---------------- ADMIN APPROVE ----------------
+export const useAdminApproveVoucher = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: adminApproveVoucher,
+
+        onSuccess: () => {
+            toast.success("Voucher updated successfully");
+            qc.invalidateQueries({ queryKey: imprestVoucherKeys.root });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update voucher"),
     });
 };
 
