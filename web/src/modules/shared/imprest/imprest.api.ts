@@ -1,10 +1,15 @@
 // src/modules/imprest/imprest.api.ts
 import api from "@/lib/axios";
-import type { ImprestRow } from "./imprest.types";
-
+import type { ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
 // ---------- GET LIST ----------
 export const getMyImprests = async (): Promise<ImprestRow[]> => {
     const res = await api.get("/employee-imprest");
+    console.log(res);
+    return res.data;
+};
+// ---------- GET LIST ----------
+export const getUserImprests = async (userId: number): Promise<ImprestRow[]> => {
+    const res = await api.get(`/employee-imprest/user/${userId}`);
     console.log(res);
     return res.data;
 };
@@ -45,5 +50,32 @@ export const uploadImprestProofs = async (id: number, files: File[]) => {
         headers: { "Content-Type": "multipart/form-data" },
     });
 
+    return res.data;
+};
+
+// ---------- LIST ----------
+export const getImprestVouchers = async ({ userId }: { userId?: number }): Promise<ImprestVoucherRow[]> => {
+    const url = userId ? `/accounts/imprest/voucher/${userId}` : `/accounts/imprest/voucher`;
+
+    const res = await api.get(url);
+    return res.data.data;
+};
+// ---------- DETAIL ----------
+export const getImprestVoucherById = async (id: number): Promise<ImprestVoucherView> => {
+    const res = await api.get(`/accounts/imprest/voucher/view/${id}`);
+    return res.data;
+};
+
+// ---------- ACCOUNT APPROVE ----------
+export const accountApproveVoucher = async (payload: { id: number; remark?: string; approve: boolean }) => {
+    const { id, ...body } = payload;
+    const res = await api.post(`/imprest-vouchers/${id}/account-approve`, body);
+    return res.data;
+};
+
+// ---------- ADMIN APPROVE ----------
+export const adminApproveVoucher = async (payload: { id: number; remark?: string; approve: boolean }) => {
+    const { id, ...body } = payload;
+    const res = await api.post(`/imprest-vouchers/${id}/admin-approve`, body);
     return res.data;
 };
