@@ -38,14 +38,21 @@ export class ImprestAdminController {
     // LIST VOUCHERS
     // ========================
     @Get("voucher")
-    async listVouchers(@Req() req, @Query("page") page = "1", @Query("limit") limit = "10") {
+    async listAllVouchers(@Query("page") page = "1", @Query("limit") limit = "10") {
         return this.service.listVouchers({
-            user: req.user,
             page: Number(page),
             limit: Number(limit),
         });
     }
 
+    @Get("voucher/:id")
+    async listUserVouchers(@Param("id", ParseIntPipe) userId: number, @Query("page") page = "1", @Query("limit") limit = "10") {
+        return this.service.listVouchers({
+            user: { id: userId },
+            page: Number(page),
+            limit: Number(limit),
+        });
+    }
     // ========================
     // CREATE VOUCHER
     // ========================
@@ -64,7 +71,7 @@ export class ImprestAdminController {
     // VIEW VOUCHER BY ID
     //=========================
 
-    @Get("voucher/:id")
+    @Get("voucher/view/:id")
     async getVoucherById(@Param("id", ParseIntPipe) id: number, @Req() req) {
         return this.service.getVoucherById({
             user: req.user,
