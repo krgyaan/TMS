@@ -1,37 +1,15 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { Receipt, FileSearch, Loader2 } from "lucide-react";
-import type { ColDef } from "ag-grid-community";
+import { Eye } from "lucide-react";
 
+import { useImprestVoucherList } from "./imprest.hooks";
+import type { ImprestVoucherRow } from "./imprest.types";
 import { paths } from "@/app/routes/paths";
 
-/** ------------------------
- * Dummy Data
- * ------------------------ */
-const dummyRows = [
-    {
-        id: 1,
-        employee_name: "Abhijeet Gaur",
-        voucher_period: "Jan 2025",
-        voucher_amount: 12000,
-        accountant_approval: "Approved",
-        admin_approval: "Pending",
-    },
-    {
-        id: 2,
-        employee_name: "John Doe",
-        voucher_period: "Feb 2025",
-        voucher_amount: 8000,
-        accountant_approval: "Approved",
-        admin_approval: "Approved",
-    },
-];
-
-/** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
         style: "currency",
@@ -39,99 +17,72 @@ const formatINR = (num: number) =>
         maximumFractionDigits: 0,
     }).format(num);
 
-const ImprestVoucher: React.FC = () => {
+const ImprestVoucherList: React.FC = () => {
     const navigate = useNavigate();
+    const { id } = useParams<{ id: string }>();
+    console.log("UserId from params:", id);
 
-    // Fake loading simulation
-    const [loading] = useState(false);
+    const parsedUserId = id ? Number(id) : undefined;
 
-    /** ------------------------
-     * Action Buttons
-     * ------------------------ */
+    console.log("parsedUserId:", parsedUserId);
+
+    const { data: rows = [], isLoading } = useImprestVoucherList(parsedUserId);
+    console.log("Fetched vouchers:", rows);
     const actionItems = useMemo(
         () => [
             {
-                label: "View Voucher",
-                icon: <Receipt className="h-4 w-4" />,
-                className: "text-blue-600",
-                onClick: (row: any) => {
-                    console.log("Voucher clicked:", row);
-                    navigate(paths.shared.imprestVoucherView ?? "/voucher");
-                },
-            },
-            {
-                label: "View Proof",
-                icon: <FileSearch className="h-4 w-4" />,
-                className: "text-blue-600",
-                onClick: (row: any) => {
-                    console.log("Proof clicked:", row);
-                    navigate(paths.shared.imprestProofView ?? "/proof");
-                },
+                label: "View",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row: ImprestVoucherRow) => navigate(paths.shared.imprestVoucherView(row.id)),
             },
         ],
         [navigate]
     );
 
-    /** ------------------------
-     * AG Grid Column Definitions
-     * ------------------------ */
-    const columns: ColDef[] = useMemo(
+    const columns = useMemo(
         () => [
-            { field: "employee_name", headerName: "Employee Name", width: 150 },
-            { field: "voucher_period", headerName: "Voucher Period", width: 150 },
+            { field: "voucherCode", headerName: "Voucher No" },
             {
-                field: "voucher_amount",
-                headerName: "Voucher Amount",
-                width: 150,
-                valueFormatter: p => formatINR(p.value ?? 0),
+                field: "validFrom",
+                headerName: "Period",
+                valueGetter: p => `${new Date(p.data.validFrom).toLocaleDateString("en-GB")} - ${new Date(p.data.validTo).toLocaleDateString("en-GB")}`,
             },
-            { field: "accountant_approval", headerName: "Accountant Approval", width: 170 },
-            { field: "admin_approval", headerName: "Admin Approval", width: 150 },
             {
-                headerName: "Actions",
-                width: 180,
-                sortable: false,
-                filter: false,
+                field: "amount",
+                headerName: "Amount",
+                valueFormatter: p => formatINR(p.value),
+            },
+            {
+                field: "approvalStatus",
+                headerName: "Status",
+                cellRenderer: p =>
+                    p.value === 1 ? (
+                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
+                    ) : p.value === 2 ? (
+                        <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">Rejected</span>
+                    ) : (
+                        <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
+                    ),
+            },
+            {
+                headerName: "Action",
                 cellRenderer: createActionColumnRenderer(actionItems),
             },
         ],
         [actionItems]
     );
 
-    /** ------------------------
-     * Loading UI
-     * ------------------------ */
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="ml-2">Loading vouchers...</span>
-            </div>
-        );
-    }
-
     return (
-        <div>
-            <Card>
-                <CardHeader className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Employee Imprest Voucher</CardTitle>
-                        <CardDescription>
-                            {dummyRows.length} record{dummyRows.length !== 1 ? "s" : ""} found
-                        </CardDescription>
-                    </div>
+        <Card>
+            <CardHeader>
+                <CardTitle>Imprest Vouchers</CardTitle>
+            </CardHeader>
 
-                    <div className="flex gap-2">
-                        <Button onClick={() => navigate(paths.shared.imprest ?? "/imprest")}>Back</Button>
-                    </div>
-                </CardHeader>
-
-                <CardContent>
-                    <DataTable data={dummyRows} loading={loading} columnDefs={columns} gridOptions={{ pagination: true }} />
-                </CardContent>
-            </Card>
-        </div>
+            <CardContent>
+                <DataTable data={rows} columnDefs={columns as any} gridOptions={{ pagination: true }} loading={isLoading} />
+            </CardContent>
+        </Card>
     );
 };
 
-export default ImprestVoucher;
+export default ImprestVoucherList;
