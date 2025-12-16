@@ -95,17 +95,21 @@ export class ImprestAdminService {
             .orderBy(desc(employeeImprestTransactions.txnDate));
     }
 
-    async listVouchers({ user, page, limit }: { user: { id: number; role: string }; page: number; limit: number }) {
+    // Role-based filtering
+    // if (user.role !== "admin") {
+    //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
+    // }
+
+    async listVouchers({ user, page, limit }: { user?: { id: number }; page: number; limit: number }) {
         const offset = (page - 1) * limit;
 
         const conditions: SQL[] = [];
 
-        // Role-based filtering
-        // if (user.role !== "admin") {
-        //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
-        // }
+        if (user) {
+            conditions.push(eq(employeeImprestVouchers.beneficiaryName, String(user.id)));
+        }
 
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        const whereClause = conditions.length ? and(...conditions) : undefined;
 
         const [rows, totalResult] = await Promise.all([
             this.db
@@ -125,9 +129,7 @@ export class ImprestAdminService {
                 .offset(offset),
 
             this.db
-                .select({
-                    count: sql<number>`count(*)`,
-                })
+                .select({ count: sql<number>`count(*)` })
                 .from(employeeImprestVouchers)
                 .where(whereClause),
         ]);
