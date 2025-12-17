@@ -146,16 +146,16 @@ const ImprestEmployeeDashboard: React.FC = () => {
                     );
                 },
             },
-            {
-                field: "approvalStatus",
-                headerName: "Status",
-                cellRenderer: p =>
-                    p.value === 1 ? (
-                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
-                    ) : (
-                        <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
-                    ),
-            },
+            // {
+            //     field: "approvalStatus",
+            //     headerName: "Status",
+            //     cellRenderer: p =>
+            //         p.value === 1 ? (
+            //             <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
+            //         ) : (
+            //             <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
+            //         ),
+            // },
             {
                 headerName: "Action",
                 cellRenderer: createActionColumnRenderer(actionItems),
