@@ -6,6 +6,8 @@ import type {
     UpdateCostingSheetDto,
     PaginatedResult,
     CostingSheetDashboardCounts,
+    CreateSheetResponse,
+    DriveScopesResponse,
 } from '@/types/api.types';
 
 export type CostingSheetListParams = {
@@ -73,6 +75,24 @@ class CostingSheetsService extends BaseApiService {
 
     async getDashboardCounts(): Promise<CostingSheetDashboardCounts> {
         return this.get<CostingSheetDashboardCounts>('/counts');
+    }
+
+    async checkDriveScopes(): Promise<DriveScopesResponse> {
+        return this.get<DriveScopesResponse>('/check-drive-scopes');
+    }
+
+    async createSheet(tenderId: number): Promise<CreateSheetResponse> {
+        return this.post<CreateSheetResponse>('/create-sheet', { tenderId });
+    }
+
+    async createSheetWithName(
+        tenderId: number,
+        customName: string,
+    ): Promise<CreateSheetResponse> {
+        return this.post<CreateSheetResponse>('/create-sheet-with-name', {
+            tenderId,
+            customName,
+        });
     }
 }
 

@@ -1,6 +1,3 @@
-import type ImprestEmployeeDashboard from "@/modules/shared/imprest";
-import { id } from "date-fns/locale";
-
 export const paths = {
     // ==================== AUTH ====================
     auth: {
@@ -47,9 +44,11 @@ export const paths = {
         documentChecklistEdit: (tenderId: number | string) => `/tendering/document-checklists/edit/${tenderId}`,
         documentChecklistView: (tenderId: number | string) => `/tendering/document-checklists/${tenderId}`,
         costingSheets: "/tendering/costing-sheets",
+        costingSheetCreate: (tenderId: number | string) => `/tendering/costing-sheets/create/${tenderId}`,
         costingSheetSubmit: (tenderId: number | string) => `/tendering/costing-sheets/submit/${tenderId}`,
         costingSheetEdit: (tenderId: number | string) => `/tendering/costing-sheets/edit/${tenderId}`,
         costingSheetResubmit: (tenderId: number | string) => `/tendering/costing-sheets/resubmit/${tenderId}`,
+        costingSheetView: (tenderId: number | string) => `/tendering/costing-sheets/${tenderId}`,
         costingApprovals: "/tendering/costing-approvals",
         costingApprove: (costingSheetId: number) => `/tendering/costing-approvals/approve/${costingSheetId}`,
         costingReject: (costingSheetId: number) => `/tendering/costing-approvals/reject/${costingSheetId}`,

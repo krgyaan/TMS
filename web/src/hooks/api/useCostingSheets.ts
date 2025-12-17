@@ -97,3 +97,48 @@ export const useCostingSheetsCounts = () => {
         staleTime: 30000, // Cache for 30 seconds
     });
 };
+
+export const useCheckDriveScopes = () => {
+    return useQuery({
+        queryKey: [...costingSheetsKey.all, 'driveScopes'],
+        queryFn: () => costingSheetsService.checkDriveScopes(),
+        staleTime: 60000, // Cache for 1 minute
+    });
+};
+
+export const useCreateCostingSheet = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (tenderId: number) => costingSheetsService.createSheet(tenderId),
+        onSuccess: (data) => {
+            if (data.success) {
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                toast.success('Costing sheet created successfully');
+            }
+        },
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Failed to create costing sheet';
+            toast.error(message);
+        },
+    });
+};
+
+export const useCreateCostingSheetWithName = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ tenderId, customName }: { tenderId: number; customName: string }) =>
+            costingSheetsService.createSheetWithName(tenderId, customName),
+        onSuccess: (data) => {
+            if (data.success) {
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                toast.success('Costing sheet created successfully');
+            }
+        },
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Failed to create costing sheet';
+            toast.error(message);
+        },
+    });
+};

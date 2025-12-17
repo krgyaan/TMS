@@ -14,8 +14,10 @@ import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { PhysicalDocsView } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
+import { DocumentChecklistView } from "@/modules/tendering/checklists/components/DocumentChecklistView";
+import { useDocumentChecklistByTender } from "@/hooks/api/useDocumentChecklists";
 
-export default function EmdShowPage() {
+export default function DocumentChecklistShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
@@ -31,6 +33,7 @@ export default function EmdShowPage() {
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
 
     const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading;
 
@@ -42,13 +45,14 @@ export default function EmdShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="emds-tenderfees" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-5 gap-2">
+            <Tabs defaultValue="document-checklist" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-6 gap-2">
                     <TabsTrigger value="tender">Tender</TabsTrigger>
                     <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
                     <TabsTrigger value="approval">Tender Approval</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
+                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
                 </TabsList>
 
                 {/* Tender */}
@@ -117,6 +121,16 @@ export default function EmdShowPage() {
                         isLoading={isLoading}
                         onEdit={() => navigate(paths.tendering.emdsTenderFeesEdit(tenderId!))}
                         onBack={() => navigate(paths.tendering.emdsTenderFees)}
+                    />
+                </TabsContent>
+
+                {/* Document Checklist */}
+                <TabsContent value="document-checklist">
+                    <DocumentChecklistView
+                        checklist={documentChecklist}
+                        isLoading={documentChecklistLoading}
+                        showEditButton={false}
+                        showBackButton={false}
                     />
                 </TabsContent>
             </Tabs>

@@ -1,27 +1,27 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
-import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
-import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
-import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
-import { useTenderResultByTenderId, type ResultDashboardRow } from '@/hooks/api/useTenderResults';
-import { TenderView } from './components/TenderView';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
-import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
-import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
-import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
-import { CostingSheetShow } from '@/modules/tendering/costing-sheets/components/CostingSheetShow';
-import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { TenderResultShow } from '@/modules/tendering/results/components/TenderResultShow';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { paths } from '@/app/routes/paths';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useParams, useNavigate } from "react-router-dom";
+import { useTender } from "@/hooks/api/useTenders";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { useRfqByTenderId } from "@/hooks/api/useRfqs";
+import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
+import { usePaymentRequestsByTender } from "@/hooks/api/useEmds";
+import { useDocumentChecklistByTender } from "@/hooks/api/useDocumentChecklists";
+import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
+import { useBidSubmissionByTender } from "@/hooks/api/useBidSubmissions";
+import { useTenderResultByTenderId, type ResultDashboardRow } from "@/hooks/api/useTenderResults";
+import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
+import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
+import { RfqView } from "@/modules/tendering/rfqs/components/RfqView";
+import { PhysicalDocsView } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
+import { EmdTenderFeeShow } from "@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow";
+import { DocumentChecklistView } from "@/modules/tendering/checklists/components/DocumentChecklistView";
+import { CostingSheetView } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
+import { BidSubmissionView } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
+import { TenderResultShow } from "@/modules/tendering/results/components/TenderResultShow";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { paths } from "@/app/routes/paths";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function TenderShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -30,7 +30,7 @@ export default function TenderShowPage() {
     const tenderId = Number.isNaN(parsedId) ? null : parsedId;
 
     // Fetch all data
-    const { data: tender, isLoading, error } = useTender(tenderId);
+    const { data: tender, isLoading } = useTender(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
     const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
@@ -48,25 +48,6 @@ export default function TenderShowPage() {
     const hasCostingSheet = !costingSheetLoading && !!costingSheet;
     const hasBidSubmission = !bidSubmissionLoading && !!bidSubmission;
     const hasTenderResult = !resultLoading && !!tenderResult;
-
-    if (!tenderId || error || (!isLoading && !tender)) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Tender not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate(paths.tendering.tenders)}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
 
     return (
         <div className="space-y-6">
@@ -218,9 +199,9 @@ export default function TenderShowPage() {
                 {/* Costing Sheet */}
                 <TabsContent value="costing">
                     {costingSheetLoading ? (
-                        <CostingSheetShow costingSheet={null} isLoading />
+                        <CostingSheetView costingSheet={null} isLoading />
                     ) : costingSheet ? (
-                        <CostingSheetShow
+                        <CostingSheetView
                             costingSheet={costingSheet}
                             onEdit={() => navigate(paths.tendering.costingSheetEdit(tenderId!))}
                         />

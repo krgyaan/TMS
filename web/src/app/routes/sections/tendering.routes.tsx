@@ -27,10 +27,12 @@ const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfee
 const Tendering_DocumentChecklist = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistListPage'));
 const Tendering_DocumentChecklist_Create = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistCreatePage'));
 const Tendering_DocumentChecklist_Edit = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistEditPage'));
+const Tendering_DocumentChecklist_Show = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistShowPage'));
 const Tendering_CostingSheets = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetListPage'));
 const Tendering_CostingSheetSubmit = lazy(() => import('@/modules/tendering/costing-sheets/CostingSubmissionPage'));
 const Tendering_CostingSheetEdit = lazy(() => import('@/modules/tendering/costing-sheets/CostingSubmissionPage'));
 const Tendering_CostingSheetResubmit = lazy(() => import('@/modules/tendering/costing-sheets/CostingSubmissionPage'));
+const Tendering_CostingSheetShow = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetShowPage'));
 const CostingApprovalListPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovalListPage'));
 const CostingApprovePage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovePage'));
 const CostingRejectPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingRejectPage'));
@@ -88,7 +90,9 @@ export default function TenderingRoutes() {
             <Route path="document-checklists" element={<RouteWrapper><Tendering_DocumentChecklist /></RouteWrapper>} />
             <Route path="document-checklists/create/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Create /></RouteWrapper>} />
             <Route path="document-checklists/edit/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Edit /></RouteWrapper>} />
+            <Route path="document-checklists/:id" element={<RouteWrapper><Tendering_DocumentChecklist_Show /></RouteWrapper>} />
             <Route path="costing-sheets" element={<RouteWrapper><Tendering_CostingSheets /></RouteWrapper>} />
+            <Route path="costing-sheets/:id" element={<RouteWrapper><Tendering_CostingSheetShow /></RouteWrapper>} />
             <Route path="costing-sheets/submit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetSubmit /></RouteWrapper>} />
             <Route path="costing-sheets/edit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetEdit /></RouteWrapper>} />
             <Route path="costing-sheets/resubmit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetResubmit /></RouteWrapper>} />

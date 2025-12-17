@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { and, eq, inArray, or, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -11,6 +11,7 @@ import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -39,10 +40,12 @@ export type CostingSheetFilters = {
 
 @Injectable()
 export class CostingSheetsService {
+    private readonly logger = new Logger(CostingSheetsService.name);
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly googleDriveService: GoogleDriveService,
     ) { }
 
     async findAll(filters?: CostingSheetFilters): Promise<PaginatedResult<CostingSheetDashboardRow>> {
@@ -64,7 +67,8 @@ export class CostingSheetsService {
                 baseConditions.push(
                     or(
                         isNull(tenderCostingSheets.id),
-                        isNull(tenderCostingSheets.status)
+                        isNull(tenderCostingSheets.status),
+                        eq(tenderCostingSheets.status, 'Pending')
                     )!
                 );
             } else if (filters.costingStatus === 'submitted') {
@@ -206,23 +210,71 @@ export class CostingSheetsService {
     }
 
     async getDashboardCounts(): Promise<{ pending: number; submitted: number; rejected: number; total: number }> {
-        const [countResult] = await this.db
+        // Build base WHERE conditions (same as findAll)
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+        ];
+
+        const baseWhereClause = and(...baseConditions);
+
+        // Count pending: no costingSheet OR costingSheet exists but status is null
+        const [pendingResult] = await this.db
             .select({ count: sql<number>`count(*)` })
-            .from(tenderCostingSheets)
-            .where(isNull(tenderCostingSheets.id));
-        const pending = Number(countResult?.count || 0);
-        const [submittedCountResult] = await this.db
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .where(
+                and(
+                    baseWhereClause,
+                    or(
+                        isNull(tenderCostingSheets.id),
+                        isNull(tenderCostingSheets.status),
+                        eq(tenderCostingSheets.status, 'Pending')
+                    )!
+                )
+            );
+        const pending = Number(pendingResult?.count || 0);
+
+        // Count submitted: status must be 'Submitted' or 'Approved'
+        const [submittedResult] = await this.db
             .select({ count: sql<number>`count(*)` })
-            .from(tenderCostingSheets)
-            .where(inArray(tenderCostingSheets.status, ['Submitted', 'Approved']));
-        const submitted = Number(submittedCountResult?.count || 0);
-        const [rejectedCountResult] = await this.db
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .where(
+                and(
+                    baseWhereClause,
+                    inArray(tenderCostingSheets.status, ['Submitted', 'Approved'])
+                )
+            );
+        const submitted = Number(submittedResult?.count || 0);
+
+        // Count rejected: status must be 'Rejected/Redo'
+        const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(*)` })
-            .from(tenderCostingSheets)
-            .where(eq(tenderCostingSheets.status, 'Rejected/Redo'));
-        const rejected = Number(rejectedCountResult?.count || 0);
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .where(
+                and(
+                    baseWhereClause,
+                    eq(tenderCostingSheets.status, 'Rejected/Redo')
+                )
+            );
+        const rejected = Number(rejectedResult?.count || 0);
+
         const total = pending + submitted + rejected;
-        console.log(pending, submitted, rejected, total);
         return { pending, submitted, rejected, total };
     }
 
@@ -360,135 +412,224 @@ export class CostingSheetsService {
     }
 
     /**
-     * Get Costing Sheet Dashboard data - Updated implementation per requirements
-     * Type logic based on tenderCostingSheets existence and status
+ * Check user's Drive scope status
+ */
+    async checkDriveScopes(userId: number) {
+        return this.googleDriveService.checkUserHasDriveScopes(userId);
+    }
+
+    /**
+     * Create Google Sheet for a tender
      */
-    async getCostingSheetData(
-        type?: 'pending' | 'submitted' | 'rejected',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-    ): Promise<PaginatedResult<CostingSheetDashboardRow>> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
-        const offset = (page - 1) * limit;
+    async createGoogleSheet(tenderId: number, userId: number): Promise<{
+        success: boolean;
+        sheetUrl?: string;
+        sheetId?: string;
+        message?: string;
+        isDuplicate?: boolean;
+        existingSheetUrl?: string;
+        suggestedName?: string;
+    }> {
+        // 1. Get tender details
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender) {
+            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+        }
 
-        // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-        ];
+        const teamId = tender.team;
+        const sheetName = tender.tenderName;
 
-        // Add type-specific filters
-        if (type === 'pending') {
-            baseConditions.push(
-                or(
-                    isNull(tenderCostingSheets.id),
-                    isNull(tenderCostingSheets.status)
-                )!
-            );
-        } else if (type === 'submitted') {
-            baseConditions.push(
-                inArray(tenderCostingSheets.status, ['Submitted', 'Approved'])
-            );
-        } else if (type === 'rejected') {
-            baseConditions.push(
-                eq(tenderCostingSheets.status, 'Rejected/Redo')
+        // 2. Check team config
+        const teamConfig = this.googleDriveService.getTeamConfig(teamId);
+        if (!teamConfig) {
+            throw new BadRequestException(
+                `Team ${teamId} is not configured for Google Drive integration`,
             );
         }
 
-        const whereClause = and(...baseConditions);
+        if (!teamConfig.folderId) {
+            throw new BadRequestException(
+                `Google Drive folder not configured for team "${teamConfig.teamName}". Please contact administrator.`,
+            );
+        }
 
-        // Build orderBy clause
-        let orderByClause: any = asc(tenderInfos.dueDate); // Default
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
-                    break;
-                case 'gstValues':
-                    orderByClause = sortOrder(tenderInfos.gstValues);
-                    break;
-                default:
-                    orderByClause = asc(tenderInfos.dueDate);
+        // 3. Check if costing sheet already exists for this tender
+        const existingSheet = await this.findByTenderId(tenderId);
+        if (existingSheet?.googleSheetUrl) {
+            return {
+                success: false,
+                message: 'Costing sheet already exists for this tender',
+                sheetUrl: existingSheet.googleSheetUrl,
+                sheetId: existingSheet.googleSheetId || undefined,
+            };
+        }
+
+        // 4. Check for duplicate name in Drive folder
+        let duplicateCheck;
+        try {
+            duplicateCheck = await this.googleDriveService.checkDuplicateInFolder(
+                userId,
+                teamId,
+                sheetName,
+            );
+        } catch (error) {
+            this.logger.error(`Error checking for duplicate sheet: ${error instanceof Error ? error.message : String(error)}`);
+            throw new BadRequestException(
+                `Failed to check for duplicate sheet: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+
+        if (duplicateCheck.isDuplicate) {
+            return {
+                success: false,
+                isDuplicate: true,
+                message: `A costing sheet with name "${sheetName}" already exists in the ${new Date().getFullYear()} folder.`,
+                existingSheetUrl: duplicateCheck.existingSheetUrl,
+                suggestedName: duplicateCheck.suggestedName,
+            };
+        }
+
+        // 5. Create the Google Sheet
+        let sheetResult;
+        try {
+            sheetResult = await this.googleDriveService.createSheet(
+                userId,
+                teamId,
+                sheetName,
+            );
+        } catch (error) {
+            this.logger.error(`Error creating Google Sheet: ${error instanceof Error ? error.message : String(error)}`);
+            // Re-throw NestJS exceptions (BadRequestException, ForbiddenException, NotFoundException, etc.)
+            if (error instanceof BadRequestException ||
+                error instanceof NotFoundException ||
+                error instanceof ForbiddenException) {
+                throw error;
             }
+            // Wrap other errors
+            throw new BadRequestException(
+                `Failed to create Google Sheet: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
         }
 
-        // Get total count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(whereClause);
-        const total = Number(countResult?.count || 0);
+        // 6. Save to database
+        const now = new Date();
 
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                teamMemberName: users.name,
-                itemName: items.name,
-                statusName: statuses.name,
-                dueDate: tenderInfos.dueDate,
-                emdAmount: tenderInfos.emd,
-                gstValues: tenderInfos.gstValues,
-                costingSheetId: tenderCostingSheets.id,
-                costingSheetStatus: tenderCostingSheets.status,
-                submittedFinalPrice: tenderCostingSheets.submittedFinalPrice,
-                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
-                googleSheetUrl: tenderCostingSheets.googleSheetUrl,
-            })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(whereClause)
-            .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+        if (existingSheet) {
+            // Update existing record
+            await this.db
+                .update(tenderCostingSheets)
+                .set({
+                    googleSheetId: sheetResult.sheetId,
+                    googleSheetUrl: sheetResult.sheetUrl,
+                    sheetTitle: sheetResult.sheetTitle,
+                    driveFolderId: sheetResult.folderId,
+                    sheetCreatedBy: userId.toString(),
+                    sheetCreatedAt: now,
+                    updatedAt: now,
+                })
+                .where(eq(tenderCostingSheets.id, existingSheet.id));
+        } else {
+            // Create new record
+            await this.db.insert(tenderCostingSheets).values({
+                tenderId,
+                googleSheetId: sheetResult.sheetId,
+                googleSheetUrl: sheetResult.sheetUrl,
+                sheetTitle: sheetResult.sheetTitle,
+                driveFolderId: sheetResult.folderId,
+                sheetCreatedBy: userId.toString(),
+                sheetCreatedAt: now,
+            });
+        }
 
-        const data: CostingSheetDashboardRow[] = rows.map((row) => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: `${row.tenderName} - ${row.tenderNo}`,
-            teamMemberName: row.teamMemberName,
-            itemName: row.itemName,
-            statusName: row.statusName,
-            dueDate: row.dueDate,
-            emdAmount: row.emdAmount,
-            gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            costingStatus: this.determineCostingStatus(row.costingSheetId, row.costingSheetStatus),
-            submittedFinalPrice: row.submittedFinalPrice,
-            submittedBudgetPrice: row.submittedBudgetPrice,
-            googleSheetUrl: row.googleSheetUrl,
-            costingSheetId: row.costingSheetId,
-        }));
+        this.logger.log(
+            `Created costing sheet for tender ${tenderId}: ${sheetResult.sheetUrl}`,
+        );
 
         return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            success: true,
+            sheetUrl: sheetResult.sheetUrl,
+            sheetId: sheetResult.sheetId,
+        };
+    }
+
+    /**
+     * Create Google Sheet with a custom name (for duplicate resolution)
+     */
+    async createGoogleSheetWithName(
+        tenderId: number,
+        userId: number,
+        customName: string,
+    ): Promise<{
+        success: boolean;
+        sheetUrl?: string;
+        sheetId?: string;
+        message?: string;
+    }> {
+        // 1. Get tender details
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender) {
+            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+        }
+
+        const teamId = tender.team;
+
+        // 2. Check team config
+        const teamConfig = this.googleDriveService.getTeamConfig(teamId);
+        if (!teamConfig || !teamConfig.folderId) {
+            throw new BadRequestException(
+                `Google Drive not configured for this team`,
+            );
+        }
+
+        // 3. Check if costing sheet already exists
+        const existingSheet = await this.findByTenderId(tenderId);
+        if (existingSheet?.googleSheetUrl) {
+            return {
+                success: false,
+                message: 'Costing sheet already exists for this tender',
+                sheetUrl: existingSheet.googleSheetUrl,
+            };
+        }
+
+        // 4. Create the Google Sheet with custom name
+        const sheetResult = await this.googleDriveService.createSheet(
+            userId,
+            teamId,
+            customName,
+        );
+
+        // 5. Save to database
+        const now = new Date();
+
+        if (existingSheet) {
+            await this.db
+                .update(tenderCostingSheets)
+                .set({
+                    googleSheetId: sheetResult.sheetId,
+                    googleSheetUrl: sheetResult.sheetUrl,
+                    sheetTitle: sheetResult.sheetTitle,
+                    driveFolderId: sheetResult.folderId,
+                    sheetCreatedBy: userId.toString(),
+                    sheetCreatedAt: now,
+                    updatedAt: now,
+                })
+                .where(eq(tenderCostingSheets.id, existingSheet.id));
+        } else {
+            await this.db.insert(tenderCostingSheets).values({
+                tenderId,
+                googleSheetId: sheetResult.sheetId,
+                googleSheetUrl: sheetResult.sheetUrl,
+                sheetTitle: sheetResult.sheetTitle,
+                driveFolderId: sheetResult.folderId,
+                sheetCreatedBy: userId.toString(),
+                sheetCreatedAt: now,
+            });
+        }
+
+        return {
+            success: true,
+            sheetUrl: sheetResult.sheetUrl,
+            sheetId: sheetResult.sheetId,
         };
     }
 }

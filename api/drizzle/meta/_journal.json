@@ -218,6 +218,13 @@
       "when": 1765787470387,
       "tag": "0055_secret_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1765967138365,
+      "tag": "0056_misty_talkback",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,10 @@ export const tenderCostingSheets = pgTable('tender_costing_sheets', {
 
     // Google Sheet
     googleSheetUrl: varchar('google_sheet_url', { length: 500 }),
+    googleSheetId: varchar('google_sheet_id', { length: 255 }),
+    driveFolderId: varchar('drive_folder_id', { length: 255 }),
+    sheetCreatedBy: varchar('sheet_created_by', { length: 255 }),
+    sheetCreatedAt: timestamp('sheet_created_at', { withTimezone: true }),
     sheetTitle: varchar('sheet_title', { length: 255 }),
 
     // Submitted Values (by Tender Executive)

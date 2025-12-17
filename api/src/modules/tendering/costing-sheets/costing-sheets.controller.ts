@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
-import { SubmitCostingSheetDto, UpdateCostingSheetDto } from './dto/costing-sheet.dto';
+import { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -33,6 +33,16 @@ export class CostingSheetsController {
         return this.costingSheetsService.findAll(filters);
     }
 
+    @Get('counts')
+    getCounts() {
+        return this.costingSheetsService.getDashboardCounts();
+    }
+
+    @Get('check-drive-scopes')
+    async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
+        return this.costingSheetsService.checkDriveScopes(user.sub);
+    }
+
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.costingSheetsService.findByTenderId(tenderId);
@@ -63,9 +73,23 @@ export class CostingSheetsController {
         return this.costingSheetsService.update(id, dto, user.sub);
     }
 
-    @Get('counts')
-    getCounts() {
-        console.log('getCounts');
-        return this.costingSheetsService.getDashboardCounts();
+    @Post('create-sheet')
+    async createGoogleSheet(
+        @Body() dto: CreateSheetDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.costingSheetsService.createGoogleSheet(dto.tenderId, user.sub);
+    }
+
+    @Post('create-sheet-with-name')
+    async createGoogleSheetWithName(
+        @Body() dto: CreateSheetWithNameDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.costingSheetsService.createGoogleSheetWithName(
+            dto.tenderId,
+            user.sub,
+            dto.customName,
+        );
     }
 }

@@ -8,7 +8,7 @@ import type { TenderCostingSheet } from '@/types/api.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
-interface CostingSheetShowProps {
+interface CostingSheetViewProps {
     costingSheet?: TenderCostingSheet | null;
     isLoading?: boolean;
     showEditButton?: boolean;
@@ -18,7 +18,7 @@ interface CostingSheetShowProps {
     className?: string;
 }
 
-export function CostingSheetShow({
+export function CostingSheetView({
     costingSheet,
     isLoading = false,
     showEditButton = true,
@@ -26,7 +26,7 @@ export function CostingSheetShow({
     onEdit,
     onBack,
     className = '',
-}: CostingSheetShowProps) {
+}: CostingSheetViewProps) {
     if (isLoading) {
         return (
             <Card className={className}>

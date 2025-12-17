@@ -1,18 +1,17 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useTender } from '@/hooks/api/useTenders';
-import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { paths } from '@/app/routes/paths';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { TenderWithRelations } from '@/types/api.types';
-import { TenderView } from '../tenders/components/TenderView';
-import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { PhysicalDocsView } from './components/PhysicalDocsView';
+import { useParams, useNavigate } from "react-router-dom";
+import { useTender } from "@/hooks/api/useTenders";
+import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { TenderApprovalView } from "@/modules/tendering/tender-approval/components/TenderApprovalView";
+import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { paths } from "@/app/routes/paths";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { TenderWithRelations } from "@/types/api.types";
+import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
+import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
+import { PhysicalDocsView } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
 
 export default function PhysicalDocsShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -20,34 +19,12 @@ export default function PhysicalDocsShowPage() {
     const parsedId = id ? Number(id) : NaN;
     const tenderId = Number.isNaN(parsedId) ? null : parsedId;
 
-    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
 
-    const isLoading = tenderLoading || approvalLoading;
-
-    // Determine which tabs have data
-    const hasInfoSheet = !infoSheetLoading && !!infoSheet;
-
-    if (!tenderId || tenderError || (!tenderLoading && !tender)) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Tender not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate(paths.tendering.tenderApproval)}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
+    const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading;
 
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations = {
@@ -60,9 +37,7 @@ export default function PhysicalDocsShowPage() {
             <Tabs defaultValue="physical-docs" className="space-y-4">
                 <TabsList className="grid w-fit grid-cols-4 gap-2">
                     <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet" disabled={!hasInfoSheet && !infoSheetLoading}>
-                        Info Sheet
-                    </TabsTrigger>
+                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
                     <TabsTrigger value="approval">Tender Approval</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                 </TabsList>
