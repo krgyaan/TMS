@@ -1,6 +1,3 @@
-import type ImprestEmployeeDashboard from "@/modules/shared/imprest";
-import { id } from "date-fns/locale";
-
 export const paths = {
     // ==================== AUTH ====================
     auth: {
