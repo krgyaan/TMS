@@ -1,8 +1,13 @@
+import { create } from "domain";
 import { z } from "zod";
 
 export const followUpQuerySchema = z.object({
     tab: z.enum(["ongoing", "achieved", "angry", "future", "all"]).optional().default("all"),
     assignedToId: z
+        .string()
+        .transform(val => parseInt(val, 10))
+        .optional(),
+    createdById: z
         .string()
         .transform(val => parseInt(val, 10))
         .optional(),
