@@ -10,6 +10,7 @@ import { employeeImprestTransactions } from "@/db/schemas/shared/employee-impres
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 
 import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
+import { admin } from "googleapis/build/src/apis/admin";
 
 @Injectable()
 export class ImprestAdminService {
@@ -121,6 +122,8 @@ export class ImprestAdminService {
                     validFrom: employeeImprestVouchers.validFrom,
                     validTo: employeeImprestVouchers.validTo,
                     createdAt: employeeImprestVouchers.createdAt,
+                    adminSignedBy: employeeImprestVouchers.adminSignedBy,
+                    accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
                 })
                 .from(employeeImprestVouchers)
                 .where(whereClause)
@@ -134,8 +137,20 @@ export class ImprestAdminService {
                 .where(whereClause),
         ]);
 
+        const data = rows.map(row => ({
+            id: row.id,
+            voucherCode: row.voucherCode,
+            beneficiaryName: row.beneficiaryName,
+            amount: row.amount,
+            validFrom: row.validFrom,
+            validTo: row.validTo,
+            createdAt: row.createdAt,
+            adminApproval: row.adminSignedBy != null,
+            accountantApproval: row.accountsSignedBy != null,
+        }));
+
         return {
-            data: rows,
+            data,
             meta: {
                 page,
                 limit,
@@ -300,9 +315,9 @@ export class ImprestAdminService {
     }
 
     async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
-        if (!user.role.startsWith("account")) {
-            throw new ForbiddenException("Only accounts can approve here");
-        }
+        // if (!user.role.startsWith("account")) {
+        //     throw new ForbiddenException("Only accounts can approve here");
+        // }
 
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
@@ -333,9 +348,9 @@ export class ImprestAdminService {
     }
 
     async adminApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
-        if (user.role !== "admin") {
-            throw new ForbiddenException("Only admin can approve here");
-        }
+        // if (user.role !== "admin") {
+        //     throw new ForbiddenException("Only admin can approve here");
+        // }
 
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
