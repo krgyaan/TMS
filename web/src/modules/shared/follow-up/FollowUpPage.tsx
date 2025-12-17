@@ -40,6 +40,15 @@ const STOP_REASON_LABELS: Record<number, string> = {
     4: "Other",
 };
 
+const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+};
+
 const FollowupPage: React.FC = () => {
     const navigate = useNavigate();
 
@@ -70,6 +79,7 @@ const FollowupPage: React.FC = () => {
     });
 
     const followups = data?.data ?? [];
+    console.log("Follow-ups Data:", followups);
 
     const updateStatusMutation = useUpdateFollowUpStatus();
 
@@ -134,11 +144,23 @@ const FollowupPage: React.FC = () => {
             {
                 field: "latest_comment",
                 headerName: "Last Comment",
-                width: 220,
+                width: 180,
                 cellRenderer: (params: any) => <span className="text-muted-foreground truncate block">{params.value || "—"}</span>,
             },
-            { field: "updated_at", headerName: "Last Update", width: 140 },
-            { field: "start_from", headerName: "Start Date", width: 120 },
+            {
+                field: "creator",
+                headerName: "Assigned By",
+                width: 120,
+                cellRenderer: (params: any) => <span className="text-muted-foreground truncate block">{params?.value?.name || "—"}</span>,
+            },
+            {
+                field: "assignee",
+                headerName: "Assigned To",
+                width: 120,
+                cellRenderer: (params: any) => <span className="text-muted-foreground truncate block">{params?.value?.name || "—"}</span>,
+            },
+            { field: "updated_at", headerName: "Last Update", width: 140, valueGetter: params => formatDate(params?.data?.updated_at ?? null) },
+            { field: "start_from", headerName: "Start Date", width: 120, valueGetter: params => formatDate(params?.data?.start_from ?? null) },
             {
                 headerName: "Actions",
                 filter: false,
