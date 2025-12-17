@@ -53,13 +53,21 @@ const ImprestVoucherList: React.FC = () => {
                 valueFormatter: p => formatINR(p.value),
             },
             {
-                field: "approvalStatus",
-                headerName: "Status",
+                field: "accountantApproval",
+                headerName: "Accountant Approval",
                 cellRenderer: p =>
-                    p.value === 1 ? (
+                    p.value ? (
                         <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
-                    ) : p.value === 2 ? (
-                        <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">Rejected</span>
+                    ) : (
+                        <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
+                    ),
+            },
+            {
+                field: "adminApproval",
+                headerName: "Admin Approval",
+                cellRenderer: p =>
+                    p.value ? (
+                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
                     ) : (
                         <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
                     ),
