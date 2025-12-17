@@ -174,8 +174,8 @@ const CourierDashboard: React.FC = () => {
     const columns: ColDef[] = useMemo(
         () => [
             {
-                headerName: "Request No",
-                width: 150,
+                headerName: "Req No",
+                width: 90,
                 valueGetter: (p: any) => (p.data ? p.data.id : "-"),
             },
             {
