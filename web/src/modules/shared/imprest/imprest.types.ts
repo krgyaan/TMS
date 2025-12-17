@@ -47,6 +47,10 @@ export type ImprestVoucherRow = {
     validFrom: string;
     validTo: string;
     approvalStatus: number;
+    accountsSignedBy: string | null;
+    adminApproval: boolean;
+    accountantApproval: boolean;
+    adminSignedBy: string | null;
     createdAt: string;
 };
 

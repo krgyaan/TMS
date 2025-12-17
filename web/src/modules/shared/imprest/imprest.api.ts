@@ -69,13 +69,14 @@ export const getImprestVoucherById = async (id: number): Promise<ImprestVoucherV
 // ---------- ACCOUNT APPROVE ----------
 export const accountApproveVoucher = async (payload: { id: number; remark?: string; approve: boolean }) => {
     const { id, ...body } = payload;
-    const res = await api.post(`/imprest-vouchers/${id}/account-approve`, body);
+    const res = await api.post(`/accounts/imprest/voucher/${id}/account-approve`, body);
     return res.data;
 };
 
 // ---------- ADMIN APPROVE ----------
 export const adminApproveVoucher = async (payload: { id: number; remark?: string; approve: boolean }) => {
     const { id, ...body } = payload;
-    const res = await api.post(`/imprest-vouchers/${id}/admin-approve`, body);
+    const res = await api.post(`/accounts/imprest/voucher/${id}/admin-approve`, body);
+    console.log(res);
     return res.data;
 };
