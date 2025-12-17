@@ -62,4 +62,10 @@ export class CostingSheetsController {
     ) {
         return this.costingSheetsService.update(id, dto, user.sub);
     }
+
+    @Get('counts')
+    getCounts() {
+        console.log('getCounts');
+        return this.costingSheetsService.getDashboardCounts();
+    }
 }

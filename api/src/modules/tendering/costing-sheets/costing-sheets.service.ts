@@ -205,6 +205,27 @@ export class CostingSheetsService {
         return costingSheetStatus as 'Submitted' | 'Approved' | 'Rejected/Redo';
     }
 
+    async getDashboardCounts(): Promise<{ pending: number; submitted: number; rejected: number; total: number }> {
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderCostingSheets)
+            .where(isNull(tenderCostingSheets.id));
+        const pending = Number(countResult?.count || 0);
+        const [submittedCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderCostingSheets)
+            .where(inArray(tenderCostingSheets.status, ['Submitted', 'Approved']));
+        const submitted = Number(submittedCountResult?.count || 0);
+        const [rejectedCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.status, 'Rejected/Redo'));
+        const rejected = Number(rejectedCountResult?.count || 0);
+        const total = pending + submitted + rejected;
+        console.log(pending, submitted, rejected, total);
+        return { pending, submitted, rejected, total };
+    }
+
     async findByTenderId(tenderId: number) {
         const result = await this.db
             .select()

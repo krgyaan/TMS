@@ -1304,6 +1304,7 @@ export interface DocumentChecklistsDashboardCounts {
     submitted: number;
     total: number;
 }
+
 export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;

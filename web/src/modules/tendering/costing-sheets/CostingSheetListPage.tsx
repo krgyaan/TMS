@@ -1,5 +1,3 @@
-// pages/CostingSheets.tsx
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
@@ -15,7 +13,8 @@ import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from 'lucide
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useCostingSheets, useCostingSheetsDashboardCounts, type CostingSheetDashboardRow } from '@/hooks/api/useCostingSheets';
+import { useCostingSheets, useCostingSheetsCounts } from '@/hooks/api/useCostingSheets';
+import type { CostingSheetDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'pending' | 'submitted' | 'rejected';
@@ -47,7 +46,7 @@ const CostingSheets = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
-    const { data: counts } = useCostingSheetsDashboardCounts();
+    const { data: counts } = useCostingSheetsCounts();
 
     const costingSheetsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -99,17 +98,17 @@ const CostingSheets = () => {
             {
                 key: 'pending' as TabKey,
                 name: 'Pending',
-                count: counts?.pending ?? 0,
+                count: counts?.pending || 0,
             },
             {
                 key: 'submitted' as TabKey,
                 name: 'Submitted',
-                count: counts?.submitted ?? 0,
+                count: counts?.submitted || 0,
             },
             {
                 key: 'rejected' as TabKey,
                 name: 'Rejected/Redo',
-                count: counts?.rejected ?? 0,
+                count: counts?.rejected || 0,
             },
         ];
     }, [counts]);
