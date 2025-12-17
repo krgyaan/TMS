@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const UserMiniSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    email: z.string().optional(),
+});
+
 /* =====================================
    CONTACT PERSON
 ===================================== */
@@ -189,17 +195,21 @@ export const FollowUpRowSchema = z.object({
     frequencyLabel: z.string().optional(),
 
     status: z.string(),
-    latest_comment: z.string().nullable().optional(),
+    latestComment: z.string().nullable().optional(),
 
-    updated_at: z.string().optional(),
-    created_at: z.string().optional(),
-    start_from: z.string().optional(),
+    updatedAt: z.string().optional(),
+    createdAt: z.string().optional(),
+    startFrom: z.string().optional(),
 
-    assigned_to_id: z.number().optional(),
+    assignedToId: z.number().optional(),
+    createdById: z.number().optional(),
+
+    assignee: UserMiniSchema.nullable().optional(),
+    creator: UserMiniSchema.nullable().optional(),
 
     followPerson: z.array(ContactPersonSchema).optional(),
 
-    stop_reason: z.number().nullable().optional(), // 1–4
+    stopReason: z.number().nullable().optional(), // 1–4
     stopReasonLabel: z.string().nullable().optional(),
 });
 
@@ -219,6 +229,7 @@ export const FollowUpDetailsSchema = z.object({
     categoryId: z.number().nullable().optional(),
 
     assignedToId: z.number(),
+    createdById: z.number(),
     details: z.string().nullable().optional(),
 
     status: z.string(),
