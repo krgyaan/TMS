@@ -1,18 +1,27 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const UpdateEmployeeImprestSchema = z.object({
-  party_name: z.string().optional().nullable(),
-  project_name: z.string().optional().nullable(),
-  amount: z.number().optional(),
-  category: z.string().optional().nullable(),
-  team_id: z.number().optional().nullable(),
-  remark: z.string().optional().nullable(),
-  approval_status: z.number().optional(),
-  tally_status: z.number().optional(),
-  proof_status: z.number().optional(),
-  status: z.number().optional(),
+    userId: z.number().int().optional().nullable(),
+    categoryId: z.number().int().optional().nullable(),
+    teamId: z.number().int().optional().nullable(),
+
+    partyName: z.string().max(255).optional().nullable(),
+    projectName: z.string().max(255).optional().nullable(),
+    ip: z.string().max(100).optional().nullable(),
+
+    amount: z.number().int().min(1).optional().nullable(),
+    strtotime: z.number().int().optional().nullable(),
+
+    remark: z.string().optional().nullable(),
+
+    invoiceProof: z.array(z.unknown()).optional(),
+
+    approvalStatus: z.number().int().optional(),
+    tallyStatus: z.number().int().optional(),
+    proofStatus: z.number().int().optional(),
+    status: z.number().int().optional(),
+
+    approvedDate: z.coerce.date().optional().nullable(),
 });
 
-export type UpdateEmployeeImprestDto = z.infer<
-  typeof UpdateEmployeeImprestSchema
->;
+export type UpdateEmployeeImprestDto = z.infer<typeof UpdateEmployeeImprestSchema>;

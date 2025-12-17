@@ -292,7 +292,7 @@ const CourierDashboard: React.FC = () => {
             </CardHeader>
 
             <CardContent>
-                <Tabs defaultValue="pending" onValueChange={setActiveTab}>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="mx-auto flex justify-center mb-4">
                         <TabsTrigger value="pending">
                             Pending

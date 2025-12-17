@@ -3,3 +3,6 @@ myenv
 */__pycache__
 */CONSTANTS.py
 */samples
+ml-ocr/samples
+ml-ocr/__pycache__
+

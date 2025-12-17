@@ -1,11 +1,11 @@
 // employee-imprest.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
 
-import { employee_imprests } from "@db/schemas/accounts/employee-imprests.schema";
+import { employeeImprests } from "@db/schemas/shared";
 
 import { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
@@ -17,52 +17,65 @@ export class EmployeeImprestService {
         private readonly db: DbInstance
     ) {}
 
+    /* ----------------------------- CREATE ----------------------------- */
     async create(data: CreateEmployeeImprestDto, userId: number) {
         const result = await this.db
-            .insert(employee_imprests)
+            .insert(employeeImprests)
             .values({
                 ...data,
-                user_id: userId,
-                invoice_proof: [],
+                userId, // override client input
+                invoiceProof: [], // safe explicit default
             })
             .returning();
-        console.log(result);
+
         return result[0];
     }
 
+    /* ----------------------------- READ ------------------------------ */
     async findAllByUser(userId: number) {
-        return this.db.select().from(employee_imprests).where(eq(employee_imprests.user_id, userId)).orderBy(employee_imprests.created_at);
+        userId = 31; // temp testing fix
+        return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(employeeImprests.createdAt);
     }
 
     async findOne(id: number) {
-        const result = await this.db.select().from(employee_imprests).where(eq(employee_imprests.id, id)).limit(1);
+        const result = await this.db.select().from(employeeImprests).where(eq(employeeImprests.id, id)).limit(1);
 
         return result[0] ?? null;
     }
 
+    /* ----------------------------- UPDATE ----------------------------- */
     async update(id: number, data: UpdateEmployeeImprestDto, userId: number) {
         const existing = await this.findOne(id);
-        if (!existing || existing.user_id !== userId) {
-            return null; // Or throw ForbiddenException
+
+        if (!existing) {
+            throw new NotFoundException("Employee imprest not found");
+        }
+
+        if (existing.userId !== userId) {
+            throw new ForbiddenException("Not authorized");
         }
 
         const result = await this.db
-            .update(employee_imprests)
-            .set({ ...data, updated_at: new Date() })
-            .where(eq(employee_imprests.id, id))
+            .update(employeeImprests)
+            .set({
+                ...data,
+                updatedAt: new Date(),
+            })
+            .where(eq(employeeImprests.id, id))
             .returning();
 
         return result[0];
     }
 
+    /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
 
         if (!existing) {
-            throw new NotFoundException("Courier not found");
+            throw new NotFoundException("Employee imprest not found");
         }
 
-        if (existing.user_id !== userId) {
+        if (existing.userId !== userId) {
             throw new ForbiddenException("Not authorized");
         }
 
@@ -72,28 +85,34 @@ export class EmployeeImprestService {
             type: file.mimetype.startsWith("image") ? "image" : "file",
         }));
 
-        const existingDocs = (existing.invoice_proof as any[]) || [];
+        const existingDocs = (existing.invoiceProof as any[]) ?? [];
         const updatedDocs = [...existingDocs, ...newDocs];
 
         const result = await this.db
-            .update(employee_imprests)
+            .update(employeeImprests)
             .set({
-                invoice_proof: updatedDocs,
-                updated_at: new Date(),
+                invoiceProof: updatedDocs,
+                updatedAt: new Date(),
             })
-            .where(eq(employee_imprests.id, id))
+            .where(eq(employeeImprests.id, id))
             .returning();
 
         return result[0];
     }
 
+    /* ----------------------------- DELETE ------------------------------ */
     async delete(id: number, userId: number) {
         const existing = await this.findOne(id);
-        if (!existing || existing.user_id !== userId) {
-            return { success: false };
+
+        if (!existing) {
+            throw new NotFoundException("Employee imprest not found");
         }
 
-        await this.db.delete(employee_imprests).where(eq(employee_imprests.id, id));
+        if (existing.userId !== userId) {
+            throw new ForbiddenException("Not authorized");
+        }
+
+        await this.db.delete(employeeImprests).where(eq(employeeImprests.id, id));
 
         return { success: true };
     }

@@ -24,16 +24,18 @@ const multerConfig = {
 };
 @Controller("employee-imprest")
 export class EmployeeImprestController {
-    constructor(private readonly service: EmployeeImprestService) { }
+    constructor(private readonly service: EmployeeImprestService) {}
 
     @Post()
     create(@Body() body: CreateEmployeeImprestDto, @CurrentUser("id") userId: number) {
-        return this.service.create(body, userId);
+        let data = this.service.create(body, userId);
+        console.log("Created Employee Imprest:", data);
+        return data;
     }
 
     @Get()
     getMyImprests(@Req() req) {
-        return this.service.findAllByUser(req.user.id);
+        return this.service.findAllByUser(req.user.sub);
     }
 
     @Get("user/:userId")

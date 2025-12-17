@@ -1,5 +1,21 @@
 // src/modules/courier/courier.controller.ts
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Param,
+    Body,
+    Query,
+    ParseIntPipe,
+    UseInterceptors,
+    UploadedFiles,
+    UploadedFile,
+    BadRequestException,
+    Req,
+} from "@nestjs/common";
 import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
@@ -28,6 +44,13 @@ const fileFilter = (req: any, file: Express.Multer.File, callback: (error: Error
         callback(new BadRequestException(`Invalid file type: ${file.mimetype}. Allowed types: images, PDF, Word documents.`), false);
     }
 };
+
+// $statusMap = [
+//     'dispatched' => ['1'],
+//     'not_delivered' => ['2', '3'],
+//     'delivered' => ['4'],
+//     'rejected' => ['5'],
+// ];
 
 // Multer config
 const multerConfig = {
@@ -73,11 +96,14 @@ const docketSlipMulterConfig = {
 
 @Controller("couriers")
 export class CourierController {
-    constructor(private readonly service: CourierService) { }
+    constructor(private readonly service: CourierService) {}
 
     @Post()
-    create(@Body() body: CreateCourierDto, @CurrentUser("id") userId: number) {
-        return this.service.create(body, userId);
+    create(@Body() body: CreateCourierDto, @Req() req) {
+        console.log("create request made");
+        console.log(body);
+        console.log(req.user);
+        return this.service.create(body, req.user.sub);
     }
 
     @Post(":id/dispatch")
@@ -86,14 +112,30 @@ export class CourierController {
         @Param("id", ParseIntPipe) id: number,
         @Body()
         body: {
-            courier_provider: string;
-            docket_no: string;
-            pickup_date: string;
+            courierProvider: string;
+            docketNo: string;
+            pickupDate: string;
         },
         @UploadedFile() file: Express.Multer.File | undefined,
         @CurrentUser("id") userId: number
     ) {
+        console.log("createDispatch called with body:", body);
         return this.service.createDispatch(id, body, file, userId);
+    }
+
+    // Update dispatch info
+    @Patch(":id/dispatch")
+    updateDispatch(
+        @Param("id", ParseIntPipe) id: number,
+        @Body()
+        body: {
+            courierProvider: string;
+            docketNo: string;
+            pickupDate: string;
+        },
+        @CurrentUser("id") userId: number
+    ) {
+        return this.service.updateDispatch(id, body, userId);
     }
 
     // Get all couriers for logged-in user
@@ -105,6 +147,8 @@ export class CourierController {
     // Get all couriers (admin/dashboard)
     @Get("all")
     getAllCouriers() {
+        // return "Hey";
+        console.log("getAllCouriers called");
         return this.service.findAll();
     }
 
@@ -148,21 +192,6 @@ export class CourierController {
         @CurrentUser("id") userId: number
     ) {
         return this.service.updateStatus(id, body, userId);
-    }
-
-    // Update dispatch info
-    @Patch(":id/dispatch")
-    updateDispatch(
-        @Param("id", ParseIntPipe) id: number,
-        @Body()
-        body: {
-            courier_provider: string;
-            docket_no: string;
-            pickup_date: string;
-        },
-        @CurrentUser("id") userId: number
-    ) {
-        return this.service.updateDispatch(id, body, userId);
     }
 
     @Delete(":id")

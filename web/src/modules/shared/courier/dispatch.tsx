@@ -18,9 +18,9 @@ import { format } from "date-fns";
 
 // Validation schema
 const courierDispatchSchema = z.object({
-    courier_provider: z.string().min(1, "Courier provider is required"),
-    pickup_date: z.string().min(1, "Pickup date and time is required"),
-    docket_no: z.string().min(1, "Docket number is required"),
+    courierProvider: z.string().min(1, "Courier provider is required"),
+    pickupDate: z.string().min(1, "Pickup date and time is required"),
+    docketNo: z.string().min(1, "Docket number is required"),
 });
 
 type CourierDispatchFormData = z.infer<typeof courierDispatchSchema>;
@@ -42,6 +42,7 @@ const CourierDispatchForm = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const courierId = id ? parseInt(id, 10) : 0;
+    console.log("Courier ID:", courierId);
 
     // File state
     const [file, setFile] = useState<File | null>(null);
@@ -58,9 +59,9 @@ const CourierDispatchForm = () => {
     } = useForm<CourierDispatchFormData>({
         resolver: zodResolver(courierDispatchSchema),
         defaultValues: {
-            courier_provider: "",
-            pickup_date: "",
-            docket_no: "",
+            courierProvider: "",
+            pickupDate: "",
+            docketNo: "",
         },
     });
 
@@ -85,16 +86,16 @@ const CourierDispatchForm = () => {
             await dispatchMutation.mutateAsync({
                 id: courierId,
                 data: {
-                    courier_provider: data.courier_provider,
-                    docket_no: data.docket_no,
-                    pickup_date: data.pickup_date,
-                    docket_slip: file || undefined,
+                    courierProvider: data.courierProvider,
+                    docketNo: data.docketNo,
+                    pickupDate: data.pickupDate,
+                    docketSlip: file || undefined,
                 },
             });
 
             toast.success("Courier dispatched successfully!", {
                 id: toastId,
-                description: `Docket #${data.docket_no} has been recorded.`,
+                description: `Docket #${data.docketNo} has been recorded.`,
             });
 
             navigate(paths.shared.couriers);
@@ -217,27 +218,27 @@ const CourierDispatchForm = () => {
                                 <User className="h-3 w-3" />
                                 Recipient
                             </p>
-                            <p className="font-medium">{courier.to_name}</p>
-                            <p className="text-sm text-muted-foreground">{courier.to_org}</p>
+                            <p className="font-medium">{courier.toName}</p>
+                            <p className="text-sm text-muted-foreground">{courier.toOrg}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
                                 Destination
                             </p>
-                            <p className="font-medium">{courier.to_addr}</p>
-                            <p className="text-sm text-muted-foreground">PIN: {courier.to_pin}</p>
+                            <p className="font-medium">{courier.toAddr}</p>
+                            <p className="text-sm text-muted-foreground">PIN: {courier.toPin}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
                                 Expected Delivery
                             </p>
-                            <p className="font-medium">{format(new Date(courier.del_date), "PPP")}</p>
+                            <p className="font-medium">{format(new Date(courier.delDate), "PPP")}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">Contact</p>
-                            <p className="font-medium">{courier.to_mobile}</p>
+                            <p className="font-medium">{courier.toMobile}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -257,8 +258,8 @@ const CourierDispatchForm = () => {
                                 <Label htmlFor="courier_provider">
                                     Courier Provider <span className="text-destructive">*</span>
                                 </Label>
-                                <Input id="courier_provider" placeholder="e.g., BlueDart, DTDC, FedEx" {...register("courier_provider")} disabled={isSubmitting} />
-                                {errors.courier_provider && <p className="text-sm text-destructive">{errors.courier_provider.message}</p>}
+                                <Input id="courier_provider" placeholder="e.g., BlueDart, DTDC, FedEx" {...register("courierProvider")} disabled={isSubmitting} />
+                                {errors.courierProvider && <p className="text-sm text-destructive">{errors.courierProvider.message}</p>}
                             </div>
 
                             {/* Pickup Date and Time */}
@@ -266,8 +267,8 @@ const CourierDispatchForm = () => {
                                 <Label htmlFor="pickup_date">
                                     Pickup Date and Time <span className="text-destructive">*</span>
                                 </Label>
-                                <Input id="pickup_date" type="datetime-local" {...register("pickup_date")} disabled={isSubmitting} />
-                                {errors.pickup_date && <p className="text-sm text-destructive">{errors.pickup_date.message}</p>}
+                                <Input id="pickup_date" type="datetime-local" {...register("pickupDate")} disabled={isSubmitting} />
+                                {errors.pickupDate && <p className="text-sm text-destructive">{errors.pickupDate.message}</p>}
                             </div>
 
                             {/* Docket Number */}
@@ -275,8 +276,8 @@ const CourierDispatchForm = () => {
                                 <Label htmlFor="docket_no">
                                     Docket No <span className="text-destructive">*</span>
                                 </Label>
-                                <Input id="docket_no" placeholder="Enter docket/AWB number" {...register("docket_no")} disabled={isSubmitting} />
-                                {errors.docket_no && <p className="text-sm text-destructive">{errors.docket_no.message}</p>}
+                                <Input id="docket_no" placeholder="Enter docket/AWB number" {...register("docketNo")} disabled={isSubmitting} />
+                                {errors.docketNo && <p className="text-sm text-destructive">{errors.docketNo.message}</p>}
                             </div>
                         </div>
 

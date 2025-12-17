@@ -29,6 +29,7 @@ export const courierApi = {
     // Get dashboard data (grouped by status)
     getDashboardData: async (): Promise<CourierDashboardData> => {
         const response = await api.get(`${ENDPOINT}/dashboard`);
+        console.log("Fetched dashboard data:", response.data);
         return response.data;
     },
 
@@ -69,14 +70,15 @@ export const courierApi = {
 
     // Create dispatch info
     createDispatch: async (id: number, data: CreateDispatchInput): Promise<Courier> => {
+        console.log("Creating dispatch with data:", data);
         const formData = new FormData();
 
-        formData.append("courier_provider", data.courierProvider);
-        formData.append("docket_no", data.docketNo);
-        formData.append("pickup_date", data.pickupDate);
+        formData.append("courierProvider", data.courierProvider);
+        formData.append("docketNo", data.docketNo);
+        formData.append("pickupDate", data.pickupDate);
 
         if (data.docketSlip) {
-            formData.append("docket_slip", data.docketSlip);
+            formData.append("docketSlip", data.docketSlip);
         }
 
         const response = await api.post(`${ENDPOINT}/${id}/dispatch`, formData, {
@@ -85,14 +87,16 @@ export const courierApi = {
             },
         });
 
+        console.log("Dispatch created, response data:", response.data);
+
         return response.data;
     },
 
     // Update dispatch info
-    updateDispatch: async (id: number, data: UpdateDispatchInput): Promise<Courier> => {
-        const response = await api.patch(`${ENDPOINT}/${id}/dispatch`, data);
-        return response.data;
-    },
+    // updateDispatch: async (id: number, data: UpdateDispatchInput): Promise<Courier> => {
+    //     const response = await api.patch(`${ENDPOINT}/${id}/dispatch`, data);
+    //     return response.data;
+    // },
 
     // Delete courier
     delete: async (id: number): Promise<{ success: boolean }> => {

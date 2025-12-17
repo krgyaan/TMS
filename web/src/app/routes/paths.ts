@@ -1,3 +1,4 @@
+import type ImprestEmployeeDashboard from "@/modules/shared/imprest";
 import { id } from "date-fns/locale";
 
 export const paths = {
@@ -108,6 +109,7 @@ export const paths = {
     // ==================== ACCOUNTS ====================
     accounts: {
         imprests: "/accounts/imprests",
+        imprestPaymentHistory: (id: number) => `/accounts/imprest/payment-history/${id}`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
         accountChecklists: "/accounts/account-checklists",
@@ -262,8 +264,9 @@ export const paths = {
         courierEdit: (id: number) => `/shared/couriers/edit/${id}`,
 
         imprest: "/shared/imprests",
+        imprestUser: (id: number) => `/shared/imprests/user/${id}`,
         imprestCreate: "/shared/imprests/create",
-        ImprestPaymentHistory: "/shared/imprests/payment-history",
-        ImprestVoucher: "/shared/imprests/voucher",
+        imprestVoucher: (id: number) => `/shared/imprests/voucher/${id}`,
+        imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
     },
 };

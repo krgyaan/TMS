@@ -10,7 +10,7 @@ export const getFollowUps = async (query: FollowUpQueryDto) => {
 
 export const getFollowUpDetail = async (id: number): Promise<FollowUpDetailsDto> => {
     const { data } = await api.get(`/follow-up/${id}`);
-    console.log(data);
+    console.log("Getting follow up details", data);
     return data;
 };
 
