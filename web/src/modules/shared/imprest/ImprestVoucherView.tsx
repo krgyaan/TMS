@@ -11,7 +11,10 @@ const ImprestVoucherView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const voucherId = Number(id);
 
-    const { user } = useAuth();
+    const { data: user } = useAuth();
+    const roleName = user?.role?.name ?? "";
+    const roleId = user?.role?.id ?? null;
+
     const { data, isLoading, refetch } = useImprestVoucherView(voucherId);
 
     const accountApproveMutation = useAccountApproveVoucher();
@@ -28,6 +31,12 @@ const ImprestVoucherView: React.FC = () => {
     const { voucher, items } = data;
 
     /* -------------------- HANDLERS -------------------- */
+
+    const resetForm = () => {
+        setRemark("");
+        setApprove(false);
+    };
+
     const handleAccountSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         accountApproveMutation.mutate(
@@ -35,8 +44,7 @@ const ImprestVoucherView: React.FC = () => {
             {
                 onSuccess: () => {
                     setAccModalOpen(false);
-                    setRemark("");
-                    setApprove(false);
+                    resetForm();
                     refetch();
                 },
             }
@@ -50,13 +58,15 @@ const ImprestVoucherView: React.FC = () => {
             {
                 onSuccess: () => {
                     setAdminModalOpen(false);
-                    setRemark("");
-                    setApprove(false);
+                    resetForm();
                     refetch();
                 },
             }
         );
     };
+
+    const isAccountUser = roleName.startsWith("account");
+    const isAdminUser = roleId === 1; // Assuming role ID 1 is for Admin/CEO
 
     return (
         <Card>
@@ -76,7 +86,7 @@ const ImprestVoucherView: React.FC = () => {
                 {/* -------------------- ITEMS -------------------- */}
                 <table className="w-full border border-collapse">
                     <thead>
-                        <tr className="border">
+                        <tr>
                             <th className="border p-2">Project</th>
                             <th className="border p-2">Remark</th>
                             <th className="border p-2 text-right">Amount</th>
@@ -118,15 +128,15 @@ const ImprestVoucherView: React.FC = () => {
 
                 {/* -------------------- ACTIONS -------------------- */}
                 <div className="flex justify-center gap-3 pt-4">
-                    {user?.role?.startsWith("account") && !voucher.accountsSignedBy && (
+                    {isAccountUser && !voucher.accountsSignedBy && (
                         <Button variant="outline" onClick={() => setAccModalOpen(true)}>
                             Approve by Accounts
                         </Button>
                     )}
 
-                    {user?.role === "admin" && !voucher.adminSignedBy && (
+                    {isAdminUser && !voucher.adminSignedBy && (
                         <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
-                            Approve by Admin
+                            Approve by CEO
                         </Button>
                     )}
 
@@ -150,7 +160,7 @@ const ImprestVoucherView: React.FC = () => {
                         </label>
 
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" type="button" onClick={() => setAccModalOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={accountApproveMutation.isLoading}>
@@ -165,7 +175,7 @@ const ImprestVoucherView: React.FC = () => {
             <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Approve by Admin</DialogTitle>
+                        <DialogTitle>Approve by CEO</DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={handleAdminSubmit} className="space-y-4">
@@ -177,7 +187,7 @@ const ImprestVoucherView: React.FC = () => {
                         </label>
 
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" type="button" onClick={() => setAdminModalOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={adminApproveMutation.isLoading}>
