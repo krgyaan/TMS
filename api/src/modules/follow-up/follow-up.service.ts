@@ -131,11 +131,11 @@ export class FollowUpService {
 
         const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
-        if (currentUser.role !== "admin") {
-            conditions.push(eq(followUps.assignedToId, currentUser.id));
-        } else if (assignedToId) {
-            conditions.push(eq(followUps.assignedToId, assignedToId));
-        }
+        // if (currentUser.role !== "admin") {
+        //     conditions.push(eq(followUps.assignedToId, currentUser.id));
+        // } else if (assignedToId) {
+        //     conditions.push(eq(followUps.assignedToId, assignedToId));
+        // }
 
         if (search) {
             conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`))!);
@@ -162,7 +162,9 @@ export class FollowUpService {
         const results = await this.db.query.followUps.findMany({
             where: and(...conditions),
             with: {
-                contacts: true, // 👈 THIS PULLS FROM follow_up_persons
+                contacts: true,
+                assignee: true,
+                creator: true,
             },
             orderBy: orderDirection(orderColumn),
             limit,
@@ -178,7 +180,9 @@ export class FollowUpService {
         // Transform + include contacts
         const data = results.map(fu => ({
             ...this.transformFollowUp(fu),
-            contacts: fu.contacts, // 👈 returned from relations
+            contacts: fu.contacts,
+            creator: fu.creator,
+            assignee: fu.assignee,
         }));
 
         return {
