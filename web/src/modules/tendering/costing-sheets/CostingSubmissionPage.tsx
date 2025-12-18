@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import CostingSheetSubmitForm from './components/CostingSheetSubmitForm';
 import { useTender } from '@/hooks/api/useTenders';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -9,9 +10,10 @@ import { ArrowLeft } from 'lucide-react';
 export default function CostingSheetSubmitPage() {
     const navigate = useNavigate();
     const { tenderId } = useParams<{ tenderId: string }>();
-    const { data: tenderDetails, isLoading } = useTender(Number(tenderId));
+    const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tenderId));
+    const { data: costingSheet, isLoading: costingLoading } = useCostingSheetByTender(Number(tenderId));
 
-    if (isLoading) return <Skeleton className="h-[600px]" />;
+    if (tenderLoading || costingLoading) return <Skeleton className="h-[600px]" />;
     if (!tenderDetails) return (
         <Alert variant="destructive">
             <AlertTitle>Tender not found</AlertTitle>
@@ -30,6 +32,7 @@ export default function CostingSheetSubmitPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
             }}
             mode="submit"
+            existingData={costingSheet || undefined}
         />
     );
 }

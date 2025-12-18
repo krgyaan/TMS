@@ -232,21 +232,9 @@ export const paths = {
         leadTypes_create: "/master/lead-types/create",
         leadTypes_edit: (id: number | string) => `/master/lead-types/${id}/edit`,
 
-        vendorAccs: "/master/vendor-accounts",
-        vendorAccs_create: "/master/vendor-accounts/create",
-        vendorAccs_edit: (id: number | string) => `/master/vendor-accounts/${id}/edit`,
-
-        vendorGsts: "/master/vendor-gsts",
-        vendorGsts_create: "/master/vendor-gsts/create",
-        vendorGsts_edit: (id: number | string) => `/master/vendor-gsts/${id}/edit`,
-
-        vendorFiles: "/master/vendor-files",
-        vendorFiles_create: "/master/vendor-files/create",
-        vendorFiles_edit: (id: number | string) => `/master/vendor-files/${id}/edit`,
-
-        vendorOrganizations: "/master/vendor-organizations",
-        vendorOrganizations_create: "/master/vendor-organizations/create",
-        vendorOrganizations_edit: (id: number | string) => `/master/vendor-organizations/${id}/edit`,
+        vendors: "/master/vendors",
+        vendors_create: "/master/vendors/create",
+        vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
     },
 
     // ==================== SHARED ====================

@@ -231,10 +231,100 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
     persons: Vendor[];
     gsts: VendorGst[];
     accounts: VendorAcc[];
+    files?: VendorFile[];
     _counts?: {
         persons: number;
         gsts: number;
         accounts: number;
+        files?: number;
+    };
+}
+
+// DTOs for creating/updating vendor organizations with relations
+export interface CreateVendorGstDto {
+    org: number;
+    gstState: string;
+    gstNum: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorGstDto {
+    gstState?: string;
+    gstNum?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorAccountDto {
+    org: number;
+    accountName: string;
+    accountNum: string;
+    accountIfsc: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorAccountDto {
+    accountName?: string;
+    accountNum?: string;
+    accountIfsc?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorFileDto {
+    vendorId: number;
+    name: string;
+    filePath: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorFileDto {
+    name?: string;
+    filePath?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorOrganizationWithRelationsDto {
+    organization: {
+        name: string;
+        address?: string;
+        status?: boolean;
+    };
+    gsts?: Omit<CreateVendorGstDto, 'org'>[];
+    accounts?: Omit<CreateVendorAccountDto, 'org'>[];
+    persons?: Array<{
+        name: string;
+        email?: string;
+        address?: string;
+        status?: boolean;
+        files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+    }>;
+}
+
+export interface UpdateVendorOrganizationWithRelationsDto {
+    organization?: {
+        name?: string;
+        address?: string;
+        status?: boolean;
+    };
+    gsts?: {
+        create?: Omit<CreateVendorGstDto, 'org'>[];
+        update?: Array<{ id: number; data: UpdateVendorGstDto }>;
+        delete?: number[];
+    };
+    accounts?: {
+        create?: Omit<CreateVendorAccountDto, 'org'>[];
+        update?: Array<{ id: number; data: UpdateVendorAccountDto }>;
+        delete?: number[];
+    };
+    persons?: {
+        create?: Array<{
+            name: string;
+            email?: string;
+            address?: string;
+            status?: boolean;
+            files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+        }>;
+        update?: Array<{ id: number; data: Partial<CreateVendorDto> }>;
+        delete?: number[];
     };
 }
 
@@ -907,6 +997,45 @@ export type UpdateCostingSheetDto = {
     teRemarks: string;
 };
 
+export type CostingApprovalDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMember: number | null;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    submittedFinalPrice: string | null;
+    submittedBudgetPrice: string | null;
+    googleSheetUrl: string | null;
+    costingSheetId: number | null;
+};
+
+export type ApproveCostingDto = {
+    finalPrice: string;
+    receiptPrice: string;
+    budgetPrice: string;
+    grossMargin: string;
+    oemVendorIds: number[];
+    tlRemarks: string;
+};
+
+export type RejectCostingDto = {
+    rejectionReason: string;
+};
+
+export type CostingApprovalListParams = {
+    costingStatus?: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 export type BidSubmissionStatus = 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
 
 export type BidDocuments = {
@@ -1270,7 +1399,7 @@ export interface BidSubmissionDashboardCounts {
 }
 
 export interface CostingApprovalDashboardCounts {
-    pending: number;
+    submitted: number;
     approved: number;
     rejected: number;
     total: number;

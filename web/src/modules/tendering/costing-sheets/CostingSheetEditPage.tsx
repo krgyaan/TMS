@@ -23,6 +23,37 @@ export default function CostingSheetEditPage() {
             <Button variant="outline" onClick={() => navigate(-1)}><ArrowLeft /> Back to Tenders</Button>
         </Alert>);
 
+    // Validate costing sheet exists
+    if (!costingSheet) {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Costing Sheet Not Found</AlertTitle>
+                <AlertDescription>
+                    No costing sheet exists for this tender. Please submit a costing sheet first.
+                </AlertDescription>
+                <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+            </Alert>
+        );
+    }
+
+    // Validate costing sheet is in Submitted status (only submitted sheets can be edited)
+    if (costingSheet.status !== 'Submitted') {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Cannot Edit Costing Sheet</AlertTitle>
+                <AlertDescription>
+                    Only costing sheets with "Submitted" status can be edited.
+                    Current status: {costingSheet.status || 'Not submitted'}
+                </AlertDescription>
+                <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+            </Alert>
+        );
+    }
+
     return (
         <CostingSheetSubmitForm
             tenderId={Number(tenderId)}
@@ -33,7 +64,7 @@ export default function CostingSheetEditPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
             }}
             mode="edit"
-            existingData={costingSheet || undefined}
+            existingData={costingSheet}
         />
     );
 }

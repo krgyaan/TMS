@@ -1,5 +1,3 @@
-// pages/CostingSheetResubmitPage.tsx
-
 import { useParams } from 'react-router-dom';
 import CostingSheetSubmitForm from './components/CostingSheetSubmitForm';
 import { useTender } from '@/hooks/api/useTenders';
@@ -25,6 +23,37 @@ export default function CostingSheetResubmitPage() {
         </Alert>
     );
 
+    // Validate costing sheet exists
+    if (!costingSheet) {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Costing Sheet Not Found</AlertTitle>
+                <AlertDescription>
+                    No costing sheet exists for this tender. Please submit a costing sheet first.
+                </AlertDescription>
+                <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+            </Alert>
+        );
+    }
+
+    // Validate costing sheet is in Rejected/Redo status (only rejected sheets can be resubmitted)
+    if (costingSheet.status !== 'Rejected/Redo') {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Cannot Resubmit Costing Sheet</AlertTitle>
+                <AlertDescription>
+                    Only costing sheets with "Rejected/Redo" status can be resubmitted.
+                    Current status: {costingSheet.status || 'Not submitted'}
+                </AlertDescription>
+                <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+            </Alert>
+        );
+    }
+
     return (
         <CostingSheetSubmitForm
             tenderId={Number(tenderId)}
@@ -35,7 +64,7 @@ export default function CostingSheetResubmitPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
             }}
             mode="resubmit"
-            existingData={costingSheet || undefined}
+            existingData={costingSheet}
         />
     );
 }

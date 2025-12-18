@@ -30,6 +30,9 @@ import { StatusesModule } from "@/modules/master/statuses/statuses.module";
 import { TqTypesModule } from "@/modules/master/tq-types/tq-types.module";
 import { VendorOrganizationsModule } from "@/modules/master/vendor-organizations/vendor-organizations.module";
 import { VendorsModule } from "@/modules/master/vendors/vendors.module";
+import { VendorGstsModule } from "@/modules/master/vendor-gsts/vendor-gsts.module";
+import { VendorAccountsModule } from "@/modules/master/vendor-accounts/vendor-accounts.module";
+import { VendorFilesModule } from "@/modules/master/vendor-files/vendor-files.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
@@ -104,6 +107,9 @@ import { PermissionsModule } from "@/modules/master/permissions/permissions.modu
         TqTypesModule,
         VendorOrganizationsModule,
         VendorsModule,
+        VendorGstsModule,
+        VendorAccountsModule,
+        VendorFilesModule,
         GoogleIntegrationModule,
         AuthModule,
         WebsitesModule,
@@ -137,4 +143,4 @@ import { PermissionsModule } from "@/modules/master/permissions/permissions.modu
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }
