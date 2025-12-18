@@ -1,16 +1,18 @@
 // src/modules/imprest/imprest.api.ts
 import api from "@/lib/axios";
 import type { ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
-// ---------- GET LIST ----------
+
+/* ===================== IMPREST ===================== */
+
+// ---------- GET MY IMPRESTS ----------
 export const getMyImprests = async (): Promise<ImprestRow[]> => {
     const res = await api.get("/employee-imprest");
-    console.log(res);
     return res.data;
 };
-// ---------- GET LIST ----------
+
+// ---------- GET USER IMPRESTS ----------
 export const getUserImprests = async (userId: number): Promise<ImprestRow[]> => {
     const res = await api.get(`/employee-imprest/user/${userId}`);
-    console.log(res);
     return res.data;
 };
 
@@ -41,17 +43,49 @@ export const deleteImprest = async (id: number) => {
     return res.data;
 };
 
-// ---------- UPLOAD PROOFS ----------
+/* ---------- STATUS TOGGLES (Laravel parity) ---------- */
+
+// APPROVE (buttonstatus)
+export const approveImprest = async (id: number) => {
+    const res = await api.post(`/employee-imprest/${id}/approve`);
+    return res.data;
+};
+
+// TALLY (tallystatus)
+export const tallyImprest = async (id: number) => {
+    const res = await api.post(`/employee-imprest/${id}/tally`);
+    return res.data;
+};
+
+// PROOF (proofstatus)
+export const proofImprest = async (id: number) => {
+    const res = await api.post(`/employee-imprest/${id}/proof-approve`);
+    return res.data;
+};
+
+// ---------- ACCOUNT REMARK ----------
+export const addImprestRemark = async (id: number, remark: string) => {
+    const res = await api.post(`/employee-imprest/${id}/remark`, {
+        remark,
+    });
+    return res.data;
+};
+
+/* ---------- UPLOAD PROOFS ---------- */
 export const uploadImprestProofs = async (id: number, files: File[]) => {
     const form = new FormData();
-    files.forEach(f => form.append("invoice_proof[]", f));
-    console.log("THIS IS A TEST");
+    files.forEach(file => form.append("invoice_proof[]", file));
+
     const res = await api.post(`/employee-imprest/${id}/upload`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
     });
 
     return res.data;
 };
+
+/* ===================== VOUCHERS ===================== */
 
 // ---------- LIST ----------
 export const getImprestVouchers = async ({ userId }: { userId?: number }): Promise<ImprestVoucherRow[]> => {
@@ -60,6 +94,7 @@ export const getImprestVouchers = async ({ userId }: { userId?: number }): Promi
     const res = await api.get(url);
     return res.data.data;
 };
+
 // ---------- DETAIL ----------
 export const getImprestVoucherById = async (id: number): Promise<ImprestVoucherView> => {
     const res = await api.get(`/accounts/imprest/voucher/view/${id}`);
@@ -77,6 +112,5 @@ export const accountApproveVoucher = async (payload: { id: number; remark?: stri
 export const adminApproveVoucher = async (payload: { id: number; remark?: string; approve: boolean }) => {
     const { id, ...body } = payload;
     const res = await api.post(`/accounts/imprest/voucher/${id}/admin-approve`, body);
-    console.log(res);
     return res.data;
 };
