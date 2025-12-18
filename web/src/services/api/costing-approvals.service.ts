@@ -48,34 +48,16 @@ class CostingApprovalsService extends BaseApiService {
         return this.get<TenderCostingSheet>(`/${id}`);
     }
 
-    async approve(
-        id: number,
-        data: ApproveCostingDto
-    ): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(
-            `/${id}/approve`,
-            data
-        );
+    async approve(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
+        return this.post<TenderCostingSheet>(`/${id}/approve`, data);
     }
 
-    async reject(
-        id: number,
-        data: RejectCostingDto
-    ): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(
-            `/${id}/reject`,
-            data
-        );
+    async reject(id: number, data: RejectCostingDto): Promise<TenderCostingSheet> {
+        return this.post<TenderCostingSheet>(`/${id}/reject`, data);
     }
 
-    async updateApproved(
-        id: number,
-        data: ApproveCostingDto
-    ): Promise<TenderCostingSheet> {
-        return this.patch<TenderCostingSheet>(
-            `/${id}`,
-            data
-        );
+    async updateApproved(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
+        return this.patch<TenderCostingSheet>(`/${id}`, data);
     }
 
     async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
@@ -83,5 +65,4 @@ class CostingApprovalsService extends BaseApiService {
     }
 }
 
-export const costingApprovalsService =
-    new CostingApprovalsService();
+export const costingApprovalsService = new CostingApprovalsService();

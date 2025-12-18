@@ -58,6 +58,8 @@ export const useCreateTqReceived = () => {
         mutationFn: tqManagementService.createTqReceived,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ received successfully');
         },
         onError: (error: any) => {
@@ -74,6 +76,8 @@ export const useUpdateTqReplied = () => {
             tqManagementService.updateTqReplied(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ replied successfully');
         },
         onError: (error: any) => {
@@ -90,6 +94,8 @@ export const useUpdateTqMissed = () => {
             tqManagementService.updateTqMissed(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ marked as missed');
         },
         onError: (error: any) => {
@@ -105,6 +111,8 @@ export const useMarkAsNoTq = () => {
         mutationFn: tqManagementService.markAsNoTq,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('Marked as No TQ');
         },
         onError: (error: any) => {
@@ -121,6 +129,8 @@ export const useUpdateTqReceived = () => {
             tqManagementService.updateTqReceived(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ updated successfully');
         },
         onError: (error: any) => {
@@ -134,6 +144,10 @@ export const useTqManagementDashboardCounts = () => {
         queryKey: tqManagementKey.dashboardCounts(),
         queryFn: () => tqManagementService.getDashboardCounts(),
         staleTime: 30000, // Cache for 30 seconds
+        retry: 2, // Retry failed requests twice
+        onError: (error: any) => {
+            console.error('Failed to fetch TQ management counts:', error);
+        },
     });
 };
 

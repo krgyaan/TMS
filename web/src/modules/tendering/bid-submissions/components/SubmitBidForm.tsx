@@ -19,9 +19,37 @@ import { FileUploadField } from '@/components/form/FileUploadField';
 const SubmitBidFormSchema = z.object({
     tenderId: z.number(),
     submissionDatetime: z.string().min(1, 'Bid submission date and time is required'),
-    submittedDocs: z.string().optional(),
-    proofOfSubmission: z.string().min(1, 'Proof of submission is required'),
-    finalPriceSs: z.string().min(1, 'Final bidding price screenshot is required'),
+    submittedDocs: z.preprocess(
+        (val) => {
+            if (!val) return undefined;
+            if (Array.isArray(val)) {
+                return val.map((f: File | string) => typeof f === 'string' ? f : f.name).join(', ');
+            }
+            if (val instanceof File) {
+                return val.name;
+            }
+            return val;
+        },
+        z.string().optional()
+    ),
+    proofOfSubmission: z.preprocess(
+        (val) => {
+            if (val instanceof File) {
+                return val.name;
+            }
+            return val;
+        },
+        z.string().min(1, 'Proof of submission is required')
+    ),
+    finalPriceSs: z.preprocess(
+        (val) => {
+            if (val instanceof File) {
+                return val.name;
+            }
+            return val;
+        },
+        z.string().min(1, 'Final bidding price screenshot is required')
+    ),
     finalBiddingPrice: z.string().optional(),
 });
 
@@ -83,10 +111,12 @@ export default function SubmitBidForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
+            // submittedDocs is now preprocessed to a comma-separated string or undefined
             const submittedDocs = data.submittedDocs
                 ? data.submittedDocs.split(',').map(s => s.trim()).filter(s => s.length > 0)
                 : [];
 
+            // proofOfSubmission and finalPriceSs are now preprocessed to strings
             if (mode === 'submit') {
                 await submitMutation.mutateAsync({
                     tenderId: data.tenderId,

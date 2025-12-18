@@ -23,9 +23,7 @@ class CostingSheetsService extends BaseApiService {
         super('/costing-sheets');
     }
 
-    async getAll(
-        params?: CostingSheetListParams
-    ): Promise<PaginatedResult<CostingSheetDashboardRow>> {
+    async getAll(params?: CostingSheetListParams): Promise<PaginatedResult<CostingSheetDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {
@@ -47,9 +45,7 @@ class CostingSheetsService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<CostingSheetDashboardRow>>(
-            queryString ? `?${queryString}` : ''
-        );
+        return this.get<PaginatedResult<CostingSheetDashboardRow>>(queryString ? `?${queryString}` : '');
     }
 
     async getById(id: number): Promise<TenderCostingSheet> {
@@ -60,16 +56,11 @@ class CostingSheetsService extends BaseApiService {
         return this.get<TenderCostingSheet>(`/tender/${tenderId}`);
     }
 
-    async submit(
-        data: SubmitCostingSheetDto
-    ): Promise<TenderCostingSheet> {
+    async submit(data: SubmitCostingSheetDto): Promise<TenderCostingSheet> {
         return this.post<TenderCostingSheet>('', data);
     }
 
-    async update(
-        id: number,
-        data: UpdateCostingSheetDto
-    ): Promise<TenderCostingSheet> {
+    async update(id: number, data: UpdateCostingSheetDto): Promise<TenderCostingSheet> {
         return this.patch<TenderCostingSheet>(`/${id}`, data);
     }
 
@@ -85,14 +76,8 @@ class CostingSheetsService extends BaseApiService {
         return this.post<CreateSheetResponse>('/create-sheet', { tenderId });
     }
 
-    async createSheetWithName(
-        tenderId: number,
-        customName: string,
-    ): Promise<CreateSheetResponse> {
-        return this.post<CreateSheetResponse>('/create-sheet-with-name', {
-            tenderId,
-            customName,
-        });
+    async createSheetWithName(tenderId: number, customName: string): Promise<CreateSheetResponse> {
+        return this.post<CreateSheetResponse>('/create-sheet-with-name', { tenderId, customName });
     }
 }
 

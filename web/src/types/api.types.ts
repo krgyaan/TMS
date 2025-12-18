@@ -1059,6 +1059,58 @@ export type BidSubmission = {
     updatedAt: Date;
 };
 
+
+export type BidSubmissionDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    finalCosting: string | null;
+    bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    bidSubmissionId: number | null;
+    costingSheetId: number | null;
+};
+
+export type BidSubmissionListParams = {
+    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export type SubmitBidDto = {
+    tenderId: number;
+    submissionDatetime: string;
+    submittedDocs: string[];
+    proofOfSubmission: string;
+    finalPriceSs: string;
+    finalBiddingPrice: string | null;
+};
+
+export type MarkAsMissedDto = {
+    tenderId: number;
+    reasonForMissing: string;
+    preventionMeasures: string;
+    tmsImprovements: string;
+};
+
+export type UpdateBidSubmissionDto = {
+    submissionDatetime?: string;
+    submittedDocs?: string[];
+    proofOfSubmission?: string;
+    finalPriceSs?: string;
+    finalBiddingPrice?: string | null;
+    reasonForMissing?: string;
+    preventionMeasures?: string;
+    tmsImprovements?: string;
+};
+
 export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
 
 export type TenderQuery = {

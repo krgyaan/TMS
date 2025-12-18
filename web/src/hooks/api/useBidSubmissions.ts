@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { bidSubmissionsService, type BidSubmissionDashboardRow, type BidSubmissionListParams } from '@/services/api/bid-submissions.service';
+import { bidSubmissionsService } from '@/services/api/bid-submissions.service';
 import { toast } from 'sonner';
-import type { PaginatedResult, BidSubmissionDashboardCounts } from '@/types/api.types';
+import type { PaginatedResult, BidSubmissionDashboardCounts, BidSubmissionDashboardRow, BidSubmissionListParams, SubmitBidDto, MarkAsMissedDto } from '@/types/api.types';
 
 export const bidSubmissionsKey = {
     all: ['bid-submissions'] as const,
@@ -69,9 +69,11 @@ export const useSubmitBid = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: bidSubmissionsService.submitBid,
+        mutationFn: (data: SubmitBidDto) => bidSubmissionsService.submitBid(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.dashboardCounts() });
             toast.success('Bid submitted successfully');
         },
         onError: (error: any) => {
@@ -84,9 +86,11 @@ export const useMarkAsMissed = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: bidSubmissionsService.markAsMissed,
+        mutationFn: (data: MarkAsMissedDto) => bidSubmissionsService.markAsMissed(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.dashboardCounts() });
             toast.success('Tender marked as missed');
         },
         onError: (error: any) => {
@@ -103,6 +107,8 @@ export const useUpdateBidSubmission = () => {
             bidSubmissionsService.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.dashboardCounts() });
             toast.success('Bid submission updated successfully');
         },
         onError: (error: any) => {
@@ -116,6 +122,7 @@ export const useBidSubmissionsDashboardCounts = () => {
         queryKey: bidSubmissionsKey.dashboardCounts(),
         queryFn: () => bidSubmissionsService.getDashboardCounts(),
         staleTime: 30000, // Cache for 30 seconds
+        retry: 2, // Retry failed requests twice
     });
 };
 

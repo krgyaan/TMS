@@ -102,7 +102,6 @@ const BidSubmissionListPage = () => {
                 navigate(paths.tendering.bidView(row.bidSubmissionId!));
             },
             icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.bidSubmissionId !== null,
         },
     ], [navigate]);
 
@@ -230,7 +229,7 @@ const BidSubmissionListPage = () => {
             cellRenderer: createActionColumnRenderer(bidSubmissionActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [bidSubmissionActions]);
 

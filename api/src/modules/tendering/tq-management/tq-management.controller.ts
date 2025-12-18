@@ -40,9 +40,9 @@ export class TqManagementController {
         });
     }
 
-    @Get(':id')
-    findById(@Param('id', ParseIntPipe) id: number) {
-        return this.tqManagementService.findById(id);
+    @Get('counts')
+    getDashboardCounts() {
+        return this.tqManagementService.getDashboardCounts();
     }
 
     @Get('tender/:tenderId')
@@ -53,6 +53,11 @@ export class TqManagementController {
     @Get(':id/items')
     getTqItems(@Param('id', ParseIntPipe) id: number) {
         return this.tqManagementService.getTqItems(id);
+    }
+
+    @Get(':id')
+    findById(@Param('id', ParseIntPipe) id: number) {
+        return this.tqManagementService.findById(id);
     }
 
     @Post('received')

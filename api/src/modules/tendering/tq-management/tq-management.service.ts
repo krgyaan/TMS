@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, desc, isNotNull, or, sql, asc, inArray } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, isNull, or, sql, asc, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -244,6 +244,116 @@ export class TqManagementService {
             .from(tenderQueryItems)
             .where(eq(tenderQueryItems.tenderQueryId, tqId))
             .orderBy(tenderQueryItems.srNo);
+    }
+
+    private tqManagementBaseWhere() {
+        return and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+        );
+    }
+
+    private tqManagementBaseQuery(select: any): any {
+        return this.db
+            .select(select)
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(
+                bidSubmissions,
+                and(
+                    eq(bidSubmissions.tenderId, tenderInfos.id),
+                    eq(bidSubmissions.status, 'Bid Submitted')
+                )
+            )
+            .leftJoin(tenderQueries, eq(tenderQueries.tenderId, tenderInfos.id));
+    }
+
+    async getDashboardCounts(): Promise<{
+        awaited: number;
+        received: number;
+        replied: number;
+        missed: number;
+        noTq: number;
+        total: number;
+    }> {
+        try {
+            const baseWhere = this.tqManagementBaseWhere();
+
+            // TQ awaited: tenders with submitted bids but no TQ records
+            const [{ count: awaited }] = await this.tqManagementBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(bidSubmissions.id),
+                        isNull(tenderQueries.id)
+                    )
+                ) as any;
+
+            // TQ received: TQ records with status 'TQ received'
+            const [{ count: received }] = await this.tqManagementBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(tenderQueries.id),
+                        eq(tenderQueries.status, 'TQ received')
+                    )
+                ) as any;
+
+            // TQ replied: TQ records with status 'TQ replied'
+            const [{ count: replied }] = await this.tqManagementBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(tenderQueries.id),
+                        eq(tenderQueries.status, 'TQ replied')
+                    )
+                ) as any;
+
+            // TQ missed: TQ records with status 'TQ missed'
+            const [{ count: missed }] = await this.tqManagementBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(tenderQueries.id),
+                        eq(tenderQueries.status, 'TQ missed')
+                    )
+                ) as any;
+
+            // No TQ: TQ records with status 'No TQ'
+            const [{ count: noTq }] = await this.tqManagementBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(tenderQueries.id),
+                        eq(tenderQueries.status, 'No TQ')
+                    )
+                ) as any;
+
+            return {
+                awaited: Number(awaited || 0),
+                received: Number(received || 0),
+                replied: Number(replied || 0),
+                missed: Number(missed || 0),
+                noTq: Number(noTq || 0),
+                total: Number(awaited || 0) + Number(received || 0) + Number(replied || 0) + Number(missed || 0) + Number(noTq || 0),
+            };
+        } catch (error) {
+            console.error('Error in getDashboardCounts:', error);
+            throw error;
+        }
     }
 
     async createTqReceived(data: {

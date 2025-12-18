@@ -7,7 +7,7 @@ import { AlertCircle, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCostingApprovalById } from '@/hooks/api/useCostingApprovals';
 import { useTender } from '@/hooks/api/useTenders';
-import { useVendors } from '@/hooks/api/useVendors';
+import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
@@ -17,7 +17,7 @@ export default function CostingApprovalViewPage() {
     const navigate = useNavigate();
     const { data: costingSheet, isLoading: costingLoading, error: costingError } = useCostingApprovalById(Number(id));
     const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(costingSheet?.tenderId));
-    const { data: vendors } = useVendors();
+    const { data: vendorOrganizations } = useVendorOrganizations();
 
     if (costingLoading || tenderLoading) return <Skeleton className="h-[800px]" />;
 
@@ -34,8 +34,8 @@ export default function CostingApprovalViewPage() {
 
     if (!costingSheet || !tenderDetails) return <div>Costing sheet not found</div>;
 
-    const selectedVendors = vendors?.filter(v =>
-        costingSheet.oemVendorIds?.includes(v.id)
+    const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
+        costingSheet.oemVendorIds?.includes(vo.id)
     ) || [];
 
     return (
@@ -220,10 +220,10 @@ export default function CostingApprovalViewPage() {
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground mb-1">Selected Vendors</p>
                                         <div className="flex flex-wrap gap-2 mt-2">
-                                            {selectedVendors.length > 0 ? (
-                                                selectedVendors.map(vendor => (
-                                                    <Badge key={vendor.id} variant="outline">
-                                                        {vendor.name}
+                                            {selectedVendorOrganizations.length > 0 ? (
+                                                selectedVendorOrganizations.map(vendorOrg => (
+                                                    <Badge key={vendorOrg.id} variant="outline">
+                                                        {vendorOrg.name}
                                                     </Badge>
                                                 ))
                                             ) : (
@@ -279,13 +279,18 @@ export default function CostingApprovalViewPage() {
                         Back to List
                     </Button>
                     {costingSheet.status === 'Submitted' && (
-                        <Button onClick={() => navigate(paths.tendering.costingApprove(Number(id)))}>
-                            Approve
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.costingReject(Number(id)))}>
+                                Reject
+                            </Button>
+                            <Button onClick={() => navigate(paths.tendering.costingApprove(Number(id)))}>
+                                Approve
+                            </Button>
+                        </>
                     )}
                     {costingSheet.status === 'Approved' && (
-                        <Button onClick={() => navigate(paths.tendering.costingReject(Number(id)))}>
-                            Reject
+                        <Button onClick={() => navigate(paths.tendering.costingEditApproval(Number(id)))}>
+                            Edit Approval
                         </Button>
                     )}
                 </div>
