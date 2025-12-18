@@ -2,22 +2,33 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
 import {
     getMyImprests,
+    getUserImprests,
     createImprest,
     updateImprest,
     deleteImprest,
     uploadImprestProofs,
-    type CreateImprestInput,
-    getUserImprests,
+
+    // vouchers
     getImprestVouchers,
     getImprestVoucherById,
     accountApproveVoucher,
     adminApproveVoucher,
+
+    // NEW – imprest actions
+    approveImprest,
+    tallyImprest,
+    proofImprest,
+    addImprestRemark,
+    type CreateImprestInput,
 } from "./imprest.api";
+
 import type { ImprestVoucherRow } from "./imprest.types";
 
-// ---------------- Query Keys ----------------
+/* ---------------- QUERY KEYS ---------------- */
+
 export const imprestKeys = {
     root: ["employee-imprest"] as const,
 
@@ -33,16 +44,19 @@ export const imprestVoucherKeys = {
 
     detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
 };
-// ---------------- LIST ----------------
+
+/* ---------------- IMPREST LIST ---------------- */
+
 export const useImprestList = (userId?: number) => {
     return useQuery({
-        queryKey: imprestKeys.list(userId), // IMPORTANT
+        queryKey: imprestKeys.list(userId),
         queryFn: () => (userId ? getUserImprests(userId) : getMyImprests()),
         enabled: userId === undefined || !!userId,
     });
 };
 
-// ---------------- CREATE ----------------
+/* ---------------- CREATE ---------------- */
+
 export const useCreateImprest = () => {
     const qc = useQueryClient();
 
@@ -51,14 +65,15 @@ export const useCreateImprest = () => {
 
         onSuccess: () => {
             toast.success("Imprest created successfully");
-            qc.invalidateQueries({ queryKey: imprestKeys.list() });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
         onError: () => toast.error("Failed to create imprest"),
     });
 };
 
-// ---------------- UPDATE ----------------
+/* ---------------- UPDATE ---------------- */
+
 export const useUpdateImprest = () => {
     const qc = useQueryClient();
 
@@ -67,13 +82,15 @@ export const useUpdateImprest = () => {
 
         onSuccess: () => {
             toast.success("Updated successfully");
-            qc.invalidateQueries({ queryKey: imprestKeys.list() });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
+
         onError: () => toast.error("Failed to update imprest"),
     });
 };
 
-// ---------------- DELETE ----------------
+/* ---------------- DELETE ---------------- */
+
 export const useDeleteImprest = () => {
     const qc = useQueryClient();
 
@@ -82,14 +99,100 @@ export const useDeleteImprest = () => {
 
         onSuccess: () => {
             toast.success("Deleted successfully");
-            qc.invalidateQueries({ queryKey: imprestKeys.list() });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
         onError: () => toast.error("Failed to delete imprest"),
     });
 };
 
-// ---------------- LIST ----------------
+/* ---------------- APPROVE (toggle) ---------------- */
+
+export const useApproveImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => approveImprest(id),
+
+        onSuccess: () => {
+            toast.success("Approval status updated");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update approval"),
+    });
+};
+
+/* ---------------- TALLY (toggle) ---------------- */
+
+export const useTallyImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => tallyImprest(id),
+
+        onSuccess: () => {
+            toast.success("Tally status updated");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update tally status"),
+    });
+};
+
+/* ---------------- PROOF (toggle) ---------------- */
+
+export const useProofImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => proofImprest(id),
+
+        onSuccess: () => {
+            toast.success("Proof status updated");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update proof status"),
+    });
+};
+
+/* ---------------- REMARK ---------------- */
+
+export const useAddImprestRemark = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, remark }: { id: number; remark: string }) => addImprestRemark(id, remark),
+
+        onSuccess: () => {
+            toast.success("Remark added successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to add remark"),
+    });
+};
+
+/* ---------------- UPLOAD PROOFS ---------------- */
+
+export const useUploadImprestProofs = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, files }: { id: number; files: File[] }) => uploadImprestProofs(id, files),
+
+        onSuccess: () => {
+            toast.success("Proofs uploaded");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to upload proofs"),
+    });
+};
+
+/* ---------------- VOUCHERS ---------------- */
+
 export const useImprestVoucherList = (userId?: number) => {
     return useQuery({
         queryKey: imprestVoucherKeys.list(userId),
@@ -97,7 +200,6 @@ export const useImprestVoucherList = (userId?: number) => {
     });
 };
 
-// ---------------- DETAIL ----------------
 export const useImprestVoucherView = (id: number) => {
     return useQuery({
         queryKey: imprestVoucherKeys.detail(id),
@@ -106,7 +208,6 @@ export const useImprestVoucherView = (id: number) => {
     });
 };
 
-// ---------------- ACCOUNT APPROVE ----------------
 export const useAccountApproveVoucher = () => {
     const qc = useQueryClient();
 
@@ -123,7 +224,6 @@ export const useAccountApproveVoucher = () => {
     });
 };
 
-// ---------------- ADMIN APPROVE ----------------
 export const useAdminApproveVoucher = () => {
     const qc = useQueryClient();
 
@@ -137,12 +237,5 @@ export const useAdminApproveVoucher = () => {
         },
 
         onError: () => toast.error("Failed to update voucher"),
-    });
-};
-
-// ---------------- UPLOAD PROOFS ----------------
-export const useUploadImprestProofs = () => {
-    return useMutation({
-        mutationFn: ({ id, files }: { id: number; files: File[] }) => uploadImprestProofs(id, files),
     });
 };
