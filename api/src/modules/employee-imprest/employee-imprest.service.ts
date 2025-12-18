@@ -100,6 +100,72 @@ export class EmployeeImprestService {
         return result[0];
     }
 
+    async proofApprove({ imprestId, userId }: { imprestId: number; userId: number }) {
+        const imprest = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, imprestId),
+        });
+
+        if (!imprest) {
+            throw new NotFoundException("Imprest not found");
+        }
+
+        await this.db
+            .update(employeeImprests)
+            .set({
+                proofStatus: 1,
+            })
+            .where(eq(employeeImprests.id, imprestId));
+
+        return {
+            success: true,
+            message: "Proof approved successfully",
+        };
+    }
+
+    async approveImprest({ imprestId, userId }: { imprestId: number; userId: number }) {
+        const imprest = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, imprestId),
+        });
+
+        if (!imprest) {
+            throw new NotFoundException("Imprest not found");
+        }
+
+        await this.db
+            .update(employeeImprests)
+            .set({
+                approvalStatus: 1,
+            })
+            .where(eq(employeeImprests.id, imprestId));
+
+        return {
+            success: true,
+            message: "Imprest approved successfully",
+        };
+    }
+
+    async tallyAddImprest({ imprestId, userId }: { imprestId: number; userId: number }) {
+        const imprest = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, imprestId),
+        });
+
+        if (!imprest) {
+            throw new NotFoundException("Imprest not found");
+        }
+
+        await this.db
+            .update(employeeImprests)
+            .set({
+                tallyStatus: 1,
+            })
+            .where(eq(employeeImprests.id, imprestId));
+
+        return {
+            success: true,
+            message: "Tally Entry added successfully",
+        };
+    }
+
     /* ----------------------------- DELETE ------------------------------ */
     async delete(id: number, userId: number) {
         const existing = await this.findOne(id);
