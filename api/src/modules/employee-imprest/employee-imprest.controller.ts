@@ -58,6 +58,30 @@ export class EmployeeImprestController {
         return this.service.delete(id, userId);
     }
 
+    @Post(":id/approve")
+    adminApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
+        return this.service.approveImprest({
+            imprestId: Number(id),
+            userId: req.user.sub,
+        });
+    }
+
+    @Post(":id/tally")
+    tallyAddImprest(@Req() req, @Param("id", ParseIntPipe) id: number) {
+        return this.service.tallyAddImprest({
+            imprestId: Number(id),
+            userId: req.user.sub,
+        });
+    }
+
+    @Post(":id/proof-approve")
+    proofApprove(@Req() req, @Param("id", ParseIntPipe) id: number) {
+        return this.service.proofApprove({
+            imprestId: id,
+            userId: req.user.sub,
+        });
+    }
+
     // File upload code
     @Post(":id/upload")
     @UseInterceptors(FilesInterceptor("invoice_proof[]", 10, multerConfig))
