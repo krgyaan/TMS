@@ -263,15 +263,9 @@ export class CourierService {
 
         // If file present, add doc to courierDocs
         if (file) {
-            const newDoc: CourierDoc = {
-                url: `/uploads/couriers/docket-slips/${file.filename}`,
-                name: file.originalname,
-                type: file.mimetype.startsWith("image/") ? "image" : "file",
-            };
-
             // existing.courierDocs may be JSONB array or null
-            const existingDocs = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
-            updateData.courierDocs = [...existingDocs, newDoc];
+            const existingDocs: string[] = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
+            updateData.courierDocs = [...existingDocs, file?.filename];
         }
 
         const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
@@ -290,7 +284,6 @@ export class CourierService {
     ) {
         const existing = await this.findOne(id);
         if (!existing) throw new NotFoundException("Courier not found");
-
         const updateData = {
             courierProvider: dispatchData.courierProvider,
             docketNo: dispatchData.docketNo,
@@ -319,18 +312,12 @@ export class CourierService {
         const existing = await this.findOne(id);
         if (!existing) throw new NotFoundException("Courier not found");
 
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
-        }
-
-        const newDocs = files.map(file => ({
-            url: `/uploads/couriers/${file.filename}`,
-            name: file.originalname,
-            type: file.mimetype.startsWith("image") ? "image" : "file",
-        }));
+        // if (existing.userId !== userId) {
+        //     throw new ForbiddenException("Not authorized");
+        // }
 
         const existingDocs = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
-        const updatedDocs = [...existingDocs, ...newDocs];
+        const updatedDocs = [...existingDocs, ...files.map(file => file.filename)];
 
         const result = await this.db
             .update(couriers)
@@ -353,7 +340,7 @@ export class CourierService {
         const result = await this.db
             .update(couriers)
             .set({
-                deliveryPod: `/uploads/couriers/pod/${file.filename}`,
+                deliveryPod: `pod/${file.filename}`,
                 updatedAt: new Date(),
             })
             .where(eq(couriers.id, id))
