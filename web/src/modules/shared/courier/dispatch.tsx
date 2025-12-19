@@ -42,7 +42,6 @@ const CourierDispatchForm = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const courierId = id ? parseInt(id, 10) : 0;
-    console.log("Courier ID:", courierId);
 
     // File state
     const [file, setFile] = useState<File | null>(null);

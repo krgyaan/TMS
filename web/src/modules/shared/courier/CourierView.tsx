@@ -383,25 +383,39 @@ const CourierViewPage: React.FC = () => {
                             <CardContent className="p-6">
                                 <div className="space-y-6">
                                     {/* Essential Documents */}
+
                                     <div>
                                         <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Essential Documents</h3>
-                                        <div className="space-y-4">
-                                            <DocumentCard
-                                                url={courier.docketSlip}
-                                                title="Docket Slip"
-                                                description="Official shipping documentation with tracking details"
-                                                icon={Package}
-                                                variant="primary"
-                                            />
-
-                                            <DocumentCard
-                                                url={courier.deliveryPod}
-                                                title="Proof of Delivery"
-                                                description="Signed confirmation of successful delivery"
-                                                icon={CheckCircle}
-                                                variant="primary"
-                                            />
-                                        </div>
+                                        {courier.docketSlip ? (
+                                            <div className="space-y-4">
+                                                <DocumentCard
+                                                    url={"/uploads/courier/" + courier.docketSlip}
+                                                    title="Docket Slip"
+                                                    description="Official shipping documentation with tracking details"
+                                                    icon={Package}
+                                                    variant="primary"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <span className="text-sm text-gray-500  ">Docket Slip Not Uploaded</span>
+                                            </div>
+                                        )}
+                                        {courier.deliveryPod ? (
+                                            <div className="space-y-4">
+                                                <DocumentCard
+                                                    url={"/uploads/courier/" + courier.deliveryPod}
+                                                    title="Proof of Delivery"
+                                                    description="Signed confirmation of successful delivery"
+                                                    icon={CheckCircle}
+                                                    variant="primary"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <span className="text-sm text-gray-500">Proof of Delivery Not Uploaded</span>
+                                            </div>
+                                        )}
                                     </div>
                                     {/* Supporting Documents */}
                                     <div>
@@ -411,7 +425,7 @@ const CourierViewPage: React.FC = () => {
                                                 {documents.map((d, i) => (
                                                     <DocumentCard
                                                         key={i}
-                                                        url={d.url}
+                                                        url={"/uploads/courier/" + d}
                                                         title={`Supporting Document ${i + 1}`}
                                                         description="Additional shipping documentation"
                                                         icon={FileText}
