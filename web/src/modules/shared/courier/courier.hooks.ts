@@ -132,7 +132,6 @@ export const useCreateCourierDispatch = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: courierKeys.all });
             queryClient.invalidateQueries({ queryKey: courierKeys.detail(variables.id) });
-            toast.success("Dispatch request created successfully");
         },
 
         onError: (error: any) => {
