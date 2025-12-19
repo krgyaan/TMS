@@ -147,15 +147,11 @@ const TenderResultListPage = () => {
             {
                 label: 'Upload Result',
                 icon: <Upload className="h-4 w-4" />,
-                visible: (row) =>
-                    (row.resultStatus === RESULT_STATUS.RESULT_AWAITED ||
-                        row.resultStatus === RESULT_STATUS.UNDER_EVALUATION) && !row.raApplicable,
                 onClick: handleUploadResult,
             },
             {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
-                visible: (row) => row.raApplicable && !!row.reverseAuctionId,
                 onClick: handleViewRa,
             },
         ],

@@ -9,19 +9,24 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle } from 'lucide-react';
+import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts } from '@/hooks/api/useTqManagement';
-import type { TqManagementDashboardRow } from '@/types/api.types';
+import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
+import type { TenderQueryStatus, TqManagementDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
+import QualificationDialog from './components/QualificationDialog';
 
-type TabKey = 'awaited' | 'received' | 'replied' | 'missed' | 'noTq';
+type TabKey = 'awaited' | 'received' | 'replied' | 'missed' | 'noTq' | 'qualified';
 
 const TqManagementListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('awaited');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [noTqDialogOpen, setNoTqDialogOpen] = useState(false);
+    const [tqQualifiedDialogOpen, setTqQualifiedDialogOpen] = useState(false);
+    const [pendingTenderId, setPendingTenderId] = useState<number | null>(null);
+    const [pendingTqId, setPendingTqId] = useState<number | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -40,13 +45,14 @@ const TqManagementListPage = () => {
     }, []);
 
     // Map tab key to tqStatus
-    const getTqStatusFromTab = (tab: TabKey): 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ' | undefined => {
+    const getTqStatusFromTab = (tab: TabKey): TenderQueryStatus | undefined => {
         switch (tab) {
             case 'awaited': return 'TQ awaited';
             case 'received': return 'TQ received';
             case 'replied': return 'TQ replied';
             case 'missed': return 'TQ missed';
-            case 'noTq': return 'No TQ';
+            case 'noTq': return 'No TQ Disqualified';
+            case 'qualified': return 'TQ Qualified';
             default: return undefined;
         }
     };
@@ -65,6 +71,7 @@ const TqManagementListPage = () => {
     const tqManagementData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
     const markNoTqMutation = useMarkAsNoTq();
+    const tqQualifiedMutation = useTqQualified();
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -76,16 +83,39 @@ const TqManagementListPage = () => {
                 return 'success';
             case 'TQ missed':
                 return 'destructive';
+            case 'TQ Qualified':
+                return 'success';
             case 'No TQ':
+            case 'No TQ, Qualified':
                 return 'outline';
+            case 'No TQ Disqualified':
+                return 'destructive';
             default:
                 return 'secondary';
         }
     };
 
-    const handleMarkAsNoTq = async (tenderId: number) => {
-        if (window.confirm('Are you sure you want to mark this as No TQ?')) {
-            await markNoTqMutation.mutateAsync(tenderId);
+    const handleMarkAsNoTq = (tenderId: number) => {
+        setPendingTenderId(tenderId);
+        setNoTqDialogOpen(true);
+    };
+
+    const handleNoTqConfirm = async (qualified: boolean) => {
+        if (pendingTenderId !== null) {
+            await markNoTqMutation.mutateAsync({ tenderId: pendingTenderId, qualified });
+            setPendingTenderId(null);
+        }
+    };
+
+    const handleTqQualified = (tqId: number) => {
+        setPendingTqId(tqId);
+        setTqQualifiedDialogOpen(true);
+    };
+
+    const handleTqQualifiedConfirm = async (qualified: boolean) => {
+        if (pendingTqId !== null) {
+            await tqQualifiedMutation.mutateAsync({ tqId: pendingTqId, qualified });
+            setPendingTqId(null);
         }
     };
 
@@ -147,7 +177,7 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ missed' && row.tqId !== null,
         },
         {
-            label: 'View TQ Details',
+            label: 'View Details',
             onClick: (row: TqManagementDashboardRow) => {
                 navigate(paths.tendering.tqView(row.tqId!));
             },
@@ -163,13 +193,14 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqCount > 1,
         },
         {
-            label: 'View Tender',
+            label: 'TQ Qualified',
             onClick: (row: TqManagementDashboardRow) => {
-                navigate(paths.tendering.tenderView(row.tenderId));
+                handleTqQualified(row.tqId!);
             },
-            icon: <Eye className="h-4 w-4" />,
+            icon: <FileCheck className="h-4 w-4" />,
+            visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
         },
-    ], [navigate, markNoTqMutation]);
+    ], [navigate, markNoTqMutation, handleTqQualified]);
 
     const tabsConfig = useMemo(() => {
         return [
@@ -197,6 +228,11 @@ const TqManagementListPage = () => {
                 key: 'noTq' as TabKey,
                 name: 'No TQ',
                 count: counts?.noTq ?? 0,
+            },
+            {
+                key: 'qualified' as TabKey,
+                name: 'TQ Qualified',
+                count: counts?.qualified ?? 0,
             },
         ];
     }, [counts]);
@@ -371,6 +407,7 @@ const TqManagementListPage = () => {
                                                 {tab.key === 'replied' && 'Replied TQs will appear here'}
                                                 {tab.key === 'missed' && 'Missed TQs will be shown here'}
                                                 {tab.key === 'noTq' && 'Tenders qualified without TQ will appear here'}
+                                                {tab.key === 'qualified' && 'Tenders qualified with TQ will appear here'}
                                             </p>
                                         </div>
                                     ) : (
@@ -400,6 +437,20 @@ const TqManagementListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <QualificationDialog
+                open={noTqDialogOpen}
+                onOpenChange={setNoTqDialogOpen}
+                onConfirm={handleNoTqConfirm}
+                title="Mark as No TQ"
+                description="This tender did not receive any technical queries. Please select whether it is Qualified or Disqualified."
+            />
+            <QualificationDialog
+                open={tqQualifiedDialogOpen}
+                onOpenChange={setTqQualifiedDialogOpen}
+                onConfirm={handleTqQualifiedConfirm}
+                title="Mark TQ as Qualified"
+                description="This technical query has been replied. Please select whether the tender is Qualified or Disqualified."
+            />
         </Card>
     );
 };

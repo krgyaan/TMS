@@ -14,7 +14,8 @@ import {
     UpdateTqRepliedDto,
     UpdateTqMissedDto,
     MarkAsNoTqDto,
-    UpdateTqReceivedDto
+    UpdateTqReceivedDto,
+    TqQualifiedDto
 } from './dto/tq-management.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -25,7 +26,7 @@ export class TqManagementController {
 
     @Get()
     findAll(
-        @Query('tqStatus') tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ',
+        @Query('tqStatus') tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ Disqualified' | 'TQ Qualified' | 'No TQ, Qualified',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -95,6 +96,15 @@ export class TqManagementController {
         @CurrentUser() user: ValidatedUser
     ) {
         return this.tqManagementService.updateTqMissed(id, dto, user.sub);
+    }
+
+    @Patch(':id/qualified')
+    tqQualified(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: TqQualifiedDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.tqManagementService.tqQualified(id, user.sub, dto.qualified ?? true);
     }
 
     @Post('no-tq')

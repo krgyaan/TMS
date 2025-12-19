@@ -8,9 +8,6 @@ import {
     integer,
     pgEnum,
 } from 'drizzle-orm/pg-core';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { tqTypes } from '@db/schemas/tendering/tq-types.schema';
 
 // Enum for TQ status
 export const tqStatusEnum = pgEnum('tq_status', [
@@ -19,6 +16,7 @@ export const tqStatusEnum = pgEnum('tq_status', [
     'TQ Missed',
     'TQ Qualified',
     'No TQ, Qualified',
+    'No TQ Disqualified',
 ]);
 
 export const tenderQueries = pgTable('tender_queries', {

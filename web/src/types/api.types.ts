@@ -1378,7 +1378,7 @@ export type TqManagementDashboardRow = {
     statusName: string | null;
     bidSubmissionDate: Date | null;
     tqSubmissionDeadline: Date | null;
-    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    tqStatus: TenderQueryStatus;
     tqId: number | null;
     tqCount: number;
     bidSubmissionId: number | null;
@@ -1471,8 +1471,11 @@ export interface TqManagementDashboardCounts {
     replied: number;
     missed: number;
     noTq: number;
+    qualified: number;
     total: number;
 }
+
+export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ Disqualified' | 'TQ Qualified' | 'No TQ, Qualified';
 
 export interface PhysicalDocsDashboardCounts {
     pending: number;

@@ -19,12 +19,14 @@ export class TenderResultController {
 
     @Get()
     findAll(@Query() filters?: ResultDashboardFilters) {
+        console.log('filters', filters);
         return this.tenderResultService.findAll(filters);
     }
 
-    @Get(':id')
-    findById(@Param('id', ParseIntPipe) id: number) {
-        return this.tenderResultService.findById(id);
+    @Get('counts')
+    getCounts() {
+        console.log('getCounts');
+        return this.tenderResultService.getCounts();
     }
 
     @Get('tender/:tenderId')
@@ -35,6 +37,11 @@ export class TenderResultController {
     @Get(':id/ra-details')
     getLinkedRaDetails(@Param('id', ParseIntPipe) id: number) {
         return this.tenderResultService.getLinkedRaDetails(id);
+    }
+
+    @Get(':id')
+    findById(@Param('id', ParseIntPipe) id: number) {
+        return this.tenderResultService.findById(id);
     }
 
     @Post('create/:tenderId')

@@ -263,12 +263,12 @@ export class BidSubmissionsService {
                     )
                 ) as any;
 
-            return {
+        return {
                 pending: Number(pending || 0),
                 submitted: Number(submitted || 0),
                 missed: Number(missed || 0),
                 total: Number(pending || 0) + Number(submitted || 0) + Number(missed || 0),
-            };
+        };
         } catch (error) {
             console.error('Error in getDashboardCounts:', error);
             throw error;

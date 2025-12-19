@@ -121,6 +121,7 @@ export class TenderInfosService {
         const statusIds = categories
             .flatMap((cat) => StatusCache.getIds(cat))
             .filter(Boolean);
+        console.log('statusIds', statusIds);
 
         return notInArray(tenderInfos.status, statusIds);
     }
@@ -129,7 +130,6 @@ export class TenderInfosService {
         const statusIds = categories
             .flatMap((cat) => StatusCache.getIds(cat))
             .filter(Boolean);
-
         return inArray(tenderInfos.status, statusIds);
     }
 

@@ -1,69 +1,97 @@
-import axiosInstance from '@/lib/axios';
-import type { TenderQuery, TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto, PaginatedResult, TqManagementDashboardCounts } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    TenderQuery,
+    TqManagementDashboardRow,
+    CreateTqReceivedDto,
+    UpdateTqRepliedDto,
+    UpdateTqMissedDto,
+    PaginatedResult,
+    TqManagementDashboardCounts,
+    TenderQueryStatus,
+} from '@/types/api.types';
 
 export type TqManagementFilters = {
-    tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    tqStatus?: TenderQueryStatus;
     page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
 
-export const tqManagementService = {
-    getAll: async (filters?: TqManagementFilters): Promise<PaginatedResult<TqManagementDashboardRow>> => {
-        const params = new URLSearchParams();
-        if (filters?.tqStatus) params.append('tqStatus', filters.tqStatus);
-        if (filters?.page) params.append('page', filters.page.toString());
-        if (filters?.limit) params.append('limit', filters.limit.toString());
-        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
-        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
-        const query = params.toString();
-        const response = await axiosInstance.get<PaginatedResult<TqManagementDashboardRow>>(`/tq-management${query ? `?${query}` : ''}`);
-        return response.data;
-    },
+class TqManagementService extends BaseApiService {
+    constructor() {
+        super('/tq-management');
+    }
 
-    getById: async (id: number): Promise<TenderQuery> => {
-        const response = await axiosInstance.get<TenderQuery>(`/tq-management/${id}`);
-        return response.data;
-    },
+    async getAll(
+        filters?: TqManagementFilters
+    ): Promise<PaginatedResult<TqManagementDashboardRow>> {
+        const search = new URLSearchParams();
 
-    getByTenderId: async (tenderId: number): Promise<TenderQuery[]> => {
-        const response = await axiosInstance.get<TenderQuery[]>(`/tq-management/tender/${tenderId}`);
-        return response.data;
-    },
+        if (filters) {
+            if (filters.tqStatus) {
+                search.set('tqStatus', filters.tqStatus);
+            }
+            if (filters.page) {
+                search.set('page', String(filters.page));
+            }
+            if (filters.limit) {
+                search.set('limit', String(filters.limit));
+            }
+            if (filters.sortBy) {
+                search.set('sortBy', filters.sortBy);
+            }
+            if (filters.sortOrder) {
+                search.set('sortOrder', filters.sortOrder);
+            }
+        }
 
-    getTqItems: async (id: number): Promise<any[]> => {
-        const response = await axiosInstance.get(`/tq-management/${id}/items`);
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<PaginatedResult<TqManagementDashboardRow>>(
+            queryString ? `?${queryString}` : ''
+        );
+    }
 
-    createTqReceived: async (data: CreateTqReceivedDto): Promise<TenderQuery> => {
-        const response = await axiosInstance.post<TenderQuery>('/tq-management/received', data);
-        return response.data;
-    },
+    async getById(id: number): Promise<TenderQuery> {
+        return this.get<TenderQuery>(`/${id}`);
+    }
 
-    updateTqReplied: async (id: number, data: UpdateTqRepliedDto): Promise<TenderQuery> => {
-        const response = await axiosInstance.patch<TenderQuery>(`/tq-management/${id}/replied`, data);
-        return response.data;
-    },
+    async getByTenderId(tenderId: number): Promise<TenderQuery[]> {
+        return this.get<TenderQuery[]>(`/tender/${tenderId}`);
+    }
 
-    updateTqMissed: async (id: number, data: UpdateTqMissedDto): Promise<TenderQuery> => {
-        const response = await axiosInstance.patch<TenderQuery>(`/tq-management/${id}/missed`, data);
-        return response.data;
-    },
+    async getTqItems(id: number): Promise<any[]> {
+        return this.get<any[]>(`/${id}/items`);
+    }
 
-    markAsNoTq: async (tenderId: number): Promise<TenderQuery> => {
-        const response = await axiosInstance.post<TenderQuery>('/tq-management/no-tq', { tenderId });
-        return response.data;
-    },
+    async createTqReceived(data: CreateTqReceivedDto): Promise<TenderQuery> {
+        return this.post<TenderQuery>('/received', data);
+    }
 
-    updateTqReceived: async (id: number, data: CreateTqReceivedDto): Promise<TenderQuery> => {
-        const response = await axiosInstance.patch<TenderQuery>(`/tq-management/${id}/received`, data);
-        return response.data;
-    },
+    async updateTqReceived(id: number, data: CreateTqReceivedDto): Promise<TenderQuery> {
+        return this.patch<TenderQuery>(`/${id}/received`, data);
+    }
 
-    getDashboardCounts: async (): Promise<TqManagementDashboardCounts> => {
-        const response = await axiosInstance.get<TqManagementDashboardCounts>('/tq-management/counts');
-        return response.data;
-    },
-};
+    async updateTqReplied(id: number, data: UpdateTqRepliedDto): Promise<TenderQuery> {
+        return this.patch<TenderQuery>(`/${id}/replied`, data);
+    }
+
+    async updateTqMissed(id: number, data: UpdateTqMissedDto): Promise<TenderQuery> {
+        return this.patch<TenderQuery>(`/${id}/missed`, data);
+    }
+
+    async markAsNoTq(tenderId: number, qualified: boolean = true): Promise<TenderQuery> {
+        return this.post<TenderQuery>('/no-tq', { tenderId, qualified });
+    }
+
+    async tqQualified(tqId: number, qualified: boolean = true): Promise<TenderQuery> {
+        return this.patch<TenderQuery>(`/${tqId}/qualified`, { qualified });
+    }
+
+    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
+        return this.get<TqManagementDashboardCounts>('/counts');
+    }
+}
+
+export const tqManagementService =
+    new TqManagementService();
