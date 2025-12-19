@@ -97,6 +97,7 @@ export default function TenderResultEditPage() {
         <UploadResultFormPage
             resultId={resultId}
             tenderDetails={tenderDetails}
+            isEditMode={true}
             onSuccess={() => navigate(`/tendering/results/${resultId}`)}
         />
     );

@@ -148,6 +148,21 @@ export class DocumentChecklistsService {
         };
     }
 
+    async getDashboardCounts(): Promise<{ pending: number; submitted: number; total: number }> {
+        const [pendingCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderDocumentChecklists)
+            .where(isNull(tenderDocumentChecklists.id));
+        const pending = Number(pendingCountResult?.count || 0);
+        const [submittedCountResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderDocumentChecklists)
+            .where(isNotNull(tenderDocumentChecklists.id));
+        const submitted = Number(submittedCountResult?.count || 0);
+        const total = pending + submitted;
+        return { pending, submitted, total };
+    }
+
     async findByTenderId(tenderId: number) {
         const result = await this.db
             .select()

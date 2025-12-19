@@ -19,12 +19,13 @@ import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatINR } from '@/hooks/useINRFormatter';
 import type { VendorOrganization } from '@/types/api.types';
 
+// Schema for form values (MultiSelectField returns strings)
 const CostingApprovalFormSchema = z.object({
     finalPrice: z.string().min(1, 'Final price is required'),
     receiptPrice: z.string().min(1, 'Receipt price is required'),
     budgetPrice: z.string().min(1, 'Budget price is required'),
     grossMargin: z.string(),
-    oemVendorIds: z.array(z.number()).min(1, 'At least one vendor must be selected'),
+    oemVendorIds: z.array(z.string()).min(1, 'At least one vendor must be selected'),
     tlRemarks: z.string().min(1, 'Remarks are required'),
 });
 
@@ -56,18 +57,37 @@ export default function CostingApprovalForm({
         label: v.name,
     })) || [];
 
+    // Determine default values based on mode
+    // Note: MultiSelectField works with strings, so we convert numbers to strings
+    const getDefaultValues = () => {
+        if (mode === 'edit') {
+            // In edit mode, use approved values
+            return {
+                finalPrice: costingSheet.finalPrice || '',
+                receiptPrice: costingSheet.receiptPrice || '',
+                budgetPrice: costingSheet.budgetPrice || '',
+                grossMargin: costingSheet.grossMargin || '0.00',
+                oemVendorIds: (costingSheet.oemVendorIds || []).map(id => id.toString()),
+                tlRemarks: costingSheet.tlRemarks || '',
+            };
+        } else {
+            // In approve mode, use submitted values as starting point
+            return {
+                finalPrice: costingSheet.submittedFinalPrice || '',
+                receiptPrice: costingSheet.submittedReceiptPrice || '',
+                budgetPrice: costingSheet.submittedBudgetPrice || '',
+                grossMargin: costingSheet.submittedGrossMargin || '0.00',
+                oemVendorIds: [],
+                tlRemarks: '',
+            };
+        }
+    };
+
+    const defaultValues = getDefaultValues();
+
     const form = useForm<FormValues>({
         resolver: zodResolver(CostingApprovalFormSchema),
-        defaultValues: {
-            finalPrice: costingSheet.submittedFinalPrice || '',
-            receiptPrice: costingSheet.submittedReceiptPrice || '',
-            budgetPrice: costingSheet.submittedBudgetPrice || '',
-            grossMargin: costingSheet.submittedGrossMargin || '0.00',
-            oemVendorIds: mode === 'edit' && costingSheet.oemVendorIds
-                ? costingSheet.oemVendorIds
-                : [],
-            tlRemarks: mode === 'edit' ? (costingSheet.tlRemarks || '') : '',
-        },
+        defaultValues,
     });
 
     const receiptPrice = form.watch('receiptPrice');
@@ -90,21 +110,32 @@ export default function CostingApprovalForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
+            // Transform form data: convert string vendor IDs to numbers
+            const transformedData = {
+                ...data,
+                oemVendorIds: data.oemVendorIds.map(id => Number(id)),
+            };
+
             if (mode === 'approve') {
                 await approveMutation.mutateAsync({
                     id: costingSheet.id,
-                    data: data,
+                    data: transformedData,
                 });
             } else {
                 await updateMutation.mutateAsync({
                     id: costingSheet.id,
-                    data: data,
+                    data: transformedData,
                 });
             }
             navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error processing approval:', error);
+            // Error toast is handled by the mutation hooks
         }
+    };
+
+    const onError = (errors: any) => {
+        console.error('Form validation errors:', errors);
     };
 
     return (
@@ -130,7 +161,7 @@ export default function CostingApprovalForm({
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-8">
                         {/* Tender Basic Details */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
@@ -354,7 +385,7 @@ export default function CostingApprovalForm({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                onClick={() => form.reset()}
+                                onClick={() => form.reset(defaultValues)}
                                 disabled={isSubmitting}
                             >
                                 Reset

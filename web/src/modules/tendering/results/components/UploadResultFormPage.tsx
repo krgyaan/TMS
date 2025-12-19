@@ -15,11 +15,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Save, Plus, X, ArrowLeft, IndianRupee } from 'lucide-react';
-import { useUploadResult } from '@/hooks/api/useTenderResults';
-import { useState } from 'react';
+import { useUploadResult, useTenderResult } from '@/hooks/api/useTenderResults';
+import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { FileUploadField } from '@/components/form/FileUploadField';
 import { useNavigate } from 'react-router-dom';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const UploadResultSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No']),
@@ -50,17 +52,21 @@ interface UploadResultFormPageProps {
         tenderNo: string;
         tenderName: string;
     };
+    isEditMode?: boolean;
     onSuccess?: () => void;
 }
 
 export default function UploadResultFormPage({
     resultId,
     tenderDetails,
+    isEditMode = false,
     onSuccess,
 }: UploadResultFormPageProps) {
     const navigate = useNavigate();
     const uploadResultMutation = useUploadResult();
+    const { data: existingResult } = useTenderResult(resultId);
     const [newPartyName, setNewPartyName] = useState('');
+    const [showResultDetails, setShowResultDetails] = useState(isEditMode);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(UploadResultSchema),
@@ -77,6 +83,29 @@ export default function UploadResultFormPage({
             finalResultScreenshot: '',
         },
     });
+
+    // Pre-populate form in edit mode
+    useEffect(() => {
+        if (isEditMode && existingResult) {
+            const result = existingResult as any;
+            form.reset({
+                technicallyQualified: result.technicallyQualified || 'Yes',
+                disqualificationReason: result.disqualificationReason || '',
+                qualifiedPartiesCount: result.qualifiedPartiesCount || '',
+                qualifiedPartiesNames: result.qualifiedPartiesNames || [],
+                result: result.result || 'Won',
+                l1Price: result.l1Price || '',
+                l2Price: result.l2Price || '',
+                ourPrice: result.ourPrice || '',
+                qualifiedPartiesScreenshot: result.qualifiedPartiesScreenshot || '',
+                finalResultScreenshot: result.finalResultScreenshot || '',
+            });
+            // If result fields exist, show Form 2
+            if (result.result || result.l1Price || result.l2Price || result.ourPrice) {
+                setShowResultDetails(true);
+            }
+        }
+    }, [isEditMode, existingResult, form]);
 
     const technicallyQualified = useWatch({
         control: form.control,
@@ -105,20 +134,27 @@ export default function UploadResultFormPage({
 
     const onSubmit = async (data: FormValues) => {
         try {
+            // If checkbox unchecked on upload page, only submit Form 1 fields
+            const submitData: any = {
+                technicallyQualified: data.technicallyQualified,
+                disqualificationReason: data.disqualificationReason,
+                qualifiedPartiesCount: data.qualifiedPartiesCount,
+                qualifiedPartiesNames: data.qualifiedPartiesNames,
+            };
+
+            // Only include Form 2 fields if checkbox is checked or in edit mode
+            if (showResultDetails || isEditMode) {
+                submitData.result = data.result;
+                submitData.l1Price = data.l1Price;
+                submitData.l2Price = data.l2Price;
+                submitData.ourPrice = data.ourPrice;
+                submitData.qualifiedPartiesScreenshot = data.qualifiedPartiesScreenshot;
+                submitData.finalResultScreenshot = data.finalResultScreenshot;
+            }
+
             await uploadResultMutation.mutateAsync({
                 id: resultId,
-                data: {
-                    technicallyQualified: data.technicallyQualified,
-                    disqualificationReason: data.disqualificationReason,
-                    qualifiedPartiesCount: data.qualifiedPartiesCount,
-                    qualifiedPartiesNames: data.qualifiedPartiesNames,
-                    result: data.result,
-                    l1Price: data.l1Price,
-                    l2Price: data.l2Price,
-                    ourPrice: data.ourPrice,
-                    qualifiedPartiesScreenshot: data.qualifiedPartiesScreenshot,
-                    finalResultScreenshot: data.finalResultScreenshot,
-                },
+                data: submitData,
             });
             if (onSuccess) {
                 onSuccess();
@@ -244,106 +280,125 @@ export default function UploadResultFormPage({
                                     </p>
                                 </div>
 
-                                {/* Result */}
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="result"
-                                    label="Result"
-                                >
-                                    {(field) => (
-                                        <Select
-                                            value={field.value}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select result" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Won">Won</SelectItem>
-                                                <SelectItem value="Lost">Lost</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </FieldWrapper>
-
-                                {/* Pricing */}
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="l1Price"
-                                        label="L1 Price"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    {...field}
-                                                    type="number"
-                                                    step="0.01"
-                                                    className="pl-10"
-                                                    placeholder="Enter L1 price"
-                                                />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="l2Price"
-                                        label="L2 Price"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    {...field}
-                                                    type="number"
-                                                    step="0.01"
-                                                    className="pl-10"
-                                                    placeholder="Enter L2 price"
-                                                />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="ourPrice"
-                                    label="Our Price"
-                                >
-                                    {(field) => (
-                                        <div className="relative">
-                                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                {...field}
-                                                type="number"
-                                                step="0.01"
-                                                className="pl-10"
-                                                placeholder="Enter our price"
-                                            />
-                                        </div>
-                                    )}
-                                </FieldWrapper>
-
-                                {/* Screenshots */}
-                                <div className="space-y-4">
-                                    <h4 className="font-semibold text-sm text-primary border-b pb-2">
-                                        Upload Screenshots
-                                    </h4>
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="qualifiedPartiesScreenshot"
-                                            label="Screenshot of Qualified Parties"
-                                            acceptedFileTypes={['image/*', 'application/pdf']}
+                                {/* Checkbox to show Result Details (only on upload page) */}
+                                {!isEditMode && (
+                                    <div className="flex items-center space-x-2 pt-4">
+                                        <Checkbox
+                                            id="showResultDetails"
+                                            checked={showResultDetails}
+                                            onCheckedChange={(checked) => setShowResultDetails(checked === true)}
                                         />
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="finalResultScreenshot"
-                                            label="Final Result Screenshot"
-                                            acceptedFileTypes={['image/*', 'application/pdf']}
-                                        />
+                                        <Label htmlFor="showResultDetails" className="text-sm font-medium cursor-pointer">
+                                            Add Result Details
+                                        </Label>
                                     </div>
-                                </div>
+                                )}
+
+                                {/* Form 2: Result Details (conditional) */}
+                                {(showResultDetails || isEditMode) && (
+                                    <>
+                                        {/* Result */}
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="result"
+                                            label="Result"
+                                        >
+                                            {(field) => (
+                                                <Select
+                                                    value={field.value}
+                                                    onValueChange={field.onChange}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select result" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Won">Won</SelectItem>
+                                                        <SelectItem value="Lost">Lost</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        </FieldWrapper>
+
+                                        {/* Pricing */}
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="l1Price"
+                                                label="L1 Price"
+                                            >
+                                                {(field) => (
+                                                    <div className="relative">
+                                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            {...field}
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="pl-10"
+                                                            placeholder="Enter L1 price"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="l2Price"
+                                                label="L2 Price"
+                                            >
+                                                {(field) => (
+                                                    <div className="relative">
+                                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            {...field}
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="pl-10"
+                                                            placeholder="Enter L2 price"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </FieldWrapper>
+                                        </div>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="ourPrice"
+                                            label="Our Price"
+                                        >
+                                            {(field) => (
+                                                <div className="relative">
+                                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                    <Input
+                                                        {...field}
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="pl-10"
+                                                        placeholder="Enter our price"
+                                                    />
+                                                </div>
+                                            )}
+                                        </FieldWrapper>
+
+                                        {/* Screenshots */}
+                                        <div className="space-y-4">
+                                            <h4 className="font-semibold text-sm text-primary border-b pb-2">
+                                                Upload Screenshots
+                                            </h4>
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <FileUploadField
+                                                    control={form.control}
+                                                    name="qualifiedPartiesScreenshot"
+                                                    label="Screenshot of Qualified Parties"
+                                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                                />
+                                                <FileUploadField
+                                                    control={form.control}
+                                                    name="finalResultScreenshot"
+                                                    label="Final Result Screenshot"
+                                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
 

@@ -82,12 +82,12 @@ export const TenderInfoSheetPayloadSchema = z.object({
     sdRequired: z.enum(['YES', 'NO']).optional().nullable(),
     sdMode: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional().nullable(),
     sdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
-    sdDurationMonths: optionalNumber(z.coerce.number().int().positive()),
+    sdDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120)),
 
     // LD
     ldRequired: z.enum(['YES', 'NO']).optional().nullable(),
     ldPercentagePerWeek: optionalNumber(z.coerce.number().min(0).max(5)),
-    maxLdPercentage: optionalNumber(z.coerce.number().int().min(0).max(20)),
+    maxLdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
 
     // Physical Docs
     physicalDocsRequired: z.enum(['YES', 'NO']).optional().nullable(),
@@ -104,15 +104,12 @@ export const TenderInfoSheetPayloadSchema = z.object({
 
     // Technical Eligibility
     techEligibilityAge: optionalNumber(z.coerce.number().int().nonnegative()),
-    workOrderValue1Required: z.enum(['YES', 'NO']).optional().nullable(),
+
+    // Work Value Type
+    workValueType: z.enum(['WORKS_VALUES', 'CUSTOM']).optional().nullable(),
     orderValue1: optionalNumber(z.coerce.number().nonnegative()),
-    wo1Custom: optionalString,
-    workOrderValue2Required: z.enum(['YES', 'NO']).optional().nullable(),
     orderValue2: optionalNumber(z.coerce.number().nonnegative()),
-    wo2Custom: optionalString,
-    workOrderValue3Required: z.enum(['YES', 'NO']).optional().nullable(),
     orderValue3: optionalNumber(z.coerce.number().nonnegative()),
-    wo3Custom: optionalString,
 
     // Financial Requirements
     avgAnnualTurnoverType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),

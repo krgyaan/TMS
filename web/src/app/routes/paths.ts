@@ -44,9 +44,11 @@ export const paths = {
         documentChecklistEdit: (tenderId: number | string) => `/tendering/document-checklists/edit/${tenderId}`,
         documentChecklistView: (tenderId: number | string) => `/tendering/document-checklists/${tenderId}`,
         costingSheets: "/tendering/costing-sheets",
+        costingSheetCreate: (tenderId: number | string) => `/tendering/costing-sheets/create/${tenderId}`,
         costingSheetSubmit: (tenderId: number | string) => `/tendering/costing-sheets/submit/${tenderId}`,
         costingSheetEdit: (tenderId: number | string) => `/tendering/costing-sheets/edit/${tenderId}`,
         costingSheetResubmit: (tenderId: number | string) => `/tendering/costing-sheets/resubmit/${tenderId}`,
+        costingSheetView: (tenderId: number | string) => `/tendering/costing-sheets/${tenderId}`,
         costingApprovals: "/tendering/costing-approvals",
         costingApprove: (costingSheetId: number) => `/tendering/costing-approvals/approve/${costingSheetId}`,
         costingReject: (costingSheetId: number) => `/tendering/costing-approvals/reject/${costingSheetId}`,
@@ -230,21 +232,9 @@ export const paths = {
         leadTypes_create: "/master/lead-types/create",
         leadTypes_edit: (id: number | string) => `/master/lead-types/${id}/edit`,
 
-        vendorAccs: "/master/vendor-accounts",
-        vendorAccs_create: "/master/vendor-accounts/create",
-        vendorAccs_edit: (id: number | string) => `/master/vendor-accounts/${id}/edit`,
-
-        vendorGsts: "/master/vendor-gsts",
-        vendorGsts_create: "/master/vendor-gsts/create",
-        vendorGsts_edit: (id: number | string) => `/master/vendor-gsts/${id}/edit`,
-
-        vendorFiles: "/master/vendor-files",
-        vendorFiles_create: "/master/vendor-files/create",
-        vendorFiles_edit: (id: number | string) => `/master/vendor-files/${id}/edit`,
-
-        vendorOrganizations: "/master/vendor-organizations",
-        vendorOrganizations_create: "/master/vendor-organizations/create",
-        vendorOrganizations_edit: (id: number | string) => `/master/vendor-organizations/${id}/edit`,
+        vendors: "/master/vendors",
+        vendors_create: "/master/vendors/create",
+        vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
     },
 
     // ==================== SHARED ====================

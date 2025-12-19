@@ -1,5 +1,14 @@
-import axiosInstance from '@/lib/axios';
-import type { TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    TenderCostingSheet,
+    CostingSheetDashboardRow,
+    SubmitCostingSheetDto,
+    UpdateCostingSheetDto,
+    PaginatedResult,
+    CostingSheetDashboardCounts,
+    CreateSheetResponse,
+    DriveScopesResponse,
+} from '@/types/api.types';
 
 export type CostingSheetListParams = {
     costingStatus?: 'pending' | 'submitted' | 'rejected';
@@ -9,49 +18,67 @@ export type CostingSheetListParams = {
     sortOrder?: 'asc' | 'desc';
 };
 
-export const costingSheetsService = {
-    getAll: async (params?: CostingSheetListParams): Promise<PaginatedResult<CostingSheetDashboardRow>> => {
-        const searchParams = new URLSearchParams();
+class CostingSheetsService extends BaseApiService {
+    constructor() {
+        super('/costing-sheets');
+    }
 
-        if (params?.costingStatus) {
-            searchParams.set('costingStatus', params.costingStatus);
+    async getAll(params?: CostingSheetListParams): Promise<PaginatedResult<CostingSheetDashboardRow>> {
+        const search = new URLSearchParams();
+
+        if (params) {
+            if (params.costingStatus) {
+                search.set('costingStatus', params.costingStatus);
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
+            }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
-        if (params?.page) {
-            searchParams.set('page', String(params.page));
-        }
-        if (params?.limit) {
-            searchParams.set('limit', String(params.limit));
-        }
-        if (params?.sortBy) {
-            searchParams.set('sortBy', params.sortBy);
-        }
-        if (params?.sortOrder) {
-            searchParams.set('sortOrder', params.sortOrder);
-        }
 
-        const queryString = searchParams.toString();
-        const url = queryString ? `/costing-sheets?${queryString}` : '/costing-sheets';
-        const response = await axiosInstance.get<PaginatedResult<CostingSheetDashboardRow>>(url);
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<PaginatedResult<CostingSheetDashboardRow>>(queryString ? `?${queryString}` : '');
+    }
 
-    getByTenderId: async (tenderId: number): Promise<TenderCostingSheet | null> => {
-        const response = await axiosInstance.get<TenderCostingSheet>(`/costing-sheets/tender/${tenderId}`);
-        return response.data;
-    },
+    async getById(id: number): Promise<TenderCostingSheet> {
+        return this.get<TenderCostingSheet>(`/${id}`);
+    }
 
-    getById: async (id: number): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.get<TenderCostingSheet>(`/costing-sheets/${id}`);
-        return response.data;
-    },
+    async getByTenderId(tenderId: number): Promise<TenderCostingSheet | null> {
+        return this.get<TenderCostingSheet>(`/tender/${tenderId}`);
+    }
 
-    submit: async (data: SubmitCostingSheetDto): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.post<TenderCostingSheet>('/costing-sheets', data);
-        return response.data;
-    },
+    async submit(data: SubmitCostingSheetDto): Promise<TenderCostingSheet> {
+        return this.post<TenderCostingSheet>('', data);
+    }
 
-    update: async (id: number, data: UpdateCostingSheetDto): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.patch<TenderCostingSheet>(`/costing-sheets/${id}`, data);
-        return response.data;
-    },
-};
+    async update(id: number, data: UpdateCostingSheetDto): Promise<TenderCostingSheet> {
+        return this.patch<TenderCostingSheet>(`/${id}`, data);
+    }
+
+    async getDashboardCounts(): Promise<CostingSheetDashboardCounts> {
+        return this.get<CostingSheetDashboardCounts>('/counts');
+    }
+
+    async checkDriveScopes(): Promise<DriveScopesResponse> {
+        return this.get<DriveScopesResponse>('/check-drive-scopes');
+    }
+
+    async createSheet(tenderId: number): Promise<CreateSheetResponse> {
+        return this.post<CreateSheetResponse>('/create-sheet', { tenderId });
+    }
+
+    async createSheetWithName(tenderId: number, customName: string): Promise<CreateSheetResponse> {
+        return this.post<CreateSheetResponse>('/create-sheet-with-name', { tenderId, customName });
+    }
+}
+
+export const costingSheetsService = new CostingSheetsService();

@@ -2,6 +2,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -111,345 +112,343 @@ export function TenderResultShow({
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <tbody className="divide-y divide-border">
-                            {/* Tender Information */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Tender Information
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground w-1/4">
-                                    Tender No
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold w-1/4">
-                                    {result.tenderNo || '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground w-1/4">
-                                    Tender Name
-                                </td>
-                                <td className="px-4 py-3 text-sm w-1/4">
-                                    {result.tenderName || '—'}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Team Executive
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {result.teamExecutiveName || '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Item
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {result.itemName || '—'}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Bid Submission Date
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {result.bidSubmissionDate ? formatDateTime(result.bidSubmissionDate) : '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Tender Status
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {result.tenderStatus || '—'}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Tender Value
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {result.tenderValue ? formatINR(parseFloat(result.tenderValue)) : '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Final Price
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {result.finalPrice ? formatINR(parseFloat(result.finalPrice)) : '—'}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Result Status
-                                </td>
-                                <td className="px-4 py-3" colSpan={3}>
-                                    <Badge variant={getStatusVariant(result.resultStatus) as any}>
-                                        {result.resultStatus}
-                                    </Badge>
-                                </td>
-                            </tr>
+                <Table>
+                    <TableBody>
+                        {/* Tender Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Tender Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Tender No
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {result.tenderNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Tender Name
+                            </TableCell>
+                            <TableCell className="text-sm w-1/4">
+                                {result.tenderName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Team Executive
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {result.teamExecutiveName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Item
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {result.itemName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Bid Submission Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {result.bidSubmissionDate ? formatDateTime(result.bidSubmissionDate) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {result.tenderStatus || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Value
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {result.tenderValue ? formatINR(parseFloat(result.tenderValue)) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Final Price
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {result.finalPrice ? formatINR(parseFloat(result.finalPrice)) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Result Status
+                            </TableCell>
+                            <TableCell colSpan={3}>
+                                <Badge variant={getStatusVariant(result.resultStatus) as any}>
+                                    {result.resultStatus}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
 
-                            {/* RA Information */}
-                            {result.raApplicable && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Reverse Auction Information
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            RA Applicable
-                                        </td>
-                                        <td className="px-4 py-3" colSpan={3}>
-                                            <Badge variant="outline" className="gap-1">
-                                                <Gavel className="h-3 w-3" />
+                        {/* RA Information */}
+                        {result.raApplicable && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Reverse Auction Information
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        RA Applicable
+                                    </TableCell>
+                                    <TableCell colSpan={3}>
+                                        <Badge variant="outline" className="gap-1">
+                                            <Gavel className="h-3 w-3" />
+                                            Yes
+                                        </Badge>
+                                        {result.reverseAuctionId && onViewRa && (
+                                            <Button
+                                                variant="link"
+                                                size="sm"
+                                                className="ml-2"
+                                                onClick={() => onViewRa(result.reverseAuctionId!)}
+                                            >
+                                                View RA Details
+                                            </Button>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+
+                        {/* EMD Details */}
+                        {result.emdDetails && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        EMD Details
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        EMD Amount
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {result.emdDetails.displayText === 'Not Applicable' ? (
+                                            <span className="text-muted-foreground">N/A</span>
+                                        ) : (
+                                            formatINR(parseFloat(result.emdDetails.amount))
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        EMD Status
+                                    </TableCell>
+                                    <TableCell>
+                                        {result.emdDetails.displayText !== 'Not Applicable' &&
+                                            result.emdDetails.displayText !== 'Not Requested' && (
+                                                <Badge
+                                                    variant={
+                                                        getEmdStatusVariant(
+                                                            result.emdDetails.instrumentStatus
+                                                        ) as any
+                                                    }
+                                                >
+                                                    {result.emdDetails.displayText}
+                                                </Badge>
+                                            )}
+                                        {result.emdDetails.displayText === 'Not Requested' && (
+                                            <Badge variant="outline">Not Requested</Badge>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                {result.emdDetails.instrumentType && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Instrument Type
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {result.emdDetails.instrumentType}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+
+                        {/* Technical Qualification (for non-RA tenders) */}
+                        {!result.raApplicable && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Technical Qualification
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Technically Qualified
+                                    </TableCell>
+                                    <TableCell colSpan={3}>
+                                        {isQualified ? (
+                                            <Badge variant="success" className="gap-1">
+                                                <CheckCircle2 className="h-3 w-3" />
                                                 Yes
                                             </Badge>
-                                            {result.reverseAuctionId && onViewRa && (
-                                                <Button
-                                                    variant="link"
-                                                    size="sm"
-                                                    className="ml-2"
-                                                    onClick={() => onViewRa(result.reverseAuctionId!)}
-                                                >
-                                                    View RA Details
-                                                </Button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                </>
-                            )}
-
-                            {/* EMD Details */}
-                            {result.emdDetails && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            EMD Details
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            EMD Amount
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-semibold">
-                                            {result.emdDetails.displayText === 'Not Applicable' ? (
-                                                <span className="text-muted-foreground">N/A</span>
-                                            ) : (
-                                                formatINR(parseFloat(result.emdDetails.amount))
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            EMD Status
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {result.emdDetails.displayText !== 'Not Applicable' &&
-                                                result.emdDetails.displayText !== 'Not Requested' && (
-                                                    <Badge
-                                                        variant={
-                                                            getEmdStatusVariant(
-                                                                result.emdDetails.instrumentStatus
-                                                            ) as any
-                                                        }
-                                                    >
-                                                        {result.emdDetails.displayText}
-                                                    </Badge>
-                                                )}
-                                            {result.emdDetails.displayText === 'Not Requested' && (
-                                                <Badge variant="outline">Not Requested</Badge>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    {result.emdDetails.instrumentType && (
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                Instrument Type
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                {result.emdDetails.instrumentType}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
-                            )}
-
-                            {/* Technical Qualification (for non-RA tenders) */}
-                            {!result.raApplicable && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Technical Qualification
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Technically Qualified
-                                        </td>
-                                        <td className="px-4 py-3" colSpan={3}>
-                                            {isQualified ? (
-                                                <Badge variant="success" className="gap-1">
-                                                    <CheckCircle2 className="h-3 w-3" />
-                                                    Yes
-                                                </Badge>
-                                            ) : isDisqualified ? (
-                                                <Badge variant="destructive" className="gap-1">
-                                                    <XCircle className="h-3 w-3" />
-                                                    No
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="secondary" className="gap-1">
-                                                    <Clock className="h-3 w-3" />
-                                                    Under Evaluation
-                                                </Badge>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    {isDisqualified && result.disqualificationReason && (
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                Disqualification Reason
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                {result.disqualificationReason}
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {isQualified && (
-                                        <>
-                                            <tr className="hover:bg-muted/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                    Number of Qualified Parties
-                                                </td>
-                                                <td className="px-4 py-3 text-sm">
-                                                    {result.qualifiedPartiesCount || '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                    Qualified Parties Names
-                                                </td>
-                                                <td className="px-4 py-3 text-sm">
-                                                    {result.qualifiedPartiesNames &&
-                                                    result.qualifiedPartiesNames.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {result.qualifiedPartiesNames.map((name, idx) => (
-                                                                <Badge key={idx} variant="outline" className="text-xs">
-                                                                    {name}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        '—'
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        </>
-                                    )}
-                                </>
-                            )}
-
-                            {/* Result Information */}
-                            {hasResult && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Result Information
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Result
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge
-                                                variant={
-                                                    result.result === 'Won'
-                                                        ? 'success'
-                                                        : result.result === 'Lost'
-                                                        ? 'destructive'
-                                                        : 'secondary'
-                                                }
-                                            >
-                                                {result.result}
+                                        ) : isDisqualified ? (
+                                            <Badge variant="destructive" className="gap-1">
+                                                <XCircle className="h-3 w-3" />
+                                                No
                                             </Badge>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground" colSpan={2}>
-                                            {/* Empty */}
-                                        </td>
-                                    </tr>
-                                    {(result.l1Price || result.l2Price || result.ourPrice) && (
-                                        <>
-                                            <tr className="hover:bg-muted/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                    L1 Price
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-semibold">
-                                                    {result.l1Price ? formatINR(parseFloat(result.l1Price)) : '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                    L2 Price
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-semibold">
-                                                    {result.l2Price ? formatINR(parseFloat(result.l2Price)) : '—'}
-                                                </td>
-                                            </tr>
-                                            <tr className="hover:bg-muted/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                    Our Price
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-semibold" colSpan={3}>
-                                                    {result.ourPrice ? formatINR(parseFloat(result.ourPrice)) : '—'}
-                                                </td>
-                                            </tr>
-                                        </>
-                                    )}
-                                </>
-                            )}
+                                        ) : (
+                                            <Badge variant="secondary" className="gap-1">
+                                                <Clock className="h-3 w-3" />
+                                                Under Evaluation
+                                            </Badge>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                {isDisqualified && result.disqualificationReason && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Disqualification Reason
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {result.disqualificationReason}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {isQualified && (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Number of Qualified Parties
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {result.qualifiedPartiesCount || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Qualified Parties Names
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {result.qualifiedPartiesNames &&
+                                                result.qualifiedPartiesNames.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {result.qualifiedPartiesNames.map((name, idx) => (
+                                                            <Badge key={idx} variant="outline" className="text-xs">
+                                                                {name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
+                            </>
+                        )}
 
-                            {/* Screenshots */}
-                            {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Screenshots
-                                        </td>
-                                    </tr>
-                                    {result.qualifiedPartiesScreenshot && (
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                Qualified Parties Screenshot
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                <a
-                                                    href={result.qualifiedPartiesScreenshot}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    View Screenshot
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {result.finalResultScreenshot && (
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                Final Result Screenshot
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                <a
-                                                    href={result.finalResultScreenshot}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    View Screenshot
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                        {/* Result Information */}
+                        {hasResult && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Result Information
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Result
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            variant={
+                                                result.result === 'Won'
+                                                    ? 'success'
+                                                    : result.result === 'Lost'
+                                                    ? 'destructive'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {result.result}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2}>
+                                        {/* Empty */}
+                                    </TableCell>
+                                </TableRow>
+                                {(result.l1Price || result.l2Price || result.ourPrice) && (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                L1 Price
+                                            </TableCell>
+                                            <TableCell className="text-sm font-semibold">
+                                                {result.l1Price ? formatINR(parseFloat(result.l1Price)) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                L2 Price
+                                            </TableCell>
+                                            <TableCell className="text-sm font-semibold">
+                                                {result.l2Price ? formatINR(parseFloat(result.l2Price)) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Our Price
+                                            </TableCell>
+                                            <TableCell className="text-sm font-semibold" colSpan={3}>
+                                                {result.ourPrice ? formatINR(parseFloat(result.ourPrice)) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        {/* Screenshots */}
+                        {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Screenshots
+                                    </TableCell>
+                                </TableRow>
+                                {result.qualifiedPartiesScreenshot && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Qualified Parties Screenshot
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <a
+                                                href={result.qualifiedPartiesScreenshot}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary hover:underline"
+                                            >
+                                                View Screenshot
+                                            </a>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {result.finalResultScreenshot && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Final Result Screenshot
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <a
+                                                href={result.finalResultScreenshot}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary hover:underline"
+                                            >
+                                                View Screenshot
+                                            </a>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

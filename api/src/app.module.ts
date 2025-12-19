@@ -30,6 +30,9 @@ import { StatusesModule } from "@/modules/master/statuses/statuses.module";
 import { TqTypesModule } from "@/modules/master/tq-types/tq-types.module";
 import { VendorOrganizationsModule } from "@/modules/master/vendor-organizations/vendor-organizations.module";
 import { VendorsModule } from "@/modules/master/vendors/vendors.module";
+import { VendorGstsModule } from "@/modules/master/vendor-gsts/vendor-gsts.module";
+import { VendorAccountsModule } from "@/modules/master/vendor-accounts/vendor-accounts.module";
+import { VendorFilesModule } from "@/modules/master/vendor-files/vendor-files.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
@@ -57,7 +60,7 @@ import { TqManagementModule } from "@/modules/tendering/tq-management/tq-managem
 import { ReverseAuctionModule } from "@/modules/tendering/reverse-auction/reverse-auction.module";
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { PermissionsModule } from "@/modules/master/permissions/permissions.module";
-import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
+// import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 
 @Module({
     imports: [
@@ -104,6 +107,9 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
         TqTypesModule,
         VendorOrganizationsModule,
         VendorsModule,
+        VendorGstsModule,
+        VendorAccountsModule,
+        VendorFilesModule,
         GoogleIntegrationModule,
         AuthModule,
         WebsitesModule,
@@ -126,7 +132,7 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
         TqManagementModule,
         ReverseAuctionModule,
         TenderResultModule,
-        ImprestAdminModule,
+        // ImprestAdminModule,
     ],
     controllers: [AppController],
     providers: [
@@ -137,4 +143,4 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }

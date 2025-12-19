@@ -39,9 +39,9 @@ export function TenderFeeSection({
         if (selectedMode) {
             if (selectedMode === 'DD') {
                 setValue(`${prefix}.details.ddPurpose`, defaultPurpose);
-            } else if (selectedMode === 'BANK_TRANSFER') {
+            } else if (selectedMode === 'BT') {
                 setValue(`${prefix}.details.btPurpose`, defaultPurpose);
-            } else if (selectedMode === 'PORTAL') {
+            } else if (selectedMode === 'POP') {
                 setValue(`${prefix}.details.portalPurpose`, defaultPurpose);
             }
         }
@@ -99,7 +99,7 @@ export function TenderFeeSection({
                     </p>
 
                     {/* Portal Payment */}
-                    {selectedMode === 'PORTAL' && (
+                    {selectedMode === 'POP' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <FieldWrapper control={control} name={`${prefix}.details.portalName`} label="Portal/Website Name *">
                                 {(field) => <Input placeholder="e.g., gem.gov.in" {...field} />}
@@ -122,7 +122,7 @@ export function TenderFeeSection({
                     )}
 
                     {/* Bank Transfer */}
-                    {selectedMode === 'BANK_TRANSFER' && (
+                    {selectedMode === 'BT' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <FieldWrapper control={control} name={`${prefix}.details.btAccountName`} label="Account Name *">
                                 {(field) => <Input {...field} />}

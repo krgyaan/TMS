@@ -42,9 +42,9 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD' }: Emd
                 setValue('emd.details.ddPurpose', defaultPurpose);
             } else if (selectedMode === 'FDR') {
                 setValue('emd.details.fdrPurpose', defaultPurpose);
-            } else if (selectedMode === 'BANK_TRANSFER') {
+            } else if (selectedMode === 'BT') {
                 setValue('emd.details.btPurpose', defaultPurpose);
-            } else if (selectedMode === 'PORTAL') {
+            } else if (selectedMode === 'POP') {
                 setValue('emd.details.portalPurpose', defaultPurpose);
             } else if (selectedMode === 'CHEQUE') {
                 setValue('emd.details.chequePurpose', defaultPurpose);
@@ -104,7 +104,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD' }: Emd
                     </p>
 
                     {/* Portal Payment */}
-                    {selectedMode === 'PORTAL' && (
+                    {selectedMode === 'POP' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <SelectField
                                 control={control}
@@ -134,14 +134,14 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD' }: Emd
                     )}
 
                     {/* Bank Transfer */}
-                    {selectedMode === 'BANK_TRANSFER' && (
+                    {selectedMode === 'BT' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <SelectField
                                 control={control}
                                 name="emd.details.btPurpose"
                                 label="Purpose *"
-                                options={PURPOSE_OPTIONS}
-                                placeholder="Select Purpose"
+                                options={[{ value: 'EMD', label: 'EMD' }]}
+                                placeholder="EMD"
                             />
                             <FieldWrapper control={control} name="emd.details.btAccountName" label="Account Name *">
                                 {(field) => <Input {...field} />}

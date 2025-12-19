@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tenderApprovalsService, type TenderApprovalFilters } from '@/services/api/tender-approvals.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow } from '@/types/api.types';
+import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts } from '@/types/api.types';
 
 // export const tenderApprovalsKey = {
 //     all: ['tender-approvals'] as const,
@@ -19,6 +19,7 @@ export const tenderApprovalsKey = {
     details: () => [...tenderApprovalsKey.all, 'detail'] as const,
     detail: (id: number) => [...tenderApprovalsKey.details(), id] as const,
     byTender: (tenderId: number) => [...tenderApprovalsKey.all, 'by-tender', tenderId] as const,
+    dashboardCounts: () => [...tenderApprovalsKey.all, 'dashboard-counts'] as const,
 }
 
 export const useTenderApprovals = (
@@ -94,5 +95,13 @@ export const useUpdateTenderApproval = () => {
         onError: error => {
             toast.error(handleQueryError(error));
         },
+    });
+};
+
+export const useTenderApprovalsDashboardCounts = () => {
+    return useQuery<TenderApprovalDashboardCounts>({
+        queryKey: tenderApprovalsKey.dashboardCounts(),
+        queryFn: () => tenderApprovalsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };

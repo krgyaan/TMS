@@ -26,11 +26,6 @@ const Master_Item = lazy(() => import('@/modules/master/item'));
 const Master_Item_Create = lazy(() => import('@/modules/master/item/create'));
 const Master_Item_Edit = lazy(() => import('@/modules/master/item/edit'));
 
-// Vendors
-const Master_Vendor = lazy(() => import('@/modules/master/vendor'));
-const Master_Vendor_Create = lazy(() => import('@/modules/master/vendor/create'));
-const Master_Vendor_Edit = lazy(() => import('@/modules/master/vendor/edit'));
-
 // Websites
 const Master_Website = lazy(() => import('@/modules/master/website'));
 const Master_Website_Create = lazy(() => import('@/modules/master/website/create'));
@@ -113,25 +108,10 @@ const Master_LeadType = lazy(() => import('@/modules/master/lead-type'));
 const Master_LeadType_Create = lazy(() => import('@/modules/master/lead-type/create'));
 const Master_LeadType_Edit = lazy(() => import('@/modules/master/lead-type/edit'));
 
-// Vendor Accounts
-const Master_VendorAcc = lazy(() => import('@/modules/master/vendor-account'));
-const Master_VendorAcc_Create = lazy(() => import('@/modules/master/vendor-account/create'));
-const Master_VendorAcc_Edit = lazy(() => import('@/modules/master/vendor-account/edit'));
-
-// Vendor GSTs
-const Master_VendorGst = lazy(() => import('@/modules/master/vendor-gst'));
-const Master_VendorGst_Create = lazy(() => import('@/modules/master/vendor-gst/create'));
-const Master_VendorGst_Edit = lazy(() => import('@/modules/master/vendor-gst/edit'));
-
-// Vendor Files
-const Master_VendorFile = lazy(() => import('@/modules/master/vendor-file'));
-const Master_VendorFile_Create = lazy(() => import('@/modules/master/vendor-file/create'));
-const Master_VendorFile_Edit = lazy(() => import('@/modules/master/vendor-file/edit'));
-
-// Vendor Organizations
-const Master_VendorOrganization = lazy(() => import('@/modules/master/vendor-organization'));
-const Master_VendorOrganization_Create = lazy(() => import('@/modules/master/vendor-organization/create'));
-const Master_VendorOrganization_Edit = lazy(() => import('@/modules/master/vendor-organization/edit'));
+// Vendors (Unified)
+const Master_Vendors = lazy(() => import('@/modules/master/vendors'));
+const Master_Vendors_Create = lazy(() => import('@/modules/master/vendors/create'));
+const Master_Vendors_Edit = lazy(() => import('@/modules/master/vendors/edit'));
 
 // ==================== ROUTES ====================
 export default function MasterRoutes() {
@@ -166,13 +146,6 @@ export default function MasterRoutes() {
                 <Route index element={<RouteWrapper><Master_Item /></RouteWrapper>} />
                 <Route path="create" element={<RouteWrapper><Master_Item_Create /></RouteWrapper>} />
                 <Route path=":id/edit" element={<RouteWrapper><Master_Item_Edit /></RouteWrapper>} />
-            </Route>
-
-            {/* Vendors */}
-            <Route path="vendors">
-                <Route index element={<RouteWrapper><Master_Vendor /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_Vendor_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_Vendor_Edit /></RouteWrapper>} />
             </Route>
 
             {/* Websites */}
@@ -285,32 +258,11 @@ export default function MasterRoutes() {
                 <Route path=":id/edit" element={<RouteWrapper><Master_LeadType_Edit /></RouteWrapper>} />
             </Route>
 
-            {/* Vendor Accounts */}
-            <Route path="vendor-accounts">
-                <Route index element={<RouteWrapper><Master_VendorAcc /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_VendorAcc_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_VendorAcc_Edit /></RouteWrapper>} />
-            </Route>
-
-            {/* Vendor GSTs */}
-            <Route path="vendor-gsts">
-                <Route index element={<RouteWrapper><Master_VendorGst /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_VendorGst_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_VendorGst_Edit /></RouteWrapper>} />
-            </Route>
-
-            {/* Vendor Files */}
-            <Route path="vendor-files">
-                <Route index element={<RouteWrapper><Master_VendorFile /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_VendorFile_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_VendorFile_Edit /></RouteWrapper>} />
-            </Route>
-
-            {/* Vendor Organizations */}
-            <Route path="vendor-organizations">
-                <Route index element={<RouteWrapper><Master_VendorOrganization /></RouteWrapper>} />
-                <Route path="create" element={<RouteWrapper><Master_VendorOrganization_Create /></RouteWrapper>} />
-                <Route path=":id/edit" element={<RouteWrapper><Master_VendorOrganization_Edit /></RouteWrapper>} />
+            {/* Vendors (Unified) */}
+            <Route path="vendors">
+                <Route index element={<RouteWrapper><Master_Vendors /></RouteWrapper>} />
+                <Route path="create" element={<RouteWrapper><Master_Vendors_Create /></RouteWrapper>} />
+                <Route path=":id/edit" element={<RouteWrapper><Master_Vendors_Edit /></RouteWrapper>} />
             </Route>
         </Routes>
     );

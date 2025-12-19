@@ -21,6 +21,7 @@ export const tenderInformation = pgTable("tender_information", {
     emdRequired: varchar("emd_required", { length: 10 }),
     emdAmount: numeric("emd_amount", { precision: 12, scale: 2 }),
     emdMode: text("emd_mode").array(),
+    tenderValueGstInclusive: numeric("tender_value_gst_inclusive", { precision: 15, scale: 2 }),
 
     reverseAuctionApplicable: varchar("reverse_auction_applicable", { length: 5 }),
     paymentTermsSupply: integer("payment_terms_supply"),
@@ -51,15 +52,11 @@ export const tenderInformation = pgTable("tender_information", {
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
     techEligibilityAge: integer("technical_eligibility_age"),
 
-    workOrderValue1Required: varchar("wo1_required", { length: 5 }),
+    workValueType: varchar("work_value_type", { length: 20 }), // "WORKS_VALUES" | "CUSTOM"
     orderValue1: numeric("order_value_1", { precision: 12, scale: 2 }),
-    wo1Custom: text("wo1_custom"),
-    workOrderValue2Required: varchar("wo2_required", { length: 5 }),
     orderValue2: numeric("order_value_2", { precision: 12, scale: 2 }),
-    wo2Custom: text("wo2_custom"),
-    workOrderValue3Required: varchar("wo3_required", { length: 5 }),
     orderValue3: numeric("order_value_3", { precision: 12, scale: 2 }),
-    wo3Custom: text("wo3_custom"),
+    customEligibilityCriteria: text("custom_eligibility_criteria"),
 
     avgAnnualTurnoverType: varchar("avg_annual_turnover_type", { length: 20 }),
     avgAnnualTurnoverValue: numeric("avg_annual_turnover_value", { precision: 12, scale: 2 }),
@@ -73,6 +70,7 @@ export const tenderInformation = pgTable("tender_information", {
     netWorthType: varchar("net_worth_type", { length: 20 }),
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
+    clientOrganization: varchar("client_organization", { length: 255 }),
     courierAddress: text("courier_address"),
 
     teFinalRemark: text("te_final_remark"),

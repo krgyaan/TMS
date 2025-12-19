@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +25,8 @@ import {
 import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
-import type { SaveTenderInfoSheetDto, TenderInfoSheet, TenderInfoWithNames } from '@/types/api.types';
+import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
+import type { TenderInfoWithNames } from '@/types/api.types';
 import {
     yesNoOptions,
     emdRequiredOptions,
@@ -44,385 +44,23 @@ import {
     rejectionReasonOptions,
     dummyTechnicalDocuments,
     dummyFinancialDocuments,
-} from '@/constants/tenderInfoOptions';
-import { TenderView } from '../../tenders/components/TenderView';
-import { infoSheetFieldOptions } from '@/constants/tenderApprovalOptions';
-
-// Zod Schema
-const TenderInformationFormSchema = z.object({
-    teRecommendation: z.enum(['YES', 'NO']),
-    teRejectionReason: z.coerce.number().int().min(1).nullable().optional(),
-    teRejectionRemarks: z.string().max(1000).optional(),
-
-    processingFeeRequired: z.enum(['YES', 'NO']).optional(),
-    processingFeeAmount: z.coerce.number().nonnegative().optional(),
-    processingFeeModes: z.array(z.string()).optional(),
-
-    tenderFeeRequired: z.enum(['YES', 'NO']).optional(),
-    tenderFeeAmount: z.coerce.number().nonnegative().optional(),
-    tenderFeeModes: z.array(z.string()).optional(),
-
-    emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional(),
-    emdModes: z.array(z.string()).optional(),
-
-    reverseAuctionApplicable: z.enum(['YES', 'NO']).optional(),
-    paymentTermsSupply: z.coerce.number().min(0).max(100).optional(),
-    paymentTermsInstallation: z.coerce.number().min(0).max(100).optional(),
-
-    bidValidityDays: z.coerce.number().int().min(0).max(366).optional(),
-    commercialEvaluation: z.enum([
-        'ITEM_WISE_GST_INCLUSIVE',
-        'ITEM_WISE_PRE_GST',
-        'OVERALL_GST_INCLUSIVE',
-        'OVERALL_PRE_GST'
-    ]).optional(),
-    mafRequired: z.enum(['YES_GENERAL', 'YES_PROJECT_SPECIFIC', 'NO']).optional(),
-
-    deliveryTimeSupply: z.coerce.number().int().positive().optional(),
-    deliveryTimeInstallationInclusive: z.boolean().default(false),
-    deliveryTimeInstallation: z.coerce.number().int().positive().optional(),
-
-    pbgRequired: z.enum(['YES', 'NO']).optional(),
-    pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
-    pbgPercentage: z.coerce.number().min(0).max(100).optional(),
-    pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
-
-    sdRequired: z.enum(['YES', 'NO']).optional(),
-    sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
-    securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
-    sdDurationMonths: z.coerce.number().int().positive().optional(),
-
-    ldRequired: z.enum(['YES', 'NO']).optional(),
-    ldPercentagePerWeek: z.coerce.number().min(0).max(5).optional(),
-    maxLdPercentage: z.coerce.number().int().min(0).max(20).optional(),
-
-    physicalDocsRequired: z.enum(['YES', 'NO']).optional(),
-    physicalDocsDeadline: z.string().optional(),
-
-    techEligibilityAgeYears: z.coerce.number().int().nonnegative().optional(),
-    workOrderValue1Required: z.enum(['YES', 'NO']).optional(),
-    orderValue1: z.coerce.number().nonnegative().optional(),
-    wo1Custom: z.string().max(1000).optional(),
-    workOrderValue2Required: z.enum(['YES', 'NO']).optional(),
-    orderValue2: z.coerce.number().nonnegative().optional(),
-    wo2Custom: z.string().max(1000).optional(),
-    workOrderValue3Required: z.enum(['YES', 'NO']).optional(),
-    orderValue3: z.coerce.number().nonnegative().optional(),
-    wo3Custom: z.string().max(1000).optional(),
-
-    technicalWorkOrders: z.array(z.string()).optional(),
-    commercialDocuments: z.array(z.string()).optional(),
-
-    avgAnnualTurnoverCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
-    avgAnnualTurnoverValue: z.coerce.number().nonnegative().optional(),
-
-    workingCapitalCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
-    workingCapitalValue: z.coerce.number().nonnegative().optional(),
-
-    solvencyCertificateCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
-    solvencyCertificateValue: z.coerce.number().nonnegative().optional(),
-
-    netWorthCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
-    netWorthValue: z.coerce.number().nonnegative().optional(),
-
-    clientOrganization: z.string().max(255).optional(),
-
-    clients: z.array(z.object({
-        clientName: z.string().min(1, 'Client name is required'),
-        clientDesignation: z.string().optional(),
-        clientMobile: z.string().max(50).optional(),
-        clientEmail: z.string().email('Invalid email').optional(),
-    })).min(1, 'At least one client is required'),
-
-    courierAddress: z.string().max(1000).optional(),
-    teRemark: z.string().max(1000).optional(),
-});
-
-const mapInitialDataToForm = (data: TenderInfoSheet | null): FormValues => {
-    if (!data) {
-        return buildDefaultValues();
-    }
-
-    // Helper to convert string/number to number
-    const toNumber = (val: string | number | null | undefined, defaultValue = 0): number => {
-        if (val === null || val === undefined) return defaultValue;
-        if (typeof val === 'number') return val;
-        const num = parseFloat(String(val));
-        return isNaN(num) ? defaultValue : num;
-    };
-
-    return {
-        teRecommendation: data.teRecommendation ?? 'YES',
-        teRejectionReason: data.teRejectionReason ?? null,
-        teRejectionRemarks: data.teRejectionRemarks ?? '',
-
-        // Processing Fee - map backend to frontend
-        processingFeeRequired: data.processingFeeRequired ?? undefined,
-        processingFeeAmount: toNumber(data.processingFeeAmount),
-        processingFeeModes: data.processingFeeModes ?? [],
-
-        // Tender Fee - map backend to frontend
-        tenderFeeRequired: data.tenderFeeRequired ?? undefined,
-        tenderFeeAmount: toNumber(data.tenderFeeAmount),
-        tenderFeeModes: data.tenderFeeModes ?? [],
-
-        emdRequired: data.emdRequired ?? undefined,
-        emdModes: data.emdModes ?? [],
-
-        reverseAuctionApplicable: data.reverseAuctionApplicable ?? undefined,
-        paymentTermsSupply: toNumber(data.paymentTermsSupply),
-        paymentTermsInstallation: toNumber(data.paymentTermsInstallation),
-
-        bidValidityDays: toNumber(data.bidValidityDays),
-        commercialEvaluation: data.commercialEvaluation ?? undefined,
-        mafRequired: data.mafRequired ?? undefined,
-
-        // Delivery Time - map backend field name to frontend
-        deliveryTimeSupply: toNumber(data.deliveryTimeSupply),
-        deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallation: toNumber(data.deliveryTimeInstallationDays ?? data.deliveryTimeInstallation), // Map deliveryTimeInstallationDays to deliveryTimeInstallation
-
-        // PBG - map backend field name to frontend
-        pbgRequired: data.pbgRequired ?? undefined,
-        pbgForm: data.pbgMode ?? data.pbgForm ?? undefined, // Map pbgMode to pbgForm
-        pbgPercentage: toNumber(data.pbgPercentage),
-        pbgDurationMonths: toNumber(data.pbgDurationMonths),
-
-        // Security Deposit - map backend field names to frontend
-        sdRequired: data.sdRequired ?? undefined,
-        sdForm: data.sdMode ?? data.sdForm ?? undefined, // Map sdMode to sdForm
-        securityDepositPercentage: toNumber(data.sdPercentage ?? data.securityDepositPercentage), // Map sdPercentage to securityDepositPercentage
-        sdDurationMonths: toNumber(data.sdDurationMonths),
-
-        // LD
-        ldRequired: data.ldRequired ?? undefined,
-        ldPercentagePerWeek: toNumber(data.ldPercentagePerWeek),
-        maxLdPercentage: toNumber(data.maxLdPercentage),
-
-        physicalDocsRequired: data.physicalDocsRequired ?? undefined,
-        physicalDocsDeadline: data.physicalDocsDeadline ? (typeof data.physicalDocsDeadline === 'string' ? data.physicalDocsDeadline : data.physicalDocsDeadline.toISOString()) : '',
-
-        // Technical Eligibility - map backend field name to frontend
-        techEligibilityAgeYears: toNumber(data.techEligibilityAge ?? data.techEligibilityAgeYears), // Map techEligibilityAge to techEligibilityAgeYears
-        workOrderValue1Required: data.workOrderValue1Required ?? undefined,
-        orderValue1: toNumber(data.orderValue1),
-        wo1Custom: data.wo1Custom ?? '',
-        workOrderValue2Required: data.workOrderValue2Required ?? undefined,
-        orderValue2: toNumber(data.orderValue2),
-        wo2Custom: data.wo2Custom ?? '',
-        workOrderValue3Required: data.workOrderValue3Required ?? undefined,
-        orderValue3: toNumber(data.orderValue3),
-        wo3Custom: data.wo3Custom ?? '',
-
-        technicalWorkOrders: data.technicalWorkOrders ?? [],
-        commercialDocuments: data.commercialDocuments ?? [],
-
-        // Financial Requirements - map backend field names to frontend
-        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType ?? data.avgAnnualTurnoverCriteria ?? undefined, // Map avgAnnualTurnoverType to avgAnnualTurnoverCriteria
-        avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
-
-        workingCapitalCriteria: data.workingCapitalType ?? data.workingCapitalCriteria ?? undefined, // Map workingCapitalType to workingCapitalCriteria
-        workingCapitalValue: toNumber(data.workingCapitalValue),
-
-        solvencyCertificateCriteria: data.solvencyCertificateType ?? data.solvencyCertificateCriteria ?? undefined, // Map solvencyCertificateType to solvencyCertificateCriteria
-        solvencyCertificateValue: toNumber(data.solvencyCertificateValue),
-
-        netWorthCriteria: data.netWorthType ?? data.netWorthCriteria ?? undefined, // Map netWorthType to netWorthCriteria
-        netWorthValue: toNumber(data.netWorthValue),
-
-        clientOrganization: data.clientOrganization ?? '',
-        courierAddress: data.courierAddress ?? '',
-
-        clients: data.clients && data.clients.length > 0
-            ? data.clients.map(client => ({
-                clientName: client.clientName ?? '',
-                clientDesignation: client.clientDesignation ?? '',
-                clientMobile: client.clientMobile ?? '',
-                clientEmail: client.clientEmail ?? '',
-            }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
-
-        // Final Remark - map backend field name to frontend
-        teRemark: data.teFinalRemark ?? data.teRemark ?? '', // Map teFinalRemark to teRemark
-    };
-};
-
-// Helper function to map form values to API payload
-const mapFormToPayload = (values: FormValues): SaveTenderInfoSheetDto => {
-    return {
-        teRecommendation: values.teRecommendation,
-        teRejectionReason: values.teRejectionReason ?? null,
-        teRejectionRemarks: values.teRejectionRemarks || null,
-
-        // Processing Fee - map frontend fields to backend
-        processingFeeRequired: values.processingFeeRequired ?? null,
-        processingFeeAmount: values.processingFeeAmount ?? null,
-        processingFeeModes: values.processingFeeModes && values.processingFeeModes.length > 0
-            ? values.processingFeeModes
-            : null,
-
-        // Tender Fee - map frontend fields to backend
-        tenderFeeRequired: values.tenderFeeRequired ?? null,
-        tenderFeeAmount: values.tenderFeeAmount ?? null,
-        tenderFeeModes: values.tenderFeeModes && values.tenderFeeModes.length > 0
-            ? values.tenderFeeModes
-            : null,
-
-        emdRequired: values.emdRequired ?? null,
-        emdModes: values.emdModes && values.emdModes.length > 0
-            ? values.emdModes
-            : null,
-
-        reverseAuctionApplicable: values.reverseAuctionApplicable ?? null,
-        paymentTermsSupply: values.paymentTermsSupply ?? null,
-        paymentTermsInstallation: values.paymentTermsInstallation ?? null,
-
-        bidValidityDays: values.bidValidityDays ?? null,
-        commercialEvaluation: values.commercialEvaluation ?? null,
-        mafRequired: values.mafRequired ?? null,
-
-        // Delivery Time - map frontend field name to backend
-        deliveryTimeSupply: values.deliveryTimeSupply ?? null,
-        deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallationDays: values.deliveryTimeInstallation ?? null, // Map deliveryTimeInstallation to deliveryTimeInstallationDays
-
-        // PBG - map frontend field name to backend
-        pbgRequired: values.pbgRequired ?? null,
-        pbgMode: values.pbgForm ?? null, // Map pbgForm to pbgMode
-        pbgPercentage: values.pbgPercentage ?? null,
-        pbgDurationMonths: values.pbgDurationMonths ?? null,
-
-        // Security Deposit - map frontend field names to backend
-        sdRequired: values.sdRequired ?? null,
-        sdMode: values.sdForm ?? null, // Map sdForm to sdMode
-        sdPercentage: values.securityDepositPercentage ?? null, // Map securityDepositPercentage to sdPercentage
-        sdDurationMonths: values.sdDurationMonths ?? null,
-
-        // LD
-        ldRequired: values.ldRequired ?? null,
-        ldPercentagePerWeek: values.ldPercentagePerWeek ?? null,
-        maxLdPercentage: values.maxLdPercentage ?? null,
-
-        physicalDocsRequired: values.physicalDocsRequired ?? null,
-        physicalDocsDeadline: values.physicalDocsDeadline || null,
-
-        // Technical Eligibility - map frontend field name to backend
-        techEligibilityAge: values.techEligibilityAgeYears ?? null, // Map techEligibilityAgeYears to techEligibilityAge
-        workOrderValue1Required: values.workOrderValue1Required ?? null,
-        orderValue1: values.orderValue1 ?? null,
-        wo1Custom: values.wo1Custom ?? null,
-        workOrderValue2Required: values.workOrderValue2Required ?? null,
-        orderValue2: values.orderValue2 ?? null,
-        wo2Custom: values.wo2Custom ?? null,
-        workOrderValue3Required: values.workOrderValue3Required ?? null,
-        orderValue3: values.orderValue3 ?? null,
-        wo3Custom: values.wo3Custom ?? null,
-
-        technicalWorkOrders: values.technicalWorkOrders && values.technicalWorkOrders.length > 0
-            ? values.technicalWorkOrders
-            : null,
-        commercialDocuments: values.commercialDocuments && values.commercialDocuments.length > 0
-            ? values.commercialDocuments
-            : null,
-
-        // Financial Requirements - map frontend field names to backend
-        avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null, // Map avgAnnualTurnoverCriteria to avgAnnualTurnoverType
-        avgAnnualTurnoverValue: values.avgAnnualTurnoverValue ?? null,
-
-        workingCapitalType: values.workingCapitalCriteria ?? null, // Map workingCapitalCriteria to workingCapitalType
-        workingCapitalValue: values.workingCapitalValue ?? null,
-
-        solvencyCertificateType: values.solvencyCertificateCriteria ?? null, // Map solvencyCertificateCriteria to solvencyCertificateType
-        solvencyCertificateValue: values.solvencyCertificateValue ?? null,
-
-        netWorthType: values.netWorthCriteria ?? null, // Map netWorthCriteria to netWorthType
-        netWorthValue: values.netWorthValue ?? null,
-
-        clientOrganization: values.clientOrganization || null,
-        courierAddress: values.courierAddress || null,
-
-        clients: values.clients.map(client => ({
-            clientName: client.clientName,
-            clientDesignation: client.clientDesignation || null,
-            clientMobile: client.clientMobile || null,
-            clientEmail: client.clientEmail || null,
-        })),
-
-        // Final Remark - map frontend field name to backend
-        teFinalRemark: values.teRemark || null, // Map teRemark to teFinalRemark
-    };
-};
-
-type FormValues = z.infer<typeof TenderInformationFormSchema>;
+} from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
+import { infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
+import { TenderInformationFormSchema } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.schema';
+import { workValueTypeOptions } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { buildDefaultValues, mapResponseToForm, mapFormToPayload } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
+import { toast } from 'sonner';
 
 interface TenderInformationFormProps {
     tenderId: number;
     tender?: TenderInfoWithNames | null;
-    initialData?: TenderInfoSheet | null;
+    initialData?: TenderInfoSheetResponse | null;
     mode: 'create' | 'edit';
     isTenderLoading?: boolean;
     isInfoSheetLoading?: boolean;
 }
-
-const buildDefaultValues = (): FormValues => ({
-    teRecommendation: 'YES',
-    teRejectionReason: null,
-    teRejectionRemarks: '',
-    processingFeeRequired: undefined,
-    processingFeeAmount: 0,
-    processingFeeModes: [],
-    tenderFeeRequired: undefined,
-    tenderFeeAmount: 0,
-    tenderFeeModes: [],
-    emdRequired: undefined,
-    emdModes: [],
-    reverseAuctionApplicable: undefined,
-    paymentTermsSupply: 0,
-    paymentTermsInstallation: 0,
-    bidValidityDays: 0,
-    commercialEvaluation: undefined,
-    mafRequired: undefined,
-    deliveryTimeSupply: 0,
-    deliveryTimeInstallationInclusive: false,
-    deliveryTimeInstallation: 0,
-    pbgRequired: undefined,
-    pbgForm: undefined,
-    pbgPercentage: 0,
-    pbgDurationMonths: 0,
-    sdRequired: undefined,
-    sdForm: undefined,
-    securityDepositPercentage: 0,
-    sdDurationMonths: 0,
-    ldRequired: undefined,
-    ldPercentagePerWeek: 0,
-    maxLdPercentage: 0,
-    physicalDocsRequired: undefined,
-    physicalDocsDeadline: '',
-    techEligibilityAgeYears: 0,
-    workOrderValue1Required: undefined,
-    orderValue1: 0,
-    wo1Custom: '',
-    workOrderValue2Required: undefined,
-    orderValue2: 0,
-    wo2Custom: '',
-    workOrderValue3Required: undefined,
-    orderValue3: 0,
-    wo3Custom: '',
-    technicalWorkOrders: [],
-    commercialDocuments: [],
-    avgAnnualTurnoverCriteria: undefined,
-    avgAnnualTurnoverValue: 0,
-    workingCapitalCriteria: undefined,
-    workingCapitalValue: 0,
-    solvencyCertificateCriteria: undefined,
-    solvencyCertificateValue: 0,
-    netWorthCriteria: undefined,
-    netWorthValue: 0,
-    clientOrganization: '',
-    courierAddress: '',
-    clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
-    teRemark: '',
-});
 
 const IncompleteFieldAlert = ({ comment }: { comment: string }) => (
     <div className="mt-2 space-y-1">
@@ -442,12 +80,16 @@ export function TenderInformationForm({
 }: TenderInformationFormProps) {
     const navigate = useNavigate();
     const { data: approvalData } = useTenderApproval(tenderId);
-    const initialFormValues = useMemo(() => {
-        return mapInitialDataToForm(initialData ?? null);
-    }, [initialData]);
 
-    const form = useForm({
-        resolver: zodResolver(TenderInformationFormSchema),
+    const initialFormValues = useMemo(() => {
+        if (mode === 'create') {
+            return buildDefaultValues(tender);
+        }
+        return mapResponseToForm(initialData ?? null, tender);
+    }, [initialData, tender, mode]);
+
+    const form = useForm<TenderInfoSheetFormValues>({
+        resolver: zodResolver(TenderInformationFormSchema) as any,
         defaultValues: initialFormValues,
     });
 
@@ -460,7 +102,7 @@ export function TenderInformationForm({
         name: 'clients',
     });
 
-    const isIncomplete = approvalData?.tlStatus === '3';
+    const isIncomplete = approvalData?.tlDecision === '3';
     const incompleteFields = approvalData?.incompleteFields || [];
 
     const getIncompleteFieldComment = (fieldName: string): string | null => {
@@ -470,8 +112,14 @@ export function TenderInformationForm({
 
     // Watch for conditional fields
     const teRecommendation = form.watch('teRecommendation');
+    const processingFeeRequired = form.watch('processingFeeRequired');
+    const tenderFeeRequired = form.watch('tenderFeeRequired');
+    const emdRequired = form.watch('emdRequired');
+    const pbgRequired = form.watch('pbgRequired');
+    const sdRequired = form.watch('sdRequired');
     const physicalDocsRequired = form.watch('physicalDocsRequired');
     const deliveryTimeInstallationInclusive = form.watch('deliveryTimeInstallationInclusive');
+    const workValueType = form.watch('workValueType');
     const avgAnnualTurnoverCriteria = form.watch('avgAnnualTurnoverCriteria');
     const workingCapitalCriteria = form.watch('workingCapitalCriteria');
     const solvencyCertificateCriteria = form.watch('solvencyCertificateCriteria');
@@ -482,7 +130,7 @@ export function TenderInformationForm({
     const updateInfoSheet = useUpdateInfoSheet();
     const isSubmitting = createInfoSheet.isPending || updateInfoSheet.isPending;
 
-    const handleSubmit: SubmitHandler<FormValues> = async (values) => {
+    const handleSubmit: SubmitHandler<TenderInfoSheetFormValues> = async (values) => {
         try {
             const payload = mapFormToPayload(values);
 
@@ -492,9 +140,9 @@ export function TenderInformationForm({
                 await updateInfoSheet.mutateAsync({ tenderId, data: payload });
             }
 
-            navigate(paths.tendering.tenderApproval);
+            navigate(paths.tendering.tenders);
         } catch (error) {
-            console.error('Form submission error:', error);
+            toast.error("Failed to submit info sheet");
         }
     };
 
@@ -572,6 +220,7 @@ export function TenderInformationForm({
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
+
                 {isIncomplete && incompleteFields.length > 0 && (
                     <Alert className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -594,562 +243,669 @@ export function TenderInformationForm({
                         </AlertDescription>
                     </Alert>
                 )}
+
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)}>
-                        <div className="space-y-8 pt-4">
+                    <form onSubmit={form.handleSubmit(handleSubmit, handleInfoSheetFormErrors)}>
+                        <div className="space-y-6 pt-4">
                             {/* TE Recommendation */}
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <SelectField
-                                        control={form.control}
-                                        name="teRecommendation"
-                                        label="TE Recommendation"
-                                        options={yesNoOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select recommendation"
-                                    />
-
-                                    {teRecommendation === 'NO' && (
-                                        <>
-                                            <SelectField
-                                                control={form.control}
-                                                name="teRejectionReason"
-                                                label="TE Reason of Rejection"
-                                                options={rejectionReasonOptions.map(option => ({
-                                                    value: String(option.value),
-                                                    label: option.label
-                                                }))}
-                                                placeholder="Select reason"
-                                            />
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="teRejectionRemarks"
-                                                label="TE Rejection Remarks"
-                                            >
-                                                {(field) => (
-                                                    <textarea
-                                                        className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                        placeholder="Enter rejection remarks..."
-                                                        maxLength={1000}
-                                                        {...field}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                        </>
-                                    )}
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="teRecommendation"
+                                    label="Recommendation by TE"
+                                    options={yesNoOptions}
+                                    placeholder="Select recommendation"
+                                />
+                                {teRecommendation === 'NO' && (
+                                    <>
+                                        <SelectField
+                                            control={form.control}
+                                            name="teRejectionReason"
+                                            label="Reason of Rejection"
+                                            options={rejectionReasonOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select reason"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="teRejectionRemarks"
+                                            label="Rejection Remarks"
+                                        >
+                                            {(field) => (
+                                                <textarea
+                                                    className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                    placeholder="Enter rejection remarks..."
+                                                    maxLength={1000}
+                                                    {...field}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
                             </div>
-                            {/* Processing Fee & Tender Fee */}
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="processingFeeAmount"
-                                        label="Processing Fee - Amount"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
-                                                onChange={field.onChange}
+
+                            {/* Processing Fee */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="processingFeeRequired"
+                                    label="Processing Fees Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                {processingFeeRequired === 'YES' && (
+                                    <>
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="processingFeeModes"
+                                            label="Processing Fees Mode"
+                                            options={paymentModeOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select payment modes"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="processingFeeAmount"
+                                            label="Processing Fees Amount"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Tender Fee */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="tenderFeeRequired"
+                                    label="Tender Fees Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                {tenderFeeRequired === 'YES' && (
+                                    <>
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="tenderFeeModes"
+                                            label="Tender Fees Mode"
+                                            options={paymentModeOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select payment modes"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="tenderFeeAmount"
+                                            label="Tender Fees Amount"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* EMD */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="emdRequired"
+                                    label="EMD Required"
+                                    options={emdRequiredOptions}
+                                    placeholder="Select option"
+                                />
+                                {emdRequired === 'YES' && (
+                                    <>
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="emdModes"
+                                            label="EMD Mode"
+                                            options={paymentModeOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select payment modes"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="emdAmount"
+                                            label="EMD Amount"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Tender Value & Bid */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="tenderValueGstInclusive"
+                                    label="Tender Value (GST Inclusive)"
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={0.01}
+                                            placeholder="0.00"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                            disabled
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <SelectField
+                                    control={form.control}
+                                    name="bidValidityDays"
+                                    label="Bid Validity (Days)"
+                                    options={bidValidityOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select days"
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="mafRequired"
+                                    label="MAF Required"
+                                    options={mafRequiredOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select option"
+                                />
+                            </div>
+
+                            {/* PBG */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="pbgRequired"
+                                    label="PBG Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                {pbgRequired === 'YES' && (
+                                    <>
+                                        <SelectField
+                                            control={form.control}
+                                            name="pbgForm"
+                                            label="PBG (in form of)"
+                                            options={pbgFormOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select form"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="pbgPercentage"
+                                            label="PBG %age"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="pbgDurationMonths"
+                                            label="PBG Duration (Months)"
+                                            options={pbgDurationOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select duration"
+                                        />
+                                    </>
+                                )}
+                            </div>
+
+                            {/* SD */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="sdRequired"
+                                    label="SD Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                {sdRequired === 'YES' && (
+                                    <>
+                                        <SelectField
+                                            control={form.control}
+                                            name="sdForm"
+                                            label="SD (in form of)"
+                                            options={sdFormOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
+                                            placeholder="Select form"
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="securityDepositPercentage"
+                                            label="SD %age"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="sdDurationMonths"
+                                            label="SD Duration (Months)"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={1}
+                                                    placeholder="Enter months"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Commercial & Auction */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="commercialEvaluation"
+                                    label="Commercial Evaluation"
+                                    options={commercialEvaluationOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select evaluation type"
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="reverseAuctionApplicable"
+                                    label="Reverse Auction Applicable"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                            </div>
+
+                            {/* Payment Terms */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="paymentTermsSupply"
+                                    label="Payment Terms on Supply (%)"
+                                    options={paymentTermsOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select percentage"
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="paymentTermsInstallation"
+                                    label="Payment Terms on Installation (%)"
+                                    options={paymentTermsOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select percentage"
+                                />
+                            </div>
+
+                            {/* Delivery Time */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="deliveryTimeSupply"
+                                    label="Delivery Time (Supply/Total) - Days"
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={1}
+                                            placeholder="Enter number of days"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="deliveryTimeInstallationInclusive"
+                                    label="Delivery Time for Installation"
+                                >
+                                    {(field) => (
+                                        <div className="flex items-center space-x-2 h-10">
+                                            <Checkbox
+                                                id="deliveryTimeInstallationInclusive"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
                                             />
-                                        )}
-                                    </FieldWrapper>
-
-                                    <MultiSelectField
-                                        control={form.control}
-                                        name="processingFeeModes"
-                                        label="Processing Fee (Mode of Payment)"
-                                        options={paymentModeOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select payment modes"
-                                    />
-
+                                            <label
+                                                htmlFor="deliveryTimeInstallationInclusive"
+                                                className="text-sm font-medium cursor-pointer"
+                                            >
+                                                Inclusive in Supply/Total time
+                                            </label>
+                                        </div>
+                                    )}
+                                </FieldWrapper>
+                                {!deliveryTimeInstallationInclusive && (
                                     <FieldWrapper
                                         control={form.control}
-                                        name="tenderFeeAmount"
-                                        label="Tender Fee - Amount"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-
-                                    <MultiSelectField
-                                        control={form.control}
-                                        name="tenderFeeModes"
-                                        label="Tender Fee (Mode of Payment)"
-                                        options={paymentModeOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select payment modes"
-                                    />
-                                    {/* EMD */}
-                                    <SelectField
-                                        control={form.control}
-                                        name="emdRequired"
-                                        label="EMD Required"
-                                        options={emdRequiredOptions}
-                                        placeholder="Select option"
-                                    />
-
-                                    <MultiSelectField
-                                        control={form.control}
-                                        name="emdModes"
-                                        label="EMD (Mode of Payment)"
-                                        options={paymentModeOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select payment modes"
-                                    />
-                                    {/* Payment Terms */}
-                                    <SelectField
-                                        control={form.control}
-                                        name="reverseAuctionApplicable"
-                                        label="Reverse Auction Applicable"
-                                        options={yesNoOptions}
-                                        placeholder="Select option"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="paymentTermsSupply"
-                                        label="Payment Terms on Supply (%)"
-                                        options={paymentTermsOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select percentage"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="paymentTermsInstallation"
-                                        label="Payment Terms on Installation (%)"
-                                        options={paymentTermsOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select percentage"
-                                    />
-                                    {/* Bid & Evaluation */}
-                                    <SelectField
-                                        control={form.control}
-                                        name="bidValidityDays"
-                                        label="Bid Validity (Days)"
-                                        options={bidValidityOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select days"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="commercialEvaluation"
-                                        label="Commercial Evaluation"
-                                        options={commercialEvaluationOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select evaluation type"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="mafRequired"
-                                        label="MAF Required"
-                                        options={mafRequiredOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select option"
-                                    />
-                                    {/* Delivery Time */}
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="deliveryTimeSupply"
-                                        label="Delivery Time (Supply/Total) - Days"
+                                        name="deliveryTimeInstallation"
+                                        label="Installation Days (if not inclusive)"
                                     >
                                         {(field) => (
                                             <NumberInput
                                                 step={1}
                                                 placeholder="Enter number of days"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
+                                                value={typeof field.value === "number" ? field.value : null}
                                                 onChange={field.onChange}
                                             />
                                         )}
                                     </FieldWrapper>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="deliveryTimeInstallationInclusive"
-                                        label="Delivery Time for Installation"
-                                    >
-                                        {(field) => (
-                                            <div className="flex items-center space-x-2 h-10">
-                                                <Checkbox
-                                                    id="deliveryTimeInstallationInclusive"
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                                <label
-                                                    htmlFor="deliveryTimeInstallationInclusive"
-                                                    className="text-sm font-medium cursor-pointer"
-                                                >
-                                                    Inclusive in Supply/Total time
-                                                </label>
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-
-                                    {!deliveryTimeInstallationInclusive && (
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="deliveryTimeInstallation"
-                                            label="Installation Days (if not inclusive)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="Enter number of days"
-                                                    value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    )}
-                                    {/* PBG & SD */}
-                                    <SelectField
-                                        control={form.control}
-                                        name="pbgForm"
-                                        label="PBG (in form of)"
-                                        options={pbgFormOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select form"
-                                    />
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="pbgPercentage"
-                                        label="PBG Percentage (%)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value) as number | null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="pbgDurationMonths"
-                                        label="PBG Duration (Months)"
-                                        options={pbgDurationOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select duration"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="sdForm"
-                                        label="SD (in form of)"
-                                        options={sdFormOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select form"
-                                    />
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="securityDepositPercentage"
-                                        label="Security Deposit Percentage (%)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="sdDurationMonths"
-                                        label="SD Duration (Months)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={1}
-                                                placeholder="Enter months"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    {/* LD & Physical Docs */}
-                                    <SelectField
-                                        control={form.control}
-                                        name="ldPercentagePerWeek"
-                                        label="LD/PRS Percentage (per week)"
-                                        options={ldPerWeekOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select percentage"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="maxLdPercentage"
-                                        label="Maximum LD Percentage"
-                                        options={maxLdOptions.map(option => ({
-                                            value: String(option.value),
-                                            label: option.label
-                                        }))}
-                                        placeholder="Select percentage"
-                                    />
-
-                                    <SelectField
-                                        control={form.control}
-                                        name="physicalDocsRequired"
-                                        label="Physical Documents Submission Required"
-                                        options={yesNoOptions}
-                                        placeholder="Select option"
-                                    />
-
-                                    {physicalDocsRequired === 'YES' && (
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="physicalDocsDeadline"
-                                            label="Physical Documents Submission Deadline"
-                                        >
-                                            {(field) => (
-                                                <DateTimeInput
-                                                    value={typeof field.value === "string" ? field.value : field.value === "" ? null : field.value}
-                                                    onChange={field.onChange}
-                                                    className="bg-background"
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    )}
-                                    {/* Technical Eligibility */}
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="techEligibilityAgeYears"
-                                        label="Technical Eligibility Criterion Age (Years)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={1}
-                                                placeholder="Enter number of years"
-                                                value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-
-                                <div className="space-y-2">
-                                    {/* Average Annual Turnover */}
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
-                                            <div>
-                                                <label className="text-sm font-medium">Technical Eligibility Criterion Value</label>
-                                                <FieldWrapper control={form.control} name="orderValue1" label="1 Order Of">
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            </div>
-                                            <SelectField
-                                                control={form.control}
-                                                name="avgAnnualTurnoverCriteria"
-                                                label="Average Annual Turnover"
-                                                options={financialCriteriaOptions}
-                                                placeholder="Select criteria"
-                                            />
-
-                                            {avgAnnualTurnoverCriteria === 'AMOUNT' && (
-                                                <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Working Capital */}
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
-                                            <FieldWrapper control={form.control} name="orderValue2" label="2 Order Of">
-                                                {(field) => (
-                                                    <NumberInput
-                                                        step={0.01}
-                                                        placeholder="0.00"
-                                                        value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                        onChange={field.onChange}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <SelectField
-                                                control={form.control}
-                                                name="workingCapitalCriteria"
-                                                label="Working Capital"
-                                                options={financialCriteriaOptions}
-                                                placeholder="Select criteria"
-                                            />
-
-                                            {workingCapitalCriteria === 'AMOUNT' && (
-                                                <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Solvency Certificate */}
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
-                                            <FieldWrapper control={form.control} name="orderValue3" label="3 Order Of">
-                                                {(field) => (
-                                                    <NumberInput
-                                                        step={0.01}
-                                                        placeholder="0.00"
-                                                        value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                        onChange={field.onChange}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <SelectField
-                                                control={form.control}
-                                                name="solvencyCertificateCriteria"
-                                                label="Solvency Certificate"
-                                                options={financialCriteriaOptions}
-                                                placeholder="Select criteria"
-                                            />
-
-                                            {solvencyCertificateCriteria === 'AMOUNT' && (
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name="solvencyCertificateValue"
-                                                    label="Amount"
-                                                >
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Net Worth */}
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 space-y-2">
-                                            <div></div>
-                                            <SelectField
-                                                control={form.control}
-                                                name="netWorthCriteria"
-                                                label="Net Worth"
-                                                options={financialCriteriaOptions}
-                                                placeholder="Select criteria"
-                                            />
-
-                                            {netWorthCriteria === 'AMOUNT' && (
-                                                <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
-                                                    {(field) => (
-                                                        <NumberInput
-                                                            step={0.01}
-                                                            placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : field.value === "" ? null : Number(field.value)}
-                                                            onChange={field.onChange}
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="technicalWorkOrders"
-                                            label="Work Orders to be submitted to meet technical eligibility criteria"
-                                            options={dummyTechnicalDocuments}
-                                            placeholder="Select documents"
-                                        />
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="commercialDocuments"
-                                            label="Documents to be submitted to meet commercial eligibility criteria"
-                                            options={dummyFinancialDocuments}
-                                            placeholder="Select documents"
-                                        />
-                                        {getIncompleteFieldComment('financialDocuments') && (
-                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('financialDocuments')!} />
-                                        )}
-                                        {getIncompleteFieldComment('commercialDocuments') && (
-                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialDocuments')!} />
-                                        )}
-                                    </div>
-                                </div>
+                                )}
                             </div>
+
+                            {/* LD */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="ldRequired"
+                                    label="LD Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="ldPercentagePerWeek"
+                                    label="LD/PRS Percentage (per week)"
+                                    options={ldPerWeekOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select percentage"
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="maxLdPercentage"
+                                    label="Maximum LD Percentage"
+                                    options={maxLdOptions.map(option => ({
+                                        value: String(option.value),
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select percentage"
+                                />
+                            </div>
+
+                            {/* Physical Docs */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="physicalDocsRequired"
+                                    label="Physical Docs Submission Required"
+                                    options={yesNoOptions}
+                                    placeholder="Select option"
+                                />
+                                {physicalDocsRequired === 'YES' && (
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="physicalDocsDeadline"
+                                        label="Physical Docs Submission Deadline"
+                                    >
+                                        {(field) => (
+                                            <DateTimeInput
+                                                value={typeof field.value === "string" ? field.value : null}
+                                                onChange={field.onChange}
+                                                className="bg-background"
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                )}
+                            </div>
+
+                            {/* Technical Eligibility */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="techEligibilityAgeYears"
+                                    label="Eligibility Criterion (Years)"
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={1}
+                                            placeholder="Enter number of years"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <SelectField
+                                    control={form.control}
+                                    name="workValueType"
+                                    label="Work Value Type"
+                                    options={workValueTypeOptions.map(option => ({
+                                        value: option.value,
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select type"
+                                />
+                            </div>
+
+                            {/* Work Values */}
+                            {workValueType === 'WORKS_VALUES' && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <FieldWrapper control={form.control} name="orderValue1" label="1 Work Value">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                            )}
+
+                            {/* Custom Eligibility */}
+                            {workValueType === 'CUSTOM' && (
+                                <div className="grid grid-cols-1 gap-6">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="customEligibilityCriteria"
+                                        label="Custom Eligibility Criteria"
+                                    >
+                                        {(field) => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Enter custom eligibility criteria..."
+                                                maxLength={1000}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                            )}
+
+                            {/* Documents */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <MultiSelectField
+                                    control={form.control}
+                                    name="technicalWorkOrders"
+                                    label="PO Selected for Technical Eligibility"
+                                    options={dummyTechnicalDocuments}
+                                    placeholder="Select documents"
+                                />
+                                <MultiSelectField
+                                    control={form.control}
+                                    name="commercialDocuments"
+                                    label="PQC Documents"
+                                    options={dummyFinancialDocuments}
+                                    placeholder="Select documents"
+                                />
+                            </div>
+
+                            {/* Financial - Average Annual Turnover */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="avgAnnualTurnoverCriteria"
+                                    label="Average Annual Turnover"
+                                    options={financialCriteriaOptions}
+                                    placeholder="Select criteria"
+                                />
+                                {avgAnnualTurnoverCriteria === 'AMOUNT' && (
+                                    <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                )}
+                            </div>
+
+                            {/* Financial - Working Capital */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="workingCapitalCriteria"
+                                    label="Working Capital"
+                                    options={financialCriteriaOptions}
+                                    placeholder="Select criteria"
+                                />
+                                {workingCapitalCriteria === 'AMOUNT' && (
+                                    <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                )}
+                            </div>
+
+                            {/* Financial - Solvency */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="solvencyCertificateCriteria"
+                                    label="Solvency Certificate"
+                                    options={financialCriteriaOptions}
+                                    placeholder="Select criteria"
+                                />
+                                {solvencyCertificateCriteria === 'AMOUNT' && (
+                                    <FieldWrapper control={form.control} name="solvencyCertificateValue" label="Amount">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                )}
+                            </div>
+
+                            {/* Financial - Net Worth */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <SelectField
+                                    control={form.control}
+                                    name="netWorthCriteria"
+                                    label="Net Worth"
+                                    options={financialCriteriaOptions}
+                                    placeholder="Select criteria"
+                                />
+                                {netWorthCriteria === 'AMOUNT' && (
+                                    <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
+                                        {(field) => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="0.00"
+                                                value={typeof field.value === "number" ? field.value : null}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                )}
+                            </div>
+
                             {/* Client Organization */}
-                            <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-6">
                                 <FieldWrapper control={form.control} name="clientOrganization" label="Client Organisation">
                                     {(field) => <Input placeholder="Enter client organisation" {...field} />}
                                 </FieldWrapper>
                             </div>
+
                             {/* Client Details */}
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-sm text-primary border-b pb-2">Add Client Details</h4>
+                                    <h4 className="font-medium text-sm text-primary border-b pb-2">Client Details</h4>
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -1183,15 +939,14 @@ export function TenderInformationForm({
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`clients.${index}.clientName`}
-                                                label="Client Name"
+                                                label="Name"
                                             >
-                                                {(field) => <Input placeholder="Enter client name" {...field} />}
+                                                {(field) => <Input placeholder="Enter name" {...field} />}
                                             </FieldWrapper>
-
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`clients.${index}.clientDesignation`}
@@ -1199,15 +954,6 @@ export function TenderInformationForm({
                                             >
                                                 {(field) => <Input placeholder="Enter designation" {...field} />}
                                             </FieldWrapper>
-
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name={`clients.${index}.clientMobile`}
-                                                label="Mobile"
-                                            >
-                                                {(field) => <Input placeholder="Enter mobile number" {...field} />}
-                                            </FieldWrapper>
-
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`clients.${index}.clientEmail`}
@@ -1215,41 +961,46 @@ export function TenderInformationForm({
                                             >
                                                 {(field) => <Input type="email" placeholder="Enter email" {...field} />}
                                             </FieldWrapper>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name={`clients.${index}.clientMobile`}
+                                                label="Number"
+                                            >
+                                                {(field) => <Input placeholder="Enter number" {...field} />}
+                                            </FieldWrapper>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            {/* Courier Address */}
-                            <div className="space-y-4">
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                                    <FieldWrapper control={form.control} name="courierAddress" label="Courier Address">
-                                        {(field) => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter courier address..."
-                                                maxLength={1000}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    {/* TE Final Remark */}
-                                    <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
-                                        {(field) => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter final remarks..."
-                                                maxLength={1000}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    {getIncompleteFieldComment('teRemark') && (
-                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
+
+                            {/* Courier & TE Remark */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FieldWrapper control={form.control} name="courierAddress" label="Courier Delivery Address">
+                                    {(field) => (
+                                        <textarea
+                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                            placeholder="Enter courier delivery address..."
+                                            maxLength={1000}
+                                            {...field}
+                                        />
                                     )}
-                                    {getIncompleteFieldComment('courierAddress') && (
-                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
+                                    {(field) => (
+                                        <textarea
+                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                            placeholder="Enter final remarks..."
+                                            maxLength={1000}
+                                            {...field}
+                                        />
                                     )}
-                                </div>
+                                </FieldWrapper>
+                                {getIncompleteFieldComment('teRemark') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
+                                )}
+                                {getIncompleteFieldComment('courierAddress') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
+                                )}
                             </div>
                         </div>
 
@@ -1266,7 +1017,10 @@ export function TenderInformationForm({
                             >
                                 Reset
                             </Button>
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                            >
                                 {isSubmitting ? (
                                     <>
                                         <span className="animate-spin mr-2">⏳</span>
@@ -1283,6 +1037,6 @@ export function TenderInformationForm({
                     </form>
                 </Form>
             </CardContent>
-        </Card >
+        </Card>
     );
 }

@@ -46,3 +46,16 @@ export class UpdateCostingSheetDto {
     @IsNotEmpty()
     teRemarks: string;
 }
+
+export class CreateSheetDto {
+    @IsNumber()
+    tenderId: number;
+}
+
+export class CreateSheetWithNameDto {
+    @IsNumber()
+    tenderId: number;
+
+    @IsString()
+    customName: string;
+}

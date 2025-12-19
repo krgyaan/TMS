@@ -23,7 +23,7 @@ const TqReceivedFormSchema = z.object({
     tqSubmissionDeadline: z.string().min(1, 'TQ submission deadline is required'),
     tqDocumentReceived: z.string().optional(),
     tqItems: z.array(z.object({
-        tqTypeId: z.number().min(1, 'TQ type is required'),
+        tqTypeId: z.number({ error: 'TQ type is required' }).min(1, 'TQ type is required'),
         queryDescription: z.string().min(1, 'Query description is required'),
     })).min(1, 'At least one TQ item is required'),
 });

@@ -13,7 +13,7 @@ import { AlertCircle, Eye, FileX2, Pencil, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
+import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
 import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid';
 
@@ -37,6 +37,8 @@ const Checklists = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const { data: counts } = useChecklistDashboardCounts();
 
     const { data: apiResponse, isLoading: loading, error } = useDocumentChecklists(
         activeTab,
@@ -76,15 +78,15 @@ const Checklists = () => {
             {
                 key: 'pending' as const,
                 name: 'Pending',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'submitted' as const,
                 name: 'Checklist Submitted',
-                count: activeTab === 'submitted' ? totalRows : 0,
+                count: counts?.submitted ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRow>[]>(() => [
         tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {

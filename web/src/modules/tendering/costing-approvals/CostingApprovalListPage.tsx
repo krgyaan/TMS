@@ -13,13 +13,14 @@ import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink } fr
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useCostingApprovals, type CostingApprovalDashboardRow } from '@/hooks/api/useCostingApprovals';
+import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
+import type { CostingApprovalDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'approved' | 'rejected';
+type TabKey = 'submitted' | 'approved' | 'rejected';
 
 const CostingApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [activeTab, setActiveTab] = useState<TabKey>('submitted');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -45,6 +46,8 @@ const CostingApprovalListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = useCostingApprovalsDashboardCounts();
+
     const costingApprovalsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
@@ -55,7 +58,7 @@ const CostingApprovalListPage = () => {
                 navigate(paths.tendering.costingApprove(row.costingSheetId!));
             },
             icon: <CheckCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Pending',
+            visible: (row) => row.costingStatus === 'Submitted',
         },
         {
             label: 'Reject Costing',
@@ -63,7 +66,7 @@ const CostingApprovalListPage = () => {
                 navigate(paths.tendering.costingReject(row.costingSheetId!));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Pending',
+            visible: (row) => row.costingStatus === 'Submitted',
         },
         {
             label: 'Edit Approval',
@@ -85,22 +88,22 @@ const CostingApprovalListPage = () => {
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'submitted' as TabKey,
                 name: 'Pending Approval',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.submitted ?? 0,
             },
             {
                 key: 'approved' as TabKey,
                 name: 'Approved',
-                count: activeTab === 'approved' ? totalRows : 0,
+                count: counts?.approved ?? 0,
             },
             {
                 key: 'rejected' as TabKey,
                 name: 'Rejected',
-                count: activeTab === 'rejected' ? totalRows : 0,
+                count: counts?.rejected ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingApprovalDashboardRow>[]>(() => [
         tenderNameCol<CostingApprovalDashboardRow>('tenderNo', {
@@ -154,6 +157,15 @@ const CostingApprovalListPage = () => {
                 if (value === null || value === undefined) return '—';
                 return formatINR(value);
             },
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'statusName',
+            headerName: 'Tender Status',
+            flex: 1,
+            minWidth: 130,
+            valueGetter: (params: any) => params.data?.statusName || '—',
             sortable: true,
             filter: true,
         },
@@ -231,7 +243,7 @@ const CostingApprovalListPage = () => {
             cellRenderer: createActionColumnRenderer(costingApprovalActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [costingApprovalActions]);
 
@@ -296,9 +308,11 @@ const CostingApprovalListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>
@@ -316,7 +330,7 @@ const CostingApprovalListPage = () => {
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'pending' && 'Submitted costing sheets will appear here for approval'}
+                                                {tab.key === 'submitted' && 'Submitted costing sheets will appear here for approval'}
                                                 {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
                                                 {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
                                             </p>

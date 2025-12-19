@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService, type CostingSheetListParams } from '@/services/api/costing-sheets.service';
-import type { CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 
 export const costingSheetsKey = {
@@ -9,6 +9,7 @@ export const costingSheetsKey = {
     detail: (id: number) => [...costingSheetsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...costingSheetsKey.all, 'byTender', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...costingSheetsKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...costingSheetsKey.all, 'dashboardCounts'] as const,
 };
 
 export const useCostingSheets = (
@@ -89,4 +90,57 @@ export const useUpdateCostingSheet = () => {
     });
 };
 
-export type { CostingSheetDashboardRow };
+export const useCostingSheetsCounts = () => {
+    return useQuery<CostingSheetDashboardCounts>({
+        queryKey: costingSheetsKey.dashboardCounts(),
+        queryFn: () => costingSheetsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
+    });
+};
+
+export const useCheckDriveScopes = () => {
+    return useQuery({
+        queryKey: [...costingSheetsKey.all, 'driveScopes'],
+        queryFn: () => costingSheetsService.checkDriveScopes(),
+        staleTime: 60000, // Cache for 1 minute
+    });
+};
+
+export const useCreateCostingSheet = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (tenderId: number) => costingSheetsService.createSheet(tenderId),
+        onSuccess: (data) => {
+            if (data.success) {
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                toast.success('Costing sheet created successfully');
+            }
+        },
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Failed to create costing sheet';
+            toast.error(message);
+        },
+    });
+};
+
+export const useCreateCostingSheetWithName = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ tenderId, customName }: { tenderId: number; customName: string }) =>
+            costingSheetsService.createSheetWithName(tenderId, customName),
+        onSuccess: (data) => {
+            if (data.success) {
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                toast.success('Costing sheet created successfully');
+            }
+        },
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Failed to create costing sheet';
+            toast.error(message);
+        },
+    });
+};
+
+

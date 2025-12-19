@@ -1,78 +1,78 @@
-import axiosInstance from '@/lib/axios';
-import type { TenderDocumentChecklistDashboardRow, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    DocumentChecklistsDashboardCounts,
+    TenderDocumentChecklist,
+    TenderDocumentChecklistDashboardRow,
+    CreateDocumentChecklistDto,
+    UpdateDocumentChecklistDto,
+    PaginatedResult,
+} from '@/types/api.types';
 
-export type ExtraDocument = {
-    name: string;
-    path?: string;
+export type DocumentChecklistListParams = {
+    checklistSubmitted?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 };
 
-export type TenderDocumentChecklist = {
-    id: number;
-    tenderId: number;
-    selectedDocuments: string[] | null;
-    extraDocuments: ExtraDocument[] | null;
-    submittedBy: number | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
+class DocumentChecklistService extends BaseApiService {
+    constructor() {
+        super('/document-checklists');
+    }
 
-export type CreateDocumentChecklistDto = {
-    tenderId: number;
-    selectedDocuments?: string[];
-    extraDocuments?: ExtraDocument[];
-};
+    async getAll(
+        params?: DocumentChecklistListParams
+    ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
+        const search = new URLSearchParams();
 
-export type UpdateDocumentChecklistDto = {
-    id: number;
-    selectedDocuments?: string[];
-    extraDocuments?: ExtraDocument[];
-};
-
-export const documentChecklistService = {
-    getAll: async (params?: { checklistSubmitted?: boolean; page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> => {
-        const searchParams = new URLSearchParams();
-
-        if (params?.checklistSubmitted !== undefined) {
-            searchParams.set('checklistSubmitted', String(params.checklistSubmitted));
-        }
-        if (params?.page) {
-            searchParams.set('page', String(params.page));
-        }
-        if (params?.limit) {
-            searchParams.set('limit', String(params.limit));
-        }
-        if (params?.sortBy) {
-            searchParams.set('sortBy', params.sortBy);
-        }
-        if (params?.sortOrder) {
-            searchParams.set('sortOrder', params.sortOrder);
+        if (params) {
+            if (params.checklistSubmitted !== undefined) {
+                search.set('checklistSubmitted', String(params.checklistSubmitted));
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
+            }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
 
-        const queryString = searchParams.toString();
-        const url = queryString ? `/document-checklists?${queryString}` : '/document-checklists';
-        const response = await axiosInstance.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(url);
-        return response.data;
-    },
-
-
-    getByTenderId: async (tenderId: number): Promise<TenderDocumentChecklist | null> => {
-        const response = await axiosInstance.get<TenderDocumentChecklist>(
-            `/document-checklists/tender/${tenderId}`
+        const queryString = search.toString();
+        return this.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(
+            queryString ? `?${queryString}` : ''
         );
-        return response.data;
-    },
+    }
 
-    create: async (data: CreateDocumentChecklistDto): Promise<TenderDocumentChecklist> => {
-        const response = await axiosInstance.post<TenderDocumentChecklist>('/document-checklists', data);
-        return response.data;
-    },
+    async getDashboardCounts(): Promise<DocumentChecklistsDashboardCounts> {
+        return this.get<DocumentChecklistsDashboardCounts>('/counts');
+    }
 
-    update: async (data: UpdateDocumentChecklistDto): Promise<TenderDocumentChecklist> => {
+    async getByTenderId(
+        tenderId: number
+    ): Promise<TenderDocumentChecklist | null> {
+        return this.get<TenderDocumentChecklist>(`/tender/${tenderId}`);
+    }
+
+    async create(
+        data: CreateDocumentChecklistDto
+    ): Promise<TenderDocumentChecklist> {
+        return this.post<TenderDocumentChecklist>('', data);
+    }
+
+    async update(
+        data: UpdateDocumentChecklistDto
+    ): Promise<TenderDocumentChecklist> {
         const { id, ...updateData } = data;
-        const response = await axiosInstance.patch<TenderDocumentChecklist>(
-            `/document-checklists/${id}`,
-            updateData
-        );
-        return response.data;
-    },
-};
+        return this.patch<TenderDocumentChecklist>(`/${id}`,updateData);
+    }
+}
+
+export const documentChecklistService =
+    new DocumentChecklistService();
