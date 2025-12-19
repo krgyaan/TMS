@@ -77,16 +77,22 @@ export default function CostingSheetSubmitForm({
         }
     }, [receiptPrice, budgetPrice, form]);
 
+    // Populate form with existing data when available
     useEffect(() => {
-        if (existingData && (mode === 'edit' || mode === 'resubmit')) {
-            form.reset({
-                tenderId: tenderId,
-                submittedFinalPrice: existingData.submittedFinalPrice || '',
-                submittedReceiptPrice: existingData.submittedReceiptPrice || '',
-                submittedBudgetPrice: existingData.submittedBudgetPrice || '',
-                submittedGrossMargin: existingData.submittedGrossMargin || '0.00',
-                teRemarks: existingData.teRemarks || '',
-            });
+        if (existingData) {
+            // For edit and resubmit modes, always populate
+            // For submit mode, populate if sheet exists (even if not submitted yet)
+            if (mode === 'edit' || mode === 'resubmit' ||
+                (mode === 'submit' && existingData.id)) {
+                form.reset({
+                    tenderId: tenderId,
+                    submittedFinalPrice: existingData.submittedFinalPrice || '',
+                    submittedReceiptPrice: existingData.submittedReceiptPrice || '',
+                    submittedBudgetPrice: existingData.submittedBudgetPrice || '',
+                    submittedGrossMargin: existingData.submittedGrossMargin || '0.00',
+                    teRemarks: existingData.teRemarks || '',
+                });
+            }
         }
     }, [existingData, form, tenderId, mode]);
 
@@ -94,9 +100,17 @@ export default function CostingSheetSubmitForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            if (mode === 'submit') {
-                await submitMutation.mutateAsync(data);
-            } else if (existingData?.id && (mode === 'edit' || mode === 'resubmit')) {
+            // Determine if we should use submit (create) or update
+            // Update if: edit/resubmit mode OR submit mode with existing sheet
+            const shouldUpdate = existingData?.id && (
+                mode === 'edit' ||
+                mode === 'resubmit' ||
+                (mode === 'submit' && existingData.status &&
+                    ['Created', 'Pending', 'Submitted', 'Rejected/Redo'].includes(existingData.status))
+            );
+
+            if (shouldUpdate && existingData?.id) {
+                // Update existing costing sheet
                 await updateMutation.mutateAsync({
                     id: existingData.id,
                     data: {
@@ -107,10 +121,17 @@ export default function CostingSheetSubmitForm({
                         teRemarks: data.teRemarks,
                     },
                 });
+            } else {
+                // Create new costing sheet (submit mode with no existing sheet)
+                await submitMutation.mutateAsync(data);
             }
+            // Navigation happens automatically via mutation success callbacks
             navigate(paths.tendering.costingSheets);
         } catch (error) {
+            // Error handling is done by mutation hooks (toast notifications)
+            // Just log for debugging
             console.error('Error submitting costing sheet:', error);
+            // Don't navigate on error - let user see the error and retry
         }
     };
 
@@ -302,7 +323,9 @@ export default function CostingSheetSubmitForm({
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
-                                {mode === 'submit' ? 'Submit' : 'Update'} Costing Sheet
+                                {mode === 'submit' && 'Submit'}
+                                {mode === 'edit' && 'Update'}
+                                {mode === 'resubmit' && 'Resubmit'} Costing Sheet
                             </Button>
                         </div>
                     </form>

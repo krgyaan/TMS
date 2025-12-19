@@ -2,6 +2,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import type { TenderInfoWithNames } from "@/types/api.types";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -44,16 +45,6 @@ const formatValue = (value?: string | number | null) => {
     return value;
 };
 
-const formatDate = (value?: string | Date | null) => {
-    if (!value) return "—";
-    return formatDateTime(value);
-};
-
-const formatCurrency = (value?: string | number | null) => {
-    if (value === null || value === undefined) return "—";
-    return formatINR(value);
-};
-
 const getStatusBadgeVariant = (status: string) => {
     const statusLower = status.toLowerCase();
     if (statusLower === 'pending') return 'secondary';
@@ -62,9 +53,12 @@ const getStatusBadgeVariant = (status: string) => {
     return 'outline';
 };
 
+const hasValue = (value?: string | Date | number | null) => {
+    return value !== null && value !== undefined && value !== "";
+};
+
 export const EmdTenderFeeShow = ({
     paymentRequests,
-    tender,
     isLoading,
     onEdit,
     onBack,
@@ -78,11 +72,17 @@ export const EmdTenderFeeShow = ({
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                            <Skeleton key={idx} className="h-12 w-full" />
-                        ))}
-                    </div>
+                    <Table>
+                        <TableBody>
+                            {Array.from({ length: 6 }).map((_, idx) => (
+                                <TableRow key={idx}>
+                                    <TableCell colSpan={4}>
+                                        <Skeleton className="h-12 w-full" />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
         );
@@ -98,7 +98,15 @@ export const EmdTenderFeeShow = ({
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">No payment requests available for this tender.</p>
+                    <Table>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell className="text-muted-foreground">
+                                    No payment requests available for this tender.
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
         );
@@ -107,6 +115,197 @@ export const EmdTenderFeeShow = ({
     const emdRequest = paymentRequests.find(r => r.purpose === 'EMD');
     const tenderFeeRequest = paymentRequests.find(r => r.purpose === 'Tender Fee');
     const processingFeeRequest = paymentRequests.find(r => r.purpose === 'Processing Fee');
+
+    const renderInstrumentRows = (instruments: PaymentRequest['instruments'], purposeLabel: string) => {
+        if (!instruments || instruments.length === 0) return null;
+
+        return (
+            <>
+                <TableRow className="bg-muted/30">
+                    <TableCell colSpan={4} className="font-medium text-sm italic">
+                        {purposeLabel} - Instrument Details
+                    </TableCell>
+                </TableRow>
+                {instruments.map((instrument, idx) => (
+                    <>
+                        {/* Instrument Header Row */}
+                        <TableRow key={`${instrument.id || idx}-header`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Instrument Type
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {instrument.instrumentType}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Status
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
+                                    {instrument.status}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+
+                        {/* Instrument Amount & Favouring Row */}
+                        <TableRow key={`${instrument.id || idx}-amount`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold" colSpan={hasValue(instrument.favouring) ? 1 : 3}>
+                                {formatINR(instrument.amount)}
+                            </TableCell>
+                            {hasValue(instrument.favouring) && (
+                                <>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Favouring
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(instrument.favouring)}
+                                    </TableCell>
+                                </>
+                            )}
+                        </TableRow>
+
+                        {/* Instrument Payable At & Issue Date Row */}
+                        {(hasValue(instrument.payableAt) || hasValue(instrument.issueDate)) && (
+                            <TableRow key={`${instrument.id || idx}-payable`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                                {hasValue(instrument.payableAt) ? (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Payable At
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={hasValue(instrument.issueDate) ? 1 : 3}>
+                                            {formatValue(instrument.payableAt)}
+                                        </TableCell>
+                                    </>
+                                ) : (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Issue Date
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDateTime(instrument.issueDate)}
+                                        </TableCell>
+                                    </>
+                                )}
+                                {hasValue(instrument.payableAt) && hasValue(instrument.issueDate) && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Issue Date
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatDateTime(instrument.issueDate)}
+                                        </TableCell>
+                                    </>
+                                )}
+                            </TableRow>
+                        )}
+
+                        {/* Instrument Expiry Dates Row */}
+                        {(hasValue(instrument.expiryDate) || hasValue(instrument.claimExpiryDate)) && (
+                            <TableRow key={`${instrument.id || idx}-expiry`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                                {hasValue(instrument.expiryDate) ? (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Expiry Date
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={hasValue(instrument.claimExpiryDate) ? 1 : 3}>
+                                            {formatDateTime(instrument.expiryDate)}
+                                        </TableCell>
+                                    </>
+                                ) : (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Claim Expiry Date
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDateTime(instrument.claimExpiryDate)}
+                                        </TableCell>
+                                    </>
+                                )}
+                                {hasValue(instrument.expiryDate) && hasValue(instrument.claimExpiryDate) && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Claim Expiry Date
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatDateTime(instrument.claimExpiryDate)}
+                                        </TableCell>
+                                    </>
+                                )}
+                            </TableRow>
+                        )}
+
+                        {/* Instrument Courier Details Row */}
+                        {(instrument.courierAddress || instrument.courierDeadline) && (
+                            <TableRow key={`${instrument.id || idx}-courier`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Courier Address
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatValue(instrument.courierAddress)}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Courier Deadline
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {instrument.courierDeadline ? `${instrument.courierDeadline} days` : "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+
+                        {/* Instrument Additional Details Rows */}
+                        {instrument.details && Object.entries(instrument.details).length > 0 && (
+                            <>
+                                {(() => {
+                                    const entries = Object.entries(instrument.details).filter(([, value]) => value);
+                                    const rows = [];
+                                    for (let i = 0; i < entries.length; i += 2) {
+                                        const [key1, value1] = entries[i];
+                                        const [key2, value2] = entries[i + 1] || [null, null];
+                                        rows.push(
+                                            <TableRow key={`${instrument.id || idx}-details-${i}`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">
+                                                    {key1.replace(/([A-Z])/g, ' $1').trim()}
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1)))
+                                                        ? formatDateTime(value1)
+                                                        : String(value1)}
+                                                </TableCell>
+                                                {key2 ? (
+                                                    <>
+                                                        <TableCell className="text-sm font-medium text-muted-foreground capitalize">
+                                                            {key2.replace(/([A-Z])/g, ' $1').trim()}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm">
+                                                            {value2 instanceof Date || (typeof value2 === "string" && !isNaN(Date.parse(value2)))
+                                                                ? formatDateTime(value2)
+                                                                : String(value2)}
+                                                        </TableCell>
+                                                    </>
+                                                ) : (
+                                                    <TableCell colSpan={2} />
+                                                )}
+                                            </TableRow>
+                                        );
+                                    }
+                                    return rows;
+                                })()}
+                            </>
+                        )}
+
+                        {/* Spacer Row between instruments */}
+                        {idx < instruments.length - 1 && (
+                            <TableRow key={`${instrument.id || idx}-spacer`}>
+                                <TableCell colSpan={4} className="h-2 bg-muted/10" />
+                            </TableRow>
+                        )}
+                    </>
+                ))}
+            </>
+        );
+    };
 
     return (
         <Card>
@@ -130,288 +329,150 @@ export const EmdTenderFeeShow = ({
                     )}
                 </CardAction>
             </CardHeader>
-            <CardContent className="space-y-8">
-                {tender && (
-                    <div className="rounded-lg border p-4">
-                        <p className="text-sm text-muted-foreground uppercase tracking-wide">Tender Summary</p>
-                        <p className="text-base font-semibold mt-1">{tender.tenderName}</p>
-                        <p className="text-sm text-muted-foreground">
-                            Tender No: {tender.tenderNo} • Organization: {tender.organizationName ?? "—"}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Due Date: {tender.dueDate ? formatDateTime(tender.dueDate) : "—"}
-                        </p>
-                    </div>
-                )}
-
-                {/* EMD Section */}
-                {emdRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">EMD Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(emdRequest.status)}>
-                                {emdRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(emdRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(emdRequest.dueDate)}</p>
-                            </div>
-                            {emdRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(emdRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {emdRequest.instruments && emdRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {emdRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.payableAt && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Payable At</p>
-                                                    <p>{formatValue(instrument.payableAt)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.issueDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Issue Date</p>
-                                                    <p>{formatDate(instrument.issueDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.expiryDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Expiry Date</p>
-                                                    <p>{formatDate(instrument.expiryDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.claimExpiryDate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Claim Expiry Date</p>
-                                                    <p>{formatDate(instrument.claimExpiryDate)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.courierAddress && (
-                                                <div className="md:col-span-2">
-                                                    <p className="text-xs text-muted-foreground">Courier Address</p>
-                                                    <p>{formatValue(instrument.courierAddress)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* EMD Section */}
+                        {emdRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        EMD Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>
+                                            {emdRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(emdRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDateTime(emdRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Remarks
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(emdRequest.remarks)}
+                                    </TableCell>
+                                </TableRow>
+                                {renderInstrumentRows(emdRequest.instruments, "EMD")}
+                            </>
                         )}
-                    </section>
-                )}
 
-                {/* Tender Fee Section */}
-                {tenderFeeRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">Tender Fee Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status)}>
-                                {tenderFeeRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(tenderFeeRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(tenderFeeRequest.dueDate)}</p>
-                            </div>
-                            {tenderFeeRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(tenderFeeRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {tenderFeeRequest.instruments && tenderFeeRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {tenderFeeRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.payableAt && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Payable At</p>
-                                                    <p>{formatValue(instrument.payableAt)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        {/* Tender Fee Section */}
+                        {tenderFeeRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Tender Fee Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>
+                                            {tenderFeeRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(tenderFeeRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDateTime(tenderFeeRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Remarks
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(tenderFeeRequest.remarks)}
+                                    </TableCell>
+                                </TableRow>
+                                {renderInstrumentRows(tenderFeeRequest.instruments, "Tender Fee")}
+                            </>
                         )}
-                    </section>
-                )}
 
-                {/* Processing Fee Section */}
-                {processingFeeRequest && (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="font-semibold text-base">Processing Fee Payment</h3>
-                            <Badge variant={getStatusBadgeVariant(processingFeeRequest.status)}>
-                                {processingFeeRequest.status}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Amount Required</p>
-                                <p className="text-base font-semibold">{formatCurrency(processingFeeRequest.amountRequired)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Due Date</p>
-                                <p className="text-base font-semibold">{formatDate(processingFeeRequest.dueDate)}</p>
-                            </div>
-                            {processingFeeRequest.remarks && (
-                                <div className="md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">Remarks</p>
-                                    <p className="text-sm">{formatValue(processingFeeRequest.remarks)}</p>
-                                </div>
-                            )}
-                        </div>
-                        {processingFeeRequest.instruments && processingFeeRequest.instruments.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                                <h4 className="font-medium text-sm">Instrument Details</h4>
-                                {processingFeeRequest.instruments.map((instrument, idx) => (
-                                    <div key={instrument.id || idx} className="rounded-md border p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">{instrument.instrumentType}</p>
-                                            <Badge variant={getStatusBadgeVariant(instrument.status)}>
-                                                {instrument.status}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Amount</p>
-                                                <p>{formatCurrency(instrument.amount)}</p>
-                                            </div>
-                                            {instrument.favouring && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Favouring</p>
-                                                    <p>{formatValue(instrument.favouring)}</p>
-                                                </div>
-                                            )}
-                                            {instrument.details && (
-                                                <div className="md:col-span-2 space-y-2">
-                                                    {Object.entries(instrument.details).map(([key, value]) => (
-                                                        value && (
-                                                            <div key={key}>
-                                                                <p className="text-xs text-muted-foreground capitalize">
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </p>
-                                                                <p className="text-sm">{String(value)}</p>
-                                                            </div>
-                                                        )
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        {/* Processing Fee Section */}
+                        {processingFeeRequest && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Processing Fee Payment
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>
+                                            {processingFeeRequest.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount Required
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {formatINR(processingFeeRequest.amountRequired)}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Due Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDateTime(processingFeeRequest.dueDate)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Remarks
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(processingFeeRequest.remarks)}
+                                    </TableCell>
+                                </TableRow>
+                                {renderInstrumentRows(processingFeeRequest.instruments, "Processing Fee")}
+                            </>
                         )}
-                    </section>
-                )}
 
-                {/* Timeline/Status History Section */}
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Status Timeline</h3>
-                    <div className="space-y-2">
-                        {paymentRequests.map((request, idx) => (
-                            <div key={request.id || idx} className="flex items-center gap-4 text-sm">
-                                <Badge variant={getStatusBadgeVariant(request.status)}>
-                                    {request.purpose}
-                                </Badge>
-                                <span className="text-muted-foreground">→</span>
-                                <Badge variant={getStatusBadgeVariant(request.status)}>
-                                    {request.status}
-                                </Badge>
-                                {request.dueDate && (
-                                    <>
-                                        <span className="text-muted-foreground">•</span>
-                                        <span className="text-muted-foreground">
-                                            Due: {formatDate(request.dueDate)}
-                                        </span>
-                                    </>
+                        {/* Summary Row */}
+                        <TableRow className="bg-primary/10">
+                            <TableCell colSpan={2} className="font-bold text-sm">
+                                Total Amount Required
+                            </TableCell>
+                            <TableCell colSpan={2} className="font-bold text-sm">
+                                {formatINR(
+                                    (Number(emdRequest?.amountRequired) || 0) +
+                                    (Number(tenderFeeRequest?.amountRequired) || 0) +
+                                    (Number(processingFeeRequest?.amountRequired) || 0)
                                 )}
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

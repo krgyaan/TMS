@@ -19,6 +19,7 @@ import {
     DashboardQuerySchema,
     type DashboardResponse,
     type DashboardCounts,
+    type DashboardTab,
 } from '@/modules/tendering/emds/dto/emds.dto';
 import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -34,11 +35,11 @@ interface AuthenticatedRequest extends Request {
     };
 }
 
-@Controller('emds')
+@Controller('emds-tenderfees')
 export class EmdsController {
     constructor(private readonly emdsService: EmdsService) { }
 
-    @Get('dashboard')
+    @Get('/')
     async getDashboard(
         @Query() query: unknown,
         @Req() req: AuthenticatedRequest,
@@ -47,14 +48,14 @@ export class EmdsController {
         // Use current user's ID if not provided in query
         const userId = parsed.userId ?? req.user?.id;
         return this.emdsService.getDashboardData(
-            parsed.tab ?? 'all',
+            parsed.tab as DashboardTab ?? 'pending',
             userId,
             parsed.page && parsed.limit ? { page: parsed.page, limit: parsed.limit } : undefined,
             parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined
         );
     }
 
-    @Get('dashboard/counts')
+    @Get('/counts')
     async getDashboardCounts(
         @Req() req: AuthenticatedRequest,
     ): Promise<DashboardCounts> {

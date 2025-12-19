@@ -8,13 +8,6 @@ import {
     timestamp,
     integer,
 } from "drizzle-orm/pg-core";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { teams } from "@db/schemas/master/teams.schema";
-import { locations } from "@db/schemas/master/locations.schema";
-import { websites } from "@db/schemas/master/websites.schema";
-import { organizations } from "@db/schemas/master/organizations.schema";
 
 export const tenderInfos = pgTable("tender_infos", {
     id: serial("id").primaryKey(),

@@ -4,7 +4,7 @@ import type { EmdDashboardFilters } from '@/types/api.types';
 
 class EmdsService extends BaseApiService {
     constructor() {
-        super('/emds');
+        super('/emds-tenderfees');
     }
 
     // Dashboard endpoints
@@ -17,11 +17,11 @@ class EmdsService extends BaseApiService {
         if (filters?.sortBy) params.append('sortBy', filters.sortBy);
         if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
         const query = params.toString();
-        return this.get<EmdDashboardResponse>(`/dashboard${query ? `?${query}` : ''}`);
+        return this.get<EmdDashboardResponse>(`${query ? `?${query}` : ''}`);
     }
 
     async getDashboardCounts(): Promise<EmdDashboardCounts> {
-        return this.get<EmdDashboardCounts>('/dashboard/counts');
+        return this.get<EmdDashboardCounts>('/counts');
     }
 
     // Existing endpoints

@@ -16,22 +16,23 @@ type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<
     placeholder: string
 }
 
-export function SelectField<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
+export function SelectField<
+    TFieldValues extends FieldValues,
+    TName extends FieldPath<TFieldValues>
+>({
     control,
     name,
     label,
     options,
     placeholder,
 }: SelectFieldProps<TFieldValues, TName>) {
-    const normalizedOptions = React.useMemo<SelectOption[]>(() =>
-        options.map((option) =>
-            'id' in option
-                ? option
-                : {
-                    id: option.value,
-                    name: option.label,
-                },
-        ),
+    const normalizedOptions = React.useMemo<SelectOption[]>(
+        () =>
+            options.map((option) =>
+                'id' in option
+                    ? option
+                    : { id: option.value, name: option.label }
+            ),
         [options],
     )
 
@@ -40,7 +41,13 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
             {(field) => (
                 <Combobox
                     value={String(field.value ?? "")}
-                    onChange={field.onChange}
+                    onChange={(v) => {
+                        if (v === "") {
+                            field.onChange(undefined)
+                        } else {
+                            field.onChange(Number(v))
+                        }
+                    }}
                     options={normalizedOptions}
                     placeholder={placeholder}
                 />
@@ -48,6 +55,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
         </FieldWrapper>
     )
 }
+
 
 function Combobox({
     value,

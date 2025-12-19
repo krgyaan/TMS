@@ -1,0 +1,1 @@
+ALTER TYPE "public"."tq_status" ADD VALUE 'No TQ Disqualified';

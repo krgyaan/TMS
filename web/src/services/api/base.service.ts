@@ -31,6 +31,14 @@ export class BaseApiService {
         return response.data
     }
 
+    protected async put<T, D = any>(endpoint: string = '', data?: D): Promise<T> {
+        const response: AxiosResponse<T> = await axiosInstance.put(
+            `${this.basePath}${endpoint}`,
+            data
+        )
+        return response.data
+    }
+
     protected async delete<T>(endpoint: string): Promise<T> {
         const response: AxiosResponse<T> = await axiosInstance.delete(
             `${this.basePath}${endpoint}`

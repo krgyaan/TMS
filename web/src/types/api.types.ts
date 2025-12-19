@@ -1,3 +1,5 @@
+export type { TenderClient, TenderClientDto, TenderInfoSheet, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import type { TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import type { AuthUser, Team, UserRole, UserProfile } from './auth.types';
 
 export interface User {
@@ -229,10 +231,100 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
     persons: Vendor[];
     gsts: VendorGst[];
     accounts: VendorAcc[];
+    files?: VendorFile[];
     _counts?: {
         persons: number;
         gsts: number;
         accounts: number;
+        files?: number;
+    };
+}
+
+// DTOs for creating/updating vendor organizations with relations
+export interface CreateVendorGstDto {
+    org: number;
+    gstState: string;
+    gstNum: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorGstDto {
+    gstState?: string;
+    gstNum?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorAccountDto {
+    org: number;
+    accountName: string;
+    accountNum: string;
+    accountIfsc: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorAccountDto {
+    accountName?: string;
+    accountNum?: string;
+    accountIfsc?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorFileDto {
+    vendorId: number;
+    name: string;
+    filePath: string;
+    status?: boolean;
+}
+
+export interface UpdateVendorFileDto {
+    name?: string;
+    filePath?: string;
+    status?: boolean;
+}
+
+export interface CreateVendorOrganizationWithRelationsDto {
+    organization: {
+        name: string;
+        address?: string;
+        status?: boolean;
+    };
+    gsts?: Omit<CreateVendorGstDto, 'org'>[];
+    accounts?: Omit<CreateVendorAccountDto, 'org'>[];
+    persons?: Array<{
+        name: string;
+        email?: string;
+        address?: string;
+        status?: boolean;
+        files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+    }>;
+}
+
+export interface UpdateVendorOrganizationWithRelationsDto {
+    organization?: {
+        name?: string;
+        address?: string;
+        status?: boolean;
+    };
+    gsts?: {
+        create?: Omit<CreateVendorGstDto, 'org'>[];
+        update?: Array<{ id: number; data: UpdateVendorGstDto }>;
+        delete?: number[];
+    };
+    accounts?: {
+        create?: Omit<CreateVendorAccountDto, 'org'>[];
+        update?: Array<{ id: number; data: UpdateVendorAccountDto }>;
+        delete?: number[];
+    };
+    persons?: {
+        create?: Array<{
+            name: string;
+            email?: string;
+            address?: string;
+            status?: boolean;
+            files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+        }>;
+        update?: Array<{ id: number; data: Partial<CreateVendorDto> }>;
+        delete?: number[];
     };
 }
 
@@ -542,14 +634,7 @@ export interface CreateLoanPartyDto {
 }
 
 export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
-// Tender Info Sheet Types
-export interface TenderClient {
-    id?: number;
-    clientName: string;
-    clientDesignation?: string | null;
-    clientMobile?: string | null;
-    clientEmail?: string | null;
-}
+// Tender Info Sheet Types - Re-exported from consolidated types file
 
 // Base Tender Info (matches tenderInfos table)
 export interface TenderInfo {
@@ -608,20 +693,23 @@ export interface SaveTenderApprovalDto {
 }
 
 export interface TenderApproval {
-    id: number;
-    tenderId: number;
-    tlStatus: '0' | '1' | '2' | '3' | number;
+    id?: number;
+    tenderId?: number;
+    tlStatus?: '0' | '1' | '2' | '3' | number;
+    tlDecision?: '0' | '1' | '2' | '3' | number; // Alias for tlStatus for backward compatibility
     rfqTo: number[] | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
     approvePqrSelection: '1' | '2' | null;
     approveFinanceDocSelection: '1' | '2' | null;
+    alternativeTechnicalDocs?: string[] | null;
+    alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
-    oemNotAllowed: number | null;
+    oemNotAllowed: string | null;
     tlRejectionRemarks: string | null;
     incompleteFields?: IncompleteField[];
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface TenderApprovalRow {
@@ -664,7 +752,9 @@ export interface TenderWithRelations extends TenderInfo {
     statusName?: string | null;
     itemName?: string | null;
     locationName?: string | null;
-    infoSheet?: TenderInfoSheet | null;
+    infoSheet?: TenderInfoSheetResponse | null;
+    approval?: TenderApproval | null;
+    rfq?: Rfq | null;
     physicalDocs?: PhysicalDocsDashboardRow | null;
     checklist?: TenderDocumentChecklistDashboardRow | null;
     costingSheet?: CostingSheetDashboardRow | null;
@@ -736,180 +826,6 @@ export interface UpdateTenderRequest {
     tenderApprovalStatus?: string | null;
     tlRejectionRemarks?: string | null;
     oemNotAllowed?: string | null;
-}
-
-// Tender Info Sheet Types (keep existing)
-export interface TenderInfoSheet {
-    id?: number;
-    tenderId: number;
-
-    // TE Recommendation
-    teRecommendation: 'YES' | 'NO';
-    teRejectionReason?: number | null;
-    teRejectionRemarks?: string | null;
-
-    // Processing Fee
-    processingFeeRequired?: 'YES' | 'NO' | null;
-    processingFeeAmount?: number | string | null;
-    processingFeeMode?: string | null;  // ✅ Single string (comma-separated)
-    processingFeeModes?: string[] | null; // ✅ Array version for frontend
-
-    // Tender Fee
-    tenderFeeRequired?: 'YES' | 'NO' | null;
-    tenderFeeAmount?: number | string | null;
-    tenderFeeMode?: string | null;  // ✅ Single string
-    tenderFeeModes?: string[] | null;
-
-    // EMD
-    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdAmount?: number | string | null;
-    emdMode?: string | null;  // ✅ Single string
-    emdModes?: string[] | null;
-
-    // Auction & Terms
-    reverseAuctionApplicable?: 'YES' | 'NO' | null;
-    paymentTermsSupply?: number | null;
-    paymentTermsInstallation?: number | null;
-    bidValidityDays?: number | null;
-    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
-    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
-
-    // Delivery Time
-    deliveryTimeSupply?: number | null;
-    deliveryTimeInstallationInclusive?: boolean;
-    deliveryTimeInstallationDays?: number | null;
-    deliveryTimeInstallation?: number | null;
-
-    // PBG
-    pbgRequired?: 'YES' | 'NO' | null;
-    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    pbgForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    pbgPercentage?: number | string | null;
-    pbgDurationMonths?: number | null;
-
-    // Security Deposit
-    sdRequired?: 'YES' | 'NO' | null;
-    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    sdForm?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    sdPercentage?: number | string | null;
-    securityDepositPercentage?: number | string | null;
-    sdDurationMonths?: number | null;
-
-    // LD
-    ldRequired?: 'YES' | 'NO' | null;
-    ldPercentagePerWeek?: number | string | null;
-    maxLdPercentage?: number | string | null;
-
-    // Physical Docs
-    physicalDocsRequired?: 'YES' | 'NO' | null;
-    physicalDocsDeadline?: string | Date | null;
-
-    // Technical Eligibility
-    techEligibilityAge?: number | null;
-    techEligibilityAgeYears?: number | null;
-    workOrderValue1Required?: 'YES' | 'NO' | null;
-    orderValue1?: number | string | null;
-    wo1Custom?: string | null;
-    workOrderValue2Required?: 'YES' | 'NO' | null;
-    orderValue2?: number | string | null;
-    wo2Custom?: string | null;
-    workOrderValue3Required?: 'YES' | 'NO' | null;
-    orderValue3?: number | string | null;
-    wo3Custom?: string | null;
-
-    // Financial Requirements
-    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    avgAnnualTurnoverCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    avgAnnualTurnoverValue?: number | string | null;
-    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    workingCapitalCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    workingCapitalValue?: number | string | null;
-    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    solvencyCertificateCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    solvencyCertificateValue?: number | string | null;
-    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    netWorthCriteria?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    netWorthValue?: number | string | null;
-
-    // Documents
-    technicalWorkOrders?: string[] | null;
-    commercialDocuments?: string[] | null;
-
-    // Client & Address
-    clientOrganization?: string | null;
-    clients?: TenderClient[];
-    courierAddress?: string | null;
-
-    // Final Remark
-    teFinalRemark?: string | null;
-    teRemark?: string | null;
-    rejectionRemark?: string | null;
-}
-
-export interface SaveTenderInfoSheetDto {
-    teRecommendation: 'YES' | 'NO';
-    teRejectionReason?: number | null;
-    teRejectionRemarks?: string | null;
-    processingFeeRequired?: 'YES' | 'NO' | null;
-    processingFeeAmount?: number | null;
-    processingFeeModes?: string[] | null;
-    tenderFeeRequired?: 'YES' | 'NO' | null;
-    tenderFeeAmount?: number | null;
-    tenderFeeModes?: string[] | null;
-    emdRequired?: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdAmount?: number | null;
-    emdModes?: string[] | null;
-    reverseAuctionApplicable?: 'YES' | 'NO' | null;
-    paymentTermsSupply?: number | null;
-    paymentTermsInstallation?: number | null;
-    bidValidityDays?: number | null;
-    commercialEvaluation?: 'ITEM_WISE_GST_INCLUSIVE' | 'ITEM_WISE_PRE_GST' | 'OVERALL_GST_INCLUSIVE' | 'OVERALL_PRE_GST' | null;
-    mafRequired?: 'YES_GENERAL' | 'YES_PROJECT_SPECIFIC' | 'NO' | null;
-    deliveryTimeSupply?: number | null;
-    deliveryTimeInstallationInclusive?: boolean;
-    deliveryTimeInstallationDays?: number | null;
-    pbgRequired?: 'YES' | 'NO' | null;
-    pbgMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    pbgPercentage?: number | null;
-    pbgDurationMonths?: number | null;
-    sdRequired?: 'YES' | 'NO' | null;
-    sdMode?: 'DD_DEDUCTION' | 'FDR' | 'PBG' | 'SB' | 'NA' | null;
-    sdPercentage?: number | null;
-    sdDurationMonths?: number | null;
-    ldRequired?: 'YES' | 'NO' | null;
-    ldPercentagePerWeek?: number | null;
-    maxLdPercentage?: number | null;
-    physicalDocsRequired?: 'YES' | 'NO' | null;
-    physicalDocsDeadline?: string | Date | null;
-    techEligibilityAge?: number | null;
-    workOrderValue1Required?: 'YES' | 'NO' | null;
-    orderValue1?: number | null;
-    wo1Custom?: string | null;
-    workOrderValue2Required?: 'YES' | 'NO' | null;
-    orderValue2?: number | null;
-    wo2Custom?: string | null;
-    workOrderValue3Required?: 'YES' | 'NO' | null;
-    orderValue3?: number | null;
-    wo3Custom?: string | null;
-    avgAnnualTurnoverType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    avgAnnualTurnoverValue?: number | null;
-    workingCapitalType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    workingCapitalValue?: number | null;
-    solvencyCertificateType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    solvencyCertificateValue?: number | null;
-    netWorthType?: 'NOT_APPLICABLE' | 'POSITIVE' | 'AMOUNT' | null;
-    netWorthValue?: number | null;
-    technicalWorkOrders?: string[] | null;
-    commercialDocuments?: string[] | null;
-    clientOrganization?: string | null;
-    clients: Array<{
-        clientName: string;
-        clientDesignation?: string | null;
-        clientMobile?: string | null;
-        clientEmail?: string | null;
-    }>;
-    courierAddress?: string | null;
-    teFinalRemark?: string | null;
 }
 
 export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee";
@@ -1081,6 +997,45 @@ export type UpdateCostingSheetDto = {
     teRemarks: string;
 };
 
+export type CostingApprovalDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMember: number | null;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    submittedFinalPrice: string | null;
+    submittedBudgetPrice: string | null;
+    googleSheetUrl: string | null;
+    costingSheetId: number | null;
+};
+
+export type ApproveCostingDto = {
+    finalPrice: string;
+    receiptPrice: string;
+    budgetPrice: string;
+    grossMargin: string;
+    oemVendorIds: number[];
+    tlRemarks: string;
+};
+
+export type RejectCostingDto = {
+    rejectionReason: string;
+};
+
+export type CostingApprovalListParams = {
+    costingStatus?: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 export type BidSubmissionStatus = 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
 
 export type BidDocuments = {
@@ -1102,6 +1057,58 @@ export type BidSubmission = {
     tmsImprovements: string | null;
     createdAt: Date;
     updatedAt: Date;
+};
+
+
+export type BidSubmissionDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    emdAmount: string | null;
+    gstValues: number;
+    finalCosting: string | null;
+    bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    bidSubmissionId: number | null;
+    costingSheetId: number | null;
+};
+
+export type BidSubmissionListParams = {
+    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export type SubmitBidDto = {
+    tenderId: number;
+    submissionDatetime: string;
+    submittedDocs: string[];
+    proofOfSubmission: string;
+    finalPriceSs: string;
+    finalBiddingPrice: string | null;
+};
+
+export type MarkAsMissedDto = {
+    tenderId: number;
+    reasonForMissing: string;
+    preventionMeasures: string;
+    tmsImprovements: string;
+};
+
+export type UpdateBidSubmissionDto = {
+    submissionDatetime?: string;
+    submittedDocs?: string[];
+    proofOfSubmission?: string;
+    finalPriceSs?: string;
+    finalBiddingPrice?: string | null;
+    reasonForMissing?: string;
+    preventionMeasures?: string;
+    tmsImprovements?: string;
 };
 
 export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
@@ -1287,6 +1294,7 @@ export interface ResultDashboardCounts {
     pending: number;
     won: number;
     lost: number;
+    disqualified: number;
     total: number;
 }
 
@@ -1320,6 +1328,8 @@ export interface PhysicalDocs {
     courierNo: number;
     submittedDocs: string | null;
     persons: PhysicalDocPerson[];
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface PhysicalDocsListParams {
@@ -1368,7 +1378,7 @@ export type TqManagementDashboardRow = {
     statusName: string | null;
     bidSubmissionDate: Date | null;
     tqSubmissionDeadline: Date | null;
-    tqStatus: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+    tqStatus: TenderQueryStatus;
     tqId: number | null;
     tqCount: number;
     bidSubmissionId: number | null;
@@ -1433,16 +1443,74 @@ export interface EmdDashboardCounts {
     total: number;
 }
 
-export interface EmdDashboardResponse {
-    data: EmdDashboardRow[];
-    counts: EmdDashboardCounts;
-    meta?: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
+export interface BidSubmissionDashboardCounts {
+    pending: number;
+    submitted: number;
+    missed: number;
+    total: number;
 }
+
+export interface CostingApprovalDashboardCounts {
+    submitted: number;
+    approved: number;
+    rejected: number;
+    total: number;
+}
+
+export interface TenderApprovalDashboardCounts {
+    pending: number;
+    approved: number;
+    rejected: number;
+    incomplete: number;
+    total: number;
+}
+
+export interface TqManagementDashboardCounts {
+    awaited: number;
+    received: number;
+    replied: number;
+    missed: number;
+    noTq: number;
+    qualified: number;
+    total: number;
+}
+
+export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ Disqualified' | 'TQ Qualified' | 'No TQ, Qualified';
+
+export interface PhysicalDocsDashboardCounts {
+    pending: number;
+    sent: number;
+    total: number;
+}
+
+export interface DocumentChecklistsDashboardCounts {
+    pending: number;
+    submitted: number;
+    total: number;
+}
+
+export interface CostingSheetDashboardCounts {
+    pending: number;
+    submitted: number;
+    rejected: number;
+    total: number;
+}
+
+export type CreateSheetResponse = {
+    success: boolean;
+    sheetUrl?: string;
+    sheetId?: string;
+    message?: string;
+    isDuplicate?: boolean;
+    existingSheetUrl?: string;
+    suggestedName?: string;
+};
+
+export type DriveScopesResponse = {
+    hasScopes: boolean;
+    missingScopes: string[];
+    grantedScopes: string[];
+};
 
 export type CreatePaymentRequestDto = {
     emdMode?: string;
@@ -1537,3 +1605,73 @@ export interface UpdateRfqDto {
         qty?: number;
     }>;
 }
+
+// Add to existing types file
+
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string | null;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    amountRequired: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    instrumentId: number | null;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    displayStatus: string;
+    createdAt: string | null;
+}
+
+export interface EmdDashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type EmdDashboardResponse = PendingTabResponse | RequestTabResponse;

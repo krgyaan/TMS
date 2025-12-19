@@ -53,6 +53,11 @@ export class PhysicalDocsController {
         return this.physicalDocsService.findAll(filters);
     }
 
+    @Get('counts')
+    async getCounts() {
+        return this.physicalDocsService.getDashboardCounts();
+    }
+
     @Get('by-tender/:tenderId')
     async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         const physicalDoc = await this.physicalDocsService.findByTenderIdWithPersons(tenderId);

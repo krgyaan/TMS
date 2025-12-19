@@ -1,4 +1,4 @@
-﻿import {
+import {
     Body,
     Controller,
     Delete,
@@ -54,10 +54,24 @@ export class VendorOrganizationsController {
         return this.vendorOrganizationsService.create(parsed);
     }
 
+    @Post('with-relations')
+    @HttpCode(HttpStatus.CREATED)
+    async createWithRelations(@Body() body: unknown) {
+        return this.vendorOrganizationsService.createWithRelations(body as any);
+    }
+
     @Patch(':id')
     async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
         const parsed = UpdateVendorOrganizationSchema.parse(body);
         return this.vendorOrganizationsService.update(id, parsed);
+    }
+
+    @Patch(':id/with-relations')
+    async updateWithRelations(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
+    ) {
+        return this.vendorOrganizationsService.updateWithRelations(id, body as any);
     }
 
     // @Delete(':id')

@@ -4,6 +4,8 @@ import type {
     VendorOrganizationWithRelations,
     CreateVendorOrganizationDto,
     UpdateVendorOrganizationDto,
+    CreateVendorOrganizationWithRelationsDto,
+    UpdateVendorOrganizationWithRelationsDto,
 } from '@/types/api.types';
 
 class VendorOrganizationsService extends BaseApiService {
@@ -42,6 +44,25 @@ class VendorOrganizationsService extends BaseApiService {
         data: UpdateVendorOrganizationDto,
     ): Promise<VendorOrganization> {
         return this.patch<VendorOrganization>(`/${id}`, data);
+    }
+
+    async createWithRelations(
+        data: CreateVendorOrganizationWithRelationsDto,
+    ): Promise<VendorOrganizationWithRelations> {
+        return this.post<VendorOrganizationWithRelations>(
+            '/with-relations',
+            data,
+        );
+    }
+
+    async updateWithRelations(
+        id: number,
+        data: UpdateVendorOrganizationWithRelationsDto,
+    ): Promise<VendorOrganizationWithRelations> {
+        return this.patch<VendorOrganizationWithRelations>(
+            `/${id}/with-relations`,
+            data,
+        );
     }
 
     //   async delete(id: number): Promise<void> {

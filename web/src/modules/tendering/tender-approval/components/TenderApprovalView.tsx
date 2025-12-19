@@ -2,6 +2,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { TenderWithRelations } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -135,197 +136,225 @@ export function TenderApprovalView({
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <tbody className="divide-y divide-border">
-                            {/* Approval Status */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Approval Status
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground w-1/4">
-                                    TL Decision
-                                </td>
-                                <td className="px-4 py-3 w-3/4" colSpan={3}>
-                                    <Badge variant={statusConfig.variant} className="gap-1.5">
-                                        <StatusIcon className="h-3.5 w-3.5" />
-                                        {statusConfig.label}
-                                    </Badge>
-                                </td>
-                            </tr>
+                <Table>
+                    <TableBody>
+                        {/* Approval Status */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Approval Status
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                TL Decision
+                            </TableCell>
+                            <TableCell className="w-3/4" colSpan={3}>
+                                <Badge variant={statusConfig.variant} className="gap-1.5">
+                                    <StatusIcon className="h-3.5 w-3.5" />
+                                    {statusConfig.label}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        {approval.tenderApprovalStatus && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Tender Approval Status
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {approval.tenderApprovalStatus}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {approval.tlRemarks && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    TL Remarks
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {approval.tlRemarks}
+                                </TableCell>
+                            </TableRow>
+                        )}
 
-                            {/* Approved Status - Show RFQ and Payment Details */}
-                            {approval.tlStatus === 1 && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            RFQ & Payment Information
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            RFQ To (Vendor Organizations)
-                                        </td>
-                                        <td className="px-4 py-3 text-sm" colSpan={3}>
-                                            {approval.rfqTo && approval.rfqTo.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {approval.rfqTo.map((vendorId) => (
-                                                        <Badge key={vendorId} variant="outline">
-                                                            Vendor ID: {vendorId}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                '—'
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Tender Fee Mode
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.tenderFeeMode || '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            EMD Mode
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.emdMode || '—'}
-                                        </td>
-                                    </tr>
+                        {/* Approved Status - Show RFQ and Payment Details */}
+                        {approval.tlStatus === 1 && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        RFQ & Payment Information
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        RFQ To (Vendor Organizations)
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {approval.rfqTo && approval.rfqTo.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {approval.rfqTo.map((vendorId) => (
+                                                    <Badge key={vendorId} variant="outline">
+                                                        Vendor ID: {vendorId}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Tender Fee Mode
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.tenderFeeMode || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        EMD Mode
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.emdMode || '—'}
+                                    </TableCell>
+                                </TableRow>
+                                {approval.courierAddress && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Courier Address
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {approval.courierAddress}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
 
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Document Approvals
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            PQR Selection
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.approvePqrSelection === '1' ? (
-                                                <Badge variant="default" className="gap-1.5">
-                                                    <CheckCircle2 className="h-3 w-3" />
-                                                    Approved
-                                                </Badge>
-                                            ) : approval.approvePqrSelection === '2' ? (
-                                                <Badge variant="destructive" className="gap-1.5">
-                                                    <XCircle className="h-3 w-3" />
-                                                    Rejected
-                                                </Badge>
-                                            ) : (
-                                                '—'
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Finance Document Selection
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.approveFinanceDocSelection === '1' ? (
-                                                <Badge variant="default" className="gap-1.5">
-                                                    <CheckCircle2 className="h-3 w-3" />
-                                                    Approved
-                                                </Badge>
-                                            ) : approval.approveFinanceDocSelection === '2' ? (
-                                                <Badge variant="destructive" className="gap-1.5">
-                                                    <XCircle className="h-3 w-3" />
-                                                    Rejected
-                                                </Badge>
-                                            ) : (
-                                                '—'
-                                            )}
-                                        </td>
-                                    </tr>
-                                </>
-                            )}
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Document Approvals
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        PQR Selection
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.approvePqrSelection === '1' ? (
+                                            <Badge variant="default" className="gap-1.5">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Approved
+                                            </Badge>
+                                        ) : approval.approvePqrSelection === '2' ? (
+                                            <Badge variant="destructive" className="gap-1.5">
+                                                <XCircle className="h-3 w-3" />
+                                                Rejected
+                                            </Badge>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Finance Document Selection
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.approveFinanceDocSelection === '1' ? (
+                                            <Badge variant="default" className="gap-1.5">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Approved
+                                            </Badge>
+                                        ) : approval.approveFinanceDocSelection === '2' ? (
+                                            <Badge variant="destructive" className="gap-1.5">
+                                                <XCircle className="h-3 w-3" />
+                                                Rejected
+                                            </Badge>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
 
-                            {/* Rejected Status - Show Rejection Details */}
-                            {approval.tlStatus === 2 && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Rejection Details
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Tender Status
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.tenderStatus ? `Status ID: ${approval.tenderStatus}` : '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            OEM Not Allowed
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {approval.oemNotAllowed ? 'Yes' : 'No'}
-                                        </td>
-                                    </tr>
-                                    {approval.tlRejectionRemarks && (
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                Rejection Remarks
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                <div className="bg-destructive/10 p-3 rounded-md">
-                                                    {approval.tlRejectionRemarks}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
-                            )}
+                        {/* Rejected Status - Show Rejection Details */}
+                        {approval.tlStatus === 2 && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Rejection Details
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Tender Status
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.tenderStatus ? `Status ID: ${approval.tenderStatus}` : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        OEM Not Allowed
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.oemNotAllowed ? 'Yes' : 'No'}
+                                    </TableCell>
+                                </TableRow>
+                                {approval.tlRejectionRemarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Rejection Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <div className="bg-destructive/10 p-3 rounded-md">
+                                                {approval.tlRejectionRemarks}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
 
-                            {/* Incomplete Status - Show Incomplete Fields */}
-                            {approval.tlStatus === 3 && approval.incompleteFields && approval.incompleteFields.length > 0 && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Incomplete Fields
-                                        </td>
-                                    </tr>
-                                    {approval.incompleteFields.map((field, index) => (
-                                        <tr key={index} className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                                {field.fieldName}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm" colSpan={3}>
-                                                <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200">
-                                                    {field.comment}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </>
-                            )}
+                        {/* Incomplete Status - Show Incomplete Fields */}
+                        {approval.tlStatus === 3 && approval.incompleteFields && approval.incompleteFields.length > 0 && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Incomplete Fields
+                                    </TableCell>
+                                </TableRow>
+                                {approval.incompleteFields.map((field, index) => (
+                                    <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            {field.fieldName}
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200">
+                                                {field.comment}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </>
+                        )}
 
-                            {/* Timestamps */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Timeline
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Created At
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {formatDateTime(approval.createdAt)}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Last Updated
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {formatDateTime(approval.updatedAt)}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                        {/* Timestamps */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Timeline
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Created At
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(approval.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Last Updated
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(approval.updatedAt)}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

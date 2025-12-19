@@ -1,22 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { costingApprovalsService, type ApproveCostingDto, type CostingApprovalDashboardRow, type RejectCostingDto, type CostingApprovalListParams } from '@/services/api/costing-approvals.service';
+import { costingApprovalsService } from '@/services/api/costing-approvals.service';
+import type { ApproveCostingDto, RejectCostingDto, CostingApprovalListParams } from '@/types/api.types';
 import { toast } from 'sonner';
-import type { PaginatedResult } from '@/types/api.types';
+import type { PaginatedResult, CostingApprovalDashboardCounts, CostingApprovalDashboardRow } from '@/types/api.types';
 
 export const costingApprovalsKey = {
     all: ['costing-approvals'] as const,
     lists: () => [...costingApprovalsKey.all, 'list'] as const,
     detail: (id: number) => [...costingApprovalsKey.all, 'detail', id] as const,
     list: (filters?: Record<string, unknown>) => [...costingApprovalsKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...costingApprovalsKey.all, 'dashboard-counts'] as const,
 };
 
 export const useCostingApprovals = (
-    tab?: 'pending' | 'approved' | 'rejected',
+    tab?: 'submitted' | 'approved' | 'rejected',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    const costingStatusMap: Record<string, 'Pending' | 'Approved' | 'Rejected/Redo'> = {
-        pending: 'Pending',
+    const costingStatusMap: Record<string, 'Submitted' | 'Approved' | 'Rejected/Redo'> = {
+        submitted: 'Submitted',
         approved: 'Approved',
         rejected: 'Rejected/Redo',
     };
@@ -100,6 +102,14 @@ export const useUpdateApprovedCosting = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to update costing');
         },
+    });
+};
+
+export const useCostingApprovalsDashboardCounts = () => {
+    return useQuery<CostingApprovalDashboardCounts>({
+        queryKey: costingApprovalsKey.dashboardCounts(),
+        queryFn: () => costingApprovalsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };
 

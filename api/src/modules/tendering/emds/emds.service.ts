@@ -4,7 +4,7 @@ import {
     NotFoundException,
     BadRequestException,
 } from '@nestjs/common';
-import { eq, and, inArray, or, lte, asc, desc, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -29,9 +29,6 @@ import type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
     UpdateStatusDto,
-    DashboardRow,
-    DashboardResponse,
-    DashboardCounts,
     PaymentPurpose,
     InstrumentType,
 } from '@/modules/tendering/emds/dto/emds.dto';
@@ -45,19 +42,137 @@ import {
 } from '@/modules/tendering/emds/constants/emd-statuses';
 
 // ============================================================================
+// Types
+// ============================================================================
+
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: PaymentPurpose;
+    amountRequired: string;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    instrumentId: number | null;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    displayStatus: string;
+    createdAt: Date | null;
+}
+
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
+    counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
+
+// ============================================================================
+// Status Mapping Constants
+// ============================================================================
+
+const APPROVED_STATUSES = [
+    // Accounts form accepted
+    DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    BG_STATUSES.BANK_REQUEST_ACCEPTED,
+    CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    // Payment completed
+    BT_STATUSES.PAYMENT_COMPLETED,
+    PORTAL_STATUSES.PAYMENT_COMPLETED,
+    // Settled
+    BT_STATUSES.SETTLED,
+    PORTAL_STATUSES.SETTLED,
+    // BG specific
+    BG_STATUSES.BG_CREATED,
+    BG_STATUSES.EXTENSION_APPROVED,
+    BG_STATUSES.EXTENSION_COMPLETED,
+    BG_STATUSES.CANCELLATION_APPROVED,
+];
+
+const RETURNED_STATUSES = [
+    // Courier returns
+    DD_STATUSES.COURIER_RETURN_RECEIVED,
+    FDR_STATUSES.COURIER_RETURN_RECEIVED,
+    BG_STATUSES.COURIER_RETURN_RECEIVED,
+    // Bank returns
+    DD_STATUSES.BANK_RETURN_COMPLETED,
+    FDR_STATUSES.BANK_RETURN_COMPLETED,
+    BT_STATUSES.RETURN_COMPLETED,
+    PORTAL_STATUSES.RETURN_COMPLETED,
+    // Cancellations
+    DD_STATUSES.CANCELLED_AT_BRANCH,
+    BG_STATUSES.BG_CANCELLATION_CONFIRMED,
+    BG_STATUSES.FDR_CANCELLATION_CONFIRMED,
+    CHEQUE_STATUSES.CANCELLED,
+    // Project settlements
+    DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
+];
+
+const REJECTED_STATUS_PATTERN = '_REJECTED';
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
-const mapInstrumentType = (
-    mode: string
-): InstrumentType => {
+const mapInstrumentType = (mode: string): InstrumentType => {
     const mapping: Record<string, InstrumentType> = {
         DD: 'DD',
         FDR: 'FDR',
         BG: 'BG',
         CHEQUE: 'Cheque',
         BANK_TRANSFER: 'Bank Transfer',
+        BT: 'Bank Transfer',  // Frontend short code
         PORTAL: 'Portal Payment',
+        POP: 'Portal Payment',  // Frontend short code
     };
     return mapping[mode] || 'DD';
 };
@@ -81,6 +196,26 @@ const getInitialInstrumentStatus = (instrumentType: InstrumentType): string => {
     }
 };
 
+const deriveDisplayStatus = (instrumentStatus: string | null): string => {
+    if (!instrumentStatus) return 'Pending';
+
+    if (instrumentStatus.includes(REJECTED_STATUS_PATTERN)) return 'Rejected';
+    if (RETURNED_STATUSES.includes(instrumentStatus as any)) return 'Returned';
+    if (APPROVED_STATUSES.includes(instrumentStatus as any)) return 'Approved';
+
+    return 'Sent';
+};
+
+const getDisplayTab = (instrumentStatus: string | null): DashboardTab => {
+    if (!instrumentStatus) return 'sent';
+
+    if (instrumentStatus.includes(REJECTED_STATUS_PATTERN)) return 'rejected';
+    if (RETURNED_STATUSES.includes(instrumentStatus as any)) return 'returned';
+    if (APPROVED_STATUSES.includes(instrumentStatus as any)) return 'approved';
+
+    return 'sent';
+};
+
 // ============================================================================
 // Service
 // ============================================================================
@@ -96,180 +231,95 @@ export class EmdsService {
     ) { }
 
     // ========================================================================
-    // Dashboard Methods
+    // Dashboard Methods (Refactored)
     // ========================================================================
 
     /**
-     * Get dashboard data with counts for all tabs
+     * Get dashboard data based on tab
      */
     async getDashboardData(
-        tab: string,
+        tab: DashboardTab = 'pending',
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
-    ): Promise<DashboardResponse> {
-        const allData = await this.getAllDashboardItems(userId);
-        const counts = this.calculateCounts(allData);
+    ): Promise<PendingTabResponse | RequestTabResponse> {
+        // Get counts first (for all tabs)
+        const counts = await this.getDashboardCounts(userId);
 
-        let filteredData: DashboardRow[];
-        switch (tab) {
-            case 'pending':
-                filteredData = allData.filter(
-                    (r) => r.status === 'Pending' || r.status === 'Not Created'
-                );
-                break;
-            case 'sent':
-                filteredData = allData.filter(
-                    (r) => r.status === 'Sent' || r.status === 'Requested'
-                );
-                break;
-            case 'approved':
-                filteredData = allData.filter((r) => r.status === 'Approved');
-                break;
-            case 'rejected':
-                filteredData = allData.filter((r) => r.status === 'Rejected');
-                break;
-            case 'returned':
-                filteredData = allData.filter((r) => r.status === 'Returned');
-                break;
-            default:
-                filteredData = allData;
+        if (tab === 'pending') {
+            return this.getPendingTenders(userId, pagination, sort, counts);
         }
 
-        // Apply sorting
-        if (sort?.sortBy) {
-            const sortOrder = sort.sortOrder === 'desc' ? -1 : 1;
-            filteredData.sort((a, b) => {
-                let aVal: any;
-                let bVal: any;
-
-                switch (sort.sortBy) {
-                    case 'tenderNo':
-                        aVal = a.tenderNo || '';
-                        bVal = b.tenderNo || '';
-                        break;
-                    case 'tenderName':
-                        aVal = a.tenderName || '';
-                        bVal = b.tenderName || '';
-                        break;
-                    case 'teamMemberName':
-                        aVal = a.teamMemberName || '';
-                        bVal = b.teamMemberName || '';
-                        break;
-                    case 'dueDate':
-                        aVal = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-                        bVal = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-                        break;
-                    case 'amountRequired':
-                        aVal = parseFloat(a.amountRequired || '0');
-                        bVal = parseFloat(b.amountRequired || '0');
-                        break;
-                    case 'status':
-                        aVal = a.status || '';
-                        bVal = b.status || '';
-                        break;
-                    default:
-                        return 0;
-                }
-
-                if (aVal < bVal) return -1 * sortOrder;
-                if (aVal > bVal) return 1 * sortOrder;
-                return 0;
-            });
-        }
-
-        // Apply pagination
-        const total = filteredData.length;
-        let paginatedData = filteredData;
-        if (pagination?.page && pagination?.limit) {
-            const page = pagination.page;
-            const limit = pagination.limit;
-            const offset = (page - 1) * limit;
-            paginatedData = filteredData.slice(offset, offset + limit);
-        }
-
-        const response: DashboardResponse = {
-            data: paginatedData,
-            counts,
-        };
-
-        if (pagination?.page && pagination?.limit) {
-            response.meta = {
-                total,
-                page: pagination.page,
-                limit: pagination.limit,
-                totalPages: Math.ceil(total / pagination.limit),
-            };
-        }
-
-        return response;
+        return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
     }
 
     /**
-     * Get only counts for tab badges
+     * Get counts for all tabs
      */
     async getDashboardCounts(userId?: number): Promise<DashboardCounts> {
-        const allData = await this.getAllDashboardItems(userId);
-        return this.calculateCounts(allData);
-    }
+        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
 
-    /**
-     * Calculate counts for each status
-     */
-    private calculateCounts(data: DashboardRow[]): DashboardCounts {
-        const counts: DashboardCounts = {
-            pending: 0,
-            sent: 0,
-            approved: 0,
-            rejected: 0,
-            returned: 0,
-            total: data.length,
+        // Count pending tenders (no payment requests)
+        const pendingCount = await this.countPendingTenders(userId);
+
+        // Count requests by status
+        const requestCounts = await this.countRequestsByStatus(userId);
+
+        return {
+            pending: pendingCount,
+            sent: requestCounts.sent,
+            approved: requestCounts.approved,
+            rejected: requestCounts.rejected,
+            returned: requestCounts.returned,
+            total: pendingCount + requestCounts.sent + requestCounts.approved + requestCounts.rejected + requestCounts.returned,
         };
-
-        for (const row of data) {
-            if (row.status === 'Pending' || row.status === 'Not Created') {
-                counts.pending++;
-            } else if (row.status === 'Sent' || row.status === 'Requested') {
-                counts.sent++;
-            } else if (row.status === 'Approved') {
-                counts.approved++;
-            } else if (row.status === 'Rejected') {
-                counts.rejected++;
-            } else if (row.status === 'Returned') {
-                counts.returned++;
-            }
-        }
-
-        return counts;
     }
 
     /**
-     * Get all dashboard items (existing requests + missing payments)
+     * Count pending tenders (tenders with requirements but no payment requests)
      */
-    private async getAllDashboardItems(userId?: number): Promise<DashboardRow[]> {
-        const [existingRequests, missingPayments] = await Promise.all([
-            this.getExistingPaymentRequests(userId),
-            this.getMissingPaymentRequests(userId),
-        ]);
+    private async countPendingTenders(userId?: number): Promise<number> {
+        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
 
-        // Sort by due date (urgent first), then by created date
-        const allItems = [...existingRequests, ...missingPayments];
-        allItems.sort((a, b) => {
-            if (!a.dueDate && !b.dueDate) return 0;
-            if (!a.dueDate) return 1;
-            if (!b.dueDate) return -1;
-            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-        });
+        // Subquery: tenders that have payment requests
+        const tendersWithRequests = this.db
+            .select({ tenderId: paymentRequests.tenderId })
+            .from(paymentRequests)
+            .groupBy(paymentRequests.tenderId);
 
-        return allItems;
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .where(
+                and(
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    // At least one payment required
+                    or(
+                        gt(tenderInfos.emd, sql`0`),
+                        gt(tenderInfos.tenderFees, sql`0`),
+                        gt(tenderInformation.processingFeeAmount, sql`0`)
+                    ),
+                    // No payment request exists
+                    sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
+                    userCondition
+                )
+            );
+
+        return Number(result?.count || 0);
     }
 
     /**
-     * Get existing payment requests for the user
+     * Count requests grouped by display status
      */
-    private async getExistingPaymentRequests(
-        userId?: number
-    ): Promise<DashboardRow[]> {
+    private async countRequestsByStatus(userId?: number): Promise<{
+        sent: number;
+        approved: number;
+        rejected: number;
+        returned: number;
+    }> {
         const userCondition = userId
             ? or(
                 eq(tenderInfos.teamMember, userId),
@@ -277,126 +327,82 @@ export class EmdsService {
             )
             : undefined;
 
-        const results = await this.db
+        const requests = await this.db
             .select({
-                id: paymentRequests.id,
-                purpose: paymentRequests.purpose,
-                amountRequired: paymentRequests.amountRequired,
-                status: paymentRequests.status,
-                createdAt: paymentRequests.createdAt,
-                requestedBy: paymentRequests.requestedBy,
-                tenderId: paymentRequests.tenderId,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                dueDate: tenderInfos.dueDate,
-                teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
+                instrumentStatus: paymentInstruments.status,
             })
             .from(paymentRequests)
             .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(
+                paymentInstruments,
+                and(
+                    eq(paymentInstruments.requestId, paymentRequests.id),
+                    eq(paymentInstruments.isActive, true)
+                )
+            )
             .where(
                 and(
                     TenderInfosService.getActiveCondition(),
                     userCondition
                 )
-            )
-            .orderBy(paymentRequests.createdAt);
+            );
 
-        // Get instruments for each request (only active ones)
-        const requestIds = results.map((r) => r.id);
+        const counts = { sent: 0, approved: 0, rejected: 0, returned: 0 };
 
-        const instrumentsMap = new Map<number, { type: string; status: string }>();
-
-        if (requestIds.length > 0) {
-            const instruments = await this.db
-                .select({
-                    requestId: paymentInstruments.requestId,
-                    instrumentType: paymentInstruments.instrumentType,
-                    status: paymentInstruments.status,
-                })
-                .from(paymentInstruments)
-                .where(
-                    and(
-                        inArray(paymentInstruments.requestId, requestIds),
-                        eq(paymentInstruments.isActive, true)
-                    )
-                );
-
-            for (const inst of instruments) {
-                if (!instrumentsMap.has(inst.requestId)) {
-                    instrumentsMap.set(inst.requestId, {
-                        type: inst.instrumentType,
-                        status: inst.status,
-                    });
-                }
+        for (const req of requests) {
+            const tab = getDisplayTab(req.instrumentStatus);
+            if (tab !== 'pending') {
+                counts[tab]++;
             }
         }
 
-        return results.map((r): DashboardRow => {
-            const instrument = instrumentsMap.get(r.id);
-
-            // Derive dashboard status from instrument status
-            const dashboardStatus = this.deriveDisplayStatus(
-                r.status,
-                instrument?.status
-            );
-
-            return {
-                id: r.id,
-                type: 'request',
-                purpose: r.purpose as PaymentPurpose,
-                amountRequired: r.amountRequired,
-                status: dashboardStatus,
-                instrumentType: (instrument?.type as InstrumentType) || null,
-                instrumentStatus: instrument?.status || null,
-                createdAt: r.createdAt,
-                tenderId: r.tenderId,
-                tenderNo: r.tenderNo || '',
-                tenderName: r.tenderName || '',
-                dueDate: r.dueDate,
-                teamMemberId: r.teamMemberId,
-                teamMemberName: r.teamMemberName,
-                requestedBy: r.requestedBy,
-            };
-        });
+        return counts;
     }
 
     /**
-     * Derive display status for dashboard from instrument status
+     * Get pending tenders (1 row per tender)
      */
-    private deriveDisplayStatus(
-        requestStatus: string | null,
-        instrumentStatus: string | null | undefined
-    ): string {
-        if (!instrumentStatus) {
-            return requestStatus || 'Pending';
+    private async getPendingTenders(
+        userId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts
+    ): Promise<PendingTabResponse> {
+        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build order clause
+        let orderClause: any = asc(tenderInfos.dueDate);
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMemberName':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = asc(tenderInfos.dueDate);
+            }
         }
 
-        // Map detailed instrument status to dashboard display status
-        const status = instrumentStatus.toUpperCase();
+        // Get total count
+        const totalCount = counts?.pending ?? await this.countPendingTenders(userId);
 
-        if (status.includes('REJECTED')) return 'Rejected';
-        if (status.includes('RETURNED') || status.includes('RECEIVED')) return 'Returned';
-        if (status.includes('APPROVED') || status.includes('ACCEPTED')) return 'Approved';
-        if (status.includes('COMPLETED') || status.includes('CONFIRMED')) return 'Approved';
-        if (status.includes('SUBMITTED') || status.includes('INITIATED') || status.includes('REQUESTED')) return 'Sent';
-        if (status.includes('PENDING')) return 'Pending';
-
-        return requestStatus || 'Pending';
-    }
-
-    /**
-     * Get tenders that need payment requests but don't have them
-     */
-    private async getMissingPaymentRequests(
-        userId?: number
-    ): Promise<DashboardRow[]> {
-        const userCondition = userId
-            ? eq(tenderInfos.teamMember, userId)
-            : undefined;
-
-        const tenders = await this.db
+        // Get paginated data
+        const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -405,122 +411,211 @@ export class EmdsService {
                 teamMemberId: tenderInfos.teamMember,
                 teamMemberName: users.name,
                 emd: tenderInfos.emd,
-                tenderFees: tenderInfos.tenderFees,
+                emdMode: tenderInfos.emdMode,
+                tenderFee: tenderInfos.tenderFees,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
                 processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
+                status: tenderInfos.status,
+                statusName: statuses.name,
+                gstValues: tenderInfos.gstValues,
             })
             .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(
-                tenderInformation,
-                eq(tenderInformation.tenderId, tenderInfos.id)
-            )
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    or(
+                        gt(tenderInfos.emd, sql`0`),
+                        gt(tenderInfos.tenderFees, sql`0`),
+                        gt(tenderInformation.processingFeeAmount, sql`0`)
+                    ),
+                    sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
                     userCondition
                 )
             )
-            .orderBy(asc(tenderInfos.dueDate));
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
 
-        if (tenders.length === 0) {
-            return [];
+        return {
+            data: rows as PendingTenderRow[],
+            counts: counts || await this.getDashboardCounts(userId),
+            meta: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages: Math.ceil(totalCount / limit),
+            },
+        };
+    }
+
+    /**
+     * Get payment requests by tab (1 row per request)
+     */
+    private async getPaymentRequestsByTab(
+        tab: DashboardTab,
+        userId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts
+    ): Promise<RequestTabResponse> {
+        const userCondition = userId
+            ? or(
+                eq(tenderInfos.teamMember, userId),
+                eq(paymentRequests.requestedBy, userId.toString())
+            )
+            : undefined;
+
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Build order clause
+        let orderClause: any = asc(tenderInfos.dueDate);
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMemberName':
+                    orderClause = direction(users.name);
+                    break;
+                case 'amountRequired':
+                    orderClause = direction(paymentRequests.amountRequired);
+                    break;
+                case 'purpose':
+                    orderClause = direction(paymentRequests.purpose);
+                    break;
+                default:
+                    orderClause = asc(tenderInfos.dueDate);
+            }
         }
 
-        const tenderIds = tenders.map((t) => t.tenderId);
+        // Build status filter based on tab
+        let statusFilter: any;
+        switch (tab) {
+            case 'approved':
+                statusFilter = inArray(paymentInstruments.status, APPROVED_STATUSES);
+                break;
+            case 'rejected':
+                statusFilter = sql`${paymentInstruments.status} LIKE '%_REJECTED'`;
+                break;
+            case 'returned':
+                statusFilter = inArray(paymentInstruments.status, RETURNED_STATUSES);
+                break;
+            case 'sent':
+            default:
+                // Sent = exists but not in approved/rejected/returned
+                statusFilter = and(
+                    sql`${paymentInstruments.status} NOT LIKE '%_REJECTED'`,
+                    notInArray(paymentInstruments.status, [...APPROVED_STATUSES, ...RETURNED_STATUSES])
+                );
+                break;
+        }
 
-        const existingRequests = await this.db
+        // Get total count for this tab
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(paymentRequests)
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(
+                paymentInstruments,
+                and(
+                    eq(paymentInstruments.requestId, paymentRequests.id),
+                    eq(paymentInstruments.isActive, true)
+                )
+            )
+            .where(
+                and(
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    statusFilter,
+                    userCondition
+                )
+            );
+
+        const totalCount = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
             .select({
+                id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
                 purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                dueDate: tenderInfos.dueDate,
+                teamMemberId: tenderInfos.teamMember,
+                teamMemberName: users.name,
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                instrumentStatus: paymentInstruments.status,
+                createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
-            .where(inArray(paymentRequests.tenderId, tenderIds));
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(
+                paymentInstruments,
+                and(
+                    eq(paymentInstruments.requestId, paymentRequests.id),
+                    eq(paymentInstruments.isActive, true)
+                )
+            )
+            .where(
+                and(
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    statusFilter,
+                    userCondition
+                )
+            )
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
 
-        const requestsByTender = new Map<number, Set<string>>();
-        for (const req of existingRequests) {
-            if (!requestsByTender.has(req.tenderId)) {
-                requestsByTender.set(req.tenderId, new Set());
-            }
-            requestsByTender.get(req.tenderId)!.add(req.purpose || '');
-        }
+        const data: PaymentRequestRow[] = rows.map((row) => ({
+            id: row.id,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo || '',
+            tenderName: row.tenderName || '',
+            purpose: row.purpose as PaymentPurpose,
+            amountRequired: row.amountRequired || '0',
+            dueDate: row.dueDate,
+            teamMemberId: row.teamMemberId,
+            teamMemberName: row.teamMemberName,
+            instrumentId: row.instrumentId,
+            instrumentType: row.instrumentType as InstrumentType | null,
+            instrumentStatus: row.instrumentStatus,
+            displayStatus: deriveDisplayStatus(row.instrumentStatus),
+            createdAt: row.createdAt,
+        }));
 
-        const missingPayments: DashboardRow[] = [];
-
-        for (const tender of tenders) {
-            const existingPurposes =
-                requestsByTender.get(tender.tenderId) || new Set();
-
-            // Check EMD
-            const emdAmount = Number(tender.emd) || 0;
-            if (emdAmount > 0 && !existingPurposes.has('EMD')) {
-                missingPayments.push({
-                    id: null,
-                    type: 'missing',
-                    purpose: 'EMD',
-                    amountRequired: emdAmount.toFixed(2),
-                    status: 'Not Created',
-                    instrumentType: null,
-                    instrumentStatus: null,
-                    createdAt: null,
-                    tenderId: tender.tenderId,
-                    tenderNo: tender.tenderNo || '',
-                    tenderName: tender.tenderName || '',
-                    dueDate: tender.dueDate,
-                    teamMemberId: tender.teamMemberId,
-                    teamMemberName: tender.teamMemberName,
-                    requestedBy: null,
-                });
-            }
-
-            // Check Tender Fee
-            const tenderFeeAmount = Number(tender.tenderFees) || 0;
-            if (tenderFeeAmount > 0 && !existingPurposes.has('Tender Fee')) {
-                missingPayments.push({
-                    id: null,
-                    type: 'missing',
-                    purpose: 'Tender Fee',
-                    amountRequired: tenderFeeAmount.toFixed(2),
-                    status: 'Not Created',
-                    instrumentType: null,
-                    instrumentStatus: null,
-                    createdAt: null,
-                    tenderId: tender.tenderId,
-                    tenderNo: tender.tenderNo || '',
-                    tenderName: tender.tenderName || '',
-                    dueDate: tender.dueDate,
-                    teamMemberId: tender.teamMemberId,
-                    teamMemberName: tender.teamMemberName,
-                    requestedBy: null,
-                });
-            }
-
-            // Check Processing Fee
-            const processingFeeAmount = Number(tender.processingFee) || 0;
-            if (processingFeeAmount > 0 && !existingPurposes.has('Processing Fee')) {
-                missingPayments.push({
-                    id: null,
-                    type: 'missing',
-                    purpose: 'Processing Fee',
-                    amountRequired: processingFeeAmount.toFixed(2),
-                    status: 'Not Created',
-                    instrumentType: null,
-                    instrumentStatus: null,
-                    createdAt: null,
-                    tenderId: tender.tenderId,
-                    tenderNo: tender.tenderNo || '',
-                    tenderName: tender.tenderName || '',
-                    dueDate: tender.dueDate,
-                    teamMemberId: tender.teamMemberId,
-                    teamMemberName: tender.teamMemberName,
-                    requestedBy: null,
-                });
-            }
-        }
-
-        return missingPayments;
+        return {
+            data,
+            counts: counts || await this.getDashboardCounts(userId),
+            meta: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages: Math.ceil(totalCount / limit),
+            },
+        };
     }
 
     async create(
@@ -727,9 +822,9 @@ export class EmdsService {
                 : null;
             instrumentData.courierAddress = details.bgCourierAddress;
             instrumentData.courierDeadline = details.bgCourierDays || null;
-        } else if (mode === 'BANK_TRANSFER' && details.btAccountName) {
+        } else if ((mode === 'BANK_TRANSFER' || mode === 'BT') && details.btAccountName) {
             // Bank transfer specific fields are in detail table
-        } else if (mode === 'PORTAL' && details.portalName) {
+        } else if ((mode === 'PORTAL' || mode === 'POP') && details.portalName) {
             // Portal specific fields are in detail table
         }
 
@@ -807,14 +902,14 @@ export class EmdsService {
                 bgClientCp: details.bgClientCpEmail,
                 bgClientFin: details.bgClientFinanceEmail,
             });
-        } else if (mode === 'BANK_TRANSFER') {
+        } else if (mode === 'BANK_TRANSFER' || mode === 'BT') {
             await tx.insert(instrumentTransferDetails).values({
                 instrumentId,
                 accountName: details.btAccountName,
                 accountNumber: details.btAccountNo,
                 ifsc: details.btIfsc,
             });
-        } else if (mode === 'PORTAL') {
+        } else if (mode === 'PORTAL' || mode === 'POP') {
             await tx.insert(instrumentTransferDetails).values({
                 instrumentId,
                 portalName: details.portalName,
@@ -1156,7 +1251,7 @@ export class EmdsService {
                     bgPurpose: details.bgPurpose,
                 })
                 .where(eq(instrumentBgDetails.instrumentId, instrumentId));
-        } else if (mode === 'BANK_TRANSFER') {
+        } else if (mode === 'BANK_TRANSFER' || mode === 'BT') {
             await this.db
                 .update(instrumentTransferDetails)
                 .set({
@@ -1165,7 +1260,7 @@ export class EmdsService {
                     ifsc: details.btIfsc,
                 })
                 .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
-        } else if (mode === 'PORTAL') {
+        } else if (mode === 'PORTAL' || mode === 'POP') {
             await this.db
                 .update(instrumentTransferDetails)
                 .set({
@@ -1255,177 +1350,5 @@ export class EmdsService {
 
     async getInstrumentHistory(instrumentId: number) {
         return this.historyService.getInstrumentChain(instrumentId);
-    }
-
-    /**
-     * Get EMD Dashboard data - Updated implementation per requirements
-     * Type logic based on paymentRequests.status and existence
-     */
-    async getEmdData(
-        type?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-    ): Promise<DashboardResponse> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
-        const offset = (page - 1) * limit;
-
-        // Build base conditions - filter by emdRequired = 'Yes' or processingFeeRequired = 'Yes'
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            or(
-                eq(tenderInformation.emdRequired, 'Yes'),
-                eq(tenderInformation.processingFeeRequired, 'Yes')
-            ),
-        ];
-
-        // Add type-specific filters
-        if (type === 'pending') {
-            baseConditions.push(
-                or(
-                    eq(paymentRequests.status, 'Pending'),
-                    isNull(paymentRequests.id)
-                )
-            );
-        } else if (type === 'sent') {
-            baseConditions.push(eq(paymentRequests.status, 'Sent'));
-        } else if (type === 'approved') {
-            baseConditions.push(eq(paymentRequests.status, 'Approved'));
-        } else if (type === 'rejected') {
-            baseConditions.push(eq(paymentRequests.status, 'Rejected'));
-        } else if (type === 'returned') {
-            baseConditions.push(eq(paymentRequests.status, 'Returned'));
-        }
-
-        const whereClause = and(...baseConditions);
-
-        // Build orderBy clause
-        let orderByClause: any = asc(tenderInfos.dueDate); // Default
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
-                    break;
-                case 'amountRequired':
-                    orderByClause = sortOrder(paymentRequests.amountRequired);
-                    break;
-                default:
-                    orderByClause = asc(tenderInfos.dueDate);
-            }
-        }
-
-        // Get total count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(paymentRequests, eq(paymentRequests.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .where(whereClause);
-        const total = Number(countResult?.count || 0);
-
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                dueDate: tenderInfos.dueDate,
-                teamMemberName: users.name,
-                paymentRequestId: paymentRequests.id,
-                paymentRequestStatus: paymentRequests.status,
-                paymentRequestPurpose: paymentRequests.purpose,
-                paymentRequestAmount: paymentRequests.amountRequired,
-                emdAmount: tenderInformation.emdAmount,
-                processingFeeAmount: tenderInformation.processingFeeAmount,
-            })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(paymentRequests, eq(paymentRequests.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .where(whereClause)
-            .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
-
-        // Get instruments for payment requests
-        const requestIds = rows.filter((r) => r.paymentRequestId).map((r) => r.paymentRequestId!);
-        const instrumentsMap = new Map<number, { type: string; status: string }>();
-
-        if (requestIds.length > 0) {
-            const instruments = await this.db
-                .select({
-                    requestId: paymentInstruments.requestId,
-                    instrumentType: paymentInstruments.instrumentType,
-                    status: paymentInstruments.status,
-                })
-                .from(paymentInstruments)
-                .where(
-                    and(
-                        inArray(paymentInstruments.requestId, requestIds),
-                        eq(paymentInstruments.isActive, true)
-                    )
-                );
-
-            for (const inst of instruments) {
-                if (!instrumentsMap.has(inst.requestId)) {
-                    instrumentsMap.set(inst.requestId, {
-                        type: inst.instrumentType,
-                        status: inst.status,
-                    });
-                }
-            }
-        }
-
-        const data: DashboardRow[] = rows.map((row) => {
-            const instrument = row.paymentRequestId ? instrumentsMap.get(row.paymentRequestId) : undefined;
-            const amountRequired = row.paymentRequestAmount || row.emdAmount || row.processingFeeAmount || '0';
-            const dashboardStatus = row.paymentRequestId
-                ? this.deriveDisplayStatus(row.paymentRequestStatus || '', instrument?.status)
-                : 'Not Created';
-
-            return {
-                id: row.paymentRequestId || null,
-                type: row.paymentRequestId ? 'request' : 'missing',
-                purpose: (row.paymentRequestPurpose as PaymentPurpose) || 'EMD',
-                amountRequired,
-                status: dashboardStatus,
-                instrumentType: (instrument?.type as InstrumentType) || null,
-                instrumentStatus: instrument?.status || null,
-                createdAt: row.paymentRequestId ? new Date() : null,
-                tenderId: row.tenderId,
-                tenderNo: row.tenderNo,
-                tenderName: `${row.tenderName} - ${row.tenderNo}`,
-                dueDate: row.dueDate,
-                teamMemberId: null,
-                teamMemberName: row.teamMemberName,
-                requestedBy: null,
-            };
-        });
-
-        // Calculate counts
-        const counts = this.calculateCounts(data);
-
-        return {
-            data,
-            counts,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
     }
 }

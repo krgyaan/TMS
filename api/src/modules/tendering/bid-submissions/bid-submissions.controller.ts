@@ -43,9 +43,9 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.findAll(filters);
     }
 
-    @Get(':id')
-    findById(@Param('id', ParseIntPipe) id: number) {
-        return this.bidSubmissionsService.findById(id);
+    @Get('counts')
+    getDashboardCounts() {
+        return this.bidSubmissionsService.getDashboardCounts();
     }
 
     @Get('tender/:tenderId')
@@ -81,6 +81,11 @@ export class BidSubmissionsController {
             tmsImprovements: dto.tmsImprovements,
             submittedBy: user.sub,
         });
+    }
+
+    @Get(':id')
+    findById(@Param('id', ParseIntPipe) id: number) {
+        return this.bidSubmissionsService.findById(id);
     }
 
     @Patch(':id')

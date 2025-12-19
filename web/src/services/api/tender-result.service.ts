@@ -1,6 +1,6 @@
 import type { ResultDashboardFilters } from '@/hooks/api/useTenderResults';
 import { BaseApiService } from './base.service';
-import type { PaginatedResult, ResultDashboardRow, TenderResult, UploadResultDto } from '@/types/api.types';
+import type { PaginatedResult, ResultDashboardCounts, ResultDashboardRow, TenderResult, UploadResultDto } from '@/types/api.types';
 
 class TenderResultService extends BaseApiService {
     constructor() {
@@ -46,6 +46,11 @@ class TenderResultService extends BaseApiService {
 
     async uploadResult(id: number, data: UploadResultDto): Promise<TenderResult> {
         return this.patch<TenderResult>(`/${id}/upload-result`, data);
+    }
+
+    async getCounts(): Promise<ResultDashboardCounts> {
+        console.log('getCounts');
+        return this.get<ResultDashboardCounts>('/counts');
     }
 }
 

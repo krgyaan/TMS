@@ -1,97 +1,68 @@
-import axiosInstance from '@/lib/axios';
-import type { TenderCostingSheet, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    TenderCostingSheet,
+    PaginatedResult,
+    CostingApprovalDashboardCounts,
+    CostingApprovalListParams,
+    CostingApprovalDashboardRow,
+    ApproveCostingDto,
+    RejectCostingDto,
+} from '@/types/api.types';
 
-export type CostingApprovalDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMember: number | null;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    dueDate: Date | null;
-    emdAmount: string | null;
-    gstValues: number;
-    costingStatus: 'Pending' | 'Approved' | 'Rejected/Redo';
-    submittedFinalPrice: string | null;
-    submittedBudgetPrice: string | null;
-    googleSheetUrl: string | null;
-    costingSheetId: number | null;
-};
 
-export type ApproveCostingDto = {
-    finalPrice: string;
-    receiptPrice: string;
-    budgetPrice: string;
-    grossMargin: string;
-    oemVendorIds: number[];
-    tlRemarks: string;
-};
+class CostingApprovalsService extends BaseApiService {
+    constructor() {
+        super('/costing-approvals');
+    }
 
-export type RejectCostingDto = {
-    rejectionReason: string;
-};
+    async getAll(
+        params?: CostingApprovalListParams
+    ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
+        const search = new URLSearchParams();
 
-export type CostingApprovalListParams = {
-    costingStatus?: 'Pending' | 'Approved' | 'Rejected/Redo';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
-
-export const costingApprovalsService = {
-    getAll: async (params?: CostingApprovalListParams): Promise<PaginatedResult<CostingApprovalDashboardRow>> => {
-        const searchParams = new URLSearchParams();
-
-        if (params?.costingStatus) {
-            searchParams.set('costingStatus', params.costingStatus);
-        }
-        if (params?.page) {
-            searchParams.set('page', String(params.page));
-        }
-        if (params?.limit) {
-            searchParams.set('limit', String(params.limit));
-        }
-        if (params?.sortBy) {
-            searchParams.set('sortBy', params.sortBy);
-        }
-        if (params?.sortOrder) {
-            searchParams.set('sortOrder', params.sortOrder);
+        if (params) {
+            if (params.costingStatus) {
+                search.set('costingStatus', params.costingStatus);
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
+            }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
 
-        const queryString = searchParams.toString();
-        const url = queryString ? `/costing-approvals?${queryString}` : '/costing-approvals';
-        const response = await axiosInstance.get<PaginatedResult<CostingApprovalDashboardRow>>(url);
-        return response.data;
-    },
-
-    getById: async (id: number): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.get<TenderCostingSheet>(`/costing-approvals/${id}`);
-        return response.data;
-    },
-
-    approve: async (id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.post<TenderCostingSheet>(
-            `/costing-approvals/${id}/approve`,
-            data
+        const queryString = search.toString();
+        return this.get<PaginatedResult<CostingApprovalDashboardRow>>(
+            queryString ? `?${queryString}` : ''
         );
-        return response.data;
-    },
+    }
 
-    reject: async (id: number, data: RejectCostingDto): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.post<TenderCostingSheet>(
-            `/costing-approvals/${id}/reject`,
-            data
-        );
-        return response.data;
-    },
+    async getById(id: number): Promise<TenderCostingSheet> {
+        return this.get<TenderCostingSheet>(`/${id}`);
+    }
 
-    updateApproved: async (id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> => {
-        const response = await axiosInstance.patch<TenderCostingSheet>(
-            `/costing-approvals/${id}`,
-            data
-        );
-        return response.data;
-    },
-};
+    async approve(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
+        return this.post<TenderCostingSheet>(`/${id}/approve`, data);
+    }
+
+    async reject(id: number, data: RejectCostingDto): Promise<TenderCostingSheet> {
+        return this.post<TenderCostingSheet>(`/${id}/reject`, data);
+    }
+
+    async updateApproved(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
+        return this.patch<TenderCostingSheet>(`/${id}`, data);
+    }
+
+    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
+        return this.get<CostingApprovalDashboardCounts>('/counts');
+    }
+}
+
+export const costingApprovalsService = new CostingApprovalsService();

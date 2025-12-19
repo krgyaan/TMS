@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
-import type { PaginatedResult, TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow } from '@/types/api.types';
 
 export const documentChecklistKeys = {
     all: ['documentChecklists'] as const,
@@ -9,6 +9,7 @@ export const documentChecklistKeys = {
     detail: (id: number) => [...documentChecklistKeys.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...documentChecklistKeys.all, 'byTender', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...documentChecklistKeys.lists(), { filters }] as const,
+    dashboardCounts: () => [...documentChecklistKeys.all, 'dashboardCounts'] as const,
 };
 
 export const useDocumentChecklists = (
@@ -77,5 +78,14 @@ export const useUpdateDocumentChecklist = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to update document checklist');
         },
+    });
+};
+
+
+export const useChecklistDashboardCounts = () => {
+    return useQuery<DocumentChecklistsDashboardCounts>({
+        queryKey: documentChecklistKeys.dashboardCounts(),
+        queryFn: () => documentChecklistService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };

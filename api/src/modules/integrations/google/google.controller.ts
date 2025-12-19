@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { RequirePermissions } from '@/modules/auth/decorators/permissions.decorator';
+import { DRIVE_SCOPES } from '@/config/google.config';
 
 const AuthUrlQuerySchema = z.object({
     userId: z.coerce.number().int().positive(),
@@ -70,6 +71,45 @@ export class GoogleController {
         const { userId } = ConnectionsQuerySchema.parse(query);
         const connections = await this.googleService.listConnections(userId);
         return { connections };
+    }
+
+    @Get('drive-auth-url')
+    @UseGuards(JwtAuthGuard)
+    async getDriveAuthUrl(@CurrentUser() user: ValidatedUser) {
+        // Check if user already has drive scopes
+        const scopeCheck = await this.googleService.checkUserScopes(
+            user.sub,
+            DRIVE_SCOPES,
+        );
+
+        if (scopeCheck.hasAllScopes) {
+            return {
+                hasScopes: true,
+                message: 'User already has Drive permissions',
+            };
+        }
+
+        const { url } = this.googleService.createDriveScopeAuthUrl(user.sub);
+        return {
+            hasScopes: false,
+            url,
+            missingScopes: scopeCheck.missingScopes,
+        };
+    }
+
+    @Get('check-drive-scopes')
+    @UseGuards(JwtAuthGuard)
+    async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
+        const scopeCheck = await this.googleService.checkUserScopes(
+            user.sub,
+            DRIVE_SCOPES,
+        );
+
+        return {
+            hasScopes: scopeCheck.hasAllScopes,
+            grantedScopes: scopeCheck.grantedScopes,
+            missingScopes: scopeCheck.missingScopes,
+        };
     }
 
     @Delete('connections/:id')

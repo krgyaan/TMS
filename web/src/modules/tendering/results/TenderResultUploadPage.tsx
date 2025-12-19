@@ -102,6 +102,7 @@ export default function TenderResultUploadPage() {
                 tenderNo: tenderDetails.tenderNo,
                 tenderName: tenderDetails.tenderName,
             }}
+            isEditMode={false}
             onSuccess={() => navigate(paths.tendering.resultsShow(resultId))}
         />
     );

@@ -90,18 +90,24 @@ const emdSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("BG"), details: bgDetails }),
     z.object({ mode: z.literal("CHEQUE"), details: ddDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+    z.object({ mode: z.literal("POP"), details: portalDetails }),
 ]).optional();
 
 const tenderFeeSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+    z.object({ mode: z.literal("POP"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
 ]).optional();
 
 const processingFeeSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+    z.object({ mode: z.literal("POP"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
 ]).optional();
 
@@ -210,8 +216,54 @@ export interface DashboardCounts {
     total: number;
 }
 
-export interface DashboardResponse {
-    data: DashboardRow[];
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: PaymentPurpose;
+    amountRequired: string;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    instrumentId: number | null;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    displayStatus: string;
+    createdAt: Date | null;
+}
+
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    approved: number;
+    rejected: number;
+    returned: number;
+    total: number;
+}
+
+export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
     counts: DashboardCounts;
     meta?: {
         total: number;
@@ -220,3 +272,16 @@ export interface DashboardResponse {
         totalPages: number;
     };
 }
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type DashboardResponse = PendingTabResponse | RequestTabResponse;

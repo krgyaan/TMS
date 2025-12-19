@@ -11,15 +11,14 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { Form } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { SelectField } from '@/components/form/SelectField'
-import type { SelectOption } from '@/components/form/SelectField'
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations'
 import { useCreateVendor, useUpdateVendor } from '@/hooks/api/useVendors'
 import type { Vendor } from '@/types/api.types'
+import FieldWrapper from '@/components/form/FieldWrapper'
 
 const VendorFormSchema = z.object({
     organizationId: z.string().optional(),
@@ -43,14 +42,6 @@ export const VendorDrawer = ({ open, onOpenChange, vendor, onSuccess }: VendorDr
     const createVendor = useCreateVendor()
     const updateVendor = useUpdateVendor()
     const isEdit = !!vendor
-
-    const organizationOptions = useMemo<SelectOption[]>(
-        () =>
-            organizations
-                .filter((org) => org.status)
-                .map((org) => ({ id: String(org.id), name: org.name })),
-        [organizations],
-    )
 
     const form = useForm<VendorFormValues>({
         resolver: zodResolver(VendorFormSchema) as any,
@@ -118,79 +109,21 @@ export const VendorDrawer = ({ open, onOpenChange, vendor, onSuccess }: VendorDr
                 </SheetHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 mt-6 px-1">
-                        <SelectField
-                            control={form.control}
-                            name="organizationId"
-                            label="Organization (optional)"
-                            options={organizationOptions}
-                            placeholder="Select organization"
-                        />
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Vendor Name *</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Enter vendor name" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email (optional)</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="email"
-                                            placeholder="Enter email address"
-                                            {...field}
-                                            value={field.value ?? ''}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="address"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Address (optional)</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            placeholder="Enter address"
-                                            {...field}
-                                            value={field.value ?? ''}
-                                            rows={3}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Active</FormLabel>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
+                        <FieldWrapper control={form.control} name="organizationId" label="Organization">
+                            {(field) => <Input placeholder="Organization" {...field} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="name" label="Vendor Name">
+                            {(field) => <Input placeholder="Enter vendor name" {...field} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="email" label="Email (optional)">
+                            {(field) => <Input type="email" placeholder="Enter email address" {...field as any} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="address" label="Address (optional)">
+                            {(field) => <Textarea placeholder="Enter address" {...field as any} rows={3} />}
+                        </FieldWrapper>
+                        <FieldWrapper control={form.control} name="status" label="Active">
+                            {(field) => <Checkbox checked={field.value} onCheckedChange={field.onChange} />}
+                        </FieldWrapper>
                         <SheetFooter className="mt-8 pt-4 border-t">
                             <Button
                                 type="button"

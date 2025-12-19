@@ -1,22 +1,37 @@
-// pages/CostingSheets.tsx
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
-import { useCostingSheets, type CostingSheetDashboardRow } from '@/hooks/api/useCostingSheets';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef } from "ag-grid-community";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
+import type { CostingSheetDashboardRow } from "@/types/api.types";
+import { tenderNameCol } from "@/components/data-grid/columns";
+import {
+    useCostingSheets,
+    useCostingSheetsCounts,
+    useCheckDriveScopes,
+    useCreateCostingSheet,
+    useCreateCostingSheetWithName,
+} from "@/hooks/api/useCostingSheets";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 type TabKey = 'pending' | 'submitted' | 'rejected';
 
@@ -25,6 +40,19 @@ const CostingSheets = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
+
+    const [connectDriveOpen, setConnectDriveOpen] = useState(false);
+    const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+    const [duplicateInfo, setDuplicateInfo] = useState<{
+        tenderId: number;
+        existingUrl?: string;
+        suggestedName?: string;
+    } | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
+
+    const { data: driveScopes, refetch: refetchScopes } = useCheckDriveScopes();
+    const createSheetMutation = useCreateCostingSheet();
+    const createSheetWithNameMutation = useCreateCostingSheetWithName();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -47,17 +75,80 @@ const CostingSheets = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = useCostingSheetsCounts();
+
     const costingSheetsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
+    const handleCreateCosting = useCallback(async (row: CostingSheetDashboardRow) => {
+        // Check if user has Drive scopes
+        if (!driveScopes?.hasScopes) {
+            setConnectDriveOpen(true);
+            return;
+        }
+
+        setIsCreating(true);
+
+        try {
+            const result = await createSheetMutation.mutateAsync(row.tenderId);
+
+            if (result.success && result.sheetUrl) {
+                // Open the sheet in a new tab
+                window.open(result.sheetUrl, '_blank');
+            } else if (result.isDuplicate) {
+                // Show duplicate dialog
+                setDuplicateInfo({
+                    tenderId: row.tenderId,
+                    existingUrl: result.existingSheetUrl,
+                    suggestedName: result.suggestedName,
+                });
+                setDuplicateDialogOpen(true);
+            } else if (result.message) {
+                toast.error(result.message);
+            }
+        } catch (error) {
+            // Error handled by mutation
+        } finally {
+            setIsCreating(false);
+        }
+    }, [driveScopes, createSheetMutation]);
+
+    const handleCreateWithSuggestedName = useCallback(async () => {
+        if (!duplicateInfo?.suggestedName) return;
+
+        setIsCreating(true);
+        setDuplicateDialogOpen(false);
+
+        try {
+            const result = await createSheetWithNameMutation.mutateAsync({
+                tenderId: duplicateInfo.tenderId,
+                customName: duplicateInfo.suggestedName,
+            });
+
+            if (result.success && result.sheetUrl) {
+                window.open(result.sheetUrl, '_blank');
+            }
+        } catch (error) {
+            // Error handled by mutation
+        } finally {
+            setIsCreating(false);
+            setDuplicateInfo(null);
+        }
+    }, [duplicateInfo, createSheetWithNameMutation]);
+
+    const handleConnectDrive = useCallback(() => {
+        // Redirect to Google OAuth with Drive scopes
+        const authUrl = `${import.meta.env.VITE_API_URL}/integrations/google/drive-auth-url`;
+        window.location.href = authUrl;
+    }, []);
+
     const costingSheetActions: ActionItem<CostingSheetDashboardRow>[] = useMemo(() => [
         {
-            label: 'Create Costing Sheet',
-            onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.costingSheetSubmit(row.tenderId));
-            },
+            label: 'Create Costing',
+            onClick: handleCreateCosting,
             icon: <Plus className="h-4 w-4" />,
-            visible: (row) => row.googleSheetUrl ? false : true,
+            visible: (row) => !row.googleSheetUrl,
+            disabled: isCreating,
         },
         {
             label: 'Submit Costing',
@@ -84,33 +175,33 @@ const CostingSheets = () => {
             visible: (row) => row.costingStatus === 'Rejected/Redo',
         },
         {
-            label: 'View Tender',
+            label: 'View Costing',
             onClick: (row: CostingSheetDashboardRow) => {
-                navigate(paths.tendering.tenderView(row.tenderId));
+                navigate(paths.tendering.costingSheetView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
-    ], [navigate]);
+    ], [navigate, handleCreateCosting, isCreating]);
 
     const tabsConfig = useMemo(() => {
         return [
             {
                 key: 'pending' as TabKey,
                 name: 'Pending',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending || 0,
             },
             {
                 key: 'submitted' as TabKey,
                 name: 'Submitted',
-                count: activeTab === 'submitted' ? totalRows : 0,
+                count: counts?.submitted || 0,
             },
             {
                 key: 'rejected' as TabKey,
                 name: 'Rejected/Redo',
-                count: activeTab === 'rejected' ? totalRows : 0,
+                count: counts?.rejected || 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingSheetDashboardRow>[]>(() => [
         tenderNameCol<CostingSheetDashboardRow>('tenderNo', {
@@ -236,7 +327,7 @@ const CostingSheets = () => {
             cellRenderer: createActionColumnRenderer(costingSheetActions),
             sortable: false,
             pinned: 'right',
-            width: 50,
+            width: 80,
         },
     ], [costingSheetActions]);
 
@@ -301,9 +392,11 @@ const CostingSheets = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>
@@ -353,6 +446,88 @@ const CostingSheets = () => {
                     ))}
                 </Tabs>
             </CardContent>
+
+            {/* Connect Drive Dialog */}
+            <Dialog open={connectDriveOpen} onOpenChange={setConnectDriveOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Connect Google Drive</DialogTitle>
+                        <DialogDescription>
+                            To create costing sheets, you need to grant access to Google Drive and Sheets.
+                            This is a one-time authorization.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Required permissions:
+                        </p>
+                        <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                            <li>Create and edit files in Google Drive</li>
+                            <li>Create and edit Google Sheets</li>
+                        </ul>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConnectDriveOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleConnectDrive}>
+                            Connect Google Drive
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Duplicate Sheet Dialog */}
+            <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Duplicate Sheet Name</DialogTitle>
+                        <DialogDescription>
+                            A costing sheet with this name already exists in the folder.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        {duplicateInfo?.existingUrl && (
+                            <div>
+                                <p className="text-sm font-medium">Existing sheet:</p>
+                                <a
+                                    href={duplicateInfo.existingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-primary hover:underline flex items-center gap-1"
+                                >
+                                    View existing sheet
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            </div>
+                        )}
+                        {duplicateInfo?.suggestedName && (
+                            <div>
+                                <p className="text-sm font-medium">Suggested name:</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {duplicateInfo.suggestedName}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDuplicateDialogOpen(false);
+                                setDuplicateInfo(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        {duplicateInfo?.suggestedName && (
+                            <Button onClick={handleCreateWithSuggestedName} disabled={isCreating}>
+                                {isCreating ? 'Creating...' : `Create as "${duplicateInfo.suggestedName}"`}
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };

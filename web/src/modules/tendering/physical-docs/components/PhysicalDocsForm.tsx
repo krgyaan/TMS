@@ -1,108 +1,101 @@
-import { z } from 'zod';
+import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
+import { type SubmitHandler, useForm, useFieldArray, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone } from 'lucide-react';
+import { MultiSelectField } from '@/components/form/MultiSelectField';
+import { SelectField } from '@/components/form/SelectField';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, Users } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
-import type { PhysicalDocs } from '@/types/api.types';
-import { MultiSelectField } from '@/components/form/MultiSelectField';
-import SelectField from '@/components/form/SelectField';
-import { useEffect } from 'react';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 
-const PhysicalDocsFormSchema = z.object({
-    tenderId: z.number().min(1, 'Tender ID is required'),
-    courierNo: z.number().min(1, 'Courier number is required'),
-    submittedDocs: z.array(z.string()).min(1, 'At least one document must be selected'),
-    physicalDocsPersons: z.array(z.object({
-        name: z.string().min(1, 'Name is required'),
-        email: z.string().email('Invalid email address'),
-        phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-    })).min(1, 'At least one person must be added'),
-});
-
-type FormValues = z.infer<typeof PhysicalDocsFormSchema>;
+// Import from helpers
+import { PhysicalDocsFormSchema } from '../helpers/physicalDocs.schema';
+import type { PhysicalDocsFormValues, PhysicalDocsResponse } from '../helpers/physicalDocs.types';
+import { courierOptions, submittedDocsOptions } from '../helpers/physicalDocs.types';
+import {
+    buildDefaultValues,
+    mapResponseToForm,
+    mapFormToCreatePayload,
+    mapFormToUpdatePayload
+} from '../helpers/physicalDocs.mappers';
 
 interface PhysicalDocsFormProps {
     tenderId: number;
     mode: 'create' | 'edit';
-    existingData?: PhysicalDocs;
+    existingData?: PhysicalDocsResponse;
 }
 
-const submittedDocsOptions = [
-    { value: 'technicalBid', label: 'Technical Bid' },
-    { value: 'financialBid', label: 'Financial Bid' },
-    { value: 'emd', label: 'EMD' },
-    { value: 'other', label: 'Other' },
-];
+const FormLoadingSkeleton = () => (
+    <Card>
+        <CardHeader>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48 mt-2" />
+        </CardHeader>
+        <CardContent>
+            <Skeleton className="h-[400px] w-full" />
+        </CardContent>
+    </Card>
+);
 
-const courierOptions = [
-    { value: '1', label: '1' },
-    { value: '2', label: '2' },
-    { value: '3', label: '3' },
-    { value: '4', label: '4' },
-    { value: '5', label: '5' },
-];
-
-export default function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsFormProps) {
+export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsFormProps) {
     const navigate = useNavigate();
+
+    // Fetch info sheet to pre-fill clients
+    const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId);
+
     const createMutation = useCreatePhysicalDoc();
     const updateMutation = useUpdatePhysicalDoc();
 
-    const form = useForm<FormValues>({
-        resolver: zodResolver(PhysicalDocsFormSchema),
-        defaultValues: {
-            tenderId: tenderId,
-            courierNo: undefined!,
-            submittedDocs: [],
-            physicalDocsPersons: [],
-        },
+    // Compute initial values
+    const initialValues = useMemo(() => {
+        if (mode === 'edit' && existingData) {
+            return mapResponseToForm(tenderId, existingData, infoSheet);
+        }
+        return buildDefaultValues(tenderId, infoSheet);
+    }, [tenderId, mode, existingData, infoSheet]);
+
+    const form = useForm<PhysicalDocsFormValues>({
+        resolver: zodResolver(PhysicalDocsFormSchema) as Resolver<PhysicalDocsFormValues>,
+        defaultValues: initialValues,
     });
 
+    // Reset form when initial values change (after info sheet loads)
     useEffect(() => {
-        if (existingData) {
-            form.reset({
-                tenderId: tenderId,
-                courierNo: existingData.courierNo || undefined!,
-                submittedDocs: existingData.submittedDocs?.split(',') || [],
-                physicalDocsPersons: existingData.persons?.map((person) => ({
-                    name: person.name,
-                    email: person.email,
-                    phone: person.phone,
-                })) || [],
-            });
-        }
-    }, [existingData, form, tenderId]);
+        form.reset(initialValues);
+    }, [form, initialValues]);
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
         name: 'physicalDocsPersons',
     });
 
-    const isSubmitting = form.formState.isSubmitting;
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-    const onSubmit: SubmitHandler<FormValues> = async (data) => {
+    // Check if clients were pre-filled from info sheet
+    const hasPrefilledClients = useMemo(() => {
+        return infoSheet?.clients && infoSheet.clients.length > 0;
+    }, [infoSheet]);
+
+    const handleAddPerson = () => {
+        append({ name: '', email: '', phone: '' });
+    };
+
+    const handleSubmit: SubmitHandler<PhysicalDocsFormValues> = async (values) => {
         try {
             if (mode === 'create') {
-                await createMutation.mutateAsync({
-                    tenderId: data.tenderId,
-                    courierNo: data.courierNo,
-                    submittedDocs: data.submittedDocs.join(','),
-                    physicalDocsPersons: data.physicalDocsPersons,
-                });
+                const payload = mapFormToCreatePayload(values);
+                await createMutation.mutateAsync(payload);
             } else if (existingData?.id) {
-                await updateMutation.mutateAsync({
-                    id: existingData.id,
-                    courierNo: data.courierNo,
-                    submittedDocs: data.submittedDocs.join(','),
-                    physicalDocsPersons: data.physicalDocsPersons,
-                });
+                const payload = mapFormToUpdatePayload(existingData.id, values);
+                await updateMutation.mutateAsync(payload);
             }
             navigate(paths.tendering.physicalDocs);
         } catch (error) {
@@ -110,14 +103,23 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
         }
     };
 
+    // Show loading while fetching info sheet (for pre-filling clients)
+    if (mode === 'create' && isInfoSheetLoading) {
+        return <FormLoadingSkeleton />;
+    }
+
     return (
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>{mode === 'create' ? 'Submit' : 'Edit'} Physical Documents</CardTitle>
+                        <CardTitle>
+                            {mode === 'create' ? 'Submit' : 'Edit'} Physical Documents
+                        </CardTitle>
                         <CardDescription className="mt-2">
-                            {mode === 'create' ? 'Submit physical documents for this tender' : 'Update physical document information'}
+                            {mode === 'create'
+                                ? 'Submit physical documents for this tender'
+                                : 'Update physical document information'}
                         </CardDescription>
                     </div>
                     <CardAction>
@@ -129,14 +131,13 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         {/* Courier Information */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Courier Information
                             </h4>
-
-                            <div className='grid gap-4 md:grid-cols-2'>
+                            <div className="grid gap-4 md:grid-cols-2">
                                 <SelectField
                                     control={form.control}
                                     name="courierNo"
@@ -164,7 +165,7 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => append({ name: '', email: '', phone: '' })}
+                                    onClick={handleAddPerson}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Add Person
@@ -182,20 +183,21 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
 
                             <div className="space-y-4">
                                 {fields.map((field, index) => (
-                                    <div key={field.id} className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                                    <div
+                                        key={field.id}
+                                        className="border rounded-lg p-4 space-y-4 bg-muted/30"
+                                    >
                                         <div className="flex items-center justify-between">
                                             <h5 className="font-medium text-sm">Person {index + 1}</h5>
-                                            {fields.length > 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => remove(index)}
-                                                    className="text-destructive hover:text-destructive"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => remove(index)}
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -204,11 +206,11 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
                                                 name={`physicalDocsPersons.${index}.name`}
                                                 label="Full Name"
                                             >
-                                                {(field) => (
+                                                {(fieldProps) => (
                                                     <div className="relative">
                                                         <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                                         <Input
-                                                            {...field}
+                                                            {...fieldProps}
                                                             className="pl-10"
                                                             placeholder="Enter full name"
                                                         />
@@ -221,11 +223,11 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
                                                 name={`physicalDocsPersons.${index}.email`}
                                                 label="Email Address"
                                             >
-                                                {(field) => (
+                                                {(fieldProps) => (
                                                     <div className="relative">
                                                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                                         <Input
-                                                            {...field}
+                                                            {...fieldProps}
                                                             type="email"
                                                             className="pl-10"
                                                             placeholder="email@example.com"
@@ -239,11 +241,11 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
                                                 name={`physicalDocsPersons.${index}.phone`}
                                                 label="Phone Number"
                                             >
-                                                {(field) => (
+                                                {(fieldProps) => (
                                                     <div className="relative">
                                                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                                         <Input
-                                                            {...field}
+                                                            {...fieldProps}
                                                             className="pl-10"
                                                             placeholder="Enter phone number"
                                                         />
@@ -269,7 +271,7 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
                             <Button
                                 type="button"
                                 variant="ghost"
-                                onClick={() => form.reset()}
+                                onClick={() => form.reset(initialValues)}
                                 disabled={isSubmitting}
                             >
                                 Reset
@@ -289,3 +291,5 @@ export default function PhysicalDocsForm({ tenderId, mode, existingData }: Physi
         </Card>
     );
 }
+
+export default PhysicalDocsForm;

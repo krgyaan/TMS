@@ -79,3 +79,9 @@ export class UpdateTqReceivedDto {
     @Type(() => TqItemDto)
     tqItems: TqItemDto[];
 }
+
+export class TqQualifiedDto {
+    @IsBoolean()
+    @IsOptional()
+    qualified: boolean = true;
+}

@@ -13,7 +13,7 @@ import { AlertCircle, Send, XCircle, Eye, Edit, FileX2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useBidSubmissions, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
+import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'pending' | 'submitted' | 'missed';
@@ -44,6 +44,8 @@ const BidSubmissionListPage = () => {
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
+
+    const { data: counts } = useBidSubmissionsDashboardCounts();
 
     const bidSubmissionsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -100,7 +102,6 @@ const BidSubmissionListPage = () => {
                 navigate(paths.tendering.bidView(row.bidSubmissionId!));
             },
             icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.bidSubmissionId !== null,
         },
     ], [navigate]);
 
@@ -109,20 +110,20 @@ const BidSubmissionListPage = () => {
             {
                 key: 'pending' as TabKey,
                 name: 'Pending',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'submitted' as TabKey,
                 name: 'Bid Submitted',
-                count: activeTab === 'submitted' ? totalRows : 0,
+                count: counts?.submitted ?? 0,
             },
             {
                 key: 'missed' as TabKey,
                 name: 'Tender Missed',
-                count: activeTab === 'missed' ? totalRows : 0,
+                count: counts?.missed ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<BidSubmissionDashboardRow>[]>(() => [
         tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
@@ -228,7 +229,7 @@ const BidSubmissionListPage = () => {
             cellRenderer: createActionColumnRenderer(bidSubmissionActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [bidSubmissionActions]);
 
@@ -293,9 +294,11 @@ const BidSubmissionListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>

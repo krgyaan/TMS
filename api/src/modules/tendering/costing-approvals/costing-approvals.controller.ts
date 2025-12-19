@@ -27,7 +27,7 @@ export class CostingApprovalsController {
     @Get()
     async findAll(
         @CurrentUser() user: ValidatedUser,
-        @Query('costingStatus') costingStatus?: 'Pending' | 'Approved' | 'Rejected/Redo',
+        @Query('costingStatus') costingStatus?: 'Submitted' | 'Approved' | 'Rejected/Redo',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -49,6 +49,11 @@ export class CostingApprovalsController {
         };
 
         return this.costingApprovalsService.findAllForApproval((user as any).team, filters);
+    }
+
+    @Get('counts')
+    async getCounts() {
+        return this.costingApprovalsService.getDashboardCounts();
     }
 
     @Get(':id')

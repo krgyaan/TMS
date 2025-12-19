@@ -120,105 +120,100 @@ export class TenderInfoSheetsService {
         await this.db.transaction(async (tx) => {
             // Insert main info sheet
             const [infoSheet] = await tx
-            .insert(tenderInformation)
-            .values({
-                tenderId,
-                teRecommendation: payload.teRecommendation,
-                teRejectionReason: payload.teRejectionReason ?? null,
-                teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                processingFeeRequired: payload.processingFeeRequired ?? null,
-                processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                processingFeeMode: payload.processingFeeModes ?? null,
-                tenderFeeRequired: payload.tenderFeeRequired ?? null,
-                tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                tenderFeeMode: payload.tenderFeeModes ?? null,
-                emdRequired: payload.emdRequired ?? null,
-                emdAmount: payload.emdAmount?.toString() ?? null,
-                emdMode: payload.emdModes ?? null,
-                reverseAuctionApplicable: payload.reverseAuctionApplicable ?? null,
-                paymentTermsSupply: payload.paymentTermsSupply ?? null,
-                paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-                bidValidityDays: payload.bidValidityDays ?? null,
-                commercialEvaluation: payload.commercialEvaluation ?? null,
-                mafRequired: payload.mafRequired ?? null,
-                deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                deliveryTimeInstallationInclusive:
-                    payload.deliveryTimeInstallationInclusive ?? false,
-                deliveryTimeInstallationDays:
-                    payload.deliveryTimeInstallationDays ?? null,
-                pbgRequired: payload.pbgRequired ?? null,
-                pbgMode: payload.pbgMode ?? null,
-                pbgPercentage: payload.pbgPercentage?.toString() ?? null,
-                pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                sdRequired: payload.sdRequired ?? null,
-                sdMode: payload.sdMode ?? null,
-                sdPercentage: payload.sdPercentage?.toString() ?? null,
-                sdDurationMonths: payload.sdDurationMonths ?? null,
-                ldRequired: payload.ldRequired ?? null,
-                ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
-                maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                physicalDocsRequired: payload.physicalDocsRequired ?? null,
-                physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
-                techEligibilityAge: payload.techEligibilityAge ?? null,
-                workOrderValue1Required: payload.workOrderValue1Required ?? null,
-                orderValue1: payload.orderValue1?.toString() ?? null,
-                wo1Custom: payload.wo1Custom ?? null,
-                workOrderValue2Required: payload.workOrderValue2Required ?? null,
-                orderValue2: payload.orderValue2?.toString() ?? null,
-                wo2Custom: payload.wo2Custom ?? null,
-                workOrderValue3Required: payload.workOrderValue3Required ?? null,
-                orderValue3: payload.orderValue3?.toString() ?? null,
-                wo3Custom: payload.wo3Custom ?? null,
-                avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                avgAnnualTurnoverValue:
-                    payload.avgAnnualTurnoverValue?.toString() ?? null,
-                workingCapitalType: payload.workingCapitalType ?? null,
-                workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
-                solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                solvencyCertificateValue:
-                    payload.solvencyCertificateValue?.toString() ?? null,
-                netWorthType: payload.netWorthType ?? null,
-                netWorthValue: payload.netWorthValue?.toString() ?? null,
-                courierAddress: payload.courierAddress ?? null,
-                teFinalRemark: payload.teFinalRemark ?? null,
-            })
-            .returning();
+                .insert(tenderInformation)
+                .values({
+                    tenderId,
+                    teRecommendation: payload.teRecommendation,
+                    teRejectionReason: payload.teRejectionReason ?? null,
+                    teRejectionRemarks: payload.teRejectionRemarks ?? null,
+                    processingFeeRequired: payload.processingFeeRequired ?? null,
+                    processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
+                    processingFeeMode: payload.processingFeeModes ?? null,
+                    tenderFeeRequired: payload.tenderFeeRequired ?? null,
+                    tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
+                    tenderFeeMode: payload.tenderFeeModes ?? null,
+                    emdRequired: payload.emdRequired ?? null,
+                    emdAmount: payload.emdAmount?.toString() ?? null,
+                    emdMode: payload.emdModes ?? null,
+                    reverseAuctionApplicable: payload.reverseAuctionApplicable ?? null,
+                    paymentTermsSupply: payload.paymentTermsSupply ?? null,
+                    paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
+                    bidValidityDays: payload.bidValidityDays ?? null,
+                    commercialEvaluation: payload.commercialEvaluation ?? null,
+                    mafRequired: payload.mafRequired ?? null,
+                    deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
+                    deliveryTimeInstallationInclusive:
+                        payload.deliveryTimeInstallationInclusive ?? false,
+                    deliveryTimeInstallationDays:
+                        payload.deliveryTimeInstallationDays ?? null,
+                    pbgRequired: payload.pbgRequired ?? null,
+                    pbgMode: payload.pbgMode ?? null,
+                    pbgPercentage: payload.pbgPercentage?.toString() ?? null,
+                    pbgDurationMonths: payload.pbgDurationMonths ?? null,
+                    sdRequired: payload.sdRequired ?? null,
+                    sdMode: payload.sdMode ?? null,
+                    sdPercentage: payload.sdPercentage?.toString() ?? null,
+                    sdDurationMonths: payload.sdDurationMonths ?? null,
+                    ldRequired: payload.ldRequired ?? null,
+                    ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
+                    maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
+                    physicalDocsRequired: payload.physicalDocsRequired ?? null,
+                    physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
+                    techEligibilityAge: payload.techEligibilityAge ?? null,
+                    workValueType: payload.workValueType ?? null,
+                    orderValue1: payload.orderValue1?.toString() ?? null,
+                    orderValue2: payload.orderValue2?.toString() ?? null,
+                    orderValue3: payload.orderValue3?.toString() ?? null,
+                    avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
+                    avgAnnualTurnoverValue:
+                        payload.avgAnnualTurnoverValue?.toString() ?? null,
+                    workingCapitalType: payload.workingCapitalType ?? null,
+                    workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
+                    solvencyCertificateType: payload.solvencyCertificateType ?? null,
+                    solvencyCertificateValue:
+                        payload.solvencyCertificateValue?.toString() ?? null,
+                    netWorthType: payload.netWorthType ?? null,
+                    netWorthValue: payload.netWorthValue?.toString() ?? null,
+                    courierAddress: payload.courierAddress ?? null,
+                    teFinalRemark: payload.teFinalRemark ?? null,
+                })
+                .returning();
 
             // Insert clients
             const clients = payload.clients ?? [];
             if (clients.length > 0) {
                 await tx.insert(tenderClients).values(
-                clients.map((client) => ({
-                    tenderId,
-                    clientName: client.clientName,
-                    clientDesignation: client.clientDesignation ?? null,
-                    clientMobile: client.clientMobile ?? null,
-                    clientEmail: client.clientEmail ?? null,
-                }))
-            );
-        }
+                    clients.map((client) => ({
+                        tenderId,
+                        clientName: client.clientName,
+                        clientDesignation: client.clientDesignation ?? null,
+                        clientMobile: client.clientMobile ?? null,
+                        clientEmail: client.clientEmail ?? null,
+                    }))
+                );
+            }
 
             // Insert technical documents
             const technicalDocs = payload.technicalWorkOrders ?? [];
             if (technicalDocs.length > 0) {
                 await tx.insert(tenderTechnicalDocuments).values(
-                technicalDocs.map((docName) => ({
-                    tenderId,
-                    documentName: docName,
-                }))
-            );
-        }
+                    technicalDocs.map((docName) => ({
+                        tenderId,
+                        documentName: docName,
+                    }))
+                );
+            }
 
             // Insert financial documents
             const financialDocs = payload.commercialDocuments ?? [];
             if (financialDocs.length > 0) {
                 await tx.insert(tenderFinancialDocuments).values(
-                financialDocs.map((docName) => ({
-                    tenderId,
-                    documentName: docName,
-                }))
-            );
-        }
+                    financialDocs.map((docName) => ({
+                        tenderId,
+                        documentName: docName,
+                    }))
+                );
+            }
 
             // Update tender status
             await tx
@@ -298,15 +293,10 @@ export class TenderInfoSheetsService {
                 physicalDocsRequired: payload.physicalDocsRequired ?? null,
                 physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
                 techEligibilityAge: payload.techEligibilityAge ?? null,
-                workOrderValue1Required: payload.workOrderValue1Required ?? null,
+                workValueType: payload.workValueType ?? null,
                 orderValue1: payload.orderValue1?.toString() ?? null,
-                wo1Custom: payload.wo1Custom ?? null,
-                workOrderValue2Required: payload.workOrderValue2Required ?? null,
                 orderValue2: payload.orderValue2?.toString() ?? null,
-                wo2Custom: payload.wo2Custom ?? null,
-                workOrderValue3Required: payload.workOrderValue3Required ?? null,
                 orderValue3: payload.orderValue3?.toString() ?? null,
-                wo3Custom: payload.wo3Custom ?? null,
                 avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
                 avgAnnualTurnoverValue:
                     payload.avgAnnualTurnoverValue?.toString() ?? null,

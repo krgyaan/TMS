@@ -1,14 +1,16 @@
+import React from "react"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
 import { ArrowLeft, FileText, Pencil } from "lucide-react"
-import type { TenderInfoSheet, TenderInfoWithNames } from "@/types/api.types"
+import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
+import { formatINR } from "@/hooks/useINRFormatter"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
-    tender?: TenderInfoWithNames | null
     isLoading?: boolean
     onEdit?: () => void
     onBack?: () => void
@@ -29,25 +31,30 @@ const formatPercentage = (value?: number | null) => {
     return `${value}%`
 }
 
-const formatDocuments = (documents: string[] = []) => {
+const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
     if (!documents.length) {
         return <span className="text-muted-foreground">No documents listed</span>
     }
 
     return (
         <div className="flex flex-wrap gap-2">
-            {documents.map((doc) => (
-                <Badge key={doc} variant="outline">
-                    {doc}
-                </Badge>
-            ))}
+            {documents.map((doc, index) => {
+                // Handle both string arrays and object arrays
+                const docName = typeof doc === 'string' ? doc : doc.documentName;
+                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+
+                return (
+                    <Badge key={docKey} variant="outline">
+                        {docName}
+                    </Badge>
+                );
+            })}
         </div>
     )
 }
 
 export const InfoSheetView = ({
     infoSheet,
-    tender,
     isLoading,
     onEdit,
     onBack,
@@ -106,156 +113,576 @@ export const InfoSheetView = ({
                     )}
                 </CardAction>
             </CardHeader>
-            <CardContent className="space-y-8">
-                {tender && (
-                    <div className="rounded-lg border p-4">
-                        <p className="text-sm text-muted-foreground uppercase tracking-wide">Tender Summary</p>
-                        <p className="text-base font-semibold mt-1">{tender.tenderName}</p>
-                        <p className="text-sm text-muted-foreground">
-                            Tender No: {tender.tenderNo} • Organization: {tender.organizationName ?? "—"}
-                        </p>
-                    </div>
-                )}
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* TE Evaluation */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                TE Evaluation
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Recommendation
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {formatYesNo(infoSheet.teRecommendation)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Rejection Reason
+                            </TableCell>
+                            <TableCell className="text-sm w-1/4">
+                                {infoSheet.teRejectionReason ? `Status ${infoSheet.teRejectionReason}` : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                TE Final Remark
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {formatValue(infoSheet.teFinalRemark)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Rejection Remarks
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {formatValue(infoSheet.teRejectionRemarks)}
+                            </TableCell>
+                        </TableRow>
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">TE Evaluation</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground">Recommendation</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.teRecommendation)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Rejection Reason</p>
-                            <p className="text-base font-semibold">
-                                {infoSheet.teRejectionReason ? `Status ${infoSheet.teRejectionReason}` : "—"}
-                            </p>
-                        </div>
-                        <div className="md:col-span-2">
-                            <p className="text-xs text-muted-foreground">TE Final Remark</p>
-                            <p className="text-sm">{formatValue(infoSheet.teFinalRemark ?? infoSheet.teRemark)}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                            <p className="text-xs text-muted-foreground">Rejection Remarks</p>
-                            <p className="text-sm">{formatValue(infoSheet.teRejectionRemarks ?? infoSheet.rejectionRemark)}</p>
-                        </div>
-                    </div>
-                </section>
+                        {/* Processing Fee */}
+                        {(infoSheet.processingFeeRequired || infoSheet.processingFeeAmount) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Processing Fee
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Processing Fee Required
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatYesNo(infoSheet.processingFeeRequired)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Processing Fee Amount
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {infoSheet.processingFeeAmount ? formatINR(Number(infoSheet.processingFeeAmount)) : '—'}
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.processingFeeMode && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Processing Fee Mode
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {infoSheet.processingFeeMode.join(', ')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Financial Terms</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground">Tender Fee Amount</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.tenderFeeAmount)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Tender Fee Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.tenderFeeModes?.map((mode) => mode).join(", "))}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">EMD Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.emdRequired)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">EMD Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.emdModes?.map((mode) => mode).join(", "))}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Reverse Auction</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.reverseAuctionApplicable)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Physical Docs Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.physicalDocsRequired)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Physical Docs Deadline</p>
-                            <p className="text-base font-semibold">{infoSheet.physicalDocsDeadline ? formatDateTime(infoSheet.physicalDocsDeadline) : "—"}</p>
-                        </div>
-                    </div>
-                </section>
+                        {/* Financial Terms */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Financial Terms
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Fee Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.tenderFeeRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Fee Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {infoSheet.tenderFeeAmount ? formatINR(Number(infoSheet.tenderFeeAmount)) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.tenderFeeMode && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Tender Fee Mode
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {infoSheet.tenderFeeMode.join(', ')}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                EMD Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.emdRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                EMD Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {infoSheet.emdAmount ? formatINR(Number(infoSheet.emdAmount)) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.emdMode && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    EMD Mode
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {infoSheet.emdMode.join(', ')}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Reverse Auction Applicable
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.reverseAuctionApplicable)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Physical Docs Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.physicalDocsRequired)}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Physical Docs Deadline
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {formatDateTime(infoSheet.physicalDocsDeadline)}
+                                </TableCell>
+                            </TableRow>
+                        )}
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">PBG & Security Deposit</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground">PBG Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.pbgRequired)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">PBG Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.pbgMode ?? infoSheet.pbgForm)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">PBG Percentage</p>
-                            <p className="text-base font-semibold">{formatPercentage(infoSheet.pbgPercentage)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">PBG Duration (Months)</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.pbgDurationMonths)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">SD Required</p>
-                            <p className="text-base font-semibold">{formatYesNo(infoSheet.sdRequired)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Security Deposit Mode</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.sdMode ?? infoSheet.sdForm)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Security Deposit %</p>
-                            <p className="text-base font-semibold">{formatPercentage(infoSheet.sdPercentage ?? infoSheet.securityDepositPercentage)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">SD Duration (Months)</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.sdDurationMonths)}</p>
-                        </div>
-                    </div>
-                </section>
+                        {/* Payment Terms */}
+                        {(infoSheet.paymentTermsSupply || infoSheet.paymentTermsInstallation) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Payment Terms
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Payment Terms Supply (Days)
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(infoSheet.paymentTermsSupply)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Payment Terms Installation (Days)
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(infoSheet.paymentTermsInstallation)}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Eligibility Summary</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground">Company Age (Years)</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.techEligibilityAge ?? infoSheet.techEligibilityAgeYears)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Bid Validity (Days)</p>
-                            <p className="text-base font-semibold">{formatValue(infoSheet.bidValidityDays)}</p>
-                        </div>
-                    </div>
-                </section>
+                        {/* Commercial Evaluation */}
+                        {(infoSheet.commercialEvaluation || infoSheet.mafRequired) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Commercial Evaluation
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Commercial Evaluation Type
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(infoSheet.commercialEvaluation)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        MAF Required
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(infoSheet.mafRequired)}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Client Contacts</h3>
-                    <div className="space-y-3">
-                        {infoSheet.clients.map((client, idx) => (
-                            <div key={`${client.clientName}-${idx}`} className="rounded-md border p-4">
-                                <p className="font-semibold text-base">{client.clientName || `Client ${idx + 1}`}</p>
-                                <p className="text-sm text-muted-foreground">{client.clientDesignation || "—"}</p>
-                                <div className="mt-2 text-sm space-y-1">
-                                    <p>Mobile: {client.clientMobile || "—"}</p>
-                                    <p>Email: {client.clientEmail || "—"}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                        {/* Delivery Terms */}
+                        {(infoSheet.deliveryTimeSupply || infoSheet.deliveryTimeInstallationDays) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Delivery Terms
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Delivery Time Supply (Days)
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatValue(infoSheet.deliveryTimeSupply)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Installation Inclusive
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No'}
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.deliveryTimeInstallationDays && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Delivery Time Installation (Days)
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatValue(infoSheet.deliveryTimeInstallationDays)}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
 
-                <section className="space-y-4">
-                    <h3 className="font-semibold text-base border-b pb-2">Documents</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <p className="text-xs text-muted-foreground mb-2">Technical Documents</p>
-                            {formatDocuments(infoSheet.technicalWorkOrders)}
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground mb-2">Financial Documents</p>
-                            {formatDocuments(infoSheet.commercialDocuments)}
-                        </div>
-                    </div>
-                </section>
+                        {/* PBG & Security Deposit */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                PBG & Security Deposit
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PBG Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.pbgRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PBG Mode
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.pbgMode)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PBG Percentage
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatPercentage(Number(infoSheet.pbgPercentage))}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                PBG Duration (Months)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.pbgDurationMonths)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                SD Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.sdRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Security Deposit Mode
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.sdMode)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Security Deposit %
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatPercentage(Number(infoSheet.sdPercentage))}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                SD Duration (Months)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.sdDurationMonths)}
+                            </TableCell>
+                        </TableRow>
+
+                        {/* Liquidated Damages */}
+                        {infoSheet.ldRequired && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Liquidated Damages
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        LD Required
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatYesNo(infoSheet.ldRequired)}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        LD Percentage Per Week
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.maxLdPercentage && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Max LD Percentage
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatPercentage(Number(infoSheet.maxLdPercentage))}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+
+                        {/* Eligibility Summary */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Eligibility Summary
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Company Age (Years)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.techEligibilityAge)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Bid Validity (Days)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.bidValidityDays)}
+                            </TableCell>
+                        </TableRow>
+
+                        {/* Work Orders */}
+                        {(infoSheet.workValueType) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Eligibility Criteria
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.workValueType === 'WORKS_VALUES' && (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Value of 1st Work Order
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {infoSheet.orderValue1 ? formatINR(Number(infoSheet.orderValue1)) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Value of 2nd Work Order
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {infoSheet.orderValue2 ? formatINR(Number(infoSheet.orderValue2)) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Value of 3rd Work Order
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {infoSheet.orderValue3 ? formatINR(Number(infoSheet.orderValue3)) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
+                                {infoSheet.workValueType === 'CUSTOM' && (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Custom Eligibility Criteria
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {infoSheet.customEligibilityCriteria || '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        {/* Financial Requirements */}
+                        {(infoSheet.avgAnnualTurnoverType || infoSheet.workingCapitalType || infoSheet.solvencyCertificateType || infoSheet.netWorthType) && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Financial Requirements
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.avgAnnualTurnoverType && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Avg Annual Turnover Type
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatValue(infoSheet.avgAnnualTurnoverType)}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Avg Annual Turnover Value
+                                        </TableCell>
+                                        <TableCell className="text-sm font-semibold">
+                                            {infoSheet.avgAnnualTurnoverValue ? formatINR(Number(infoSheet.avgAnnualTurnoverValue)) : '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {infoSheet.workingCapitalType && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Working Capital Type
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatValue(infoSheet.workingCapitalType)}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Working Capital Value
+                                        </TableCell>
+                                        <TableCell className="text-sm font-semibold">
+                                            {infoSheet.workingCapitalValue ? formatINR(Number(infoSheet.workingCapitalValue)) : '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {infoSheet.solvencyCertificateType && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Solvency Certificate Type
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatValue(infoSheet.solvencyCertificateType)}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Solvency Certificate Value
+                                        </TableCell>
+                                        <TableCell className="text-sm font-semibold">
+                                            {infoSheet.solvencyCertificateValue ? formatINR(Number(infoSheet.solvencyCertificateValue)) : '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {infoSheet.netWorthType && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Net Worth Type
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatValue(infoSheet.netWorthType)}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Net Worth Value
+                                        </TableCell>
+                                        <TableCell className="text-sm font-semibold">
+                                            {infoSheet.netWorthValue ? formatINR(Number(infoSheet.netWorthValue)) : '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        )}
+
+                        {/* Courier Address */}
+                        {infoSheet.courierAddress && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Courier Information
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Courier Address
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {infoSheet.courierAddress}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+
+                        {/* Client Contacts */}
+                        {infoSheet.clients && infoSheet.clients.length > 0 ? (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Client Contacts
+                                    </TableCell>
+                                </TableRow>
+                                {infoSheet.clients.map((client, idx) => (
+                                    <React.Fragment key={`${client.clientName}-${idx}`}>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Client {idx + 1} Name
+                                            </TableCell>
+                                            <TableCell className="text-sm font-semibold">
+                                                {client.clientName || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Designation
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {client.clientDesignation || '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Mobile
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {client.clientMobile || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Email
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {client.clientEmail || '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                    </React.Fragment>
+                                ))}
+                            </>
+                        ) : null}
+
+                        {/* Documents */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Documents
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Technical Documents
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {formatDocuments(infoSheet.technicalWorkOrders || [])}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Financial Documents
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {formatDocuments(infoSheet.commercialDocuments || [])}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     )

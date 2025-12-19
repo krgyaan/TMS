@@ -10,10 +10,10 @@ import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { usePhysicalDocs, useDeletePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 
 const PhysicalDocsListPage = () => {
@@ -43,10 +43,10 @@ const PhysicalDocsListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = usePhysicalDocsDashboardCounts();
+
     const tabsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
-
-    const deleteMutation = useDeletePhysicalDoc();
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRow>[] = [
         {
@@ -60,17 +60,7 @@ const PhysicalDocsListPage = () => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
-        },
-        {
-            label: 'Delete',
-            onClick: (row: PhysicalDocsDashboardRow) => {
-                if (row.physicalDocs && confirm('Are you sure you want to delete this physical doc submission?')) {
-                    deleteMutation.mutate(row.physicalDocs);
-                }
-            },
-            icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: PhysicalDocsDashboardRow) => row.physicalDocs !== null,
-        },
+        }
     ];
 
     const tabsConfig = useMemo(() => {
@@ -78,15 +68,15 @@ const PhysicalDocsListPage = () => {
             {
                 key: 'pending' as const,
                 name: 'Pending',
-                count: activeTab === 'pending' ? totalRows : 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'sent' as const,
                 name: 'Sent',
-                count: activeTab === 'sent' ? totalRows : 0,
+                count: counts?.sent ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<PhysicalDocsDashboardRow>[]>(() => [
         tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
@@ -130,6 +120,11 @@ const PhysicalDocsListPage = () => {
             flex: 1,
             minWidth: 120,
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            cellRenderer: (params: any) => (
+                <Badge variant={params.value ? 'default' : 'secondary'}>
+                    {params.value}
+                </Badge>
+            ),
             sortable: true,
             filter: true,
         },
@@ -214,9 +209,11 @@ const PhysicalDocsListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {tab.count}
-                                </Badge>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
                             </TabsTrigger>
                         ))}
                     </TabsList>

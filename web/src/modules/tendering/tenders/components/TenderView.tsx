@@ -2,6 +2,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, FileText } from 'lucide-react';
 import type { TenderInfoWithNames } from '@/types/api.types'
 import { formatINR } from '@/hooks/useINRFormatter';
@@ -67,139 +68,137 @@ export function TenderView({
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <tbody className="divide-y divide-border">
-                            {/* Basic Information */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Basic Information
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground w-1/4">
-                                    Tender No
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold w-1/4">
-                                    {tender.tenderNo || '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground w-1/4">
-                                    Status
-                                </td>
-                                <td className="px-4 py-3 w-1/4">
-                                    <Badge variant="outline">{tender.statusName || '—'}</Badge>
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Tender Name
-                                </td>
-                                <td className="px-4 py-3 text-sm" colSpan={3}>
-                                    {tender.tenderName || '—'}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Organization
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {tender.organizationName || '—'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Item
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {tender.itemName || '—'}
-                                </td>
-                            </tr>
+                <Table>
+                    <TableBody>
+                        {/* Basic Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Basic Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Tender No
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {tender.tenderNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Status
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                <Badge variant="outline">{tender.statusName || '—'}</Badge>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Name
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {tender.tenderName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Organization
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {tender.organizationName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Item
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {tender.itemName || '—'}
+                            </TableCell>
+                        </TableRow>
 
-                            {/* Financial Information */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Financial Information
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Tender Value (GST Inclusive)
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {formatINR(tender.gstValues ?? 0)}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Tender Fee
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {formatINR(tender.tenderFees ?? 0)}
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    EMD
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {formatINR(tender.emd ?? 0)}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Due Date & Time
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {formatDateTime(tender.dueDate)}
-                                </td>
-                            </tr>
+                        {/* Financial Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Financial Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Value (GST Inclusive)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {formatINR(tender.gstValues ?? 0)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Fee
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {formatINR(tender.tenderFees ?? 0)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                EMD
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {formatINR(tender.emd ?? 0)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Due Date & Time
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(tender.dueDate)}
+                            </TableCell>
+                        </TableRow>
 
-                            {/* Assignment & Location */}
-                            <tr className="bg-muted/50">
-                                <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                    Assignment & Location
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Team Member
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {tender.teamMemberName || (
-                                        <span className="text-muted-foreground italic">Unassigned</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Location
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    {tender.locationName || '—'} <span className='text-gray-400'>({tender.locationState})</span>
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                    Website
-                                </td>
-                                <td className="px-4 py-3 text-sm" colSpan={3}>
-                                    <Link to={tender.websiteLink ?? '#'} target='_blank' className='hover:text-primary'>{tender.websiteName || '—'}</Link>
-                                </td>
-                            </tr>
+                        {/* Assignment & Location */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Assignment & Location
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Team Member
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {tender.teamMemberName || (
+                                    <span className="text-muted-foreground italic">Unassigned</span>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Location
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {tender.locationName || '—'} <span className='text-gray-400'>({tender.locationState})</span>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Website
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                <Link to={tender.websiteLink ?? '#'} target='_blank' className='hover:text-primary'>{tender.websiteName || '—'}</Link>
+                            </TableCell>
+                        </TableRow>
 
-                            {/* Additional Information */}
-                            {tender.remarks && (
-                                <>
-                                    <tr className="bg-muted/50">
-                                        <td colSpan={4} className="px-4 py-3 font-semibold text-sm">
-                                            Additional Information
-                                        </td>
-                                    </tr>
-                                    <tr className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
-                                            Remarks
-                                        </td>
-                                        <td className="px-4 py-3 text-sm" colSpan={3}>
-                                            {tender.remarks}
-                                        </td>
-                                    </tr>
-                                </>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                        {/* Additional Information */}
+                        {tender.remarks && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Additional Information
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Remarks
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {tender.remarks}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

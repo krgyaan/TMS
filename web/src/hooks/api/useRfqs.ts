@@ -40,7 +40,17 @@ export const useRfq = (id: number | null) => {
 export const useRfqByTenderId = (tenderId: number | null) => {
     return useQuery({
         queryKey: rfqsKey.byTender(tenderId ?? 0),
-        queryFn: () => rfqsService.getByTenderId(tenderId ?? 0),
+        queryFn: async () => {
+            try {
+                return await rfqsService.getByTenderId(tenderId ?? 0);
+            } catch (error: any) {
+                // Handle 404 gracefully - return null if resource doesn't exist
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
         enabled: !!tenderId,
     });
 };

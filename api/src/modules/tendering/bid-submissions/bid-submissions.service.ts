@@ -6,7 +6,6 @@ import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
@@ -35,6 +34,13 @@ export type BidSubmissionFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+};
+
+export type BidSubmissionDashboardCounts = {
+    pending: number;
+    submitted: number;
+    missed: number;
+    total: number;
 };
 
 @Injectable()
@@ -196,6 +202,77 @@ export class BidSubmissionsService {
                 totalPages: Math.ceil(total / limit),
             },
         };
+    }
+
+    private bidSubmissionBaseWhere() {
+        return and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+        );
+    }
+
+    private bidSubmissionBaseQuery(select: any): any {
+        return this.db
+            .select(select)
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id));
+    }
+
+    async getDashboardCounts(): Promise<BidSubmissionDashboardCounts> {
+        try {
+            const baseWhere = this.bidSubmissionBaseWhere();
+
+            // Pending count: tenders with approved costing but no bid submission
+            const [{ count: pending }] = await this.bidSubmissionBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        eq(tenderCostingSheets.status, 'Approved'),
+                        isNull(bidSubmissions.id)
+                    )
+                ) as any;
+
+            // Submitted count: bid submissions with status 'Bid Submitted'
+            const [{ count: submitted }] = await this.bidSubmissionBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(bidSubmissions.id),
+                        eq(bidSubmissions.status, 'Bid Submitted')
+                    )
+                ) as any;
+
+            // Missed count: bid submissions with status 'Tender Missed'
+            const [{ count: missed }] = await this.bidSubmissionBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(
+                    and(
+                        baseWhere,
+                        isNotNull(bidSubmissions.id),
+                        eq(bidSubmissions.status, 'Tender Missed')
+                    )
+                ) as any;
+
+        return {
+                pending: Number(pending || 0),
+                submitted: Number(submitted || 0),
+                missed: Number(missed || 0),
+                total: Number(pending || 0) + Number(submitted || 0) + Number(missed || 0),
+        };
+        } catch (error) {
+            console.error('Error in getDashboardCounts:', error);
+            throw error;
+        }
     }
 
     async findById(id: number) {

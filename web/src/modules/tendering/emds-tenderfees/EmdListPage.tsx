@@ -5,7 +5,7 @@ import DataTable from "@/components/ui/data-table";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, AlertCircle } from "lucide-react";
+import { EyeIcon, Pencil, Plus, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -14,10 +14,11 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { EmdDashboardRow } from "@/types/api.types";
+import type { PendingTenderRow, PaymentRequestRow, EmdDashboardCounts } from "@/types/api.types";
 import { tenderNameCol } from "@/components/data-grid";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Tab configuration with status mappings
+// Tab configuration
 const TABS = [
     { value: 'pending', label: 'Pending' },
     { value: 'sent', label: 'Sent' },
@@ -26,12 +27,12 @@ const TABS = [
     { value: 'returned', label: 'Returned' },
 ] as const;
 
+type TabValue = typeof TABS[number]['value'];
+
 // Status badge colors
 const STATUS_COLORS: Record<string, string> = {
-    'Not Created': 'bg-gray-100 text-gray-800 border-gray-200',
     'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'Sent': 'bg-blue-100 text-blue-800 border-blue-200',
-    'Requested': 'bg-blue-100 text-blue-800 border-blue-200',
     'Approved': 'bg-green-100 text-green-800 border-green-200',
     'Rejected': 'bg-red-100 text-red-800 border-red-200',
     'Returned': 'bg-purple-100 text-purple-800 border-purple-200',
@@ -56,10 +57,11 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 
 const EmdsAndTenderFeesPage = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<string>('pending');
+    const [activeTab, setActiveTab] = useState<TabValue>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
 
+    // Reset pagination when tab changes
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab]);
@@ -75,11 +77,12 @@ const EmdsAndTenderFeesPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    // Fetch dashboard data with counts
+    // Fetch dashboard data
     const {
         data: dashboardData,
         isLoading,
         error,
+        refetch,
     } = usePaymentDashboard(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
@@ -87,129 +90,100 @@ const EmdsAndTenderFeesPage = () => {
     );
 
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
+    const counts = dashboardData?.counts as EmdDashboardCounts | undefined;
 
-    // Get actions based on row type and status
-    const getActionsForRow = (row: EmdDashboardRow): ActionItem<EmdDashboardRow>[] => {
-        if (row.type === 'missing') {
-            // No request exists - show Create action
-            return [
-                {
-                    label: 'Create Request',
-                    icon: <Plus className="w-4 h-4" />,
-                    onClick: (r) => navigate(
-                        `${paths.tendering.emdsTenderFeesCreate(r.tenderId)}?purpose=${encodeURIComponent(r.purpose)}`
-                    ),
-                },
-                {
-                    label: 'View Tender',
-                    icon: <EyeIcon className="w-4 h-4" />,
-                    onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
-                },
-            ];
-        }
+    // ========================================================================
+    // Column Definitions
+    // ========================================================================
 
-        // Request exists - show Edit/View actions
-        const actions: ActionItem<EmdDashboardRow>[] = [
-            {
-                label: 'View Details',
-                icon: <EyeIcon className="w-4 h-4" />,
-                onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.id!)),
-            },
-        ];
-
-        // Only allow edit if status is Pending or Rejected
-        if (row.status === 'Pending' || row.status === 'Rejected') {
-            actions.unshift({
-                label: 'Edit Request',
-                icon: <Pencil className="w-4 h-4" />,
-                onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id!)),
-            });
-        }
-
-        return actions;
-    };
-
-    // Column definitions
-    const colDefs = useMemo<ColDef<EmdDashboardRow>[]>(() => [
-        tenderNameCol<EmdDashboardRow>('tenderNo', {
+    // Columns for Pending tab (per tender)
+    const pendingColDefs = useMemo<ColDef<PendingTenderRow>[]>(() => [
+        tenderNameCol<PendingTenderRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            minWidth: 250,
+            width: 130,
         }),
         {
-            field: 'purpose',
-            colId: 'purpose',
-            headerName: 'Payment Type',
-            width: 140,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
-                const purpose = params.value as string;
-                return (
-                    <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
-                        {purpose}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: 'amountRequired',
-            colId: 'amountRequired',
-            headerName: 'Amount',
+            field: 'gstValues',
+            headerName: 'Tender Value',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) =>
-                params.value ? (
-                    <span className="font-medium">{formatINR(params.value)}</span>
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
-        },
-        {
-            field: 'instrumentType',
-            colId: 'instrumentType',
-            headerName: 'Mode',
-            width: 140,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
-                if (!params.value) {
-                    return <span className="text-gray-400 text-sm">Not Set</span>;
-                }
-                return (
-                    <span className="text-sm">
-                        {INSTRUMENT_LABELS[params.value] || params.value}
-                    </span>
-                );
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                return <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>;
             },
         },
         {
-            field: 'status',
-            colId: 'status',
-            headerName: 'Status',
+            field: 'emd',
+            headerName: 'EMD',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
-                const status = params.value as string;
-                const isMissing = params.data?.type === 'missing';
-
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                const amount = Number(params.value) || 0;
+                if (amount <= 0) return <span className="text-gray-400">—</span>;
                 return (
-                    <Badge
-                        variant="outline"
-                        className={`${STATUS_COLORS[status] || ''} ${isMissing ? 'border-dashed' : ''}`}
-                    >
-                        {isMissing && <AlertCircle className="w-3 h-3 mr-1" />}
-                        {status}
-                    </Badge>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-medium">{formatINR(amount)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{params.data?.emdMode}</p>
+                        </TooltipContent>
+                    </Tooltip>
                 );
             },
+        },
+        {
+            field: 'tenderFee',
+            headerName: 'Tender Fee',
+            width: 130,
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                const amount = Number(params.value) || 0;
+                if (amount <= 0) return <span className="text-gray-400">—</span>;
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-medium">{formatINR(amount)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{params.data?.tenderFeeMode}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            field: 'processingFee',
+            headerName: 'Processing Fee',
+            width: 130,
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                const amount = Number(params.value) || 0;
+                if (amount <= 0) return <span className="text-gray-400">—</span>;
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-medium">{formatINR(amount)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{params.data?.processingFeeMode}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            field: 'teamMemberName',
+            headerName: 'Assigned To',
+            width: 140,
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) =>
+                params.value || <span className="text-gray-400">Unassigned</span>,
         },
         {
             field: 'dueDate',
-            colId: 'dueDate',
             headerName: 'Due Date',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
                 if (!params.value) return <span className="text-gray-400">—</span>;
-
                 const dueDate = new Date(params.value);
                 const isOverdue = dueDate < new Date();
-                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
-
+                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
                 return (
                     <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
                         {formatDateTime(params.value)}
@@ -220,40 +194,167 @@ const EmdsAndTenderFeesPage = () => {
         {
             field: 'statusName',
             headerName: 'Status',
-        },
-        {
-            field: 'teamMemberName',
-            headerName: 'Assigned To',
-            width: 140,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) =>
-                params.value || <span className="text-gray-400">Unassigned</span>,
+            width: 120,
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                return <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>{params.value}</Badge>;
+            },
         },
         {
             headerName: 'Actions',
             filter: false,
             sortable: false,
-            cellRenderer: (params: ICellRendererParams<EmdDashboardRow>) => {
-                const actions = getActionsForRow(params.data!);
+            width: 100,
+            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+                const actions: ActionItem<PendingTenderRow>[] = [
+                    {
+                        label: 'Create Request',
+                        icon: <Plus className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
+                    },
+                    {
+                        label: 'View Tender',
+                        icon: <EyeIcon className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+                    },
+                ];
                 const ActionRenderer = createActionColumnRenderer(actions);
                 return <ActionRenderer data={params.data!} />;
             },
             pinned: 'right',
-            width: 80,
         },
     ], [navigate]);
 
+    // Columns for Sent/Approved/Rejected/Returned tabs (per request)
+    const requestColDefs = useMemo<ColDef<PaymentRequestRow>[]>(() => [
+        tenderNameCol<PaymentRequestRow>('tenderNo', {
+            headerName: 'Tender Details',
+            filter: true,
+            width: 130,
+        }),
+        {
+            field: 'purpose',
+            headerName: 'Type',
+            width: 130,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                const purpose = params.value as string;
+                return (
+                    <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
+                        {purpose}
+                    </Badge>
+                );
+            },
+        },
+        {
+            field: 'amountRequired',
+            headerName: 'Amount',
+            width: 130,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) =>
+                params.value ? (
+                    <span className="font-medium">{formatINR(params.value)}</span>
+                ) : (
+                    <span className="text-gray-400">—</span>
+                ),
+        },
+        {
+            field: 'instrumentType',
+            headerName: 'Mode',
+            width: 140,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
+                return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
+            },
+        },
+        {
+            field: 'displayStatus',
+            headerName: 'Status',
+            width: 120,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                const status = params.value as string;
+                return (
+                    <Badge variant="outline" className={STATUS_COLORS[status] || ''}>
+                        {status}
+                    </Badge>
+                );
+            },
+        },
+        {
+            field: 'dueDate',
+            headerName: 'Due Date',
+            width: 140,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                if (!params.value) return <span className="text-gray-400">—</span>;
+                const dueDate = new Date(params.value);
+                const isOverdue = dueDate < new Date();
+                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                return (
+                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                        {formatDateTime(params.value)}
+                    </span>
+                );
+            },
+        },
+        {
+            field: 'teamMemberName',
+            headerName: 'Assigned To',
+            width: 140,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) =>
+                params.value || <span className="text-gray-400">Unassigned</span>,
+        },
+        {
+            field: 'createdAt',
+            headerName: 'Requested On',
+            width: 140,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                return <span>{formatDateTime(params.value)}</span>;
+            },
+        },
+        {
+            headerName: 'Actions',
+            filter: false,
+            sortable: false,
+            width: 80,
+            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+                const row = params.data!;
+                const actions: ActionItem<PaymentRequestRow>[] = [
+                    {
+                        label: 'View Details',
+                        icon: <EyeIcon className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
+                    },
+                ];
+
+                // Add edit for Sent/Rejected
+                if (activeTab === 'sent' || activeTab === 'rejected') {
+                    actions.unshift({
+                        label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
+                        icon: activeTab === 'rejected' ? <RefreshCw className="w-4 h-4" /> : <Pencil className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.tenderId)),
+                    });
+                }
+
+                const ActionRenderer = createActionColumnRenderer(actions);
+                return <ActionRenderer data={row} />;
+            },
+            pinned: 'right',
+        },
+    ], [navigate, activeTab]);
+
+    // Select column definitions based on active tab
+    const columnDefs = activeTab === 'pending' ? pendingColDefs : requestColDefs;
+    const tableData = dashboardData?.data || [];
+
+    // ========================================================================
+    // Render
+    // ========================================================================
+
     // Render tab with count badge
     const renderTabTrigger = (tab: typeof TABS[number]) => {
-        const count = dashboardData?.counts?.[tab.value as keyof typeof dashboardData.counts] ?? 0;
-
+        const count = counts?.[tab.value as keyof EmdDashboardCounts] ?? 0;
         return (
             <TabsTrigger key={tab.value} value={tab.value} className="relative">
                 {tab.label}
                 {count > 0 && (
-                    <Badge
-                        variant="secondary"
-                        className="ml-2 h-5 min-w-[20px] px-1.5 text-xs"
-                    >
+                    <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
                         {count}
                     </Badge>
                 )}
@@ -262,7 +363,7 @@ const EmdsAndTenderFeesPage = () => {
     };
 
     // Loading state
-    if (isLoading) {
+    if (isLoading && !dashboardData) {
         return (
             <Card>
                 <CardHeader>
@@ -289,17 +390,12 @@ const EmdsAndTenderFeesPage = () => {
                     <CardDescription>Error loading payment requests</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-2 text-red-500">
-                        <AlertCircle className="w-5 h-5" />
-                        <p>Failed to load payment requests. Please try again.</p>
+                    <div className="flex flex-col items-center gap-4 py-8">
+                        <p className="text-red-500">Failed to load payment requests. Please try again.</p>
+                        <Button variant="outline" onClick={() => refetch()}>
+                            Retry
+                        </Button>
                     </div>
-                    <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => window.location.reload()}
-                    >
-                        Retry
-                    </Button>
                 </CardContent>
             </Card>
         );
@@ -313,16 +409,16 @@ const EmdsAndTenderFeesPage = () => {
                         <CardTitle>EMDs, Tender Fees & Processing Fees</CardTitle>
                         <CardDescription>
                             Track all payment requests for your assigned tenders
-                            {dashboardData?.counts && (
+                            {counts && (
                                 <span className="ml-2 text-muted-foreground">
-                                    • {dashboardData.counts.total} total items
+                                    • {counts.total} total items
                                 </span>
                             )}
                         </CardDescription>
                     </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="mt-4">
                     <TabsList>
                         {TABS.map(renderTabTrigger)}
                     </TabsList>
@@ -330,29 +426,39 @@ const EmdsAndTenderFeesPage = () => {
             </CardHeader>
 
             <CardContent className="px-0">
-                {/* Summary for current tab */}
-                {activeTab === 'pending' && dashboardData?.data && (
-                    <div className="px-6 pb-4">
-                        <div className="flex gap-4 text-sm text-muted-foreground">
-                            <span>
-                                <strong className="text-foreground">
-                                    {dashboardData.data.filter((r: EmdDashboardRow) => r.type === 'missing').length}
-                                </strong> need to be created
-                            </span>
-                            <span>•</span>
-                            <span>
-                                <strong className="text-foreground">
-                                    {dashboardData.data.filter((r: EmdDashboardRow) => r.type === 'request' && r.status === 'Pending').length}
-                                </strong> awaiting submission
-                            </span>
-                        </div>
-                    </div>
-                )}
+                {/* Tab-specific description */}
+                <div className="px-6 pb-4">
+                    {activeTab === 'pending' && (
+                        <p className="text-sm text-muted-foreground">
+                            Tenders requiring payment but no request created yet. Click <strong>Create Request</strong> to submit.
+                        </p>
+                    )}
+                    {activeTab === 'sent' && (
+                        <p className="text-sm text-muted-foreground">
+                            Payment requests submitted and awaiting processing.
+                        </p>
+                    )}
+                    {activeTab === 'approved' && (
+                        <p className="text-sm text-muted-foreground">
+                            Payment requests that have been approved/paid.
+                        </p>
+                    )}
+                    {activeTab === 'rejected' && (
+                        <p className="text-sm text-muted-foreground">
+                            Payment requests that were rejected. You can resubmit with corrections.
+                        </p>
+                    )}
+                    {activeTab === 'returned' && (
+                        <p className="text-sm text-muted-foreground">
+                            EMDs and deposits that have been returned after tender completion.
+                        </p>
+                    )}
+                </div>
 
                 <DataTable
-                    data={dashboardData?.data || []}
+                    data={tableData}
                     loading={isLoading}
-                    columnDefs={colDefs}
+                    columnDefs={columnDefs as ColDef[]}
                     manualPagination={true}
                     rowCount={totalRows}
                     paginationState={pagination}
@@ -364,9 +470,8 @@ const EmdsAndTenderFeesPage = () => {
                             sortable: true,
                         },
                         onSortChanged: handleSortChanged,
-                        rowSelection: 'multiple',
                         suppressRowClickSelection: true,
-                        overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No payment requests found</span>',
+                        overlayNoRowsTemplate: `<span style="padding: 10px; text-align: center;">No ${activeTab} items found</span>`,
                     }}
                 />
             </CardContent>

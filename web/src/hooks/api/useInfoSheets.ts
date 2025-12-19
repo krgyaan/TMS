@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { infoSheetsService } from "@/services/api";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
-import type { SaveTenderInfoSheetDto } from "@/types/api.types";
+import type { SaveTenderInfoSheetDto } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types";
 
 export const infoSheetsKey = {
     all: ["info-sheets"] as const,

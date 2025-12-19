@@ -1,4 +1,4 @@
-﻿import {
+import {
     Inject,
     Injectable,
     Logger,
@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import googleConfig, { type GoogleConfig } from '@config/google.config';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
+import { DRIVE_SCOPES } from '@config/google.config';
 import {
     oauthAccounts,
     type OauthAccount,
@@ -49,6 +50,26 @@ const normalizeCredentials = (
     };
 };
 
+/**
+ * Merge and deduplicate scope arrays
+ * Combines existing scopes with newly granted scopes, removing duplicates
+ */
+const mergeScopes = (
+    existingScopes: string | null | undefined,
+    newScopes: string | null | undefined,
+): string => {
+    const existing = existingScopes
+        ? existingScopes.split(/\s+/).filter(Boolean)
+        : [];
+    const newlyGranted = newScopes
+        ? newScopes.split(/\s+/).filter(Boolean)
+        : [];
+
+    // Combine and deduplicate
+    const merged = [...new Set([...existing, ...newlyGranted])];
+    return merged.join(' ');
+};
+
 export type GoogleConnection = {
     id: number;
     userId: number;
@@ -80,25 +101,75 @@ export class GoogleService {
         );
     }
 
-    createAuthUrl(userId: number): { url: string } {
+    createAuthUrl(userId: number, useIntegrationRedirect: boolean = false): { url: string } {
         if (!Number.isInteger(userId) || userId <= 0) {
             throw new BadRequestException(
                 'A valid userId is required to initiate Google OAuth',
             );
         }
-        return this.createAuthUrlWithState(String(userId));
+
+        const redirectUri = useIntegrationRedirect
+            ? this.config.integrationRedirectUri
+            : this.config.redirectUri;
+
+        return this.createAuthUrlWithState(String(userId), redirectUri);
     }
 
-    createAuthUrlWithState(state: string, redirectUri?: string): { url: string } {
+    createAuthUrlWithState(state: string, redirectUri?: string, forceConsent: boolean = false): { url: string } {
         const client = this.createClient(redirectUri);
-        const url = client.generateAuthUrl({
+        const authOptions: any = {
             access_type: 'offline',
             include_granted_scopes: true,
-            prompt: 'consent',
             scope: this.config.scopes,
             state,
-        });
+        };
+
+        // Only force consent for drive integration flows
+        if (forceConsent) {
+            authOptions.prompt = 'consent';
+        }
+
+        const url = client.generateAuthUrl(authOptions);
         return { url };
+    }
+
+    async checkUserScopes(userId: number, requiredScopes: string[]): Promise<{
+        hasAllScopes: boolean;
+        grantedScopes: string[];
+        missingScopes: string[];
+    }> {
+        const accounts = await this.db
+            .select()
+            .from(oauthAccounts)
+            .where(
+                and(
+                    eq(oauthAccounts.userId, userId),
+                    eq(oauthAccounts.provider, 'google'),
+                ),
+            )
+            .limit(1);
+
+        if (!accounts.length) {
+            return {
+                hasAllScopes: false,
+                grantedScopes: [],
+                missingScopes: requiredScopes,
+            };
+        }
+
+        const grantedScopes = accounts[0].scopes
+            ? accounts[0].scopes.split(/\s+/).filter(Boolean)
+            : [];
+
+        const missingScopes = requiredScopes.filter(
+            (scope) => !grantedScopes.includes(scope),
+        );
+
+        return {
+            hasAllScopes: missingScopes.length === 0,
+            grantedScopes,
+            missingScopes,
+        };
     }
 
     async exchangeCode(code: string, redirectUri?: string): Promise<{
@@ -140,7 +211,6 @@ export class GoogleService {
         }
 
         const expiresAt = tokens.expiresAt;
-        const scopes = tokens.scope ?? this.config.scopes.join(' ');
         const now = new Date();
 
         const existing = await this.db
@@ -157,7 +227,13 @@ export class GoogleService {
         let stored: OauthAccount;
 
         if (existing.length) {
+            // Merge existing scopes with newly granted scopes
             const current = existing[0];
+            const mergedScopes = mergeScopes(
+                current.scopes,
+                tokens.scope ?? this.config.scopes.join(' '),
+            );
+
             const updated = await this.db
                 .update(oauthAccounts)
                 .set({
@@ -167,7 +243,7 @@ export class GoogleService {
                     accessToken: tokens.accessToken ?? current.accessToken,
                     refreshToken: tokens.refreshToken ?? current.refreshToken,
                     expiresAt,
-                    scopes,
+                    scopes: mergedScopes,
                     rawPayload: profile as Record<string, unknown>,
                     updatedAt: now,
                 })
@@ -175,11 +251,13 @@ export class GoogleService {
                 .returning();
             stored = updated[0];
         } else {
+            // New connection - use scopes from token or config defaults
             if (!tokens.accessToken) {
                 throw new BadRequestException(
                     'Google access token missing in response',
                 );
             }
+            const scopes = tokens.scope ?? this.config.scopes.join(' ');
             const inserted = await this.db
                 .insert(oauthAccounts)
                 .values({
@@ -231,6 +309,7 @@ export class GoogleService {
     async handleOAuthCallback(params: {
         code: string;
         state?: string;
+        redirectUri?: string;
     }): Promise<GoogleConnection> {
         if (!params.state) {
             throw new BadRequestException('Missing OAuth state parameter');
@@ -240,7 +319,10 @@ export class GoogleService {
             throw new BadRequestException('Invalid OAuth state payload');
         }
 
-        const { tokens, profile } = await this.exchangeCode(params.code);
+        // Use integration redirect URI by default (for drive integration callbacks)
+        // or the provided redirect URI if specified
+        const redirectUri = params.redirectUri ?? this.config.integrationRedirectUri;
+        const { tokens, profile } = await this.exchangeCode(params.code, redirectUri);
         return this.upsertConnection(userId, tokens, profile);
     }
 
@@ -356,5 +438,44 @@ export class GoogleService {
             updatedAt: account.updatedAt,
             hasRefreshToken: Boolean(account.refreshToken),
         };
+    }
+
+    getIntegrationRedirectUri(): string {
+        return this.config.integrationRedirectUri;
+    }
+
+    getLoginRedirectUri(): string {
+        return this.config.redirectUri;
+    }
+
+    createDriveScopeAuthUrl(userId: number): { url: string } {
+        if (!Number.isInteger(userId) || userId <= 0) {
+            throw new BadRequestException(
+                'A valid userId is required to initiate Google OAuth',
+            );
+        }
+
+        // IMPORTANT: Use INTEGRATION redirect URI, not login redirect URI
+        const client = new google.auth.OAuth2(
+            this.config.clientId,
+            this.config.clientSecret,
+            this.config.integrationRedirectUri, // <-- Integration callback
+        );
+
+        // Combine login scopes + drive scopes for full access
+        const allScopes = [
+            ...this.config.scopes,  // openid email profile
+            ...DRIVE_SCOPES,        // drive.file spreadsheets
+        ];
+
+        const url = client.generateAuthUrl({
+            access_type: 'offline',
+            include_granted_scopes: true,
+            prompt: 'consent',
+            scope: allScopes,
+            state: String(userId),
+        });
+
+        return { url };
     }
 }

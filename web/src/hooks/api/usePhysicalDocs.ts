@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams } from '@/types/api.types'
+import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams, PhysicalDocsDashboardCounts } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
@@ -11,6 +11,7 @@ export const physicalDocsKey = {
     details: () => [...physicalDocsKey.all, 'detail'] as const,
     detail: (id: number) => [...physicalDocsKey.details(), id] as const,
     byTender: (tenderId: number) => [...physicalDocsKey.all, "by-tender", tenderId] as const,
+    dashboardCounts: () => [...physicalDocsKey.all, 'dashboard-counts'] as const,
 };
 
 export const usePhysicalDocs = (
@@ -55,7 +56,17 @@ export const usePhysicalDoc = (id: number | null) => {
 export const usePhysicalDocByTenderId = (tenderId: number | null) => {
     return useQuery({
         queryKey: physicalDocsKey.byTender(tenderId ?? 0),
-        queryFn: () => physicalDocsService.getByTenderId(tenderId ?? 0),
+        queryFn: async () => {
+            try {
+                return await physicalDocsService.getByTenderId(tenderId ?? 0);
+            } catch (error: any) {
+                // Handle 404 gracefully - return null if resource doesn't exist
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
         enabled: !!tenderId,
     });
 };
@@ -91,17 +102,10 @@ export const useUpdatePhysicalDoc = () => {
     });
 };
 
-export const useDeletePhysicalDoc = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (id: number) => physicalDocsService.delete(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
-            toast.success("Physical doc deleted successfully");
-        },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
+export const usePhysicalDocsDashboardCounts = () => {
+    return useQuery<PhysicalDocsDashboardCounts>({
+        queryKey: physicalDocsKey.dashboardCounts(),
+        queryFn: () => physicalDocsService.getDashboardCounts(),
+        staleTime: 30000, // Cache for 30 seconds
     });
 };

@@ -1,7 +1,7 @@
 // Payment modes - use string identifiers that match backend
 export const EMD_MODE_VALUES = {
-    PORTAL: 'PORTAL',
-    BANK_TRANSFER: 'BANK_TRANSFER',
+    POP: 'POP',
+    BT: 'BT',
     DD: 'DD',
     BG: 'BG',
     FDR: 'FDR',
@@ -10,8 +10,8 @@ export const EMD_MODE_VALUES = {
 } as const;
 
 export const EMD_MODES = [
-    { value: 'PORTAL', label: 'Pay on Portal' },
-    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
     { value: 'DD', label: 'Demand Draft' },
     { value: 'BG', label: 'Bank Guarantee' },
     { value: 'FDR', label: 'Fixed Deposit Receipt' },
@@ -19,27 +19,27 @@ export const EMD_MODES = [
 ];
 
 export const TENDER_FEE_MODES = [
-    { value: 'PORTAL', label: 'Pay on Portal' },
-    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
     { value: 'DD', label: 'Demand Draft' },
 ];
 
 export const PROCESSING_FEE_MODES = [
-    { value: 'PORTAL', label: 'Pay on Portal' },
-    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
     { value: 'DD', label: 'Demand Draft' },
 ];
 
 // Legacy mode mapping (database stores numeric, we need to convert)
 export const MODE_VALUE_MAP: Record<string, string> = {
-    '1': 'PORTAL',
-    '2': 'BANK_TRANSFER',
+    '1': 'POP',
+    '2': 'BT',
     '3': 'DD',
     '4': 'BG',
     '5': 'FDR',
     '6': 'CHEQUE',
-    'PORTAL': 'PORTAL',
-    'BANK_TRANSFER': 'BANK_TRANSFER',
+    'POP': 'POP',
+    'BT': 'BT',
     'DD': 'DD',
     'BG': 'BG',
     'FDR': 'FDR',
@@ -51,8 +51,8 @@ export const MODE_LABELS: Record<string, string> = {
     'FDR': 'Fixed Deposit Receipt',
     'CHEQUE': 'Cheque',
     'BG': 'Bank Guarantee',
-    'BANK_TRANSFER': 'Bank Transfer',
-    'PORTAL': 'Payment on Portal',
+    'BT': 'Bank Transfer',
+    'POP': 'Payment on Portal',
 };
 
 export const PURPOSE_OPTIONS = [
