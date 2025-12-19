@@ -55,7 +55,7 @@ const fileFilter = (req: any, file: Express.Multer.File, callback: (error: Error
 // Multer config
 const multerConfig = {
     storage: diskStorage({
-        destination: "./uploads/couriers",
+        destination: "./uploads/courier",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -69,7 +69,7 @@ const multerConfig = {
 
 const podMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/couriers/pod",
+        destination: "./uploads/courier/pod",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -81,7 +81,7 @@ const podMulterConfig = {
 // Multer config for docket slip
 const docketSlipMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/couriers/docket-slips",
+        destination: "./uploads/courier/docket-slips",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -107,7 +107,7 @@ export class CourierController {
     }
 
     @Post(":id/dispatch")
-    @UseInterceptors(FileInterceptor("docket_slip", docketSlipMulterConfig))
+    @UseInterceptors(FileInterceptor("docketSlip", docketSlipMulterConfig))
     createDispatch(
         @Param("id", ParseIntPipe) id: number,
         @Body()
@@ -200,13 +200,13 @@ export class CourierController {
     }
 
     @Post(":id/upload")
-    @UseInterceptors(FilesInterceptor("courier_docs[]", 10, multerConfig))
+    @UseInterceptors(FilesInterceptor("courierDocs[]", 10, multerConfig))
     uploadDocs(@Param("id", ParseIntPipe) id: number, @UploadedFiles() files: Express.Multer.File[], @CurrentUser("id") userId: number) {
         return this.service.uploadDocs(id, files, userId);
     }
 
     @Post(":id/upload-pod")
-    @UseInterceptors(FileInterceptor("delivery_pod", podMulterConfig))
+    @UseInterceptors(FileInterceptor("deliveryPod", podMulterConfig))
     uploadDeliveryPod(@Param("id", ParseIntPipe) id: number, @UploadedFile() file: Express.Multer.File, @CurrentUser("id") userId: number) {
         return this.service.uploadDeliveryPod(id, file, userId);
     }
