@@ -9,6 +9,8 @@ class TenderResultService extends BaseApiService {
 
     async getAll(params?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
         const search = new URLSearchParams();
+        console.log('=== tenderResultService.getAll ===');
+        console.log('params:', params);
 
         if (params) {
             if (params.type !== undefined) {
@@ -29,7 +31,23 @@ class TenderResultService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<ResultDashboardRow>>(queryString ? `?${queryString}` : '');
+        const url = queryString ? `?${queryString}` : '';
+        console.log('Request URL:', url);
+        console.log('Full URL:', `${this.basePath}${url}`);
+
+        try {
+            const result = await this.get<PaginatedResult<ResultDashboardRow>>(url);
+            console.log('=== tenderResultService.getAll Response ===');
+            console.log('result:', result);
+            console.log('result.data:', result?.data);
+            console.log('result.meta:', result?.meta);
+            console.log('result.data length:', result?.data?.length);
+            return result;
+        } catch (error) {
+            console.error('=== tenderResultService.getAll Error ===');
+            console.error('error:', error);
+            throw error;
+        }
     }
 
     async getById(id: number): Promise<TenderResult> {
@@ -49,8 +67,25 @@ class TenderResultService extends BaseApiService {
     }
 
     async getCounts(): Promise<ResultDashboardCounts> {
-        console.log('getCounts');
-        return this.get<ResultDashboardCounts>('/counts');
+        console.log('=== tenderResultService.getCounts ===');
+        console.log('Request URL: /counts');
+        console.log('Full URL:', `${this.basePath}/counts`);
+
+        try {
+            const result = await this.get<ResultDashboardCounts>('/counts');
+            console.log('=== tenderResultService.getCounts Response ===');
+            console.log('result:', result);
+            console.log('result.pending:', result?.pending);
+            console.log('result.won:', result?.won);
+            console.log('result.lost:', result?.lost);
+            console.log('result.disqualified:', result?.disqualified);
+            console.log('result.total:', result?.total);
+            return result;
+        } catch (error) {
+            console.error('=== tenderResultService.getCounts Error ===');
+            console.error('error:', error);
+            throw error;
+        }
     }
 }
 

@@ -40,6 +40,7 @@ export type ResultDashboardRow = {
     finalPrice: string | null;
     itemName: string | null;
     tenderStatus: string | null;
+    tenderStatusId: number | null;
     resultStatus: string | null;
     emdDetails: EmdDetails | null;
     hasResultEntry: boolean;
@@ -78,10 +79,16 @@ export class TenderResultService {
     ) { }
 
     async findAll(filters?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
+        console.log('=== findAll START ===');
+        console.log('filters:', JSON.stringify(filters, null, 2));
+
+        // Convert page and limit to numbers, with validation
+        const pageRaw = filters?.page;
+        const limitRaw = filters?.limit;
+        const page = pageRaw ? (isNaN(Number(pageRaw)) || Number(pageRaw) < 1 ? 1 : Math.floor(Number(pageRaw))) : 1;
+        const limit = limitRaw ? (isNaN(Number(limitRaw)) || Number(limitRaw) < 1 ? 50 : Math.floor(Number(limitRaw))) : 50;
         const offset = (page - 1) * limit;
-        console.log('filters', filters);
+
         let orderByClause: any = desc(bidSubmissions.submissionDatetime);
 
         // Build dynamic order by clause based on filters
@@ -119,7 +126,17 @@ export class TenderResultService {
         if (filters?.type) {
             switch (filters.type) {
                 case 'pending':
-                    typeFilter = inArray(statuses.name, ['Bid Submitted', 'TQ Qualified', 'No TQ, Qualified'])
+                    // Pending: result status is null OR 'Under Evaluation' AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified
+                    const pendingStatusNames = ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'];
+                    console.log('Pending filter - checking status names:', pendingStatusNames);
+                    console.log('Pending filter - checking for NULL OR Under Evaluation tenderResults.status');
+                    typeFilter = and(
+                        or(
+                            isNull(tenderResults.status),
+                            inArray(statuses.name, pendingStatusNames),
+                            eq(tenderResults.status, RESULT_STATUS.UNDER_EVALUATION)
+                        ),
+                    );
                     break;
                 case 'won':
                     typeFilter = eq(tenderResults.status, RESULT_STATUS.WON);
@@ -145,93 +162,134 @@ export class TenderResultService {
 
         if (typeFilter) {
             whereConditions.push(typeFilter);
-        }
-        console.log('whereConditions', whereConditions);
-        // Fetch the rows from the database with DISTINCT to avoid duplicates
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                tenderValue: tenderInfos.gstValues,
-                emdAmount: tenderInfos.emd,
-                teamExecutiveName: users.name,
-                itemName: items.name,
-                tenderStatus: statuses.name,
-                tenderCategory: statuses.tenderCategory,
-                bidSubmissionDate: bidSubmissions.submissionDatetime,
-                costingFinalPrice: tenderCostingSheets.finalPrice,
-                resultId: tenderResults.id,
-                resultStatus: tenderResults.status,
-            })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(and(...whereConditions))
-            .orderBy(orderByClause)
-            .limit(limit)
-            .offset(offset);
-        console.log('rows', rows);
-        // If no rows, return empty data
-        if (!rows || rows.length === 0) {
-            return {
-                data: [],
-                meta: {
-                    total: 0,
-                    page,
-                    limit,
-                    totalPages: 0,
-                },
-            };
+            console.log('Type filter added to conditions');
+        } else {
+            console.log('No type filter applied');
         }
 
-        const tenderIds = rows.map((r) => r.tenderId);
-        const emdDetailsMap = await this.getEmdDetailsForTenders(tenderIds);
-        console.log('emdDetailsMap', emdDetailsMap);
-        // Map the rows to the desired structure
-        const data = rows.map((row) => ({
-            id: row.resultId,
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            teamExecutiveName: row.teamExecutiveName,
-            bidSubmissionDate: row.bidSubmissionDate,
-            tenderValue: row.tenderValue,
-            finalPrice: row.costingFinalPrice || row.tenderValue,
-            itemName: row.itemName,
-            tenderStatus: row.tenderStatus,
-            resultStatus: row.resultStatus || '', // Ensure the result status is not null
-            emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
-            hasResultEntry: row.resultId !== null,
-        }));
-        console.log('data', data);
-        // Get the total number of matching rows
-        const totalRows = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(and(...whereConditions));
-        console.log('totalRows', totalRows);
-        const total = Number(totalRows[0]?.count || 0);
-        console.log('total', total);
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+        try {
+            // Check 1: Base conditions only (without type filter)
+            const baseConditionsCount = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...whereConditions.slice(0, 4))); // Base conditions only
+
+            const baseCount = Number(baseConditionsCount[0]?.count || 0);
+
+            // Check 3: If type filter exists, check count with type filter
+            if (typeFilter) {
+                const withTypeFilterCount = await this.db
+                    .select({ count: sql<number>`count(*)` })
+                    .from(tenderInfos)
+                    .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                    .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                    .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+                    .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                    .where(and(...whereConditions));
+            }
+        } catch (diagError) {
+            console.error('Diagnostic query error:', diagError);
+        }
+
+        // Fetch the rows from the database with DISTINCT to avoid duplicates
+        try {
+            const rows = await this.db
+                .select({
+                    tenderId: tenderInfos.id,
+                    tenderNo: tenderInfos.tenderNo,
+                    tenderName: tenderInfos.tenderName,
+                    tenderValue: tenderInfos.gstValues,
+                    emdAmount: tenderInfos.emd,
+                    teamExecutiveName: users.name,
+                    itemName: items.name,
+                    statusId: tenderInfos.status,
+                    tenderStatus: statuses.name,
+                    tenderCategory: statuses.tenderCategory,
+                    bidSubmissionDate: bidSubmissions.submissionDatetime,
+                    costingFinalPrice: tenderCostingSheets.finalPrice,
+                    resultId: tenderResults.id,
+                    resultStatus: tenderResults.status,
+                })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...whereConditions))
+                .orderBy(orderByClause)
+                .limit(limit)
+                .offset(offset);
+
+            // If no rows, return empty data
+            if (!rows || rows.length === 0) {
+                console.log('=== No rows found, returning empty result ===');
+                return {
+                    data: [],
+                    meta: {
+                        total: 0,
+                        page,
+                        limit,
+                        totalPages: 0,
+                    },
+                };
+            }
+
+            const tenderIds = rows.map((r) => r.tenderId);
+            const emdDetailsMap = await this.getEmdDetailsForTenders(tenderIds);
+
+            // Map the rows to the desired structure
+            const data = rows.map((row) => ({
+                id: row.resultId,
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo,
+                tenderName: row.tenderName,
+                teamExecutiveName: row.teamExecutiveName,
+                bidSubmissionDate: row.bidSubmissionDate,
+                tenderValue: row.tenderValue,
+                finalPrice: row.costingFinalPrice || row.tenderValue,
+                itemName: row.itemName,
+                tenderStatus: row.tenderStatus,
+                tenderStatusId: row.statusId,
+                resultStatus: row.resultStatus || '', // Ensure the result status is not null
+                emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
+                hasResultEntry: row.resultId !== null,
+            }));
+
+            // Get the total number of matching rows
+            const totalRows = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...whereConditions));
+
+            const total = Number(totalRows[0]?.count || 0);
+
+            return {
+                data,
+                meta: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+        } catch (error) {
+            console.error('Error details:', error);
+            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+            console.error('Query parameters:', { filters, page, limit, offset });
+            throw error;
+        }
     }
 
     async getCounts(): Promise<ResultDashboardCounts> {
@@ -242,7 +300,9 @@ export class TenderResultService {
             eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1]),
         ];
 
-        // Count pending (result status is null AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified)
+        // Count pending (result status is null OR 'Under Evaluation' AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified)
+        const pendingStatusNames = ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'];
+
         const pendingCount = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(tenderInfos)
@@ -253,8 +313,11 @@ export class TenderResultService {
             .where(
                 and(
                     ...baseConditions,
-                    isNull(tenderResults.status),
-                    inArray(statuses.name, ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'])
+                    or(
+                        isNull(tenderResults.status),
+                        eq(tenderResults.status, RESULT_STATUS.UNDER_EVALUATION),
+                        inArray(statuses.name, pendingStatusNames)
+                    ),
                 )
             );
 
@@ -520,31 +583,34 @@ export class TenderResultService {
         let statusComment: string = '';
 
         if (dto.technicallyQualified === 'No') {
+            // Disqualified: Update tender status to 22
             updateData.status = RESULT_STATUS.DISQUALIFIED;
             updateData.disqualificationReason = dto.disqualificationReason;
-            // AUTO STATUS CHANGE: Update tender status to 22 (Disqualified)
             newStatus = 22; // Status ID for "Disqualified (reason)"
             statusComment = 'Disqualified';
         } else {
-            updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
+            // Qualified: Save qualified parties data
             updateData.qualifiedPartiesCount = dto.qualifiedPartiesCount;
             updateData.qualifiedPartiesNames = dto.qualifiedPartiesNames;
-            updateData.result = dto.result;
-            updateData.l1Price = dto.l1Price;
-            updateData.l2Price = dto.l2Price;
-            updateData.ourPrice = dto.ourPrice;
             updateData.qualifiedPartiesScreenshot = dto.qualifiedPartiesScreenshot;
-            updateData.finalResultScreenshot = dto.finalResultScreenshot;
-            updateData.resultUploadedAt = new Date();
 
-            if (dto.result === 'Won') {
-                // AUTO STATUS CHANGE: Update tender status to 25 (Won (PO awaited))
-                newStatus = 25; // Status ID for "Won (PO awaited)"
-                statusComment = 'Won (PO awaited)';
-            } else if (dto.result === 'Lost') {
-                // AUTO STATUS CHANGE: Update tender status to 24 (Lost)
-                newStatus = 24; // Status ID for "Lost (Price Bid result to be uploaded)"
-                statusComment = 'Lost';
+            // Only update tender status if result details are provided
+            if (dto.result) {
+                updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
+                updateData.result = dto.result;
+                updateData.l1Price = dto.l1Price;
+                updateData.l2Price = dto.l2Price;
+                updateData.ourPrice = dto.ourPrice;
+                updateData.finalResultScreenshot = dto.finalResultScreenshot;
+                updateData.resultUploadedAt = new Date();
+
+                // Update tender status based on result
+                newStatus = dto.result === 'Won' ? 25 : 24; // 25 for Won, 24 for Lost
+                statusComment = dto.result === 'Won' ? 'Won (PO awaited)' : 'Lost';
+            } else {
+                // No result details: Only update result status, not tender status
+                updateData.status = RESULT_STATUS.UNDER_EVALUATION;
+                // newStatus remains null, so tender status won't be updated
             }
         }
 
