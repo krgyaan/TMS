@@ -136,13 +136,17 @@ export class AuthController {
      */
     private getFrontendBaseUrl(redirectUri?: string): string {
         if (!redirectUri) {
-            return 'http://localhost:5173';
+            throw new BadRequestException(
+                'AUTH_GOOGLE_REDIRECT environment variable is not configured. Please set it to your frontend callback URL.'
+            );
         }
         try {
             const url = new URL(redirectUri);
             return `${url.protocol}//${url.host}`;
-        } catch {
-            return 'http://localhost:5173';
+        } catch (error) {
+            throw new BadRequestException(
+                `Invalid AUTH_GOOGLE_REDIRECT format: ${redirectUri}. Must be a valid URL.`
+            );
         }
     }
 
@@ -166,22 +170,26 @@ export class AuthController {
 
             this.setAuthCookie(res, session.accessToken);
 
-            // Redirect to frontend callback URL with success flag
-            // Don't include code/state since they've already been used
-            // The cookie is already set, so the frontend can verify authentication
-            const frontendCallbackUrl = this.configService.get<string>(
-                'auth.googleRedirect',
-                'http://localhost:5173/auth/google/callback',
-            );
-            const redirectUrl = new URL(frontendCallbackUrl);
+            // Get redirect URL from config (no fallback)
+            const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
+            if (!authCfg?.googleRedirect) {
+                throw new BadRequestException(
+                    'AUTH_GOOGLE_REDIRECT environment variable is not configured.'
+                );
+            }
+            const redirectUrl = new URL(authCfg.googleRedirect);
             redirectUrl.searchParams.set('success', 'true');
             res.redirect(redirectUrl.toString());
         } catch (error) {
-            // Redirect to frontend callback with error
-            const frontendCallbackUrl = this.configService.get<string>(
-                'auth.googleRedirect',
-                'http://localhost:5173/auth/google/callback',
-            );
+            // Get redirect URL from config (no fallback)
+            const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
+            const frontendCallbackUrl = authCfg?.googleRedirect;
+            if (!frontendCallbackUrl) {
+                // If config is missing, return error response instead of redirecting
+                throw new BadRequestException(
+                    'AUTH_GOOGLE_REDIRECT environment variable is not configured.'
+                );
+            }
             const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
             const redirectUrl = new URL(frontendCallbackUrl);
             redirectUrl.searchParams.set('error', errorMessage);
