@@ -231,10 +231,6 @@ export const paths = {
         leadTypes: "/master/lead-types",
         leadTypes_create: "/master/lead-types/create",
         leadTypes_edit: (id: number | string) => `/master/lead-types/${id}/edit`,
-
-        vendors: "/master/vendors",
-        vendors_create: "/master/vendors/create",
-        vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
     },
 
     // ==================== SHARED ====================
