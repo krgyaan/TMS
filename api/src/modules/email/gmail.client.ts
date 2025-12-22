@@ -78,6 +78,11 @@ export class GmailClient {
             this.oauth2Client.setCredentials({ refresh_token: oauth.refreshToken });
             const { credentials } = await this.oauth2Client.refreshAccessToken();
 
+            if (!credentials.access_token) {
+                this.logger.error(`Token refresh succeeded but no access_token for user ${oauth.userId}`);
+                return null;
+            }
+
             // Update in database
             await this.db
                 .update(oauthAccounts)
@@ -115,7 +120,11 @@ export class GmailClient {
         const token = await this.getValidToken(userId);
         if (!token) return null;
 
-        const auth = new OAuth2Client();
+        const auth = new google.auth.OAuth2(
+            this.config.get('GOOGLE_CLIENT_ID'),
+            this.config.get('GOOGLE_CLIENT_SECRET'),
+            this.config.get('GOOGLE_REDIRECT_URI'),
+        );
         auth.setCredentials({ access_token: token.accessToken });
 
         return google.gmail({ version: 'v1', auth });
