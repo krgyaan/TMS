@@ -689,8 +689,8 @@ export class TenderInfosService {
             throw new NotFoundException(`Item with ID ${itemId} not found`);
         }
 
-        // Build base name parts
-        const nameParts = [organization.acronym.trim(), item.name.trim()];
+        // Build base name parts: org loc item
+        const nameParts = [organization.acronym.trim()];
 
         // Add location name if provided
         if (locationId) {
@@ -704,6 +704,9 @@ export class TenderInfosService {
                 nameParts.push(location.name.trim());
             }
         }
+
+        // Add item name last
+        nameParts.push(item.name.trim());
 
         // Build base name
         const baseName = nameParts.join(' ');
@@ -723,7 +726,7 @@ export class TenderInfosService {
         if (existingCount > 0) {
             uniqueName = `${baseName} (${existingCount})`;
         }
-
+        console.log("Tender Name: ", uniqueName);
         return { tenderName: uniqueName };
     }
 }

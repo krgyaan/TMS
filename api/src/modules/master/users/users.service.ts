@@ -22,6 +22,7 @@ export type SafeUser = Pick<
     | 'email'
     | 'username'
     | 'mobile'
+    | 'team'
     | 'isActive'
     | 'createdAt'
     | 'updatedAt'
@@ -37,6 +38,7 @@ export type UserProfileSummary = {
     employeeCode?: string | null;
     designationId?: number | null;
     primaryTeamId?: number | null;
+    oldTeamId?: number | null;
     altEmail?: string | null;
     emergencyContactName?: string | null;
     emergencyContactPhone?: string | null;
@@ -73,6 +75,7 @@ export type UserAuthInfo = {
     roleName: string | null;
     roleId: number | null;
     primaryTeamId: number | null;
+    oldTeamId: number | null;
     dataScope: DataScope;
     canSwitchTeams: boolean;
 };
@@ -90,6 +93,7 @@ export class UsersService {
                 name: users.name,
                 email: users.email,
                 username: users.username,
+                oldTeamId: users.team,
                 mobile: users.mobile,
                 isActive: users.isActive,
                 createdAt: users.createdAt,
@@ -146,6 +150,7 @@ export class UsersService {
                 employeeCode: row.profileEmployeeCode,
                 designationId: row.profileDesignationId,
                 primaryTeamId: row.profilePrimaryTeamId,
+                oldTeamId: row.team,
                 altEmail: row.profileAltEmail,
                 emergencyContactName: row.profileEmergencyContactName,
                 emergencyContactPhone: row.profileEmergencyContactPhone,
@@ -197,7 +202,7 @@ export class UsersService {
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             profile,
-            team,
+            team: row.primaryTeamId !== null ? row.primaryTeamId : row.oldTeamId,
             designation,
             role,  // NEW
         };
@@ -212,6 +217,7 @@ export class UsersService {
                 roleName: roles.name,
                 roleId: roles.id,
                 primaryTeamId: userProfiles.primaryTeamId,
+                oldTeamId: users.team,
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
@@ -229,6 +235,7 @@ export class UsersService {
             roleName: row.roleName,
             roleId: row.roleId,
             primaryTeamId: row.primaryTeamId,
+            oldTeamId: row.oldTeamId,
             dataScope: getDataScope(row.roleName ?? ''),
             canSwitchTeams: canSwitchTeams(row.roleName ?? ''),
         };
@@ -431,6 +438,7 @@ export class UsersService {
             email,
             username,
             mobile,
+            team,
             isActive,
             createdAt,
             updatedAt,
@@ -439,6 +447,7 @@ export class UsersService {
             id,
             name,
             email,
+            team,
             username,
             mobile,
             isActive,
@@ -587,5 +596,21 @@ export class UsersService {
 
     private async hashPassword(plain: string) {
         return hash(plain);
+    }
+
+    async getTeamMembers(teamId: number): Promise<User[]> {
+        const result = (await this.db
+            .select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                mobile: users.mobile,
+                team: users.team,
+                isActive: users.isActive
+            })
+            .from(users)
+            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))
+        ) as User[];
+        return result;
     }
 }

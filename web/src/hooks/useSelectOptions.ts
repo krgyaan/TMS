@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { useTeams } from './api/useTeams';
 import { useOrganizations } from './api/useOrganizations';
-import { useUsers } from './api/useUsers';
 import { useLocations } from './api/useLocations';
 import { useWebsites } from './api/useWebsites';
 import { useItems } from './api/useItems';
 import { useStatuses } from './api/useStatuses';
+import { useGetTeamMembers } from './api/useUsers';
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -25,11 +25,11 @@ export function useOrganizationOptions(status: boolean = true) {
     );
 }
 
-export function useUserOptions(status: boolean = true) {
-    const { data: users = [] } = useUsers();
-
+export function useUserOptions(teamId?: number) {
+    const { data: users = [] } = useGetTeamMembers(teamId ?? 2);
+    console.log("users", users);
     return useMemo(
-        () => users.filter((u) => u.isActive === status).map((u) => ({ id: String(u.id), name: u.name })),
+        () => users.map((u) => ({ id: String(u.id), name: u.name })),
         [users]
     );
 }

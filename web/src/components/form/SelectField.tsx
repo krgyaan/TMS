@@ -14,6 +14,7 @@ type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<
     label: React.ReactNode
     options: Array<SelectOption | { value: string; label: string }>
     placeholder: string
+    disabled?: boolean
 }
 
 export function SelectField<
@@ -25,6 +26,7 @@ export function SelectField<
     label,
     options,
     placeholder,
+    disabled,
 }: SelectFieldProps<TFieldValues, TName>) {
     const normalizedOptions = React.useMemo<SelectOption[]>(
         () =>
@@ -53,6 +55,7 @@ export function SelectField<
                     }}
                     options={normalizedOptions}
                     placeholder={placeholder}
+                    disabled={disabled}
                 />
             )}
         </FieldWrapper>
@@ -65,11 +68,13 @@ function Combobox({
     onChange,
     options,
     placeholder,
+    disabled,
 }: {
     value: string
     onChange: (v: string) => void
     options: SelectOption[]
     placeholder: string
+    disabled?: boolean
 }) {
     const [open, setOpen] = React.useState(false)
     const [query, setQuery] = React.useState("")
@@ -91,13 +96,14 @@ function Combobox({
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild disabled={disabled}>
                 <Button
                     type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
                     className="w-full justify-between"
+                    disabled={disabled}
                 >
                     {selected ? selected.name : placeholder}
                     <svg
