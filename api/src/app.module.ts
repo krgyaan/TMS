@@ -60,7 +60,7 @@ import { TqManagementModule } from "@/modules/tendering/tq-management/tq-managem
 import { ReverseAuctionModule } from "@/modules/tendering/reverse-auction/reverse-auction.module";
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { PermissionsModule } from "@/modules/master/permissions/permissions.module";
-// import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
+import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 
 @Module({
     imports: [
@@ -132,7 +132,7 @@ import { PermissionsModule } from "@/modules/master/permissions/permissions.modu
         TqManagementModule,
         ReverseAuctionModule,
         TenderResultModule,
-        // ImprestAdminModule,
+        ImprestAdminModule,
     ],
     controllers: [AppController],
     providers: [
@@ -143,4 +143,4 @@ import { PermissionsModule } from "@/modules/master/permissions/permissions.modu
         },
     ],
 })
-export class AppModule { }
+export class AppModule {}
