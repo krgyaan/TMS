@@ -69,6 +69,10 @@ class UsersService extends BaseApiService {
     async removeUserPermission(userId: number, permissionId: number): Promise<void> {
         return this.delete<void>(`/${userId}/permissions/${permissionId}`)
     }
+
+    async getTeamMembers(teamId: number): Promise<User[]> {
+        return this.get<User[]>(`/team/${teamId}/members`)
+    }
 }
 
 export const usersService = new UsersService()

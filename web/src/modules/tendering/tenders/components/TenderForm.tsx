@@ -69,7 +69,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     const teamOptions = useTeamOptions([1, 2]);
     const organizationOptions = useOrganizationOptions();
-    const userOptions = useUserOptions();
     const locationOptions = useLocationOptions();
     const websiteOptions = useWebsiteOptions();
     const itemOptions = useItemOptions();
@@ -106,14 +105,18 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         },
     });
 
-    // Watch organization, item, and location fields for auto-generation
+    // Watch organization, item, location, and team fields for auto-generation and filtering
     const organization = useWatch({ control: manualForm.control, name: "organization" });
     const item = useWatch({ control: manualForm.control, name: "item" });
     const location = useWatch({ control: manualForm.control, name: "location" });
+    const team = useWatch({ control: manualForm.control, name: "team" });
+
+    // Filter user options by selected team
+    const userOptions = useUserOptions(team);
 
     // Track if form has been initialized to avoid auto-generation on initial load
     const isInitialLoad = useRef(true);
-    const previousValues = useRef<{ organization?: number; item?: number; location?: number }>({});
+    const previousValues = useRef<{ organization?: number; item?: number; location?: number; team?: number }>({});
 
     useEffect(() => {
         if (!tender || mode !== "edit") {
@@ -149,6 +152,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 organization: resetValues.organization,
                 item: resetValues.item,
                 location: resetValues.location,
+                team: resetValues.team,
             };
             // Mark as ready after reset completes
             setTimeout(() => {
@@ -198,8 +202,23 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         }
 
         // Update previous values
-        previousValues.current = { organization, item, location };
-    }, [organization, item, location, generateTenderName, manualForm]);
+        previousValues.current = { organization, item, location, team };
+    }, [organization, item, location, team, generateTenderName, manualForm]);
+
+    // Clear team member when team changes
+    useEffect(() => {
+        // Skip on initial load
+        if (isInitialLoad.current) {
+            return;
+        }
+
+        // Check if team actually changed
+        if (previousValues.current.team !== team) {
+            // Clear team member field when team changes
+            manualForm.setValue("teamMember", undefined as any, { shouldValidate: false });
+            previousValues.current.team = team;
+        }
+    }, [team, manualForm]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
@@ -321,7 +340,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
                                     {/* Tender Name */}
                                     <FieldWrapper<ManualFormValues, "tenderName"> control={manualForm.control} name="tenderName" label="Tender Name">
-                                        {field => <Input placeholder="Tender Name" {...field} />}
+                                        {field => <Input placeholder="Tender Name" {...field} readOnly={true} />}
                                     </FieldWrapper>
 
                                     {/* Organization */}
@@ -331,6 +350,23 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Organization"
                                         options={organizationOptions}
                                         placeholder="Select Organization"
+                                    />
+
+                                    {/* Location */}
+                                    <SelectField<ManualFormValues, "location">
+                                        control={manualForm.control}
+                                        name="location"
+                                        label="Location"
+                                        options={locationOptions}
+                                        placeholder="Select Location"
+                                    />
+
+                                    {/* Item */}
+                                    <SelectField<ManualFormValues, "item">
+                                        control={manualForm.control}
+                                        name="item" label="Item"
+                                        options={itemOptions}
+                                        placeholder="Select Item"
                                     />
 
                                     {/* GST Values */}
@@ -355,21 +391,13 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Member"
                                         options={userOptions}
                                         placeholder="Select User"
+                                        disabled={!team}
                                     />
 
                                     {/* Due Date & Time */}
                                     <FieldWrapper<ManualFormValues, "dueDate"> control={manualForm.control} name="dueDate" label="Due Date and Time">
                                         {field => <DateTimeInput value={field.value} onChange={field.onChange} className="bg-background" />}
                                     </FieldWrapper>
-
-                                    {/* Location */}
-                                    <SelectField<ManualFormValues, "location">
-                                        control={manualForm.control}
-                                        name="location"
-                                        label="Location"
-                                        options={locationOptions}
-                                        placeholder="Select Location"
-                                    />
 
                                     {/* Website */}
                                     <SelectField<ManualFormValues, "website">
@@ -379,9 +407,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-
-                                    {/* Item */}
-                                    <SelectField<ManualFormValues, "item"> control={manualForm.control} name="item" label="Item" options={itemOptions} placeholder="Select Item" />
 
                                     {/* Documents */}
                                     <FileUploadField<ManualFormValues, "documents">

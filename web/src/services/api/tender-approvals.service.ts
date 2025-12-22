@@ -17,7 +17,7 @@ class TenderApprovalsService extends BaseApiService {
         params?: TenderApprovalFilters
     ): Promise<PaginatedResult<TenderApprovalRow>> {
         const search = new URLSearchParams();
-
+        console.log("TESSSST");
         if (params) {
             if (params.tlStatus) search.set('tlStatus', String(params.tlStatus));
             if (params.page) search.set('page', params.page.toString());

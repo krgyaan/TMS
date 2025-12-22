@@ -288,4 +288,11 @@ export class UsersController {
     ) {
         await this.usersService.removeUserPermission(userId, permissionId);
     }
+
+    @Get('team/:teamId/members')
+    @CanRead('users')
+    async getTeamMembers(@Param('teamId', ParseIntPipe) teamId: number) {
+        const members = await this.usersService.getTeamMembers(teamId);
+        return members;
+    }
 }

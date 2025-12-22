@@ -72,3 +72,11 @@ export const useDeleteUser = () => {
         },
     });
 };
+
+export const useGetTeamMembers = (teamId: number) => {
+    return useQuery({
+        queryKey: [...userKeys.lists(), "team", teamId, "members"],
+        queryFn: () => usersService.getTeamMembers(teamId),
+        enabled: !!teamId,
+    });
+};
