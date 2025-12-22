@@ -94,6 +94,18 @@ export class GoogleService {
     ) { }
 
     private createClient(redirectUri?: string) {
+        // Better logging to check if config is loaded
+        if (!this.config.clientId || this.config.clientId.includes('your_client')) {
+            this.logger.error('GOOGLE_CLIENT_ID is not properly configured!');
+            this.logger.error(`Current value: ${this.config.clientId}`);
+        }
+        if (!this.config.clientSecret || this.config.clientSecret.includes('your_secret')) {
+            this.logger.error('GOOGLE_CLIENT_SECRET is not properly configured!');
+        }
+
+        this.logger.debug(`Creating OAuth client with Client ID: ${this.config.clientId?.substring(0, 20)}...`);
+        this.logger.debug(`Redirect URI: ${redirectUri ?? this.config.redirectUri}`);
+
         return new google.auth.OAuth2(
             this.config.clientId,
             this.config.clientSecret,

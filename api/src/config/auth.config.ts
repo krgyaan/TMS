@@ -7,8 +7,7 @@ const authEnvSchema = z.object({
     STATE_SECRET: z.string().min(16, 'STATE_SECRET must be at least 16 characters'),
     AUTH_GOOGLE_REDIRECT: z
         .string()
-        .url('AUTH_GOOGLE_REDIRECT must be a valid URL')
-        .default('http://localhost:5173/auth/google/callback'),
+        .url('AUTH_GOOGLE_REDIRECT must be a valid URL'),
 });
 
 export type AuthConfig = {
