@@ -11,6 +11,9 @@ export const axiosInstance: AxiosInstance = axios.create({
     withCredentials: true, // ✅ IMPORTANT: Send cookies with requests
 })
 
+// Flag to prevent multiple simultaneous redirects
+let isRedirecting = false
+
 // Request interceptor - No need to add token manually (cookies are automatic)
 axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
@@ -28,12 +31,26 @@ axiosInstance.interceptors.response.use(
     async (error: AxiosError) => {
         // Handle 401 Unauthorized
         if (error.response?.status === 401) {
+            // Prevent multiple simultaneous redirects
+            if (isRedirecting) {
+                return Promise.reject(error)
+            }
+
+            // Set flag to prevent multiple redirects
+            isRedirecting = true
+
             // Clear user data (token is in httpOnly cookie, can't access it)
             localStorage.removeItem('user')
 
             // Only redirect if not already on login page
             if (!window.location.pathname.startsWith('/login')) {
-                window.location.href = '/login'
+                // Use a small delay to ensure localStorage is cleared before redirect
+                setTimeout(() => {
+                    window.location.href = '/login'
+                }, 0)
+            } else {
+                // Reset flag if already on login page
+                isRedirecting = false
             }
         }
 

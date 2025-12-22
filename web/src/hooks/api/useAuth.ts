@@ -27,6 +27,8 @@ export const useCurrentUser = () => {
         },
         retry: false,
         staleTime: 5 * 60 * 1000, // 5 minutes
+        refetchOnWindowFocus: false, // Prevent refetch when tab becomes active
+        refetchOnReconnect: false, // Prevent refetch on network reconnect
         initialData: () => getStoredUser(),
     });
 };

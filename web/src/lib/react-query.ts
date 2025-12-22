@@ -5,6 +5,7 @@ const queryConfig: DefaultOptions = {
     queries: {
         retry: 1,
         refetchOnWindowFocus: false,
+        refetchOnReconnect: false, // Add this to prevent refetch when network reconnects
         staleTime: 5 * 60 * 1000, // 5 minutes
         gcTime: 10 * 60 * 1000, // 10 minutes (previously cacheTime)
     },
