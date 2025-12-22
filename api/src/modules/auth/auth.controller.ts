@@ -1,24 +1,13 @@
-import {
-    Body,
-    BadRequestException,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Post,
-    Query,
-    Res,
-    UnauthorizedException,
-} from '@nestjs/common';
-import type { Response } from 'express';
-import { z } from 'zod';
-import { AuthService } from '@/modules/auth/auth.service';
-import { Public } from '@/modules/auth/decorators/public.decorator';
-import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { ConfigService } from '@nestjs/config';
-import type { AuthConfig } from '@config/auth.config';
-import authConfig from '@config/auth.config';
+import { Body, BadRequestException, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UnauthorizedException } from "@nestjs/common";
+import type { Response } from "express";
+import { z } from "zod";
+import { AuthService } from "@/modules/auth/auth.service";
+import { Public } from "@/modules/auth/decorators/public.decorator";
+import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { ConfigService } from "@nestjs/config";
+import type { AuthConfig } from "@config/auth.config";
+import authConfig from "@config/auth.config";
 
 const LoginSchema = z.object({
     email: z.string().email(),
@@ -30,20 +19,17 @@ const GoogleCallbackSchema = z.object({
     state: z.string().optional(),
 });
 
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
-        private readonly configService: ConfigService,
-    ) { }
+        private readonly configService: ConfigService
+    ) {}
 
     @Public()
-    @Post('login')
+    @Post("login")
     @HttpCode(HttpStatus.OK)
-    async login(
-        @Body() body: unknown,
-        @Res({ passthrough: true }) res: Response,
-    ) {
+    async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
         const { email, password } = LoginSchema.parse(body);
         const session = await this.authService.loginWithPassword(email, password);
 
@@ -52,29 +38,31 @@ export class AuthController {
         return { user: session.user };
     }
 
-    @Get('me')
+    @Get("me")
     async me(@CurrentUser() user: ValidatedUser) {
         if (!user) {
-            throw new UnauthorizedException('Not authenticated');
+            throw new UnauthorizedException("Not authenticated");
         }
         // Return full user details including role
         return { user: await this.authService.getProfile(user.sub) };
     }
 
-    @Post('logout')
+    @Public()
+    @Post("logout")
     @HttpCode(HttpStatus.OK)
     async logout(@Res({ passthrough: true }) res: Response) {
-        res.clearCookie('access_token', {
+        res.clearCookie("access_token", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
         });
-        return { message: 'Logged out successfully' };
+
+        return { message: "Logged out successfully" };
     }
 
     @Public()
-    @Get('google/url')
+    @Get("google/url")
     async googleUrl() {
         console.log("google login called!");
         return this.authService.generateGoogleLoginUrl();
@@ -85,11 +73,8 @@ export class AuthController {
      * This sets the auth cookie and redirects to the frontend
      */
     @Public()
-    @Get('google/callback')
-    async googleCallbackGetOld(
-        @Query() query: Record<string, unknown>,
-        @Res() res: Response,
-    ) {
+    @Get("google/callback")
+    async googleCallbackGetOld(@Query() query: Record<string, unknown>, @Res() res: Response) {
         let code: string;
         let state: string | undefined;
 
@@ -101,16 +86,13 @@ export class AuthController {
             const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
             const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
             const errorMessage = encodeURIComponent(
-                `Invalid OAuth callback parameters. ${error instanceof Error ? error.message : 'Missing required fields: code and optional state.'}`
+                `Invalid OAuth callback parameters. ${error instanceof Error ? error.message : "Missing required fields: code and optional state."}`
             );
             return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}`);
         }
 
         try {
-            const session = await this.authService.handleGoogleLoginCallback(
-                code,
-                state,
-            );
+            const session = await this.authService.handleGoogleLoginCallback(code, state);
 
             this.setAuthCookie(res, session.accessToken);
 
@@ -123,9 +105,7 @@ export class AuthController {
             const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
             const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
             const errorMessage = encodeURIComponent(
-                error instanceof BadRequestException
-                    ? error.message
-                    : `Google OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+                error instanceof BadRequestException ? error.message : `Google OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error occurred"}`
             );
             return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}`);
         }
@@ -136,13 +116,13 @@ export class AuthController {
      */
     private getFrontendBaseUrl(redirectUri?: string): string {
         if (!redirectUri) {
-            return 'http://localhost:5173';
+            return "http://localhost:5173";
         }
         try {
             const url = new URL(redirectUri);
             return `${url.protocol}//${url.host}`;
         } catch {
-            return 'http://localhost:5173';
+            return "http://localhost:5173";
         }
     }
 
@@ -151,51 +131,36 @@ export class AuthController {
      * This is used when Google redirects to frontend, and frontend calls backend
      */
     @Public()
-    @Get('google/callback')
-    async googleCallbackGet(
-        @Query() query: Record<string, unknown>,
-        @Res() res: Response,
-    ) {
+    @Get("google/callback")
+    async googleCallbackGet(@Query() query: Record<string, unknown>, @Res() res: Response) {
         const { code, state } = GoogleCallbackSchema.parse(query);
 
         try {
-            const session = await this.authService.handleGoogleLoginCallback(
-                code,
-                state,
-            );
+            const session = await this.authService.handleGoogleLoginCallback(code, state);
 
             this.setAuthCookie(res, session.accessToken);
 
             // Redirect to frontend callback URL with success flag
             // Don't include code/state since they've already been used
             // The cookie is already set, so the frontend can verify authentication
-            const frontendCallbackUrl = this.configService.get<string>(
-                'auth.googleRedirect',
-                'http://localhost:5173/auth/google/callback',
-            );
+            const frontendCallbackUrl = this.configService.get<string>("auth.googleRedirect", "http://localhost:5173/auth/google/callback");
             const redirectUrl = new URL(frontendCallbackUrl);
-            redirectUrl.searchParams.set('success', 'true');
+            redirectUrl.searchParams.set("success", "true");
             res.redirect(redirectUrl.toString());
         } catch (error) {
             // Redirect to frontend callback with error
-            const frontendCallbackUrl = this.configService.get<string>(
-                'auth.googleRedirect',
-                'http://localhost:5173/auth/google/callback',
-            );
-            const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+            const frontendCallbackUrl = this.configService.get<string>("auth.googleRedirect", "http://localhost:5173/auth/google/callback");
+            const errorMessage = error instanceof Error ? error.message : "Authentication failed";
             const redirectUrl = new URL(frontendCallbackUrl);
-            redirectUrl.searchParams.set('error', errorMessage);
+            redirectUrl.searchParams.set("error", errorMessage);
             res.redirect(redirectUrl.toString());
         }
     }
 
     @Public()
-    @Post('google/callback')
+    @Post("google/callback")
     @HttpCode(HttpStatus.OK)
-    async googleCallbackPost(
-        @Body() body: unknown,
-        @Res({ passthrough: true }) res: Response,
-    ) {
+    async googleCallbackPost(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
         let code: string;
         let state: string | undefined;
 
@@ -205,15 +170,12 @@ export class AuthController {
             state = parsed.state;
         } catch (error) {
             throw new BadRequestException(
-                `Invalid request body for Google OAuth callback. ${error instanceof Error ? error.message : 'Missing required fields: code and optional state.'}`
+                `Invalid request body for Google OAuth callback. ${error instanceof Error ? error.message : "Missing required fields: code and optional state."}`
             );
         }
 
         try {
-            const session = await this.authService.handleGoogleLoginCallback(
-                code,
-                state,
-            );
+            const session = await this.authService.handleGoogleLoginCallback(code, state);
 
             this.setAuthCookie(res, session.accessToken);
 
@@ -224,9 +186,7 @@ export class AuthController {
                 throw error;
             }
             // Wrap unexpected errors
-            throw new BadRequestException(
-                `Google OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
-            );
+            throw new BadRequestException(`Google OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
         }
     }
 
@@ -234,12 +194,9 @@ export class AuthController {
      * Refresh the current user's session
      * Useful when role/team changes need to be reflected
      */
-    @Post('refresh')
+    @Post("refresh")
     @HttpCode(HttpStatus.OK)
-    async refresh(
-        @CurrentUser() user: ValidatedUser,
-        @Res({ passthrough: true }) res: Response,
-    ) {
+    async refresh(@CurrentUser() user: ValidatedUser, @Res({ passthrough: true }) res: Response) {
         const session = await this.authService.refreshSession(user.sub);
 
         this.setAuthCookie(res, session.accessToken);
@@ -248,12 +205,12 @@ export class AuthController {
     }
 
     private setAuthCookie(res: Response, token: string) {
-        res.cookie('access_token', token, {
+        res.cookie("access_token", token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            path: '/',
+            path: "/",
         });
     }
 }

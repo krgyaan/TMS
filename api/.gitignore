@@ -53,6 +53,7 @@ pids
 *.pid.lock
 
 #uploads
+/uploads
 /uploads/
 /uploads/*
 
