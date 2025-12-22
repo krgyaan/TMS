@@ -40,7 +40,7 @@ const CreateTenderInfoSchema = z.object({
     tenderFees: decimalField("Tender fees must be positive").default(0.00),
     emd: decimalField("EMD must be positive").default(0.00),
 
-    teamMember: z.coerce.number().int().positive("Team member is required"),
+    teamMember: z.coerce.number().int().positive().nullable().optional(),
     dueDate: z.string().min(1, "Due date is required").transform((val) => new Date(val)),
 
     remarks: z.string().max(200).optional(),
@@ -67,7 +67,7 @@ const UpdateTenderInfoSchema = z.object({
     tenderFees: decimalField("Tender fees must be positive", false),
     emd: decimalField("EMD must be positive", false),
 
-    teamMember: z.coerce.number().int().positive("Team member is required").optional(),
+    teamMember: z.coerce.number().int().positive().nullable().optional(),
     dueDate: z.string().min(1, "Due date is required").transform((val) => new Date(val)).optional(),
 
     remarks: z.string().max(200).optional(),

@@ -40,9 +40,33 @@ export const TenderInformationFormSchema = z.object({
     paymentTermsInstallation: z.coerce.number().min(0).max(100).optional(),
 
     // Delivery Time
-    deliveryTimeSupply: z.coerce.number().int().positive().optional(),
+    deliveryTimeSupply: z.preprocess(
+        (v) => {
+            if (v === null || v === undefined || v === '') {
+                return null;
+            }
+            const num = typeof v === 'number' ? v : Number(v);
+            if (isNaN(num) || num <= 0) {
+                return null;
+            }
+            return num;
+        },
+        z.number().int().positive().nullable().optional()
+    ),
     deliveryTimeInstallationInclusive: z.boolean().default(false),
-    deliveryTimeInstallation: z.coerce.number().int().positive().optional(),
+    deliveryTimeInstallation: z.preprocess(
+        (v) => {
+            if (v === null || v === undefined || v === '') {
+                return null;
+            }
+            const num = typeof v === 'number' ? v : Number(v);
+            if (isNaN(num) || num <= 0) {
+                return null;
+            }
+            return num;
+        },
+        z.number().int().positive().nullable().optional()
+    ),
 
     // PBG
     pbgRequired: z.enum(['YES', 'NO']).optional(),

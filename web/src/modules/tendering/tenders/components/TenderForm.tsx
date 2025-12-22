@@ -29,7 +29,7 @@ const ManualFormSchema = z.object({
     gstValues: z.coerce.number().nonnegative({ message: "Enter a valid amount" }).default(0),
     tenderFees: z.coerce.number().nonnegative({ message: "Enter a valid amount" }).default(0),
     emd: z.coerce.number().nonnegative({ message: "Enter a valid amount" }).default(0),
-    teamMember: z.coerce.number().int().positive({ message: "Team member is required" }),
+    teamMember: z.coerce.number().int().positive().nullable().optional(),
     dueDate: z.string().min(1, { message: "Due date and time is required" }),
     location: z.coerce.number().int().positive().optional(),
     website: z.coerce.number().int().positive().optional(),
@@ -83,7 +83,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             gstValues: 0,
             tenderFees: 0,
             emd: 0,
-            teamMember: undefined as any,
+            teamMember: null,
             dueDate: "",
             location: undefined,
             website: undefined,
@@ -138,7 +138,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 gstValues: tender.gstValues != null ? Number(tender.gstValues) : 0,
                 tenderFees: tender.tenderFees != null ? Number(tender.tenderFees) : 0,
                 emd: tender.emd != null ? Number(tender.emd) : 0,
-                teamMember: Number(tender.teamMember) || (undefined as any),
+                teamMember: tender.teamMember != null ? Number(tender.teamMember) : null,
                 dueDate: tender.dueDate ? (tender.dueDate as Date).toISOString() : undefined,
                 location: tender.location ? Number(tender.location) : undefined,
                 website: tender.website ? Number(tender.website) : undefined,
@@ -215,7 +215,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         // Check if team actually changed
         if (previousValues.current.team !== team) {
             // Clear team member field when team changes
-            manualForm.setValue("teamMember", undefined as any, { shouldValidate: false });
+            manualForm.setValue("teamMember", null, { shouldValidate: false });
             previousValues.current.team = team;
         }
     }, [team, manualForm]);
@@ -230,7 +230,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 gstValues: values.gstValues.toString(),
                 tenderFees: values.tenderFees.toString(),
                 emd: values.emd.toString(),
-                teamMember: values.teamMember,
+                teamMember: values.teamMember ?? null,
                 dueDate: new Date(values.dueDate).toISOString(),
                 location: values.location || undefined,
                 website: values.website || undefined,

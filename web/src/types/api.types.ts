@@ -647,7 +647,7 @@ export interface TenderInfo {
     gstValues: string;
     tenderFees: string;
     emd: string;
-    teamMember: number;
+    teamMember: number | null;
     dueDate: Date | string;
     remarks: string | null;
     status: number;
@@ -791,7 +791,7 @@ export interface CreateTenderRequest {
     gstValues?: string;
     tenderFees?: string;
     emd?: string;
-    teamMember: number;
+    teamMember?: number | null;
     dueDate: Date | string;
     remarks?: string | null;
     status?: number;
@@ -809,7 +809,7 @@ export interface UpdateTenderRequest {
     gstValues?: string;
     tenderFees?: string;
     emd?: string;
-    teamMember?: number;
+    teamMember?: number | null;
     dueDate?: Date | string;
     remarks?: string | null;
     status?: number;
