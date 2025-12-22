@@ -16,6 +16,7 @@ import { useResultDashboard, useResultDashboardCounts } from '@/hooks/api/useTen
 import type { ResultDashboardRow, ResultDashboardType } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -117,24 +118,16 @@ const TenderResultListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const handleViewDetails = useCallback((row: ResultDashboardRow) => {
-        if (row.id) {
-            navigate(`/tendering/results/${row.id}`);
-        }
+        if (row.id) return navigate(paths.tendering.resultsShow(row.tenderId));
     }, [navigate]);
 
     const handleUploadResult = useCallback((row: ResultDashboardRow) => {
-        if (row.id) {
-            navigate(`/tendering/results/${row.id}/edit`);
-        } else {
-            // If no result entry exists, navigate to upload page with tenderId
-            navigate(`/tendering/results/upload/${row.tenderId}`);
-        }
+        if (row.id) return navigate(paths.tendering.resultsUpload(row.tenderId));
+        return navigate(paths.tendering.resultsEdit(row.tenderId));
     }, [navigate]);
 
     const handleViewRa = useCallback((row: ResultDashboardRow) => {
-        if (row.reverseAuctionId) {
-            navigate(`/tendering/ras/${row.reverseAuctionId}`);
-        }
+        if (row.reverseAuctionId) return navigate(paths.tendering.rasShow(row.reverseAuctionId));
     }, [navigate]);
 
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
@@ -153,6 +146,7 @@ const TenderResultListPage = () => {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
                 onClick: handleViewRa,
+                visible: (row) => row.raApplicable && !!row.reverseAuctionId,
             },
         ],
         [handleViewDetails, handleUploadResult, handleViewRa]
@@ -163,16 +157,14 @@ const TenderResultListPage = () => {
             tenderNameCol<ResultDashboardRow>('tenderNo', {
                 headerName: 'Tender',
                 filter: true,
-                flex: 2,
-                minWidth: 250,
+                width: 250,
                 colId: 'tenderNo',
                 sortable: true,
             }),
             {
                 field: 'teamExecutiveName',
-                headerName: 'Team Executive',
-                flex: 1.5,
-                minWidth: 150,
+                headerName: 'Member',
+                width: 100,
                 colId: 'teamExecutiveName',
                 valueGetter: (params) => params.data?.teamExecutiveName || '—',
                 sortable: true,
@@ -181,8 +173,7 @@ const TenderResultListPage = () => {
             {
                 field: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
-                flex: 1.5,
-                minWidth: 170,
+                width: 150,
                 colId: 'bidSubmissionDate',
                 valueGetter: (params) =>
                     params.data?.bidSubmissionDate
@@ -194,8 +185,7 @@ const TenderResultListPage = () => {
             {
                 field: 'finalPrice',
                 headerName: 'Final Price',
-                flex: 1.2,
-                minWidth: 140,
+                width: 110,
                 colId: 'finalPrice',
                 valueGetter: (params) => {
                     const value = params.data?.finalPrice || params.data?.tenderValue;
@@ -209,7 +199,7 @@ const TenderResultListPage = () => {
                 field: 'itemName',
                 headerName: 'Item',
                 flex: 1,
-                minWidth: 120,
+                width: 100,
                 colId: 'itemName',
                 valueGetter: (params) => params.data?.itemName || '—',
                 sortable: true,
@@ -218,18 +208,21 @@ const TenderResultListPage = () => {
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
-                flex: 1,
-                minWidth: 130,
+                width: 150,
                 colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
+                cellRenderer: (params: any) => {
+                    const status = params.data?.tenderStatus;
+                    if (!status) return '—';
+                    return <Badge variant='outline'>{status}</Badge>;
+                },
                 sortable: true,
                 filter: true,
             },
             {
                 field: 'emdDetails',
                 headerName: 'EMD',
-                flex: 1.3,
-                minWidth: 150,
+                width: 100,
                 sortable: false,
                 filter: false,
                 cellRenderer: (params: any) => {
@@ -276,8 +269,7 @@ const TenderResultListPage = () => {
             {
                 field: 'resultStatus',
                 headerName: 'Result',
-                flex: 1.2,
-                minWidth: 150,
+                width: 150,
                 colId: 'resultStatus',
                 sortable: true,
                 filter: true,
@@ -293,7 +285,7 @@ const TenderResultListPage = () => {
                 cellRenderer: createActionColumnRenderer(resultActions),
                 sortable: false,
                 pinned: 'right',
-                width: 120,
+                width: 80,
             },
         ],
         [resultActions]
@@ -324,6 +316,15 @@ const TenderResultListPage = () => {
             };
         });
     }, [counts]);
+
+    // Additional debug logging for derived values
+    useEffect(() => {
+        console.log('=== Derived Values Debug ===');
+        console.log('resultData length:', resultData.length);
+        console.log('resultData:', resultData);
+        console.log('totalRows:', totalRows);
+        console.log('tabsWithData:', tabsWithData);
+    }, [resultData, totalRows, tabsWithData]);
 
     if (isLoading) {
         return (

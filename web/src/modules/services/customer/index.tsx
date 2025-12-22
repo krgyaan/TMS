@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef, RowSelectionOptions } from "ag-grid-community";
 import { useFetchJson } from "@/hooks/usFetchJson";
-import { dateCol, currencyCol, logoCol, booleanIconCol } from "@/components/data-grid";
+import { dateCol, currencyCol, booleanIconCol } from "@/components/data-grid";
 import DataTable from "@/components/ui/data-table";
 
 interface IRow {
@@ -28,8 +28,6 @@ const index = () => {
 
   const [colDefs] = useState<ColDef[]>([
     { field: "mission", width: 150 },
-    logoCol("company", { width: 130 }),
-    { field: "location", width: 225 },
     dateCol("date"),
     currencyCol(
       "price",
@@ -60,7 +58,6 @@ const index = () => {
           enableRowSelection={true}
           selectionType="multiple"
           onSelectionChanged={(rows) => console.log("Row Selected!", rows)}
-          height="100%"
         />
       </CardContent>
     </Card>

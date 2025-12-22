@@ -45,7 +45,10 @@ export function SelectField<
                         if (v === "") {
                             field.onChange(undefined)
                         } else {
-                            field.onChange(Number(v))
+                            // Try to convert to number, but preserve string if conversion fails
+                            const numValue = Number(v);
+                            const isNumeric = !isNaN(numValue) && v.trim() !== '';
+                            field.onChange(isNumeric ? numValue : v)
                         }
                     }}
                     options={normalizedOptions}

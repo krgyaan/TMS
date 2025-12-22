@@ -262,11 +262,11 @@ export function TenderInformationForm({
                                             control={form.control}
                                             name="teRejectionReason"
                                             label="Reason of Rejection"
-                                            options={rejectionReasonOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select reason"
+                                                options={rejectionReasonOptions.map(option => ({
+                                                    value: String(option.value),
+                                                    label: option.label
+                                                }))}
+                                            placeholder="Select rejection reason"
                                         />
                                         <FieldWrapper
                                             control={form.control}
