@@ -53,7 +53,7 @@ const Rfqs = () => {
     const rfqsActions: ActionItem<RfqDashboardRow>[] = [
         {
             label: 'Send',
-            onClick: (row: RfqDashboardRow) => row.rfqId ? navigate(paths.tendering.rfqsEdit(row.tenderId)) : navigate(paths.tendering.rfqsCreate(row.tenderId)),
+            onClick: (row: RfqDashboardRow) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
@@ -98,16 +98,14 @@ const Rfqs = () => {
         tenderNameCol<RfqDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            flex: 2,
-            minWidth: 250,
+            width: 250,
             colId: 'tenderNo',
             sortable: true,
         }),
         {
             field: 'dueDate',
             headerName: 'Due Date',
-            flex: 1.5,
-            minWidth: 150,
+            width: 150,
             colId: 'dueDate',
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
@@ -116,24 +114,21 @@ const Rfqs = () => {
         {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
-            minWidth: 300,
+            width: 150,
             colId: 'vendorOrganizationNames',
             valueGetter: (params) => {
                 const names = params.data?.vendorOrganizationNames;
                 if (!names) return '—';
 
-                return names /*.split(', ').join(',\n')*/;
+                return names;
             },
-            // cellStyle: { whiteSpace: 'pre-line' },
-            // autoHeight: true,
             sortable: true,
             filter: true,
         },
         {
             field: 'itemName',
             headerName: 'Item',
-            flex: 1,
-            minWidth: 120,
+            width: 150,
             colId: 'itemName',
             valueGetter: (params: any) => params.data?.itemName ? params.data.itemName : '—',
             sortable: true,
@@ -142,8 +137,7 @@ const Rfqs = () => {
         {
             field: 'statusName',
             headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
+            width: 100,
             colId: 'statusName',
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
             sortable: true,
@@ -155,7 +149,7 @@ const Rfqs = () => {
             cellRenderer: createActionColumnRenderer(rfqsActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [rfqsActions]);
 

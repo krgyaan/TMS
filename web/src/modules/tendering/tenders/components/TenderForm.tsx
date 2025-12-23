@@ -13,12 +13,11 @@ import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
 import { DateInput } from "@/components/form/DateInput";
-import { FileUploadField } from "@/components/form/FileUploadField";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames } from "@/types/api.types";
 import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
-
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 
 const ManualFormSchema = z.object({
@@ -35,7 +34,7 @@ const ManualFormSchema = z.object({
     website: z.coerce.number().int().positive().optional(),
     item: z.coerce.number().int().positive({ message: "Item is required" }),
     status: z.coerce.number().int().min(0).default(1),
-    documents: z.any().optional(),
+    documents: z.array(z.string()).default([]),
     remarks: z.string().max(200).optional(),
 
     deleteStatus: z.enum(["0", "1"]).optional(),
@@ -50,7 +49,7 @@ const AiFormSchema = z.object({
     tenderNo: z.string().min(1, { message: "Tender No is required" }),
     startDate: z.string().min(1, { message: "Start date is required" }),
     closingDate: z.string().min(1, { message: "Closing date is required" }),
-    files: z.any().optional(),
+    files: z.array(z.string()).default([]),
 });
 
 type ManualFormValues = z.infer<typeof ManualFormSchema>;
@@ -89,7 +88,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             website: undefined,
             item: undefined as any,
             status: 1,
-            documents: undefined,
+            documents: [],
             remarks: "",
         },
     });
@@ -101,28 +100,28 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             tenderNo: "",
             startDate: "",
             closingDate: "",
-            files: undefined,
+            files: [],
         },
     });
 
-    // Watch organization, item, location, and team fields for auto-generation and filtering
+    // Watch fields for auto-generation
     const organization = useWatch({ control: manualForm.control, name: "organization" });
     const item = useWatch({ control: manualForm.control, name: "item" });
     const location = useWatch({ control: manualForm.control, name: "location" });
     const team = useWatch({ control: manualForm.control, name: "team" });
 
-    // Filter user options by selected team
+    // Watch documents for display
+    const documents = useWatch({ control: manualForm.control, name: "documents" });
+    const aiFiles = useWatch({ control: aiForm.control, name: "files" });
+
     const userOptions = useUserOptions(team);
 
-    // Track if form has been initialized to avoid auto-generation on initial load
     const isInitialLoad = useRef(true);
     const previousValues = useRef<{ organization?: number; item?: number; location?: number; team?: number }>({});
 
     useEffect(() => {
         if (!tender || mode !== "edit") {
-            // For create mode, mark as ready after first render
             if (mode === "create") {
-                // Use setTimeout to ensure form is ready
                 setTimeout(() => {
                     isInitialLoad.current = false;
                 }, 0);
@@ -130,6 +129,15 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             return;
         }
         try {
+            let parsedDocuments: string[] = [];
+            if (tender.documents) {
+                try {
+                    parsedDocuments = JSON.parse(tender.documents);
+                } catch {
+                    parsedDocuments = [];
+                }
+            }
+
             const resetValues = {
                 team: Number(tender.team) || (undefined as any),
                 tenderNo: tender.tenderNo || "",
@@ -144,17 +152,16 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 website: tender.website ? Number(tender.website) : undefined,
                 item: Number(tender.item) || (undefined as any),
                 status: Number(tender.status) ?? 1,
+                documents: parsedDocuments,
                 remarks: tender.remarks || "",
             };
             manualForm.reset(resetValues);
-            // Set initial values after reset to prevent auto-generation trigger
             previousValues.current = {
                 organization: resetValues.organization,
                 item: resetValues.item,
                 location: resetValues.location,
                 team: resetValues.team,
             };
-            // Mark as ready after reset completes
             setTimeout(() => {
                 isInitialLoad.current = false;
             }, 0);
@@ -163,24 +170,17 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         }
     }, [tender, mode, manualForm]);
 
-    // Auto-generate tender name when organization, item, or location changes
+    // Auto-generate tender name
     useEffect(() => {
-        // Skip on initial load
-        if (isInitialLoad.current) {
-            return;
-        }
+        if (isInitialLoad.current) return;
 
-        // Check if values actually changed
         const hasChanged =
             previousValues.current.organization !== organization ||
             previousValues.current.item !== item ||
             previousValues.current.location !== location;
 
-        if (!hasChanged) {
-            return;
-        }
+        if (!hasChanged) return;
 
-        // Only generate if organization and item are present (location is optional)
         if (organization && item) {
             const generateName = async () => {
                 try {
@@ -194,27 +194,19 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                     }
                 } catch (error) {
                     console.error("Error generating tender name:", error);
-                    // Don't show error toast, just log it
                 }
             };
-
             generateName();
         }
 
-        // Update previous values
         previousValues.current = { organization, item, location, team };
     }, [organization, item, location, team, generateTenderName, manualForm]);
 
     // Clear team member when team changes
     useEffect(() => {
-        // Skip on initial load
-        if (isInitialLoad.current) {
-            return;
-        }
+        if (isInitialLoad.current) return;
 
-        // Check if team actually changed
         if (previousValues.current.team !== team) {
-            // Clear team member field when team changes
             manualForm.setValue("teamMember", null, { shouldValidate: false });
             previousValues.current.team = team;
         }
@@ -237,7 +229,9 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 item: values.item,
                 status: values.status,
                 remarks: values.remarks || undefined,
+                documents: values.documents.length > 0 ? JSON.stringify(values.documents) : null,
             };
+
             if (mode === "create") {
                 await createTender.mutateAsync(payload);
             } else if (tender) {
@@ -251,8 +245,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     };
 
     const handleAiSubmit: SubmitHandler<AiFormValues> = async _values => {
-        // AI form submission is not yet implemented
-        // This feature will be available in a future update
         alert("AI-based tender creation is not yet available. Please use the manual form instead.");
     };
 
@@ -282,28 +274,45 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                         <Form {...aiForm}>
                             <form onSubmit={aiForm.handleSubmit(handleAiSubmit)} className="space-y-8">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                    <SelectField<AiFormValues, "team"> control={aiForm.control} name="team" label="Team" options={teamOptions} placeholder="Select Team" />
+                                    <SelectField<AiFormValues, "team">
+                                        control={aiForm.control}
+                                        name="team"
+                                        label="Team"
+                                        options={teamOptions}
+                                        placeholder="Select Team"
+                                    />
 
-                                    <FieldWrapper<AiFormValues, "tenderNo"> control={aiForm.control} name="tenderNo" label="Tender No">
+                                    <FieldWrapper<AiFormValues, "tenderNo">
+                                        control={aiForm.control}
+                                        name="tenderNo"
+                                        label="Tender No"
+                                    >
                                         {field => <Input placeholder="Tender No" {...field} />}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<AiFormValues, "startDate"> control={aiForm.control} name="startDate" label="Start Date">
+                                    <FieldWrapper<AiFormValues, "startDate">
+                                        control={aiForm.control}
+                                        name="startDate"
+                                        label="Start Date"
+                                    >
                                         {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
                                     </FieldWrapper>
 
-                                    <FieldWrapper<AiFormValues, "closingDate"> control={aiForm.control} name="closingDate" label="Closing Date">
+                                    <FieldWrapper<AiFormValues, "closingDate">
+                                        control={aiForm.control}
+                                        name="closingDate"
+                                        label="Closing Date"
+                                    >
                                         {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
                                     </FieldWrapper>
                                 </div>
 
                                 <div className="w-full md:w-1/2">
-                                    <FileUploadField<AiFormValues, "files">
-                                        control={aiForm.control}
-                                        name="files"
-                                        label="Choose Files"
-                                        allowMultiple
-                                        acceptedFileTypes={["application/pdf"]}
+                                    <TenderFileUploader
+                                        context="tender-documents"
+                                        value={aiFiles}
+                                        onChange={(paths) => aiForm.setValue("files", paths)}
+                                        label="Choose Files (PDF only for AI processing)"
                                     />
                                 </div>
 
@@ -334,12 +343,20 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                     />
 
                                     {/* Tender No */}
-                                    <FieldWrapper<ManualFormValues, "tenderNo"> control={manualForm.control} name="tenderNo" label="Tender No">
+                                    <FieldWrapper<ManualFormValues, "tenderNo">
+                                        control={manualForm.control}
+                                        name="tenderNo"
+                                        label="Tender No"
+                                    >
                                         {field => <Input placeholder="Tender No" {...field} />}
                                     </FieldWrapper>
 
                                     {/* Tender Name */}
-                                    <FieldWrapper<ManualFormValues, "tenderName"> control={manualForm.control} name="tenderName" label="Tender Name">
+                                    <FieldWrapper<ManualFormValues, "tenderName">
+                                        control={manualForm.control}
+                                        name="tenderName"
+                                        label="Tender Name"
+                                    >
                                         {field => <Input placeholder="Tender Name" {...field} readOnly={true} />}
                                     </FieldWrapper>
 
@@ -364,24 +381,58 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                     {/* Item */}
                                     <SelectField<ManualFormValues, "item">
                                         control={manualForm.control}
-                                        name="item" label="Item"
+                                        name="item"
+                                        label="Item"
                                         options={itemOptions}
                                         placeholder="Select Item"
                                     />
 
                                     {/* GST Values */}
-                                    <FieldWrapper<ManualFormValues, "gstValues"> control={manualForm.control} name="gstValues" label="Tender Value (GST Inclusive)">
-                                        {field => <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />}
+                                    <FieldWrapper<ManualFormValues, "gstValues">
+                                        control={manualForm.control}
+                                        name="gstValues"
+                                        label="Tender Value (GST Inclusive)"
+                                    >
+                                        {field => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="Amount"
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
                                     </FieldWrapper>
 
                                     {/* Tender Fees */}
-                                    <FieldWrapper<ManualFormValues, "tenderFees"> control={manualForm.control} name="tenderFees" label="Tender Fee">
-                                        {field => <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />}
+                                    <FieldWrapper<ManualFormValues, "tenderFees">
+                                        control={manualForm.control}
+                                        name="tenderFees"
+                                        label="Tender Fee"
+                                    >
+                                        {field => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="Amount"
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
                                     </FieldWrapper>
 
                                     {/* EMD */}
-                                    <FieldWrapper<ManualFormValues, "emd"> control={manualForm.control} name="emd" label="EMD">
-                                        {field => <NumberInput step={0.01} placeholder="Amount" value={field.value} onChange={field.onChange} />}
+                                    <FieldWrapper<ManualFormValues, "emd">
+                                        control={manualForm.control}
+                                        name="emd"
+                                        label="EMD"
+                                    >
+                                        {field => (
+                                            <NumberInput
+                                                step={0.01}
+                                                placeholder="Amount"
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
                                     </FieldWrapper>
 
                                     {/* Team Member */}
@@ -395,8 +446,18 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                     />
 
                                     {/* Due Date & Time */}
-                                    <FieldWrapper<ManualFormValues, "dueDate"> control={manualForm.control} name="dueDate" label="Due Date and Time">
-                                        {field => <DateTimeInput value={field.value} onChange={field.onChange} className="bg-background" />}
+                                    <FieldWrapper<ManualFormValues, "dueDate">
+                                        control={manualForm.control}
+                                        name="dueDate"
+                                        label="Due Date and Time"
+                                    >
+                                        {field => (
+                                            <DateTimeInput
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                className="bg-background"
+                                            />
+                                        )}
                                     </FieldWrapper>
 
                                     {/* Website */}
@@ -407,40 +468,55 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-
-                                    {/* Documents */}
-                                    <FileUploadField<ManualFormValues, "documents">
-                                        control={manualForm.control}
-                                        name="documents"
-                                        label="Upload Documents"
-                                        description="Upload relevant tender documents (optional)"
-                                        allowMultiple
-                                        layout="grid"
-                                        gridCols={3}
-                                        acceptedFileTypes={["image/*", "application/pdf"]}
-                                    />
-
-                                    {/* Remarks */}
-                                    <FieldWrapper<ManualFormValues, "remarks"> control={manualForm.control} name="remarks" label="Remarks" className="md:col-span-2">
-                                        {field => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Remarks"
-                                                maxLength={200}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
                                 </div>
+
+                                <div className="space-y-2">
+                                    <TenderFileUploader
+                                        context="tender-documents"
+                                        value={documents}
+                                        onChange={(paths) => manualForm.setValue("documents", paths)}
+                                        label="Upload Documents"
+                                        disabled={saving}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Upload relevant tender documents (optional)
+                                    </p>
+                                </div>
+
+                                {/* Remarks */}
+                                <FieldWrapper<ManualFormValues, "remarks">
+                                    control={manualForm.control}
+                                    name="remarks"
+                                    label="Remarks"
+                                >
+                                    {field => (
+                                        <textarea
+                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                            placeholder="Remarks"
+                                            maxLength={200}
+                                            {...field}
+                                        />
+                                    )}
+                                </FieldWrapper>
 
                                 <div className="w-full flex items-center justify-center gap-2">
                                     <Button type="submit" disabled={saving}>
                                         {saving ? "Saving..." : mode === "create" ? "Create Tender" : "Update Tender"}
                                     </Button>
-                                    <Button type="button" variant="outline" onClick={() => navigate(paths.tendering.tenders)} disabled={saving}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => navigate(paths.tendering.tenders)}
+                                        disabled={saving}
+                                    >
                                         Cancel
                                     </Button>
-                                    <Button type="button" variant="outline" onClick={() => manualForm.reset()} disabled={saving}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => manualForm.reset()}
+                                        disabled={saving}
+                                    >
                                         Reset
                                     </Button>
                                 </div>

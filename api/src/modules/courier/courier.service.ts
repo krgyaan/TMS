@@ -35,7 +35,7 @@ export class CourierService {
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailer: MailerService
-    ) {}
+    ) { }
 
     private validateDispatchData(dispatchData: DispatchCourierDto): void {
         if (!dispatchData.courierProvider?.trim()) {
