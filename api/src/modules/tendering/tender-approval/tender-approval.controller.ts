@@ -8,6 +8,11 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TenderApprovalController {
     constructor(private readonly tenderApprovalService: TenderApprovalService) { }
 
+    @Get('counts')
+    async getCounts() {
+        return this.tenderApprovalService.getCounts();
+    }
+
     @Get()
     async getAll(
         @Query('tlStatus') tlStatus?: '0' | '1' | '2' | '3',
@@ -23,11 +28,6 @@ export class TenderApprovalController {
             sortBy,
             sortOrder,
         });
-    }
-
-    @Get('counts')
-    async getCounts() {
-        return this.tenderApprovalService.getCounts();
     }
 
     @Get(':id/approval')
