@@ -99,11 +99,9 @@ export class CourierController {
     constructor(private readonly service: CourierService) {}
 
     @Post()
-    create(@Body() body: CreateCourierDto, @Req() req) {
-        console.log("create request made");
-        console.log(body);
-        console.log(req.user);
-        return this.service.create(body, req.user.sub);
+    @UseInterceptors(FilesInterceptor("courierDocs[]", 10, multerConfig))
+    create(@Body() body: CreateCourierDto, @UploadedFiles() files: Express.Multer.File[], @Req() req) {
+        return this.service.create(body, files, req.user.sub);
     }
 
     @Post(":id/dispatch")
