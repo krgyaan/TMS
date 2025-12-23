@@ -47,10 +47,18 @@ export function SelectField<
                         if (v === "") {
                             field.onChange(undefined)
                         } else {
-                            // Try to convert to number, but preserve string if conversion fails
-                            const numValue = Number(v);
-                            const isNumeric = !isNaN(numValue) && v.trim() !== '';
-                            field.onChange(isNumeric ? numValue : v)
+                            // Preserve string values for enum types (like '0', '1', '2', '3')
+                            // Check if the current field value is a string enum (single char) or if the value itself is a single char
+                            // This handles cases where tlDecision should be '0' | '1' | '2' | '3' as strings
+                            const isStringEnum = v.length === 1 && /^[0-3]$/.test(v);
+                            if (isStringEnum || typeof field.value === 'string') {
+                                field.onChange(v);
+                            } else {
+                                // Try to convert to number for other numeric fields
+                                const numValue = Number(v);
+                                const isNumeric = !isNaN(numValue) && v.trim() !== '';
+                                field.onChange(isNumeric ? numValue : v);
+                            }
                         }
                     }}
                     options={normalizedOptions}

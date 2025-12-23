@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -88,7 +89,6 @@ const formatDocuments = (documents: string[] | Array<{ id?: number; documentName
 }
 
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
-    // ✅ ALL HOOKS FIRST (UNCONDITIONAL)
     const navigate = useNavigate();
     const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations();
     const { data: statuses, isLoading: isStatusesLoading } = useStatuses();
@@ -106,7 +106,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     // Form hooks (now safe - always called)
     const form = useForm<TenderApprovalFormValues>({
-        resolver: zodResolver(TenderApprovalFormSchema),
+        resolver: zodResolver(TenderApprovalFormSchema) as any,
         defaultValues: getInitialValues(approval),
     });
 
@@ -126,6 +126,52 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const tenderStatus = form.watch('tenderStatus');
     const techDocs = form.watch('approvePqrSelection');
     const finDocs = form.watch('approveFinanceDocSelection');
+
+    // Clear irrelevant fields when tlDecision changes
+    useEffect(() => {
+        if (tlDecision === '1') {
+            // Clear rejection and incomplete fields
+            form.setValue('tenderStatus', undefined);
+            form.setValue('oemNotAllowed', undefined);
+            form.setValue('remarks', undefined);
+            form.setValue('incompleteFields', []);
+        } else if (tlDecision === '2') {
+            // Clear approval and incomplete fields
+            form.setValue('rfqTo', []);
+            form.setValue('tenderFeeMode', undefined);
+            form.setValue('emdMode', undefined);
+            form.setValue('approvePqrSelection', undefined);
+            form.setValue('approveFinanceDocSelection', undefined);
+            form.setValue('alternativeTechnicalDocs', []);
+            form.setValue('alternativeFinancialDocs', []);
+            form.setValue('incompleteFields', []);
+        } else if (tlDecision === '3') {
+            // Clear approval and rejection fields
+            form.setValue('rfqTo', []);
+            form.setValue('tenderFeeMode', undefined);
+            form.setValue('emdMode', undefined);
+            form.setValue('approvePqrSelection', undefined);
+            form.setValue('approveFinanceDocSelection', undefined);
+            form.setValue('alternativeTechnicalDocs', []);
+            form.setValue('alternativeFinancialDocs', []);
+            form.setValue('tenderStatus', undefined);
+            form.setValue('oemNotAllowed', undefined);
+            form.setValue('remarks', undefined);
+        } else if (tlDecision === '0') {
+            // Clear all conditional fields
+            form.setValue('rfqTo', []);
+            form.setValue('tenderFeeMode', undefined);
+            form.setValue('emdMode', undefined);
+            form.setValue('approvePqrSelection', undefined);
+            form.setValue('approveFinanceDocSelection', undefined);
+            form.setValue('alternativeTechnicalDocs', []);
+            form.setValue('alternativeFinancialDocs', []);
+            form.setValue('tenderStatus', undefined);
+            form.setValue('oemNotAllowed', undefined);
+            form.setValue('remarks', undefined);
+            form.setValue('incompleteFields', []);
+        }
+    }, [tlDecision, form]);
 
     const vendorOrgOptions = useMemo(() =>
         vendorOrganizations?.map(org => ({ value: String(org.id), label: org.name })) ?? [],
@@ -155,14 +201,36 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
         console.log('🚀 Submit called with values:', values);
+
+        // Trigger validation
+        const isValid = await form.trigger();
+        if (!isValid) {
+            const errors = form.formState.errors;
+            const errorMessages = Object.values(errors)
+                .map(err => err?.message)
+                .filter(Boolean);
+            if (errorMessages.length > 0) {
+                toast.error(`Validation errors: ${errorMessages.join(', ')}`);
+            } else {
+                toast.error('Please fix the form errors before submitting');
+            }
+            return;
+        }
+
         try {
             const payload = mapFormToPayload(values);
             console.log('📦 Mapped payload:', payload);
             const mutation = mode === 'create' ? createApproval : updateApproval;
             await mutation.mutateAsync({ tenderId, data: payload });
+            toast.success(mode === 'create' ? 'Approval submitted successfully' : 'Approval updated successfully');
             navigate(paths.tendering.tenderApproval);
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Submission error', error);
+            if (error?.response?.data?.message) {
+                toast.error(error.response.data.message);
+            } else {
+                toast.error('Failed to save approval. Please try again.');
+            }
         }
     };
 
@@ -231,6 +299,9 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                             options={tlDecisionOptions}
                             placeholder="Select decision"
                         />
+                        {form.formState.errors.tlDecision && (
+                            <p className="text-sm text-destructive mt-1">{form.formState.errors.tlDecision.message}</p>
+                        )}
 
                         {tlDecision === '1' && (
                             <div className="space-y-8 animate-in fade-in-50 duration-300">
@@ -278,13 +349,18 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             )}
                                             {
                                                 techDocs === '2' && (
-                                                    <MultiSelectField
-                                                        control={form.control}
-                                                        name="alternativeTechnicalDocs"
-                                                        label="Alternative Technical Docs"
-                                                        options={dummyTechnicalDocuments}
-                                                        placeholder="Select documents"
-                                                    />
+                                                    <>
+                                                        <MultiSelectField
+                                                            control={form.control}
+                                                            name="alternativeTechnicalDocs"
+                                                            label="Alternative Technical Docs"
+                                                            options={dummyTechnicalDocuments}
+                                                            placeholder="Select documents"
+                                                        />
+                                                        {form.formState.errors.alternativeTechnicalDocs && (
+                                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.alternativeTechnicalDocs.message}</p>
+                                                        )}
+                                                    </>
                                                 )
                                             }
                                         </div>
@@ -303,13 +379,18 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             )}
                                             {
                                                 finDocs === '2' && (
-                                                    <MultiSelectField
-                                                        control={form.control}
-                                                        name="alternativeFinancialDocs"
-                                                        label="Alternative Financial Docs"
-                                                        options={dummyFinancialDocuments}
-                                                        placeholder="Select documents"
-                                                    />
+                                                    <>
+                                                        <MultiSelectField
+                                                            control={form.control}
+                                                            name="alternativeFinancialDocs"
+                                                            label="Alternative Financial Docs"
+                                                            options={dummyFinancialDocuments}
+                                                            placeholder="Select documents"
+                                                        />
+                                                        {form.formState.errors.alternativeFinancialDocs && (
+                                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.alternativeFinancialDocs.message}</p>
+                                                        )}
+                                                    </>
                                                 )
                                             }
                                         </div>
@@ -369,6 +450,12 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             Select the fields that need correction and provide specific comments for each field.
                                         </AlertDescription>
                                     </Alert>
+                                    {form.formState.errors.incompleteFields && (
+                                        <Alert variant="destructive">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertDescription>{form.formState.errors.incompleteFields.message}</AlertDescription>
+                                        </Alert>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -440,6 +527,14 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                             </div>
                         )}
 
+                        {(createApproval.error || updateApproval.error) && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                    {(createApproval.error || updateApproval.error)?.message || 'An error occurred while saving. Please try again.'}
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                                 Cancel

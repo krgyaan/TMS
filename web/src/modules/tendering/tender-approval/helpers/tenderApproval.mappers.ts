@@ -10,6 +10,8 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
             emdMode: undefined,
             approvePqrSelection: undefined,
             approveFinanceDocSelection: undefined,
+            alternativeTechnicalDocs: [],
+            alternativeFinancialDocs: [],
             tenderStatus: undefined,
             oemNotAllowed: undefined,
             remarks: undefined,
@@ -18,12 +20,14 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
     }
 
     return {
-        tlDecision: (approval.tlStatus ?? approval.tlDecision) as '0' | '1' | '2' | '3',
+        tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
         tenderFeeMode: approval.tenderFeeMode ?? undefined,
         emdMode: approval.emdMode ?? undefined,
         approvePqrSelection: approval.approvePqrSelection as '1' | '2' | undefined,
         approveFinanceDocSelection: approval.approveFinanceDocSelection as '1' | '2' | undefined,
+        alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],
+        alternativeFinancialDocs: approval.alternativeFinancialDocs ?? [],
         tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
         oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
         remarks: approval.tlRejectionRemarks ?? undefined,
@@ -56,6 +60,8 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.approveFinanceDocSelection) {
             payload.approveFinanceDocSelection = values.approveFinanceDocSelection as '1' | '2';
         }
+        // Note: alternativeTechnicalDocs and alternativeFinancialDocs are not yet supported by backend
+        // They are kept in the form for validation but not sent in the payload
         return payload;
     }
 

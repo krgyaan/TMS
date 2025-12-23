@@ -3,7 +3,7 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
@@ -19,10 +19,6 @@ export type TenderApprovalFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
-
-// ============================================================================
-// Types
-// ============================================================================
 
 const TABS_NAMES = {
     '0': 'Pending',
@@ -49,10 +45,6 @@ type TenderRow = {
     statusName: string;
     tlStatus: string | number;
 };
-
-// ============================================================================
-// Service
-// ============================================================================
 
 @Injectable()
 export class TenderApprovalService {
@@ -167,6 +159,19 @@ export class TenderApprovalService {
         };
     }
 
+    async getCounts() {
+        const counts = await this.db
+            .select({
+                total: sql<number>`count(*)`,
+                pending: sql<number>`count(*) FILTER (WHERE tlStatus = 0)`,
+                approved: sql<number>`count(*) FILTER (WHERE tlStatus = 1)`,
+                rejected: sql<number>`count(*) FILTER (WHERE tlStatus = 2)`,
+                incomplete: sql<number>`count(*) FILTER (WHERE tlStatus = 3)`,
+            })
+            .from(tenderInfos)
+            .where(TenderInfosService.getActiveCondition());
+        return counts[0];
+    }
 
     async getByTenderId(tenderId: number) {
         // Validate tender exists first
@@ -219,10 +224,6 @@ export class TenderApprovalService {
         };
     }
 
-    /**
-     * Get approval data with full tender details
-     * Uses shared tender service method
-     */
     async getByTenderIdWithDetails(tenderId: number) {
         const [approvalData, tenderDetails] = await Promise.all([
             this.getByTenderId(tenderId),

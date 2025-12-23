@@ -25,6 +25,11 @@ export class TenderApprovalController {
         });
     }
 
+    @Get('counts')
+    async getCounts() {
+        return this.tenderApprovalService.getCounts();
+    }
+
     @Get(':id/approval')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.tenderApprovalService.getByTenderId(id);
