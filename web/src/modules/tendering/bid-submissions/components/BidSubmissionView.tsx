@@ -7,6 +7,7 @@ import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import type { BidSubmission } from '@/types/api.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface BidSubmissionViewProps {
     bidSubmission?: BidSubmission | null;
@@ -71,6 +72,22 @@ export function BidSubmissionView({
             default:
                 return 'outline';
         }
+    };
+
+    // Helper function to get file URL from stored path
+    const getFileUrl = (filePath: string): string => {
+        // File paths are stored as "context/filename.ext" (e.g., "bid-submitted-docs/file.pdf")
+        // API expects: /tender-files/serve/:context/:fileName
+        const parts = filePath.split('/');
+        if (parts.length >= 2) {
+            const context = parts[0];
+            const fileName = parts.slice(1).join('/');
+            // Get base URL from axios instance
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+            return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+        }
+        // Fallback: try to use as-is (shouldn't happen with proper paths)
+        return tenderFilesService.getFileUrl(filePath);
     };
 
     return (
@@ -162,7 +179,7 @@ export function BidSubmissionView({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => window.open(doc, '_blank')}
+                                                                onClick={() => window.open(getFileUrl(doc), '_blank')}
                                                             >
                                                                 <ExternalLink className="h-4 w-4 mr-1" />
                                                                 View
@@ -186,7 +203,7 @@ export function BidSubmissionView({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => window.open(bidSubmission.documents!.submissionProof!, '_blank')}
+                                                        onClick={() => window.open(getFileUrl(bidSubmission.documents!.submissionProof!), '_blank')}
                                                     >
                                                         <ExternalLink className="h-4 w-4 mr-1" />
                                                         View
@@ -208,7 +225,7 @@ export function BidSubmissionView({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => window.open(bidSubmission.documents!.finalPriceSs!, '_blank')}
+                                                        onClick={() => window.open(getFileUrl(bidSubmission.documents!.finalPriceSs!), '_blank')}
                                                     >
                                                         <ExternalLink className="h-4 w-4 mr-1" />
                                                         View

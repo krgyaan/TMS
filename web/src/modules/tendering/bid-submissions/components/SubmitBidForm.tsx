@@ -1,55 +1,27 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Upload, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Save, IndianRupee } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useSubmitBid, useUpdateBidSubmission } from '@/hooks/api/useBidSubmissions';
 import type { BidSubmission } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { FileUploadField } from '@/components/form/FileUploadField';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const SubmitBidFormSchema = z.object({
     tenderId: z.number(),
     submissionDatetime: z.string().min(1, 'Bid submission date and time is required'),
-    submittedDocs: z.preprocess(
-        (val) => {
-            if (!val) return undefined;
-            if (Array.isArray(val)) {
-                return val.map((f: File | string) => typeof f === 'string' ? f : f.name).join(', ');
-            }
-            if (val instanceof File) {
-                return val.name;
-            }
-            return val;
-        },
-        z.string().optional()
-    ),
-    proofOfSubmission: z.preprocess(
-        (val) => {
-            if (val instanceof File) {
-                return val.name;
-            }
-            return val;
-        },
-        z.string().min(1, 'Proof of submission is required')
-    ),
-    finalPriceSs: z.preprocess(
-        (val) => {
-            if (val instanceof File) {
-                return val.name;
-            }
-            return val;
-        },
-        z.string().min(1, 'Final bidding price screenshot is required')
-    ),
+    submittedDocs: z.array(z.string()).default([]),
+    proofOfSubmission: z.array(z.string()).min(1, 'Proof of submission is required'),
+    finalPriceSs: z.array(z.string()).min(1, 'Final bidding price screenshot is required'),
     finalBiddingPrice: z.string().optional(),
 });
 
@@ -85,12 +57,17 @@ export default function SubmitBidForm({
         defaultValues: {
             tenderId: tenderId,
             submissionDatetime: '',
-            submittedDocs: '',
-            proofOfSubmission: '',
-            finalPriceSs: '',
+            submittedDocs: [],
+            proofOfSubmission: [],
+            finalPriceSs: [],
             finalBiddingPrice: '',
         },
     });
+
+    // Watch file values for display
+    const submittedDocs = useWatch({ control: form.control, name: 'submittedDocs' });
+    const proofOfSubmission = useWatch({ control: form.control, name: 'proofOfSubmission' });
+    const finalPriceSs = useWatch({ control: form.control, name: 'finalPriceSs' });
 
     useEffect(() => {
         if (existingData && mode === 'edit') {
@@ -99,9 +76,13 @@ export default function SubmitBidForm({
                 submissionDatetime: existingData.submissionDatetime
                     ? new Date(existingData.submissionDatetime).toISOString().slice(0, 16)
                     : '',
-                submittedDocs: existingData.documents?.submittedDocs?.join(', ') || '',
-                proofOfSubmission: existingData.documents?.submissionProof || '',
-                finalPriceSs: existingData.documents?.finalPriceSs || '',
+                submittedDocs: existingData.documents?.submittedDocs || [],
+                proofOfSubmission: existingData.documents?.submissionProof
+                    ? [existingData.documents.submissionProof]
+                    : [],
+                finalPriceSs: existingData.documents?.finalPriceSs
+                    ? [existingData.documents.finalPriceSs]
+                    : [],
                 finalBiddingPrice: existingData.finalBiddingPrice || '',
             });
         }
@@ -111,19 +92,19 @@ export default function SubmitBidForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            // submittedDocs is now preprocessed to a comma-separated string or undefined
-            const submittedDocs = data.submittedDocs
-                ? data.submittedDocs.split(',').map(s => s.trim()).filter(s => s.length > 0)
-                : [];
+            // File paths are already arrays of strings from TenderFileUploader
+            // proofOfSubmission and finalPriceSs are arrays, but backend expects single string
+            // Take the first file path if array has items
+            const proofOfSubmissionPath = data.proofOfSubmission.length > 0 ? data.proofOfSubmission[0] : '';
+            const finalPriceSsPath = data.finalPriceSs.length > 0 ? data.finalPriceSs[0] : '';
 
-            // proofOfSubmission and finalPriceSs are now preprocessed to strings
             if (mode === 'submit') {
                 await submitMutation.mutateAsync({
                     tenderId: data.tenderId,
                     submissionDatetime: data.submissionDatetime,
-                    submittedDocs: submittedDocs,
-                    proofOfSubmission: data.proofOfSubmission,
-                    finalPriceSs: data.finalPriceSs,
+                    submittedDocs: data.submittedDocs,
+                    proofOfSubmission: proofOfSubmissionPath,
+                    finalPriceSs: finalPriceSsPath,
                     finalBiddingPrice: data.finalBiddingPrice || null,
                 });
             } else if (existingData?.id) {
@@ -131,9 +112,9 @@ export default function SubmitBidForm({
                     id: existingData.id,
                     data: {
                         submissionDatetime: data.submissionDatetime,
-                        submittedDocs: submittedDocs,
-                        proofOfSubmission: data.proofOfSubmission,
-                        finalPriceSs: data.finalPriceSs,
+                        submittedDocs: data.submittedDocs,
+                        proofOfSubmission: proofOfSubmissionPath,
+                        finalPriceSs: finalPriceSsPath,
                         finalBiddingPrice: data.finalBiddingPrice || null,
                     },
                 });
@@ -171,7 +152,7 @@ export default function SubmitBidForm({
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Tender Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
+                            <div className="grid gap-4 md:grid-cols-3 bg-muted/30 p-4 rounded-lg">
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Tender No</p>
                                     <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
@@ -221,7 +202,7 @@ export default function SubmitBidForm({
                                 Bid Submission Details
                             </h4>
 
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <FieldWrapper
                                     control={form.control}
                                     name="submissionDatetime"
@@ -254,24 +235,28 @@ export default function SubmitBidForm({
                                         </div>
                                     )}
                                 </FieldWrapper>
-                                <FileUploadField
-                                    control={form.control}
-                                    name="submittedDocs"
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <TenderFileUploader
+                                    context="bid-submitted-docs"
+                                    value={submittedDocs}
+                                    onChange={(paths) => form.setValue('submittedDocs', paths)}
                                     label="Submitted Bid Documents (Optional)"
-                                    allowMultiple
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="proofOfSubmission"
+                                <TenderFileUploader
+                                    context="bid-submission-proof"
+                                    value={proofOfSubmission}
+                                    onChange={(paths) => form.setValue('proofOfSubmission', paths)}
                                     label="Proof of Submission"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="finalPriceSs"
+                                <TenderFileUploader
+                                    context="bid-final-price-ss"
+                                    value={finalPriceSs}
+                                    onChange={(paths) => form.setValue('finalPriceSs', paths)}
                                     label="Final Bidding Price Screenshot"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
                             </div>
                         </div>
