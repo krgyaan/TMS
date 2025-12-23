@@ -655,6 +655,7 @@ export interface TenderInfo {
     website: number | null;
     courierAddress: string | null;
     deleteStatus: number;
+    documents: string | null;
 
     // Tender approval fields
     tlRemarks: string | null;

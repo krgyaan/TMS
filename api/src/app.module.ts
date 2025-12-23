@@ -61,6 +61,7 @@ import { ReverseAuctionModule } from "@/modules/tendering/reverse-auction/revers
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { PermissionsModule } from "@/modules/master/permissions/permissions.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
+import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 
 @Module({
     imports: [
@@ -133,6 +134,7 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
         ReverseAuctionModule,
         TenderResultModule,
         ImprestAdminModule,
+        TenderFilesModule,
     ],
     controllers: [AppController],
     providers: [
