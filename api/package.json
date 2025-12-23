@@ -51,9 +51,11 @@
         "nodemailer": "^7.0.11",
         "passport": "^0.7.0",
         "passport-jwt": "^4.0.1",
+        "pdf-lib": "^1.17.1",
         "pg-boss": "^10.3.2",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
+        "sharp": "^0.34.5",
         "uuid": "^13.0.0",
         "yet-another-react-lightbox": "^3.25.0",
         "zod": "^3.25.76"
