@@ -42,7 +42,7 @@ export const TenderInformationFormSchema = z.object({
     // Delivery Time
     deliveryTimeSupply: z.preprocess(
         (v) => {
-            if (v === null || v === undefined || v === '') {
+            if (v === null || v === undefined || v === '' || v === 0) {
                 return null;
             }
             const num = typeof v === 'number' ? v : Number(v);
@@ -56,7 +56,8 @@ export const TenderInformationFormSchema = z.object({
     deliveryTimeInstallationInclusive: z.boolean().default(false),
     deliveryTimeInstallation: z.preprocess(
         (v) => {
-            if (v === null || v === undefined || v === '') {
+            // Convert 0, null, undefined, or empty string to null
+            if (v === null || v === undefined || v === '' || v === 0) {
                 return null;
             }
             const num = typeof v === 'number' ? v : Number(v);

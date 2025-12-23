@@ -125,6 +125,13 @@ export function TenderInformationForm({
     const solvencyCertificateCriteria = form.watch('solvencyCertificateCriteria');
     const netWorthCriteria = form.watch('netWorthCriteria');
 
+    // Clear deliveryTimeInstallation when inclusive is true
+    useEffect(() => {
+        if (deliveryTimeInstallationInclusive) {
+            form.setValue('deliveryTimeInstallation', null, { shouldValidate: false });
+        }
+    }, [deliveryTimeInstallationInclusive, form]);
+
     const isLoading = isTenderLoading || (mode === 'edit' && isInfoSheetLoading);
     const createInfoSheet = useCreateInfoSheet();
     const updateInfoSheet = useUpdateInfoSheet();
@@ -262,10 +269,10 @@ export function TenderInformationForm({
                                             control={form.control}
                                             name="teRejectionReason"
                                             label="Reason of Rejection"
-                                                options={rejectionReasonOptions.map(option => ({
-                                                    value: String(option.value),
-                                                    label: option.label
-                                                }))}
+                                            options={rejectionReasonOptions.map(option => ({
+                                                value: String(option.value),
+                                                label: option.label
+                                            }))}
                                             placeholder="Select rejection reason"
                                         />
                                         <FieldWrapper
