@@ -1,21 +1,12 @@
-import {
-    Inject,
-    Injectable,
-    Logger,
-    BadRequestException,
-    NotFoundException,
-} from '@nestjs/common';
-import { google, oauth2_v2 } from 'googleapis';
-import { and, eq } from 'drizzle-orm';
-import googleConfig, { type GoogleConfig } from '@config/google.config';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { DRIVE_SCOPES } from '@config/google.config';
-import {
-    oauthAccounts,
-    type OauthAccount,
-} from '@db/schemas/auth/oauth-accounts.schema';
-import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
+import { Inject, Injectable, Logger, BadRequestException, NotFoundException } from "@nestjs/common";
+import { google, oauth2_v2 } from "googleapis";
+import { and, eq } from "drizzle-orm";
+import googleConfig, { type GoogleConfig } from "@config/google.config";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { DRIVE_SCOPES } from "@config/google.config";
+import { oauthAccounts, type OauthAccount } from "@db/schemas/auth/oauth-accounts.schema";
+import { userProfiles } from "@db/schemas/auth/user-profiles.schema";
 
 type CredentialPayload = {
     access_token: string;
@@ -26,25 +17,17 @@ type CredentialPayload = {
 
 type GoogleTokenPayload = {
     accessToken: string;
-    refreshToken: string | null;
+    refreshToken: string | undefined;
     expiresAt: Date | null;
     scope?: string;
 };
 
-const normalizeCredentials = (
-    credentials: CredentialPayload,
-): GoogleTokenPayload => {
-    const expiresAt =
-        typeof credentials.expiry_date === 'number'
-            ? new Date(credentials.expiry_date)
-            : null;
+const normalizeCredentials = (credentials: CredentialPayload): GoogleTokenPayload => {
+    const expiresAt = typeof credentials.expiry_date === "number" ? new Date(credentials.expiry_date) : null;
 
     return {
         accessToken: credentials.access_token,
-        refreshToken:
-            typeof credentials.refresh_token === 'string'
-                ? credentials.refresh_token
-                : null,
+        refreshToken: typeof credentials.refresh_token === "string" ? credentials.refresh_token : undefined,
         expiresAt,
         scope: credentials.scope,
     };
@@ -54,20 +37,13 @@ const normalizeCredentials = (
  * Merge and deduplicate scope arrays
  * Combines existing scopes with newly granted scopes, removing duplicates
  */
-const mergeScopes = (
-    existingScopes: string | null | undefined,
-    newScopes: string | null | undefined,
-): string => {
-    const existing = existingScopes
-        ? existingScopes.split(/\s+/).filter(Boolean)
-        : [];
-    const newlyGranted = newScopes
-        ? newScopes.split(/\s+/).filter(Boolean)
-        : [];
+const mergeScopes = (existingScopes: string | null | undefined, newScopes: string | null | undefined): string => {
+    const existing = existingScopes ? existingScopes.split(/\s+/).filter(Boolean) : [];
+    const newlyGranted = newScopes ? newScopes.split(/\s+/).filter(Boolean) : [];
 
     // Combine and deduplicate
     const merged = [...new Set([...existing, ...newlyGranted])];
-    return merged.join(' ');
+    return merged.join(" ");
 };
 
 export type GoogleConnection = {
@@ -82,6 +58,7 @@ export type GoogleConnection = {
     createdAt: Date;
     updatedAt: Date;
     hasRefreshToken: boolean;
+    refreshToken: string | null;
 };
 
 @Injectable()
@@ -90,39 +67,31 @@ export class GoogleService {
 
     constructor(
         @Inject(googleConfig.KEY) private readonly config: GoogleConfig,
-        @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) { }
+        @Inject(DRIZZLE) private readonly db: DbInstance
+    ) {}
 
     private createClient(redirectUri?: string) {
         // Better logging to check if config is loaded
-        if (!this.config.clientId || this.config.clientId.includes('your_client')) {
-            this.logger.error('GOOGLE_CLIENT_ID is not properly configured!');
+        if (!this.config.clientId || this.config.clientId.includes("your_client")) {
+            this.logger.error("GOOGLE_CLIENT_ID is not properly configured!");
             this.logger.error(`Current value: ${this.config.clientId}`);
         }
-        if (!this.config.clientSecret || this.config.clientSecret.includes('your_secret')) {
-            this.logger.error('GOOGLE_CLIENT_SECRET is not properly configured!');
+        if (!this.config.clientSecret || this.config.clientSecret.includes("your_secret")) {
+            this.logger.error("GOOGLE_CLIENT_SECRET is not properly configured!");
         }
 
         this.logger.debug(`Creating OAuth client with Client ID: ${this.config.clientId?.substring(0, 20)}...`);
         this.logger.debug(`Redirect URI: ${redirectUri ?? this.config.redirectUri}`);
 
-        return new google.auth.OAuth2(
-            this.config.clientId,
-            this.config.clientSecret,
-            redirectUri ?? this.config.redirectUri,
-        );
+        return new google.auth.OAuth2(this.config.clientId, this.config.clientSecret, redirectUri ?? this.config.redirectUri);
     }
 
     createAuthUrl(userId: number, useIntegrationRedirect: boolean = false): { url: string } {
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new BadRequestException(
-                'A valid userId is required to initiate Google OAuth',
-            );
+            throw new BadRequestException("A valid userId is required to initiate Google OAuth");
         }
 
-        const redirectUri = useIntegrationRedirect
-            ? this.config.integrationRedirectUri
-            : this.config.redirectUri;
+        const redirectUri = useIntegrationRedirect ? this.config.integrationRedirectUri : this.config.redirectUri;
 
         return this.createAuthUrlWithState(String(userId), redirectUri);
     }
@@ -130,7 +99,7 @@ export class GoogleService {
     createAuthUrlWithState(state: string, redirectUri?: string, forceConsent: boolean = false): { url: string } {
         const client = this.createClient(redirectUri);
         const authOptions: any = {
-            access_type: 'offline',
+            access_type: "offline",
             include_granted_scopes: true,
             scope: this.config.scopes,
             state,
@@ -138,14 +107,17 @@ export class GoogleService {
 
         // Only force consent for drive integration flows
         if (forceConsent) {
-            authOptions.prompt = 'consent';
+            authOptions.prompt = "consent";
         }
 
         const url = client.generateAuthUrl(authOptions);
         return { url };
     }
 
-    async checkUserScopes(userId: number, requiredScopes: string[]): Promise<{
+    async checkUserScopes(
+        userId: number,
+        requiredScopes: string[]
+    ): Promise<{
         hasAllScopes: boolean;
         grantedScopes: string[];
         missingScopes: string[];
@@ -153,12 +125,7 @@ export class GoogleService {
         const accounts = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                and(
-                    eq(oauthAccounts.userId, userId),
-                    eq(oauthAccounts.provider, 'google'),
-                ),
-            )
+            .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, "google")))
             .limit(1);
 
         if (!accounts.length) {
@@ -169,13 +136,9 @@ export class GoogleService {
             };
         }
 
-        const grantedScopes = accounts[0].scopes
-            ? accounts[0].scopes.split(/\s+/).filter(Boolean)
-            : [];
+        const grantedScopes = accounts[0].scopes ? accounts[0].scopes.split(/\s+/).filter(Boolean) : [];
 
-        const missingScopes = requiredScopes.filter(
-            (scope) => !grantedScopes.includes(scope),
-        );
+        const missingScopes = requiredScopes.filter(scope => !grantedScopes.includes(scope));
 
         return {
             hasAllScopes: missingScopes.length === 0,
@@ -184,42 +147,39 @@ export class GoogleService {
         };
     }
 
-    async exchangeCode(code: string, redirectUri?: string): Promise<{
+    async exchangeCode(
+        code: string,
+        redirectUri?: string
+    ): Promise<{
         tokens: GoogleTokenPayload;
         profile: oauth2_v2.Schema$Userinfo;
     }> {
         const client = this.createClient(redirectUri);
         const { tokens: rawTokens } = await client.getToken(code);
-        if (!rawTokens || typeof rawTokens !== 'object') {
-            throw new BadRequestException('Google did not return an access token');
+        if (!rawTokens || typeof rawTokens !== "object") {
+            throw new BadRequestException("Google did not return an access token");
         }
 
         const raw = rawTokens as CredentialPayload;
-        if (typeof raw.access_token !== 'string' || raw.access_token.length === 0) {
-            throw new BadRequestException('Google did not return an access token');
+        if (typeof raw.access_token !== "string" || raw.access_token.length === 0) {
+            throw new BadRequestException("Google did not return an access token");
         }
 
         const tokens = normalizeCredentials(raw);
         client.setCredentials(rawTokens);
 
-        const oauth2 = google.oauth2({ version: 'v2', auth: client });
+        const oauth2 = google.oauth2({ version: "v2", auth: client });
         const { data: profile } = await oauth2.userinfo.get();
         if (!profile || !profile.id) {
-            throw new BadRequestException(
-                'Unable to read Google profile information',
-            );
+            throw new BadRequestException("Unable to read Google profile information");
         }
 
         return { tokens, profile };
     }
 
-    async upsertConnection(
-        userId: number,
-        tokens: GoogleTokenPayload,
-        profile: oauth2_v2.Schema$Userinfo,
-    ): Promise<GoogleConnection> {
+    async upsertConnection(userId: number, tokens: GoogleTokenPayload, profile: oauth2_v2.Schema$Userinfo): Promise<GoogleConnection> {
         if (!profile.id) {
-            throw new BadRequestException('Google profile is missing an identifier');
+            throw new BadRequestException("Google profile is missing an identifier");
         }
 
         const expiresAt = tokens.expiresAt;
@@ -228,12 +188,7 @@ export class GoogleService {
         const existing = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                and(
-                    eq(oauthAccounts.userId, userId),
-                    eq(oauthAccounts.provider, 'google'),
-                ),
-            )
+            .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, "google")))
             .limit(1);
 
         let stored: OauthAccount;
@@ -241,10 +196,7 @@ export class GoogleService {
         if (existing.length) {
             // Merge existing scopes with newly granted scopes
             const current = existing[0];
-            const mergedScopes = mergeScopes(
-                current.scopes,
-                tokens.scope ?? this.config.scopes.join(' '),
-            );
+            const mergedScopes = mergeScopes(current.scopes, tokens.scope ?? this.config.scopes.join(" "));
 
             const updated = await this.db
                 .update(oauthAccounts)
@@ -265,16 +217,14 @@ export class GoogleService {
         } else {
             // New connection - use scopes from token or config defaults
             if (!tokens.accessToken) {
-                throw new BadRequestException(
-                    'Google access token missing in response',
-                );
+                throw new BadRequestException("Google access token missing in response");
             }
-            const scopes = tokens.scope ?? this.config.scopes.join(' ');
+            const scopes = tokens.scope ?? this.config.scopes.join(" ");
             const inserted = await this.db
                 .insert(oauthAccounts)
                 .values({
                     userId,
-                    provider: 'google',
+                    provider: "google",
                     providerUserId: profile.id,
                     providerEmail: profile.email ?? null,
                     avatar: profile.picture ?? null,
@@ -290,18 +240,11 @@ export class GoogleService {
 
         // Update user profile with Google avatar if available
         if (profile.picture) {
-            const existingProfile = await this.db
-                .select()
-                .from(userProfiles)
-                .where(eq(userProfiles.userId, userId))
-                .limit(1);
+            const existingProfile = await this.db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
 
             if (existingProfile[0]) {
                 // Update existing profile
-                await this.db
-                    .update(userProfiles)
-                    .set({ image: profile.picture, updatedAt: new Date() })
-                    .where(eq(userProfiles.userId, userId));
+                await this.db.update(userProfiles).set({ image: profile.picture, updatedAt: new Date() }).where(eq(userProfiles.userId, userId));
             } else {
                 // Create profile with Google avatar
                 await this.db.insert(userProfiles).values({
@@ -311,24 +254,18 @@ export class GoogleService {
             }
         }
 
-        this.logger.log(
-            `Linked Google account ${profile.email ?? profile.id} to user ${userId}`,
-        );
+        this.logger.log(`Linked Google account ${profile.email ?? profile.id} to user ${userId}`);
 
         return this.sanitizeConnection(stored);
     }
 
-    async handleOAuthCallback(params: {
-        code: string;
-        state?: string;
-        redirectUri?: string;
-    }): Promise<GoogleConnection> {
+    async handleOAuthCallback(params: { code: string; state?: string; redirectUri?: string }): Promise<GoogleConnection> {
         if (!params.state) {
-            throw new BadRequestException('Missing OAuth state parameter');
+            throw new BadRequestException("Missing OAuth state parameter");
         }
         const userId = Number(params.state);
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new BadRequestException('Invalid OAuth state payload');
+            throw new BadRequestException("Invalid OAuth state payload");
         }
 
         // Use integration redirect URI by default (for drive integration callbacks)
@@ -338,15 +275,23 @@ export class GoogleService {
         return this.upsertConnection(userId, tokens, profile);
     }
 
-    async handleAccountLinkCallback(
-        code: string,
-        state: string,
-        userId: number,
-    ): Promise<GoogleConnection> {
+    async getSanitizedGoogleConnection(userId: number): Promise<GoogleConnection | null> {
+        const account = await this.findGoogleAccountByUserId(userId);
+        if (!account) return null;
+        return this.sanitizeConnection(account);
+    }
+
+    async findGoogleAccountByUserId(userId: number) {
+        return this.db.query.oauthAccounts.findFirst({
+            where: and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, "google")),
+        });
+    }
+
+    async handleAccountLinkCallback(code: string, state: string, userId: number): Promise<GoogleConnection> {
         // Verify state matches userId
         const stateUserId = Number(state);
         if (!Number.isInteger(stateUserId) || stateUserId !== userId) {
-            throw new BadRequestException('Invalid OAuth state for account linking');
+            throw new BadRequestException("Invalid OAuth state for account linking");
         }
 
         const { tokens, profile } = await this.exchangeCode(code);
@@ -355,44 +300,31 @@ export class GoogleService {
 
     async listConnections(userId: number): Promise<GoogleConnection[]> {
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new BadRequestException('A valid userId is required');
+            throw new BadRequestException("A valid userId is required");
         }
         const rows = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                and(
-                    eq(oauthAccounts.userId, userId),
-                    eq(oauthAccounts.provider, 'google'),
-                ),
-            );
-        return rows.map((row) => this.sanitizeConnection(row));
+            .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, "google")));
+        return rows.map(row => this.sanitizeConnection(row));
     }
 
-    async disconnect(
-        userId: number,
-        connectionId: number,
-    ): Promise<{ success: true }> {
+    async disconnect(userId: number, connectionId: number): Promise<{ success: true }> {
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new BadRequestException('A valid userId is required');
+            throw new BadRequestException("A valid userId is required");
         }
         if (!Number.isInteger(connectionId) || connectionId <= 0) {
-            throw new BadRequestException('A valid connection id is required');
+            throw new BadRequestException("A valid connection id is required");
         }
 
         const existing = await this.db
             .select()
             .from(oauthAccounts)
-            .where(
-                and(
-                    eq(oauthAccounts.id, connectionId),
-                    eq(oauthAccounts.userId, userId),
-                ),
-            )
+            .where(and(eq(oauthAccounts.id, connectionId), eq(oauthAccounts.userId, userId)))
             .limit(1);
 
         if (!existing.length) {
-            throw new NotFoundException('Google connection not found');
+            throw new NotFoundException("Google connection not found");
         }
 
         const connection = existing[0];
@@ -402,36 +334,27 @@ export class GoogleService {
         try {
             await client.revokeToken(tokenToRevoke);
         } catch (error) {
-            this.logger.warn(
-                `Failed to revoke Google token for account ${connection.id}: ${(error as Error).message}`,
-            );
+            this.logger.warn(`Failed to revoke Google token for account ${connection.id}: ${(error as Error).message}`);
         }
 
-        await this.db
-            .delete(oauthAccounts)
-            .where(eq(oauthAccounts.id, connectionId));
+        await this.db.delete(oauthAccounts).where(eq(oauthAccounts.id, connectionId));
 
         return { success: true };
     }
 
-    buildRedirectUrl(
-        status: 'success' | 'error',
-        payload?: { userId?: number; connectionId?: number; error?: string },
-    ): string {
-        const base =
-            this.config.successRedirect ??
-            'http://localhost:5173/integrations/google/status';
+    buildRedirectUrl(status: "success" | "error", payload?: { userId?: number; connectionId?: number; error?: string }): string {
+        const base = this.config.successRedirect ?? "http://localhost:5173/integrations/google/status";
         const url = new URL(base);
-        url.searchParams.set('status', status);
-        if (status === 'success') {
+        url.searchParams.set("status", status);
+        if (status === "success") {
             if (payload?.userId) {
-                url.searchParams.set('userId', String(payload.userId));
+                url.searchParams.set("userId", String(payload.userId));
             }
             if (payload?.connectionId) {
-                url.searchParams.set('connectionId', String(payload.connectionId));
+                url.searchParams.set("connectionId", String(payload.connectionId));
             }
-        } else if (status === 'error' && payload?.error) {
-            url.searchParams.set('error', payload.error);
+        } else if (status === "error" && payload?.error) {
+            url.searchParams.set("error", payload.error);
         }
         return url.toString();
     }
@@ -449,6 +372,7 @@ export class GoogleService {
             createdAt: account.createdAt,
             updatedAt: account.updatedAt,
             hasRefreshToken: Boolean(account.refreshToken),
+            refreshToken: account.refreshToken,
         };
     }
 
@@ -462,28 +386,26 @@ export class GoogleService {
 
     createDriveScopeAuthUrl(userId: number): { url: string } {
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new BadRequestException(
-                'A valid userId is required to initiate Google OAuth',
-            );
+            throw new BadRequestException("A valid userId is required to initiate Google OAuth");
         }
 
         // IMPORTANT: Use INTEGRATION redirect URI, not login redirect URI
         const client = new google.auth.OAuth2(
             this.config.clientId,
             this.config.clientSecret,
-            this.config.integrationRedirectUri, // <-- Integration callback
+            this.config.integrationRedirectUri // <-- Integration callback
         );
 
         // Combine login scopes + drive scopes for full access
         const allScopes = [
-            ...this.config.scopes,  // openid email profile
-            ...DRIVE_SCOPES,        // drive.file spreadsheets
+            ...this.config.scopes, // openid email profile
+            ...DRIVE_SCOPES, // drive.file spreadsheets
         ];
 
         const url = client.generateAuthUrl({
-            access_type: 'offline',
+            access_type: "offline",
             include_granted_scopes: true,
-            prompt: 'consent',
+            prompt: "consent",
             scope: allScopes,
             state: String(userId),
         });
