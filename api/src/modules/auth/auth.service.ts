@@ -1,16 +1,11 @@
-import { z } from 'zod';
-import {
-    Inject,
-    Injectable,
-    UnauthorizedException,
-    BadRequestException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import authConfig, { type AuthConfig } from '@config/auth.config';
-import { UsersService, type UserWithRelations } from '@/modules/master/users/users.service';
-import { GoogleService } from '@/modules/integrations/google/google.service';
-import { PermissionService } from '@/modules/auth/services/permission.service';
-import { DataScope } from '@/common/constants/roles.constant';
+import { z } from "zod";
+import { Inject, Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import authConfig, { type AuthConfig } from "@config/auth.config";
+import { UsersService, type UserWithRelations } from "@/modules/master/users/users.service";
+import { GoogleService } from "@/modules/integrations/google/google.service";
+import { PermissionService } from "@/modules/auth/services/permission.service";
+import { DataScope } from "@/common/constants/roles.constant";
 
 type SessionWithToken = {
     accessToken: string;
@@ -19,6 +14,7 @@ type SessionWithToken = {
 
 export type JwtPayload = {
     sub: number;
+    id: number;
     email: string;
     role: string | null;
     roleId: number | null;
@@ -38,8 +34,8 @@ export class AuthService {
         private readonly jwtService: JwtService,
         private readonly usersService: UsersService,
         private readonly googleService: GoogleService,
-        private readonly permissionService: PermissionService,
-    ) { }
+        private readonly permissionService: PermissionService
+    ) {}
 
     async loginWithPassword(email: string, password: string): Promise<SessionWithToken> {
         const user = await this.usersService.findByEmail(email);
@@ -65,10 +61,7 @@ export class AuthService {
             throw new UnauthorizedException("User not found");
         }
 
-        const permissions = await this.permissionService.getUserPermissions(
-            userId,
-            user.role?.id ?? null
-        );
+        const permissions = await this.permissionService.getUserPermissions(userId, user.role?.id ?? null);
 
         return { ...user, permissions };
     }
@@ -78,9 +71,7 @@ export class AuthService {
         try {
             new URL(this.config.googleRedirect);
         } catch {
-            throw new BadRequestException(
-                `Invalid redirect URI format: ${this.config.googleRedirect}. Must be a valid URL.`
-            );
+            throw new BadRequestException(`Invalid redirect URI format: ${this.config.googleRedirect}. Must be a valid URL.`);
         }
 
         const state = await this.jwtService.signAsync({ purpose: "google-login" }, { secret: this.config.stateSecret, expiresIn: "5m" });
@@ -100,9 +91,7 @@ export class AuthService {
         try {
             new URL(this.config.googleRedirect);
         } catch {
-            throw new BadRequestException(
-                `Invalid redirect URI configuration: ${this.config.googleRedirect}. Please check AUTH_GOOGLE_REDIRECT environment variable.`
-            );
+            throw new BadRequestException(`Invalid redirect URI configuration: ${this.config.googleRedirect}. Please check AUTH_GOOGLE_REDIRECT environment variable.`);
         }
 
         let verifiedState;
@@ -112,7 +101,7 @@ export class AuthService {
             });
             GoogleLoginStateSchema.parse(verifiedState);
         } catch (error) {
-            if (error instanceof Error && error.name === 'TokenExpiredError') {
+            if (error instanceof Error && error.name === "TokenExpiredError") {
                 throw new BadRequestException("Google login state has expired. Please try logging in again.");
             }
             throw new BadRequestException("Google login state verification failed. The state parameter may be invalid or tampered with.");
@@ -126,7 +115,7 @@ export class AuthService {
                 throw error;
             }
             throw new BadRequestException(
-                `Failed to exchange Google authorization code for tokens: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the redirect URI matches Google OAuth configuration.`
+                `Failed to exchange Google authorization code for tokens: ${error instanceof Error ? error.message : "Unknown error"}. Please ensure the redirect URI matches Google OAuth configuration.`
             );
         }
 
@@ -134,7 +123,9 @@ export class AuthService {
         const profile = exchangeResult.profile;
 
         if (!profile.email) {
-            throw new BadRequestException("Google account does not expose an email address. Please ensure your Google account has an email address and grants permission to share it.");
+            throw new BadRequestException(
+                "Google account does not expose an email address. Please ensure your Google account has an email address and grants permission to share it."
+            );
         }
 
         let user = await this.usersService.findByEmail(profile.email);
@@ -157,17 +148,18 @@ export class AuthService {
     private async issueSession(userId: number): Promise<SessionWithToken> {
         const userWithRelations = await this.usersService.findDetailById(userId);
         if (!userWithRelations) {
-            throw new UnauthorizedException('User not found');
+            throw new UnauthorizedException("User not found");
         }
 
         if (!userWithRelations.isActive) {
-            throw new UnauthorizedException('Account is inactive');
+            throw new UnauthorizedException("Account is inactive");
         }
 
         const authInfo = await this.usersService.getUserAuthInfo(userId);
 
         const payload: JwtPayload = {
             sub: userId,
+            id: userId,
             email: userWithRelations.email,
             role: authInfo?.roleName ?? null,
             roleId: authInfo?.roleId ?? null,
@@ -179,10 +171,7 @@ export class AuthService {
         const accessToken = await this.jwtService.signAsync(payload);
 
         // Get permissions for frontend
-        const permissions = await this.permissionService.getUserPermissions(
-            userId,
-            authInfo?.roleId ?? null
-        );
+        const permissions = await this.permissionService.getUserPermissions(userId, authInfo?.roleId ?? null);
 
         return {
             accessToken,
