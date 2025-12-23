@@ -389,6 +389,23 @@ export class RfqsService {
             }
         }
 
+        // Handle documents update if provided
+        if (data.documents !== undefined) {
+            // Delete existing documents
+            await this.db.delete(rfqDocuments).where(eq(rfqDocuments.rfqId, id));
+
+            // Insert new documents
+            if (data.documents.length > 0) {
+                const documentsData: NewRfqDocument[] = data.documents.map((doc) => ({
+                    rfqId: id,
+                    docType: doc.docType,
+                    path: doc.path,
+                    metadata: doc.metadata || {},
+                }));
+                await this.db.insert(rfqDocuments).values(documentsData);
+            }
+        }
+
         // Fetch the complete updated RFQ with items and documents
         const result = await this.findById(id);
         if (!result) {

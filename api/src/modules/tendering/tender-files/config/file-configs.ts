@@ -4,6 +4,11 @@ export type TenderFileContext =
     | 'tender-fees'
     | 'physical-docs'
     | 'rfqs'
+    | 'rfq-scope-of-work'
+    | 'rfq-tech-specs'
+    | 'rfq-detailed-boq'
+    | 'rfq-maf-format'
+    | 'rfq-mii-format'
     | 'info-sheets'
     | 'costing-sheets'
     | 'bid-submissions'
@@ -86,6 +91,56 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     },
     'rfqs': {
         maxFiles: 10,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-scope-of-work': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-tech-specs': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-detailed-boq': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-maf-format': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-mii-format': {
+        maxFiles: 3,
         maxSizeBytes: MB(25),
         allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
