@@ -56,8 +56,12 @@ export const TenderInformationFormSchema = z.object({
     deliveryTimeInstallationInclusive: z.boolean().default(false),
     deliveryTimeInstallation: z.preprocess(
         (v) => {
-            // Convert 0, null, undefined, or empty string to null
-            if (v === null || v === undefined || v === '' || v === 0) {
+            // Convert 0, undefined, or empty string to null
+            // Keep null as null (form sets it explicitly)
+            if (v === undefined || v === '' || v === 0) {
+                return null;
+            }
+            if (v === null) {
                 return null;
             }
             const num = typeof v === 'number' ? v : Number(v);
@@ -66,7 +70,7 @@ export const TenderInformationFormSchema = z.object({
             }
             return num;
         },
-        z.number().int().positive().nullable().optional()
+        z.union([z.null(), z.number().int().positive()]).optional()
     ),
 
     // PBG

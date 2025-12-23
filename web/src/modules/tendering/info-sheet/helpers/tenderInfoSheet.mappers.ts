@@ -62,7 +62,7 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
 
     deliveryTimeSupply: 0,
     deliveryTimeInstallationInclusive: false,
-    deliveryTimeInstallation: 0,
+    deliveryTimeInstallation: null,
 
     pbgRequired: undefined,
     pbgForm: undefined,
@@ -146,7 +146,7 @@ export const mapResponseToForm = (
 
         deliveryTimeSupply: toNumber(data.deliveryTimeSupply),
         deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallation: toNumber(data.deliveryTimeInstallationDays),
+        deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : null,
 
         pbgRequired: data.pbgRequired ?? undefined,
         pbgForm: data.pbgMode as TenderInfoSheetFormValues['pbgForm'],
