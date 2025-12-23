@@ -14,7 +14,7 @@ import { ArrowLeft, Upload, X, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 
 // API & Hooks
-import { useCreateCourier, useUploadCourierDocs } from "@/modules/shared/courier/courier.hooks";
+import { useCreateCourier } from "@/modules/shared/courier/courier.hooks";
 import { useUsers } from "@/hooks/api/useUsers";
 
 // =====================
@@ -66,7 +66,6 @@ const CourierForm = () => {
 
     // API hooks
     const createMutation = useCreateCourier();
-    const uploadMutation = useUploadCourierDocs();
     const { data: employees = [], isLoading: employeesLoading } = useUsers();
 
     // Form setup
@@ -91,23 +90,14 @@ const CourierForm = () => {
     });
 
     // Check if form is submitting
-    const isSubmitting = createMutation.isPending || uploadMutation.isPending;
+    const isSubmitting = createMutation.isPending;
 
     // Form submit handler
     const onSubmit = async (data: CourierFormData) => {
         try {
             // Step 1: Create courier
-            const created = await createMutation.mutateAsync(data);
-
-            // Step 2: Upload files if any
-            if (files.length > 0) {
-                try {
-                    await uploadMutation.mutateAsync({ id: created.id, files });
-                } catch (uploadError) {
-                    console.error("Upload failed:", uploadError);
-                    toast.error("Courier created but file upload failed");
-                }
-            }
+            const created = await createMutation.mutateAsync({ data, files });
+            console.log("Courier created:", created);
 
             // Step 3: Navigate back
             navigate(paths.shared.couriers ?? "/courier");
