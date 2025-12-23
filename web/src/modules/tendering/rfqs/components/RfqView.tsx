@@ -20,7 +20,6 @@ interface RfqViewProps {
 
 export function RfqView({
     rfq,
-    tender,
     isLoading = false,
     showEditButton = true,
     showBackButton = true,
@@ -70,53 +69,6 @@ export function RfqView({
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Tender Information */}
-                        {tender && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Tender Information
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                        Tender No
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold w-1/4">
-                                        {tender.tenderNo || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                        Status
-                                    </TableCell>
-                                    <TableCell className="w-1/4">
-                                        <Badge variant="outline">{tender.statusName || '—'}</Badge>
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Tender Name
-                                    </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
-                                        {tender.tenderName || '—'}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Item
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {tender.itemName || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Team Member
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {tender.teamMemberName || '—'}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
                         {/* RFQ Information */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">
@@ -142,7 +94,7 @@ export function RfqView({
                                 Requested Vendor IDs
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {rfq.requestedVendor || '—'}
+                                {rfq.vendorOrganizationNames || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -197,19 +149,19 @@ export function RfqView({
                                 </TableRow>
                                 {rfq.documents.map((doc) => (
                                     <TableRow key={doc.id} className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            {doc.docType}
-                                        </TableCell>
                                         <TableCell className="text-sm" colSpan={2}>
                                             <span className="text-xs text-muted-foreground font-mono break-all">
-                                                {doc.path}
+                                                {doc.docType.split('_')}
                                             </span>
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            {doc.path.split("\\").pop()}
                                         </TableCell>
                                         <TableCell className="text-sm text-right">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => window.open(doc.path, '_blank')}
+                                                onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
                                             >
                                                 <ExternalLink className="h-4 w-4 mr-1" />
                                                 View

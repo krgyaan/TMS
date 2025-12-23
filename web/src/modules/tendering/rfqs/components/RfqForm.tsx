@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Save, ArrowLeft, Paperclip } from 'lucide-react';
+import { Trash2, Plus, Save, ArrowLeft } from 'lucide-react';
 
 // UI Components
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Custom Form Components
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
-import { FileUploadField } from '@/components/form/FileUploadField';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 import { SelectField } from '@/components/form/SelectField';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { NumberInput } from '@/components/form/NumberInput';
@@ -29,11 +30,11 @@ import { Input } from '@/components/ui/input';
 const RfqFormSchema = z.object({
     dueDate: z.date({ message: "Due date is required" }),
 
-    scopeOfWork: z.any().optional(),
-    techSpecs: z.any().optional(),
-    detailedBoq: z.any().optional(),
-    mafFormat: z.any().optional(),
-    miiFormat: z.any().optional(),
+    scopeOfWorkPaths: z.array(z.string()).default([]),
+    techSpecsPaths: z.array(z.string()).default([]),
+    detailedBoqPaths: z.array(z.string()).default([]),
+    mafFormatPaths: z.array(z.string()).default([]),
+    miiFormatPaths: z.array(z.string()).default([]),
 
     docList: z.string().optional(),
     items: z.array(z.object({
@@ -46,7 +47,24 @@ const RfqFormSchema = z.object({
         orgId: z.string().min(1, "Organization is required"),
         personIds: z.array(z.string()).min(1, "Select at least one contact person"),
     })).optional(),
-});
+}).refine(
+    (data) => {
+        // Calculate total file count
+        const totalFiles =
+            data.scopeOfWorkPaths.length +
+            data.techSpecsPaths.length +
+            data.detailedBoqPaths.length +
+            data.mafFormatPaths.length +
+            data.miiFormatPaths.length;
+
+        // Max 15 files total (3 per field × 5 fields)
+        return totalFiles <= 15;
+    },
+    {
+        message: "Maximum 15 files total allowed (3 per field)",
+        path: ["scopeOfWorkPaths"],
+    }
+);
 
 type FormValues = z.infer<typeof RfqFormSchema>;
 
@@ -73,8 +91,20 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
             items: [{ requirement: '', unit: '', qty: undefined }],
             vendorRows: [],
             docList: '',
+            scopeOfWorkPaths: [],
+            techSpecsPaths: [],
+            detailedBoqPaths: [],
+            mafFormatPaths: [],
+            miiFormatPaths: [],
         },
     });
+
+    // Watch file paths for display
+    const scopeOfWorkPaths = form.watch('scopeOfWorkPaths');
+    const techSpecsPaths = form.watch('techSpecsPaths');
+    const detailedBoqPaths = form.watch('detailedBoqPaths');
+    const mafFormatPaths = form.watch('mafFormatPaths');
+    const miiFormatPaths = form.watch('miiFormatPaths');
 
     const { fields: itemFields, append: appendItem, remove: removeItem } = useFieldArray({
         control: form.control,
@@ -107,6 +137,23 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                 }
             });
 
+            // Group documents by docType
+            const scopeOfWorkDocs = initialData.documents
+                ?.filter(d => d.docType === 'SCOPE_OF_WORK')
+                .map(d => d.path) || [];
+            const techSpecsDocs = initialData.documents
+                ?.filter(d => d.docType === 'TECH_SPECS')
+                .map(d => d.path) || [];
+            const detailedBoqDocs = initialData.documents
+                ?.filter(d => d.docType === 'DETAILED_BOQ')
+                .map(d => d.path) || [];
+            const mafFormatDocs = initialData.documents
+                ?.filter(d => d.docType === 'MAF_FORMAT')
+                .map(d => d.path) || [];
+            const miiFormatDocs = initialData.documents
+                ?.filter(d => d.docType === 'MII_FORMAT')
+                .map(d => d.path) || [];
+
             const dueDateValue = initialData.dueDate ? new Date(initialData.dueDate) : new Date();
             form.reset({
                 dueDate: dueDateValue,
@@ -117,32 +164,29 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                     qty: Number(i.qty)
                 })),
                 vendorRows: reconstructedRows,
-                // Note: File inputs usually can't be prefilled with File objects programmatically due to security.
-                // You would usually display existing files separately or pass URLs to your FileUploadField.
+                scopeOfWorkPaths: scopeOfWorkDocs,
+                techSpecsPaths: techSpecsDocs,
+                detailedBoqPaths: detailedBoqDocs,
+                mafFormatPaths: mafFormatDocs,
+                miiFormatPaths: miiFormatDocs,
             });
         }
     }, [initialData, allowedVendors, form]);
 
     const handleSubmit: SubmitHandler<FormValues> = async (values) => {
-        console.log('🚀 Submitting RFQ:', values);
-
         // 1. Flatten Vendor IDs to CSV
         const allSelectedPersonIds = values.vendorRows?.flatMap(row => row.personIds) || [];
         // Remove duplicates just in case
         const uniquePersonIds = Array.from(new Set(allSelectedPersonIds)).join(',');
 
-        // 2. Prepare File Uploads
-        // Note: Implementation depends on how your FileUploadField works.
-        // Assuming it returns File[] and we need to convert to the array of objects expected by API.
-        // This part usually involves uploading files to S3/Server first, getting paths, then submitting JSON.
-        // For this example, I'll construct the JSON payload structure.
-
-        const documents = [];
-        if (values.scopeOfWork) documents.push({ docType: 'SCOPE_OF_WORK', file: values.scopeOfWork });
-        if (values.techSpecs) documents.push({ docType: 'TECH_SPECS', file: values.techSpecs });
-        if (values.detailedBoq) documents.push({ docType: 'DETAILED_BOQ', file: values.detailedBoq });
-        if (values.mafFormat) documents.push({ docType: 'MAF_FORMAT', file: values.mafFormat });
-        if (values.miiFormat) documents.push({ docType: 'MII_FORMAT', file: values.miiFormat });
+        // 2. Convert file paths to documents array format expected by API
+        const documents = [
+            ...values.scopeOfWorkPaths.map(path => ({ docType: 'SCOPE_OF_WORK', path })),
+            ...values.techSpecsPaths.map(path => ({ docType: 'TECH_SPECS', path })),
+            ...values.detailedBoqPaths.map(path => ({ docType: 'DETAILED_BOQ', path })),
+            ...values.mafFormatPaths.map(path => ({ docType: 'MAF_FORMAT', path })),
+            ...values.miiFormatPaths.map(path => ({ docType: 'MII_FORMAT', path })),
+        ];
 
         const payload = {
             tenderId: tenderData.tenderId,
@@ -153,8 +197,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                 ...i,
                 qty: Number(i.qty) // ensure number
             })),
-            // Depending on your API, you might send `documents` as metadata or upload separately
-            _files: documents
+            documents: documents.length > 0 ? documents : undefined,
         };
 
         try {
@@ -225,21 +268,58 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 </FieldWrapper>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-                                <FileUploadField control={form.control} name="scopeOfWork" label="Scope of Work" multiple />
-                                <FileUploadField control={form.control} name="techSpecs" label="Technical Specifications" multiple />
-                                <FileUploadField control={form.control} name="detailedBoq" label="Detailed BOQ" multiple />
-                                <FileUploadField control={form.control} name="mafFormat" label="MAF Format" multiple />
-                                <FileUploadField control={form.control} name="miiFormat" label="MII Format" multiple />
-                                <FieldWrapper control={form.control} name="docList" label="Other Documents Needed">
-                                    {(field) => (
-                                        <textarea
-                                            {...field}
-                                            className="flex min-h-[42px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                            placeholder="List any other required docs..."
-                                        />
-                                    )}
-                                </FieldWrapper>
+                            <div className="space-y-4 pt-2">
+                                <Alert>
+                                    <AlertDescription className="text-sm">
+                                        Maximum 3 files per field. Total combined size should not exceed 25MB for Gmail compatibility.
+                                    </AlertDescription>
+                                </Alert>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <TenderFileUploader
+                                        context="rfq-scope-of-work"
+                                        value={scopeOfWorkPaths}
+                                        onChange={(paths) => form.setValue("scopeOfWorkPaths", paths)}
+                                        label="Scope of Work"
+                                        disabled={isSubmitting}
+                                    />
+                                    <TenderFileUploader
+                                        context="rfq-tech-specs"
+                                        value={techSpecsPaths}
+                                        onChange={(paths) => form.setValue("techSpecsPaths", paths)}
+                                        label="Technical Specifications"
+                                        disabled={isSubmitting}
+                                    />
+                                    <TenderFileUploader
+                                        context="rfq-detailed-boq"
+                                        value={detailedBoqPaths}
+                                        onChange={(paths) => form.setValue("detailedBoqPaths", paths)}
+                                        label="Detailed BOQ"
+                                        disabled={isSubmitting}
+                                    />
+                                    <TenderFileUploader
+                                        context="rfq-maf-format"
+                                        value={mafFormatPaths}
+                                        onChange={(paths) => form.setValue("mafFormatPaths", paths)}
+                                        label="MAF Format"
+                                        disabled={isSubmitting}
+                                    />
+                                    <TenderFileUploader
+                                        context="rfq-mii-format"
+                                        value={miiFormatPaths}
+                                        onChange={(paths) => form.setValue("miiFormatPaths", paths)}
+                                        label="MII Format"
+                                        disabled={isSubmitting}
+                                    />
+                                    <FieldWrapper control={form.control} name="docList" label="Other Documents Needed">
+                                        {(field) => (
+                                            <textarea
+                                                {...field}
+                                                className="flex min-h-[42px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                                placeholder="List any other required docs..."
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
                             </div>
                         </div>
 
