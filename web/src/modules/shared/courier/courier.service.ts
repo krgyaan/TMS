@@ -51,8 +51,27 @@ export const courierApi = {
     },
 
     // Create courier
-    create: async (data: CreateCourierInput): Promise<Courier> => {
-        const response = await api.post(ENDPOINT, data);
+    create: async ({ data, files }: { data: CreateCourierInput; files: File[] }): Promise<Courier> => {
+        const formData = new FormData();
+
+        // Append form fields
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
+        });
+
+        // Append files
+        files.forEach(file => {
+            formData.append("courierDocs[]", file);
+        });
+
+        const response = await api.post(ENDPOINT, formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+
         return response.data;
     },
 
