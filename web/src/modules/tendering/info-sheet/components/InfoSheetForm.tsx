@@ -128,7 +128,7 @@ export function TenderInformationForm({
     // Clear deliveryTimeInstallation when inclusive is true
     useEffect(() => {
         if (deliveryTimeInstallationInclusive) {
-            form.setValue('deliveryTimeInstallation', null, { shouldValidate: false });
+            form.setValue('deliveryTimeInstallation', undefined, { shouldValidate: false });
         }
     }, [deliveryTimeInstallationInclusive, form]);
 
@@ -543,7 +543,10 @@ export function TenderInformationForm({
                                                     step={1}
                                                     placeholder="Enter months"
                                                     value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
+                                                    onChange={(value) => {
+                                                        // Convert 0 to null before setting
+                                                        field.onChange(value === 0 ? null : value);
+                                                    }}
                                                 />
                                             )}
                                         </FieldWrapper>
@@ -608,7 +611,10 @@ export function TenderInformationForm({
                                             step={1}
                                             placeholder="Enter number of days"
                                             value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
+                                            onChange={(value) => {
+                                                // Convert 0 to null before setting
+                                                field.onChange(value === 0 ? null : value);
+                                            }}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -644,7 +650,10 @@ export function TenderInformationForm({
                                                 step={1}
                                                 placeholder="Enter number of days"
                                                 value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
+                                                onChange={(value) => {
+                                                    // Convert 0 to null before setting
+                                                    field.onChange(value === 0 ? null : value);
+                                                }}
                                             />
                                         )}
                                     </FieldWrapper>

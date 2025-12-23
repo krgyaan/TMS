@@ -56,32 +56,28 @@ export const TenderInformationFormSchema = z.object({
     deliveryTimeInstallationInclusive: z.boolean().default(false),
     deliveryTimeInstallation: z.preprocess(
         (v) => {
-            // Convert 0, undefined, or empty string to null
-            // Keep null as null (form sets it explicitly)
-            if (v === undefined || v === '' || v === 0) {
-                return null;
-            }
-            if (v === null) {
-                return null;
+            // Convert 0, null, undefined, or empty string to undefined (so optional() handles it)
+            if (v === null || v === undefined || v === '' || v === 0) {
+                return undefined;
             }
             const num = typeof v === 'number' ? v : Number(v);
             if (isNaN(num) || num <= 0) {
-                return null;
+                return undefined;
             }
             return num;
         },
-        z.union([z.null(), z.number().int().positive()]).optional()
+        z.number().int().positive().optional()
     ),
 
     // PBG
     pbgRequired: z.enum(['YES', 'NO']).optional(),
-    pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
+    pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).nullable().optional(),
     pbgPercentage: z.coerce.number().min(0).max(100).optional(),
     pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
     // Security Deposit
     sdRequired: z.enum(['YES', 'NO']).optional(),
-    sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional(),
+    sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).nullable().optional(),
     securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
     sdDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
