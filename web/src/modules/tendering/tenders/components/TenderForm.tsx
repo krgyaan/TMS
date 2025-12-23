@@ -147,7 +147,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 tenderFees: tender.tenderFees != null ? Number(tender.tenderFees) : 0,
                 emd: tender.emd != null ? Number(tender.emd) : 0,
                 teamMember: tender.teamMember != null ? Number(tender.teamMember) : null,
-                dueDate: tender.dueDate ? (tender.dueDate as Date).toISOString() : undefined,
+                dueDate: tender.dueDate ? new Date(tender.dueDate).toISOString() : "",
                 location: tender.location ? Number(tender.location) : undefined,
                 website: tender.website ? Number(tender.website) : undefined,
                 item: Number(tender.item) || (undefined as any),
