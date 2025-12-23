@@ -1,15 +1,11 @@
-﻿import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import {
-    Strategy,
-    type JwtFromRequestFunction,
-    type StrategyOptions,
-} from 'passport-jwt';
-import type { Request } from 'express';
-import authConfig, { type AuthConfig } from '@/config/auth.config';
-import { UsersService } from '@/modules/master/users/users.service';
-import type { JwtPayload } from '@/modules/auth/auth.service';
-import { DataScope } from '@/common/constants/roles.constant';
+﻿import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy, type JwtFromRequestFunction, type StrategyOptions } from "passport-jwt";
+import type { Request } from "express";
+import authConfig, { type AuthConfig } from "@/config/auth.config";
+import { UsersService } from "@/modules/master/users/users.service";
+import type { JwtPayload } from "@/modules/auth/auth.service";
+import { DataScope } from "@/common/constants/roles.constant";
 
 // What gets attached to request.user
 export type ValidatedUser = {
@@ -19,15 +15,15 @@ export type ValidatedUser = {
     roleId: number | null;
     teamId: number | null;
     dataScope: DataScope;
-    canSwitchTeams: boolean;
-    isActive: boolean;
+    canSwitchTeams: boolean | null;
+    isActive: boolean | null;
 };
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor(
         @Inject(authConfig.KEY) private readonly config: AuthConfig,
-        private readonly usersService: UsersService,
+        private readonly usersService: UsersService
     ) {
         super({
             jwtFromRequest: JwtStrategy.extractJwtFromRequest(config),
@@ -36,9 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         } satisfies StrategyOptions);
     }
 
-    private static extractJwtFromRequest(
-        config: AuthConfig,
-    ): JwtFromRequestFunction {
+    private static extractJwtFromRequest(config: AuthConfig): JwtFromRequestFunction {
         return (req: Request): string | null => {
             // 1. Try httpOnly cookie
             if (req.cookies?.[config.cookie.name]) {
@@ -51,8 +45,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 return null;
             }
 
-            const [type, token] = authorization.split(' ');
-            if (type?.toLowerCase() !== 'bearer' || !token) {
+            const [type, token] = authorization.split(" ");
+            if (type?.toLowerCase() !== "bearer" || !token) {
                 return null;
             }
 
@@ -65,11 +59,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         const user = await this.usersService.findById(payload.sub);
 
         if (!user) {
-            throw new UnauthorizedException('User not found');
+            throw new UnauthorizedException("User not found");
         }
 
         if (!user.isActive) {
-            throw new UnauthorizedException('Account is inactive');
+            throw new UnauthorizedException("Account is inactive");
         }
 
         // Return JWT payload data + active status

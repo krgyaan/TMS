@@ -126,37 +126,6 @@ export class AuthController {
         }
     }
 
-    /**
-     * POST handler for Google OAuth callback (when frontend makes API call)
-     * This is used when Google redirects to frontend, and frontend calls backend
-     */
-    @Public()
-    @Get("google/callback")
-    async googleCallbackGet(@Query() query: Record<string, unknown>, @Res() res: Response) {
-        const { code, state } = GoogleCallbackSchema.parse(query);
-
-        try {
-            const session = await this.authService.handleGoogleLoginCallback(code, state);
-
-            this.setAuthCookie(res, session.accessToken);
-
-            // Redirect to frontend callback URL with success flag
-            // Don't include code/state since they've already been used
-            // The cookie is already set, so the frontend can verify authentication
-            const frontendCallbackUrl = this.configService.get<string>("auth.googleRedirect", "http://localhost:5173/auth/google/callback");
-            const redirectUrl = new URL(frontendCallbackUrl);
-            redirectUrl.searchParams.set("success", "true");
-            res.redirect(redirectUrl.toString());
-        } catch (error) {
-            // Redirect to frontend callback with error
-            const frontendCallbackUrl = this.configService.get<string>("auth.googleRedirect", "http://localhost:5173/auth/google/callback");
-            const errorMessage = error instanceof Error ? error.message : "Authentication failed";
-            const redirectUrl = new URL(frontendCallbackUrl);
-            redirectUrl.searchParams.set("error", errorMessage);
-            res.redirect(redirectUrl.toString());
-        }
-    }
-
     @Public()
     @Post("google/callback")
     @HttpCode(HttpStatus.OK)
