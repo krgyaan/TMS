@@ -54,6 +54,8 @@ const CreateTenderInfoSchema = z.object({
     tlRemarks: z.string().max(200).optional(),
     rfqTo: z.string().max(15).optional(),
     courierAddress: z.string().optional(),
+
+    documents: z.string().nullable().optional(),
 });
 
 const UpdateTenderInfoSchema = z.object({
@@ -90,6 +92,8 @@ const UpdateTenderInfoSchema = z.object({
     tenderApprovalStatus: z.string().max(50).optional(),
     oemNotAllowed: z.string().optional(),
     tlRejectionRemarks: z.string().optional(),
+
+    documents: z.string().nullable().optional(),
 });
 
 const SaveTenderApprovalSchema = z.object({
@@ -204,10 +208,6 @@ export class TenderInfoController {
         return this.tenderInfosService.updateApproval(id, parsed);
     }
 
-    /**
-     * Manual status update endpoint
-     * Requires status ID and comment
-     */
     @Patch(':id/status')
     async updateStatus(
         @Param('id', ParseIntPipe) id: number,
@@ -223,9 +223,6 @@ export class TenderInfoController {
         );
     }
 
-    /**
-     * Generate tender name based on organization, item, and location
-     */
     @Post('generate-name')
     async generateName(@Body() body: unknown) {
         const parsed = GenerateTenderNameSchema.parse(body);

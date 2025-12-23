@@ -93,6 +93,13 @@ export class UpdateRfqDto {
     @ValidateNested({ each: true })
     @Type(() => RfqItemDto)
     items?: RfqItemDto[];
+
+    // Nested Documents (Optional)
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => RfqDocumentDto)
+    documents?: RfqDocumentDto[];
 }
 
 export class RfqResponseItemDto {

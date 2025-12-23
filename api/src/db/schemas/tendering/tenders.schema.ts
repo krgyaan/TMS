@@ -27,7 +27,7 @@ export const tenderInfos = pgTable("tender_infos", {
     website: bigint("website", { mode: "number" }),
     courierAddress: text("courier_address"),
     deleteStatus: integer("delete_status").default(0).notNull(),
-
+    documents: text("documents"), 
     // Tender approval fields
     tlRemarks: varchar("tl_remarks", { length: 200 }),
     rfqTo: varchar("rfq_to", { length: 15 }),

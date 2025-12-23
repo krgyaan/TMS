@@ -655,6 +655,7 @@ export interface TenderInfo {
     website: number | null;
     courierAddress: string | null;
     deleteStatus: number;
+    documents: string | null;
 
     // Tender approval fields
     tlRemarks: string | null;
@@ -1560,6 +1561,22 @@ export interface RfqDashboardRow {
 }
 
 export interface Rfq {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    itemName: string;
+    rfqTo: string;
+    teamMemberName: string;
+    statusName: string;
+    dueDate: Date;
+    rfqId: number | null;
+    vendorOrganizationNames: string | null;
+    items: RfqItem[];
+    documents: RfqDocument[];
+    docList: string | null;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface RfqItem {
