@@ -1,0 +1,37 @@
+<html>
+    <head>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <h4>Dear Coordinator,</h4>
+
+        <p>Please send the courier as detailed below:</p>
+
+        <ul>
+            <li>Courier to: {{to_name}}</li>
+            <li>Organization Name: {{to_org}}</li>
+            <li>Address: {{to_addr}}</li>
+            <li>Pin Code: {{to_pin}}</li>
+            <li>Mob No.: {{to_mobile}}</li>
+            <li>Courier from: {{from_name}}</li>
+            <li>Expected Delivery Date: {{expected_delivery_date}}</li>
+            <li>Dispatch Urgency: {{dispatch_urgency}}</li>
+        </ul>
+
+        <p>Please find the soft copy of the documents attached.</p>
+
+        <p>
+            Also, update the
+            <a href="{{dispatch_link}}">courier dispatch form</a>, when the courier has been sent.
+        </p>
+
+        <p>
+            <b>Regards,</b><br />
+            {{from_name}}
+        </p>
+    </body>
+</html>
