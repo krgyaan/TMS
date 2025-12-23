@@ -163,12 +163,16 @@ export class TenderApprovalService {
         const counts = await this.db
             .select({
                 total: sql<number>`count(*)`,
-                pending: sql<number>`count(*) FILTER (WHERE tlStatus = 0)`,
-                approved: sql<number>`count(*) FILTER (WHERE tlStatus = 1)`,
-                rejected: sql<number>`count(*) FILTER (WHERE tlStatus = 2)`,
-                incomplete: sql<number>`count(*) FILTER (WHERE tlStatus = 3)`,
+                pending: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 0)`,
+                approved: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 1)`,
+                rejected: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 2)`,
+                incomplete: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 3)`,
             })
             .from(tenderInfos)
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
             .where(TenderInfosService.getActiveCondition());
         return counts[0];
     }

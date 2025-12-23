@@ -12,6 +12,7 @@ import { useStatuses } from "@/hooks/api/useStatuses";
 import type { TenderInfoWithNames, TenderWithRelations } from "@/types/api.types";
 import { Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
@@ -19,6 +20,7 @@ import { tenderNameCol } from "@/components/data-grid/columns";
 const TenderListPage = () => {
     const { data: statuses } = useStatuses();
     const [activeTab, setActiveTab] = useState<string>("");
+    const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
 
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
 
@@ -82,6 +84,16 @@ const TenderListPage = () => {
     const totalRows = Array.isArray(apiResponse)
         ? apiResponse.length
         : (apiResponse?.meta?.total || 0);
+
+    // Cache the count for the active tab
+    useEffect(() => {
+        if (activeTab && totalRows > 0) {
+            setTabCounts(prev => ({
+                ...prev,
+                [activeTab]: totalRows
+            }));
+        }
+    }, [activeTab, totalRows]);
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
         {
@@ -221,11 +233,23 @@ const TenderListPage = () => {
                 >
                     <div className="flex-none m-auto">
                         <TabsList>
-                            {categories.map(category => (
-                                <TabsTrigger key={category.name} value={category.name}>
-                                    {category.label}
-                                </TabsTrigger>
-                            ))}
+                            {categories.map(category => {
+                                const count = tabCounts[category.name] ?? 0;
+                                return (
+                                    <TabsTrigger
+                                        key={category.name}
+                                        value={category.name}
+                                        className="data-[state=active]:shadow-md flex items-center gap-1"
+                                    >
+                                        <span className="font-semibold text-sm">{category.label}</span>
+                                        {count > 0 && (
+                                            <Badge variant="secondary" className="text-xs">
+                                                {count}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                );
+                            })}
                         </TabsList>
                     </div>
 
