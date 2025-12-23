@@ -22,7 +22,7 @@ import { DocumentChecklistView } from '@/modules/tendering/checklists/components
 import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
 import { BidSubmissionView } from './components/BidSubmissionView';
 
-export default function BidSubmissionViewPage() {
+export default function BidSubmissionShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
@@ -35,11 +35,11 @@ export default function BidSubmissionViewPage() {
     const tenderId = bidSubmission?.tenderId;
 
     // Fetch all related tender data
-    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
-    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
-    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
-    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId!);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId!);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId!);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId!(tenderId!);
+    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId!);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
     const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId!);
 
@@ -67,9 +67,9 @@ export default function BidSubmissionViewPage() {
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
-              ...tender,
-              approval: approval || null,
-          }
+            ...tender,
+            approval: approval || null,
+        }
         : null;
 
     return (
