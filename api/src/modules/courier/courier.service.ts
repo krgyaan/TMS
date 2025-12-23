@@ -12,6 +12,9 @@ import type { UpdateCourierDto } from "@/modules/courier/zod/update-courier.sche
 import type { DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
 
 import { MailerService } from "@/mailer/mailer.service";
+import { GoogleService } from "@/modules/integrations/google/google.service";
+
+import { CourierMailTemplates } from "./courier.mail";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -34,7 +37,8 @@ export class CourierService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
-        private readonly mailer: MailerService
+        private readonly mailerService: MailerService,
+        private readonly googleService: GoogleService
     ) {}
 
     private validateDispatchData(dispatchData: DispatchCourierDto): void {
@@ -54,7 +58,11 @@ export class CourierService {
         }
     }
 
-    async create(data: CreateCourierDto, userId: number) {
+    async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
+        // 1️⃣ Prepare uploaded docs (if any)
+        const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
+
+        // 2️⃣ Create courier with docs already attached
         const values = {
             toOrg: data.toOrg,
             toName: data.toName,
@@ -65,27 +73,63 @@ export class CourierService {
             urgency: data.urgency,
             userId,
             delDate: new Date(data.delDate),
-            courierDocs: [],
+            courierDocs, // ✅ files stored here
             status: COURIER_STATUS.PENDING,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
 
-        const result = await this.db.insert(couriers).values(values).returning();
+        const [courier] = await this.db.insert(couriers).values(values).returning();
+        console.log("Created courier:", courier);
 
-        // optional welcome/notification mail (kept from original)
-        try {
-            const mail = await this.mailer.sendMail({
-                to: "abhijeetgaur.dev@gmail.com",
-                subject: "New courier created",
-                html: `<h1>Courier Created</h1><p>Courier ID: ${result[0].id}</p>`,
-            });
-            console.log("Notification mail sent:", mail);
-        } catch (e) {
-            console.warn("Failed to send mail:", e);
+        if (!courier) {
+            throw new Error("Failed to create courier");
         }
 
-        return result[0];
+        // 3️⃣ Fetch creator user (optional – for template usage)
+        const [user] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+
+        // 4️⃣ Fetch Google OAuth connection
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(userId);
+        console.log("Google Connection for user", userId, googleConnection);
+
+        // 5️⃣ Send mail (NON-BLOCKING)
+        if (googleConnection) {
+            try {
+                const urgencyLabel = courier.urgency === 1 ? "Low" : courier.urgency === 2 ? "Medium" : "High";
+
+                const mailContext = {
+                    to_name: courier.toName,
+                    to_org: courier.toOrg,
+                    to_addr: courier.toAddr,
+                    to_pin: courier.toPin,
+                    to_mobile: courier.toMobile,
+                    expected_delivery_date: courier.delDate.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                    }),
+                    dispatch_urgency: urgencyLabel,
+                    dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
+                };
+
+                await this.mailerService.sendTemplateAsUser(
+                    CourierMailTemplates.COURIER_REQUEST,
+                    mailContext,
+                    {
+                        to: ["abhijeetgaur.dev@gmail.com"],
+                        cc: ["abhijeetgaur777@gmail.com"],
+                        subject: "Courier Dispatch Request",
+                        attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
+                    },
+                    googleConnection
+                );
+            } catch (e) {
+                console.warn(`[Courier ${courier.id}] Failed to send mail`, e);
+            }
+        }
+
+        return courier;
     }
 
     // Get all couriers (dashboard)
