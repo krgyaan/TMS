@@ -1,0 +1,25 @@
+<div>
+    <p>Dear {{fromName}},</p>
+    <p>
+        The courier sent to
+        {{toName}}
+        of
+        {{toOrg}}
+        has been
+        {{status}}.
+    </p>
+
+    <ul>
+        <li>Request No: {{id}}</li>
+        <li>Courier Provider: {{courierProvider}}</li>
+        <li>Docket No: {{docketNo}}</li>
+        <li>Pickup date and time: {{pickup}}</li>
+        <li>Delivery date and time: {{delivery}}</li>
+        <li>Delivery within Expected time: {{withinTimeCheck}}</li>
+    </ul>
+
+    <p>The Proof of Delivery (POD) slip against the tender has been attached with the mail.</p>
+
+    <br />
+    <p>Regards,<br />{{coordinatorName}}</p>
+</div>
