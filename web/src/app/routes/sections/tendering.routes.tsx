@@ -9,7 +9,7 @@ const Tender_Edit = lazy(() => import('@/modules/tendering/tenders/TenderEditPag
 const Tender_View = lazy(() => import('@/modules/tendering/tenders/TenderShowPage'));
 const Tendering_TenderApproval = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalListPage'));
 const Tendering_TenderApproval_Create = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalCreatePage'));
-const Tendering_TenderApproval_Show = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalViewPage'));
+const Tendering_TenderApproval_Show = lazy(() => import('@/modules/tendering/tender-approval/TenderApprovalShowPage'));
 const InfoSheet_Create = lazy(() => import('@/modules/tendering/info-sheet/TenderInfoSheetCreatePage'));
 const InfoSheet_Edit = lazy(() => import('@/modules/tendering/info-sheet/TenderInfoSheetEditPage'));
 const Tendering_PhysicalDocs = lazy(() => import('@/modules/tendering/physical-docs/PhysicalDocsListPage'));
@@ -19,7 +19,7 @@ const Tendering_PhysicalDocs_Show = lazy(() => import('@/modules/tendering/physi
 const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs/RfqListPage'));
 const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/RfqCreatePage'));
 const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/RfqEditPage'));
-const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/show'));
+const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/RfqShowPage'));
 const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdListPage'));
 const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
 const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdEditPage'));
@@ -43,7 +43,7 @@ const BidSubmitPage = lazy(() => import('@/modules/tendering/bid-submissions/Bid
 const BidEditPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditPage'));
 const BidMarkMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidMarkMissedPage'));
 const BidEditMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditMissedPage'));
-const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionViewPage'));
+const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionShowPage'));
 const TqManagementListPage = lazy(() => import('@/modules/tendering/tq-management/TqManagementListPage'));
 const TqReceivedPage = lazy(() => import('@/modules/tendering/tq-management/TqReceivedPage'));
 const TqEditReceivedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditReceivedPage'));

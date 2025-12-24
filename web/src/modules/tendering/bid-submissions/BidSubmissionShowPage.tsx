@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useTqById, useTqItems } from '@/hooks/api/useTqManagement';
+import { useBidSubmissionById } from '@/hooks/api/useBidSubmissions';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
@@ -11,8 +11,6 @@ import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
-import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
-import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { paths } from '@/app/routes/paths';
 import type { TenderWithRelations } from '@/types/api.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
@@ -22,66 +20,62 @@ import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/P
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
-import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { TqView } from './components/TqView';
+import { BidSubmissionView } from './components/BidSubmissionView';
 
-export default function TqViewPage() {
+export default function BidSubmissionShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
     if (!id) {
-        return <div>Invalid TQ ID</div>;
+        return <div>Invalid bid submission ID</div>;
     }
 
-    const tqId = Number(id);
-    const { data: tqData, isLoading: tqLoading, error: tqError } = useTqById(tqId);
-    const tenderId = tqData?.tenderId;
+    const bidSubmissionId = Number(id);
+    const { data: bidSubmission, isLoading: bidLoading, error: bidError } = useBidSubmissionById(bidSubmissionId);
+    const tenderId = bidSubmission?.tenderId;
 
     // Fetch all related tender data
     const { data: tender, isLoading: tenderLoading } = useTender(tenderId!);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId!);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId!);
-    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId!);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId!(tenderId!);
     const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId!);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
     const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId!);
-    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId!);
-    const { data: tqItems, isLoading: itemsLoading } = useTqItems(tqId);
-    const { data: tqTypes } = useTqTypes();
 
-    const isLoading = tqLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading || costingSheetLoading || bidSubmissionLoading || itemsLoading;
+    const isLoading = bidLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading || costingSheetLoading;
 
-    if (tqError) {
+    if (bidError) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Failed to load TQ details. Please try again later.
+                    Failed to load bid submission details. Please try again later.
                 </AlertDescription>
             </Alert>
         );
     }
 
-    if (tqLoading) {
+    if (bidLoading) {
         return <Skeleton className="h-[800px]" />;
     }
 
-    if (!tqData) {
-        return <div>TQ not found</div>;
+    if (!bidSubmission) {
+        return <div>Bid submission not found</div>;
     }
 
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
-              ...tender,
-              approval: approval || null,
-          }
+            ...tender,
+            approval: approval || null,
+        }
         : null;
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="tq-management" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-9 gap-2">
+            <Tabs defaultValue="bid-submission" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-8 gap-2">
                     <TabsTrigger value="tender">Tender</TabsTrigger>
                     <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
                     <TabsTrigger value="approval">Tender Approval</TabsTrigger>
@@ -90,7 +84,6 @@ export default function TqViewPage() {
                     <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
                     <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
                     <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
-                    <TabsTrigger value="tq-management">TQ Management</TabsTrigger>
                 </TabsList>
 
                 {/* Tender */}
@@ -183,41 +176,19 @@ export default function TqViewPage() {
 
                 {/* Bid Submission */}
                 <TabsContent value="bid-submission">
-                    {bidSubmissionLoading ? (
-                        <BidSubmissionView bidSubmission={null} isLoading />
-                    ) : bidSubmission ? (
-                        <BidSubmissionView
-                            bidSubmission={bidSubmission}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>No bid submission exists for this tender yet.</AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* TQ Management */}
-                <TabsContent value="tq-management">
-                    <TqView
-                        tqData={tqData}
-                        tqItems={tqItems || null}
-                        tqTypes={tqTypes || null}
-                        isLoading={tqLoading || itemsLoading}
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission}
+                        isLoading={bidLoading}
                         showEditButton={true}
                         showBackButton={true}
                         onEdit={() => {
-                            if (tqData.status === 'TQ received') {
-                                navigate(paths.tendering.tqEditReceived(tqId));
-                            } else if (tqData.status === 'TQ replied') {
-                                navigate(paths.tendering.tqEditReplied(tqId));
-                            } else if (tqData.status === 'TQ missed') {
-                                navigate(paths.tendering.tqEditMissed(tqId));
+                            if (bidSubmission.status === 'Bid Submitted') {
+                                navigate(paths.tendering.bidEdit(bidSubmission.id));
+                            } else if (bidSubmission.status === 'Tender Missed') {
+                                navigate(paths.tendering.bidEditMissed(bidSubmission.id));
                             }
                         }}
-                        onBack={() => navigate(paths.tendering.tqManagement)}
+                        onBack={() => navigate(paths.tendering.bidSubmissions)}
                     />
                 </TabsContent>
             </Tabs>

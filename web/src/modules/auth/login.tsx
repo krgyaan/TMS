@@ -8,11 +8,14 @@ import { toast } from "sonner"
 const Login = () => {
     const navigate = useNavigate()
     const location = useLocation()
-    const login = useLogin()
-    const { refetch: getGoogleUrl } = useGoogleAuthUrl()
 
-    const redirectTo =
-        (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/"
+    // Get redirect URL from location state (React Router) or sessionStorage (axios 401 redirect)
+    const stateRedirect = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+    const storedRedirect = sessionStorage.getItem("auth_redirect")
+    const redirectTo = stateRedirect || storedRedirect || "/"
+
+    const login = useLogin(redirectTo)
+    const { refetch: getGoogleUrl } = useGoogleAuthUrl()
 
     // Check authentication status and redirect if already logged in
     useEffect(() => {
@@ -41,6 +44,9 @@ const Login = () => {
 
     const handleGoogleLogin = useCallback(async () => {
         try {
+            if (redirectTo && redirectTo !== "/") {
+                sessionStorage.setItem("auth_redirect", redirectTo);
+            }
             // console.log("🔍 Starting Google login...")
             const { data } = await getGoogleUrl()
             console.log("📋 Google auth URL:", data?.url)

@@ -4,9 +4,16 @@ export type TenderFileContext =
     | 'tender-fees'
     | 'physical-docs'
     | 'rfqs'
+    | 'rfq-scope-of-work'
+    | 'rfq-tech-specs'
+    | 'rfq-detailed-boq'
+    | 'rfq-maf-format'
+    | 'rfq-mii-format'
     | 'info-sheets'
     | 'costing-sheets'
-    | 'bid-submissions'
+    | 'bid-submitted-docs'
+    | 'bid-submission-proof'
+    | 'bid-final-price-ss'
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
@@ -94,6 +101,56 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
+    'rfq-scope-of-work': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-tech-specs': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-detailed-boq': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-maf-format': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-mii-format': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
     'info-sheets': {
         maxFiles: 10,
         maxSizeBytes: MB(10),
@@ -114,12 +171,32 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
-    'bid-submissions': {
-        maxFiles: 10,
-        maxSizeBytes: MB(50),
-        allowedMimeTypes: [MIME.PDF, ...ARCHIVES],
-        allowedExtensions: ['.pdf', '.zip', '.rar'],
-        compressImages: false,
+    'bid-submitted-docs': {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bid-submission-proof': {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bid-final-price-ss': {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
         imageQuality: 80,
         compressPdf: true,
         pdfQuality: 80,

@@ -35,7 +35,7 @@ export default function DocumentChecklistShowPage() {
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
 
-    const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading;
+    const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading;
 
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations = {
