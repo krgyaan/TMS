@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm } from 'react-hook-form';
+import { type Resolver, type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
@@ -106,7 +106,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     // Form hooks (now safe - always called)
     const form = useForm<TenderApprovalFormValues>({
-        resolver: zodResolver(TenderApprovalFormSchema) as any,
+        resolver: zodResolver(TenderApprovalFormSchema) as Resolver<TenderApprovalFormValues>,
         defaultValues: getInitialValues(approval),
     });
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
+import { type SubmitHandler, useForm, useFieldArray, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Plus, Trash2, Upload, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useCreateTqReceived, useUpdateTqReceived, useTqItems } from '@/hooks/api/useTqManagement';
@@ -17,11 +17,12 @@ import { useTqTypes } from '@/hooks/api/useTqTypes';
 import type { TenderQuery } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import SelectField from '@/components/form/SelectField';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const TqReceivedFormSchema = z.object({
     tenderId: z.number(),
     tqSubmissionDeadline: z.string().min(1, 'TQ submission deadline is required'),
-    tqDocumentReceived: z.string().optional(),
+    tqDocumentReceived: z.array(z.string()).default([]),
     tqItems: z.array(z.object({
         tqTypeId: z.number({ error: 'TQ type is required' }).min(1, 'TQ type is required'),
         queryDescription: z.string().min(1, 'Query description is required'),
@@ -60,14 +61,17 @@ export default function TqReceivedForm({
     })) || [];
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(TqReceivedFormSchema),
+        resolver: zodResolver(TqReceivedFormSchema) as Resolver<FormValues>,
         defaultValues: {
             tenderId: tenderId,
             tqSubmissionDeadline: '',
-            tqDocumentReceived: '',
+            tqDocumentReceived: [],
             tqItems: [],
         },
     });
+
+    // Watch file value for display
+    const tqDocumentReceived = useWatch({ control: form.control, name: 'tqDocumentReceived' });
 
     useEffect(() => {
         if (existingData && mode === 'edit' && existingItems) {
@@ -76,7 +80,7 @@ export default function TqReceivedForm({
                 tqSubmissionDeadline: existingData.tqSubmissionDeadline
                     ? new Date(existingData.tqSubmissionDeadline).toISOString().slice(0, 16)
                     : '',
-                tqDocumentReceived: existingData.tqDocumentReceived || '',
+                tqDocumentReceived: existingData.tqDocumentReceived ? [existingData.tqDocumentReceived] : [],
                 tqItems: existingItems.map(item => ({
                     tqTypeId: item.tqTypeId,
                     queryDescription: item.queryDescription,
@@ -94,11 +98,13 @@ export default function TqReceivedForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
+            const tqDocumentReceivedPath = data.tqDocumentReceived.length > 0 ? data.tqDocumentReceived[0] : null;
+
             if (mode === 'create') {
                 await createMutation.mutateAsync({
                     tenderId: data.tenderId,
                     tqSubmissionDeadline: data.tqSubmissionDeadline,
-                    tqDocumentReceived: data.tqDocumentReceived || null,
+                    tqDocumentReceived: tqDocumentReceivedPath,
                     tqItems: data.tqItems,
                 });
             } else if (existingData?.id) {
@@ -107,7 +113,7 @@ export default function TqReceivedForm({
                     data: {
                         tenderId: data.tenderId,
                         tqSubmissionDeadline: data.tqSubmissionDeadline,
-                        tqDocumentReceived: data.tqDocumentReceived || null,
+                        tqDocumentReceived: tqDocumentReceivedPath,
                         tqItems: data.tqItems,
                     },
                 });
@@ -145,22 +151,22 @@ export default function TqReceivedForm({
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Tender Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
+                            <div className="grid gap-4 md:grid-cols-5 bg-muted/30 p-4 rounded-lg">
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
+                                    <p className="font-medium text-muted-foreground">Tender No</p>
+                                    <p className="font-semibold">{tenderDetails.tenderNo}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                                    <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
+                                    <p className="font-medium text-muted-foreground">Team Member</p>
+                                    <p className="font-semibold">{tenderDetails.teamMemberName || '—'}</p>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
+                                    <p className="font-medium text-muted-foreground">Tender Name</p>
+                                    <p className="font-semibold">{tenderDetails.tenderName}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                                    <p className="text-base font-semibold">
+                                    <p className="font-medium text-muted-foreground">Due Date</p>
+                                    <p className="font-semibold">
                                         {tenderDetails.dueDate ? formatDateTime(tenderDetails.dueDate) : '—'}
                                     </p>
                                 </div>
@@ -173,38 +179,30 @@ export default function TqReceivedForm({
                                 TQ Details
                             </h4>
 
-                            <FieldWrapper
-                                control={form.control}
-                                name="tqSubmissionDeadline"
-                                label="TQ Submission Deadline"
-                                description="TODO: This will be added to employee calendar"
-                            >
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        type="datetime-local"
-                                        placeholder="Select deadline"
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper
-                                control={form.control}
-                                name="tqDocumentReceived"
-                                label="TQ Document (Optional)"
-                                description="Upload functionality will be implemented later. Enter file path for now."
-                            >
-                                {(field) => (
-                                    <div className="relative">
-                                        <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <div className="grid gap-4 md:grid-cols-2 items-start">
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="tqSubmissionDeadline"
+                                    label="TQ Submission Deadline"
+                                    description="TODO: This will be added to employee calendar"
+                                >
+                                    {(field) => (
                                         <Input
                                             {...field}
-                                            className="pl-10"
-                                            placeholder="Enter file path or URL"
+                                            type="datetime-local"
+                                            placeholder="Select deadline"
                                         />
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                                    )}
+                                </FieldWrapper>
+
+                                <TenderFileUploader
+                                    context="tq-management"
+                                    value={tqDocumentReceived}
+                                    onChange={(paths) => form.setValue('tqDocumentReceived', paths)}
+                                    label="TQ Document (Optional)"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
                         </div>
 
                         {/* TQ Items Table */}

@@ -1,23 +1,24 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useUpdateTqReplied } from '@/hooks/api/useTqManagement';
 import type { TenderQuery } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const TqRepliedFormSchema = z.object({
     repliedDatetime: z.string().min(1, 'TQ reply date and time is required'),
-    repliedDocument: z.string().optional(),
-    proofOfSubmission: z.string().min(1, 'Proof of submission is required'),
+    repliedDocument: z.array(z.string()).default([]),
+    proofOfSubmission: z.array(z.string()).min(1, 'Proof of submission is required'),
 });
 
 type FormValues = z.infer<typeof TqRepliedFormSchema>;
@@ -45,10 +46,14 @@ export default function TqRepliedForm({
         resolver: zodResolver(TqRepliedFormSchema),
         defaultValues: {
             repliedDatetime: '',
-            repliedDocument: '',
-            proofOfSubmission: '',
+            repliedDocument: [],
+            proofOfSubmission: [],
         },
     });
+
+    // Watch file values for display
+    const repliedDocument = useWatch({ control: form.control, name: 'repliedDocument' });
+    const proofOfSubmission = useWatch({ control: form.control, name: 'proofOfSubmission' });
 
     useEffect(() => {
         if (mode === 'edit' && tqData) {
@@ -56,8 +61,8 @@ export default function TqRepliedForm({
                 repliedDatetime: tqData.repliedDatetime
                     ? formatDateTime(tqData.repliedDatetime)
                     : '',
-                repliedDocument: tqData.repliedDocument || '',
-                proofOfSubmission: tqData.proofOfSubmission || '',
+                repliedDocument: tqData.repliedDocument ? [tqData.repliedDocument] : [],
+                proofOfSubmission: tqData.proofOfSubmission ? [tqData.proofOfSubmission] : [],
             });
         }
     }, [tqData, form, mode]);
@@ -66,12 +71,15 @@ export default function TqRepliedForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
+            const repliedDocumentPath = data.repliedDocument.length > 0 ? data.repliedDocument[0] : null;
+            const proofOfSubmissionPath = data.proofOfSubmission.length > 0 ? data.proofOfSubmission[0] : '';
+
             await updateMutation.mutateAsync({
                 id: tqData.id,
                 data: {
                     repliedDatetime: data.repliedDatetime,
-                    repliedDocument: data.repliedDocument || null,
-                    proofOfSubmission: data.proofOfSubmission,
+                    repliedDocument: repliedDocumentPath,
+                    proofOfSubmission: proofOfSubmissionPath,
                 },
             });
             navigate(paths.tendering.tqManagement);
@@ -143,40 +151,21 @@ export default function TqRepliedForm({
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper
-                                control={form.control}
-                                name="repliedDocument"
+                            <TenderFileUploader
+                                context="tq-management"
+                                value={repliedDocument}
+                                onChange={(paths) => form.setValue('repliedDocument', paths)}
                                 label="Submitted TQ Documents (Optional)"
-                                description="Upload functionality will be implemented later. Enter file paths separated by commas."
-                            >
-                                {(field) => (
-                                    <div className="relative">
-                                        <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            {...field}
-                                            className="pl-10"
-                                            placeholder="e.g., /uploads/doc1.pdf, /uploads/doc2.pdf"
-                                        />
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                                disabled={isSubmitting}
+                            />
 
-                            <FieldWrapper
-                                control={form.control}
-                                name="proofOfSubmission"
+                            <TenderFileUploader
+                                context="tq-management"
+                                value={proofOfSubmission}
+                                onChange={(paths) => form.setValue('proofOfSubmission', paths)}
                                 label="Proof of Submission"
-                            >
-                                {(field) => (
-                                    <div className="relative">
-                                        <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            {...field}
-                                            className="pl-10"
-                                            placeholder="Enter file path or URL"
-                                        />
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                                disabled={isSubmitting}
+                            />
                         </div>
 
                         {/* Form Actions */}

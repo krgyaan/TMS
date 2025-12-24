@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { type Resolver, useForm, useWatch } from 'react-hook-form';
 import {
     Dialog,
     DialogContent,
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Save, IndianRupee } from 'lucide-react';
 import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
-import { FileUploadField } from '@/components/form/FileUploadField';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
@@ -30,9 +30,9 @@ const UploadRaResultSchema = z.object({
     raStartPrice: z.string().optional(),
     raClosePrice: z.string().optional(),
     raCloseTime: z.string().optional(),
-    screenshotQualifiedParties: z.string().optional(),
-    screenshotDecrements: z.string().optional(),
-    finalResultScreenshot: z.string().optional(),
+    screenshotQualifiedParties: z.array(z.string()).default([]),
+    screenshotDecrements: z.array(z.string()).default([]),
+    finalResultScreenshot: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof UploadRaResultSchema>;
@@ -56,23 +56,32 @@ export default function RAResultForm({
     const uploadResultMutation = useUploadRaResult();
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(UploadRaResultSchema),
+        resolver: zodResolver(UploadRaResultSchema) as Resolver<FormValues>,
         defaultValues: {
             raResult: 'Won',
             veL1AtStart: 'Yes',
             raStartPrice: '',
             raClosePrice: '',
             raCloseTime: '',
-            screenshotQualifiedParties: '',
-            screenshotDecrements: '',
-            finalResultScreenshot: '',
+            screenshotQualifiedParties: [],
+            screenshotDecrements: [],
+            finalResultScreenshot: [],
         },
     });
+
+    // Watch file values for display
+    const screenshotQualifiedParties = useWatch({ control: form.control, name: 'screenshotQualifiedParties' });
+    const screenshotDecrements = useWatch({ control: form.control, name: 'screenshotDecrements' });
+    const finalResultScreenshot = useWatch({ control: form.control, name: 'finalResultScreenshot' });
 
     const isSubmitting = form.formState.isSubmitting;
 
     const onSubmit = async (data: FormValues) => {
         try {
+            const screenshotQualifiedPartiesPath = data.screenshotQualifiedParties.length > 0 ? data.screenshotQualifiedParties[0] : null;
+            const screenshotDecrementsPath = data.screenshotDecrements.length > 0 ? data.screenshotDecrements[0] : null;
+            const finalResultScreenshotPath = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
+
             await uploadResultMutation.mutateAsync({
                 id: raId,
                 data: {
@@ -81,9 +90,9 @@ export default function RAResultForm({
                     raStartPrice: data.raStartPrice,
                     raClosePrice: data.raClosePrice,
                     raCloseTime: data.raCloseTime,
-                    screenshotQualifiedParties: data.screenshotQualifiedParties,
-                    screenshotDecrements: data.screenshotDecrements,
-                    finalResultScreenshot: data.finalResultScreenshot,
+                    screenshotQualifiedParties: screenshotQualifiedPartiesPath,
+                    screenshotDecrements: screenshotDecrementsPath,
+                    finalResultScreenshot: finalResultScreenshotPath,
                 },
             });
             onOpenChange(false);
@@ -210,23 +219,26 @@ export default function RAResultForm({
                                 Upload Screenshots
                             </h4>
                             <div className="grid gap-4 md:grid-cols-2">
-                                <FileUploadField
-                                    control={form.control}
-                                    name="screenshotQualifiedParties"
+                                <TenderFileUploader
+                                    context="ra-screenshots"
+                                    value={screenshotQualifiedParties}
+                                    onChange={(paths) => form.setValue('screenshotQualifiedParties', paths)}
                                     label="Screenshot of Qualified Parties"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="screenshotDecrements"
+                                <TenderFileUploader
+                                    context="ra-screenshots"
+                                    value={screenshotDecrements}
+                                    onChange={(paths) => form.setValue('screenshotDecrements', paths)}
                                     label="Screenshot of Decrements"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="finalResultScreenshot"
+                                <TenderFileUploader
+                                    context="ra-screenshots"
+                                    value={finalResultScreenshot}
+                                    onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
                                     label="Final Result Screenshot"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
                             </div>
                         </div>

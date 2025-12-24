@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
+import { type Resolver, type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Save, ArrowLeft } from 'lucide-react';
 
@@ -24,7 +24,7 @@ import { NumberInput } from '@/components/form/NumberInput';
 // Hooks & Types
 import { useCreateRfq, useUpdateRfq } from '@/hooks/api/useRfqs';
 import { useRfqVendors } from '@/hooks/api/useRfqs';
-import type { RfqDetails, RfqRow } from '@/types/api.types';
+import type { Rfq, RfqDashboardRow } from '@/types/api.types';
 import { Input } from '@/components/ui/input';
 
 const RfqFormSchema = z.object({
@@ -69,8 +69,8 @@ const RfqFormSchema = z.object({
 type FormValues = z.infer<typeof RfqFormSchema>;
 
 interface RfqFormProps {
-    tenderData: RfqRow; // Contains tenderNo, tenderName, rfqTo, etc.
-    initialData?: RfqDetails; // For Edit Mode
+    tenderData: RfqDashboardRow; // Contains tenderNo, tenderName, rfqTo, etc.
+    initialData?: Rfq; // For Edit Mode
 }
 
 export function RfqForm({ tenderData, initialData }: RfqFormProps) {
@@ -85,7 +85,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
 
     // Initialize Form
     const form = useForm<FormValues>({
-        resolver: zodResolver(RfqFormSchema),
+        resolver: zodResolver(RfqFormSchema) as Resolver<FormValues>,
         defaultValues: {
             dueDate: undefined,
             items: [{ requirement: '', unit: '', qty: undefined }],
