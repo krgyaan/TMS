@@ -17,7 +17,9 @@ export type TenderFileContext =
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
-    | 'reverse-auctions';
+    | 'reverse-auctions'
+    | 'ra-screenshots'
+    | 'result-screenshots';
 
 export interface FileConfig {
     context: string;
