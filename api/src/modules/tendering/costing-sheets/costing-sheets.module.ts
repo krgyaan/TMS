@@ -5,9 +5,10 @@ import { CostingSheetsService } from '@/modules/tendering/costing-sheets/costing
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { GoogleIntegrationModule } from '@/modules/integrations/google/google.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, GoogleIntegrationModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, GoogleIntegrationModule, EmailModule],
     controllers: [CostingSheetsController],
     providers: [CostingSheetsService],
     exports: [CostingSheetsService],

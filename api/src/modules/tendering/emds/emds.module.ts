@@ -5,9 +5,10 @@ import { InstrumentStatusService } from '@/modules/tendering/emds/services/instr
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [TendersModule, TenderStatusHistoryModule],
+    imports: [TendersModule, TenderStatusHistoryModule, EmailModule],
     controllers: [EmdsController],
     providers: [
         EmdsService,

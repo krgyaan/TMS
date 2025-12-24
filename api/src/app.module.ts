@@ -62,6 +62,7 @@ import { TenderResultModule } from "@/modules/tendering/tender-result/tender-res
 import { PermissionsModule } from "@/modules/master/permissions/permissions.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
     imports: [
@@ -135,6 +136,7 @@ import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files
         TenderResultModule,
         ImprestAdminModule,
         TenderFilesModule,
+        EmailModule,
     ],
     controllers: [AppController],
     providers: [
@@ -145,4 +147,4 @@ import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -4,9 +4,10 @@ import { PhysicalDocsController } from '@/modules/tendering/physical-docs/physic
 import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
     controllers: [PhysicalDocsController],
     providers: [PhysicalDocsService],
     exports: [PhysicalDocsService],
