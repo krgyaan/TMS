@@ -1,0 +1,19 @@
+<div>
+    <p>Dear {{data.tl}},</p>
+
+    <p>Following are the documents required for Tender No. {{data.tenderNo}}</p>
+
+    <h4>Tender Details:</h4>
+    <ul>
+        <li>Tender Name: {{data.tenderName}}</li>
+        <li>Tender Number: {{data.tenderNo}}</li>
+    </ul>
+
+    <p>Checked Documents</p>
+    <ul>
+        {{#each data.documents}}
+            <li>{{this}}</li>
+        {{/each}}
+    </ul>
+    <p>Regards,<br />{{data.te}}</p>
+</div>

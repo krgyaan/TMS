@@ -1,0 +1,67 @@
+<div>
+    <p>Dear {{data.org}} Team,</p>
+    <div>
+        <p>
+            Please provide the best price for the requirements stated below. Also, please find the relevant techno-commercial documents attached for your reference.
+        </p>
+
+        {{#if data.items}}
+            <p>Here are the requirements:</p>
+            <table style="border: 1px solid black; border-collapse: collapse;">
+                <thead style="background-color: #ddd;">
+                    <tr>
+                        <th style="border: 1px solid black; padding: 5px;">Requirement</th>
+                        <th style="border: 1px solid black; padding: 5px;">Qty</th>
+                        <th style="border: 1px solid black; padding: 5px;">Unit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each data.items}}
+                        <tr>
+                            <td style="border: 1px solid black; padding: 5px;">{{this.requirement}}</td>
+                            <td style="border: 1px solid black; padding: 5px;">{{this.qty}}</td>
+                            <td style="border: 1px solid black; padding: 5px;">{{this.unit}}</td>
+                        </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        {{/if}}
+
+        <p>Here are the documents:</p>
+        <ul>
+            <li>Scope of Work - {{#if data.hasScope}}Attached{{else}}NA{{/if}}</li>
+            <li>Technical Specifications - {{#if data.hasTechnical}}Attached{{else}}NA{{/if}}</li>
+            <li>Detailed BOQ - {{#if data.hasBoq}}Attached{{else}}NA{{/if}}</li>
+            <li>MAF format - {{#if data.hasMaf}}Attached{{else}}NA{{/if}}</li>
+            <li>MII Format - {{#if data.hasMii}}Attached{{else}}NA{{/if}}</li>
+            <li>List of Docs needed from manufacturer: {{data.list_of_docs}}</li>
+        </ul>
+        <br />
+        <b>Please send the Techno-Commercial Offer before the due date {{data.due_date}}.</b>
+        <br />
+        <b>Hoping for a prompt response.</b>
+    </div>
+    <div>
+        <b>Best Regards,</b>
+        <br />
+        {{data.te_name}}
+        <br />
+        Tender Executive
+        <br />
+        Mob No.:
+        {{data.teMob}}
+        <br />
+        Mail ID:
+        {{data.teMail}}
+    </div>
+    <br />
+    <div>
+        Volks Energie Pvt. Ltd.
+        <br />
+        B1/D8, 2nd Floor,
+        <br />
+        Mohan Cooperative Industrial Estate,
+        <br />
+        New Delhi - 110044
+    </div>
+</div>
