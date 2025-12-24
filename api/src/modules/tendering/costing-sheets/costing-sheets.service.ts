@@ -12,6 +12,7 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -46,6 +47,7 @@ export class CostingSheetsService {
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly googleDriveService: GoogleDriveService,
+        private readonly emailService: EmailService,
     ) { }
 
     async findAll(filters?: CostingSheetFilters): Promise<PaginatedResult<CostingSheetDashboardRow>> {
