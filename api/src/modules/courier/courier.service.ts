@@ -15,6 +15,9 @@ import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 
 import { CourierMailTemplates } from "./courier.mail";
+import { fi } from "zod/v4/locales";
+import { stat } from "fs";
+import { from } from "rxjs";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -25,6 +28,8 @@ export const COURIER_STATUS = {
     DELIVERED: 4,
     REJECTED: 5,
 } as const;
+
+const COURIER_STATUS_LABELS: string[] = ["Pending", "In Transit", "Dispatched", "Not Delivered", "Delivered", "Rejected"];
 
 interface CourierDoc {
     url: string;
@@ -41,97 +46,7 @@ export class CourierService {
         private readonly googleService: GoogleService
     ) {}
 
-    private validateDispatchData(dispatchData: DispatchCourierDto): void {
-        if (!dispatchData.courierProvider?.trim()) {
-            throw new BadRequestException("Courier provider is required");
-        }
-        if (!dispatchData.docketNo?.trim()) {
-            throw new BadRequestException("Docket number is required");
-        }
-        if (!dispatchData.pickupDate) {
-            throw new BadRequestException("Pickup date is required");
-        }
-
-        const pickupDate = new Date(dispatchData.pickupDate);
-        if (isNaN(pickupDate.getTime())) {
-            throw new BadRequestException("Invalid pickup date format");
-        }
-    }
-
-    async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
-        // 1️⃣ Prepare uploaded docs (if any)
-        const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
-
-        // 2️⃣ Create courier with docs already attached
-        const values = {
-            toOrg: data.toOrg,
-            toName: data.toName,
-            toAddr: data.toAddr,
-            toPin: data.toPin,
-            toMobile: data.toMobile,
-            empFrom: data.empFrom,
-            urgency: data.urgency,
-            userId,
-            delDate: new Date(data.delDate),
-            courierDocs, // ✅ files stored here
-            status: COURIER_STATUS.PENDING,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        const [courier] = await this.db.insert(couriers).values(values).returning();
-        console.log("Created courier:", courier);
-
-        if (!courier) {
-            throw new Error("Failed to create courier");
-        }
-
-        // 3️⃣ Fetch creator user (optional – for template usage)
-        const [user] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
-
-        // 4️⃣ Fetch Google OAuth connection
-        const googleConnection = await this.googleService.getSanitizedGoogleConnection(userId);
-        console.log("Google Connection for user", userId, googleConnection);
-
-        // 5️⃣ Send mail (NON-BLOCKING)
-        if (googleConnection) {
-            try {
-                const urgencyLabel = courier.urgency === 1 ? "Low" : courier.urgency === 2 ? "Medium" : "High";
-
-                const mailContext = {
-                    to_name: courier.toName,
-                    to_org: courier.toOrg,
-                    to_addr: courier.toAddr,
-                    to_pin: courier.toPin,
-                    to_mobile: courier.toMobile,
-                    expected_delivery_date: courier.delDate.toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                    }),
-                    dispatch_urgency: urgencyLabel,
-                    dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
-                };
-
-                await this.mailerService.sendTemplateAsUser(
-                    CourierMailTemplates.COURIER_REQUEST,
-                    mailContext,
-                    {
-                        to: ["abhijeetgaur.dev@gmail.com"],
-                        cc: ["abhijeetgaur777@gmail.com"],
-                        subject: "Courier Dispatch Request",
-                        attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
-                    },
-                    googleConnection
-                );
-            } catch (e) {
-                console.warn(`[Courier ${courier.id}] Failed to send mail`, e);
-            }
-        }
-
-        return courier;
-    }
-
+    //General db helper functions to carry out simple DB ops
     // Get all couriers (dashboard)
     async findAll() {
         return this.db.query.couriers.findMany({
@@ -233,6 +148,98 @@ export class CourierService {
         };
     }
 
+    private validateDispatchData(dispatchData: DispatchCourierDto): void {
+        if (!dispatchData.courierProvider?.trim()) {
+            throw new BadRequestException("Courier provider is required");
+        }
+        if (!dispatchData.docketNo?.trim()) {
+            throw new BadRequestException("Docket number is required");
+        }
+        if (!dispatchData.pickupDate) {
+            throw new BadRequestException("Pickup date is required");
+        }
+
+        const pickupDate = new Date(dispatchData.pickupDate);
+        if (isNaN(pickupDate.getTime())) {
+            throw new BadRequestException("Invalid pickup date format");
+        }
+    }
+
+    //Actual business logic begins from here
+    async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
+        // 1️⃣ Prepare uploaded docs (if any)
+        const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
+
+        // 2️⃣ Create courier with docs already attached
+        const values = {
+            toOrg: data.toOrg,
+            toName: data.toName,
+            toAddr: data.toAddr,
+            toPin: data.toPin,
+            toMobile: data.toMobile,
+            empFrom: data.empFrom,
+            urgency: data.urgency,
+            userId,
+            delDate: new Date(data.delDate),
+            courierDocs,
+            status: COURIER_STATUS.PENDING,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        const [courier] = await this.db.insert(couriers).values(values).returning();
+        console.log("Created courier:", courier);
+
+        if (!courier) {
+            throw new Error("Failed to create courier");
+        }
+
+        // 3️⃣ Fetch creator user (optional – for template usage)
+        const [user] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+
+        // 4️⃣ Fetch Google OAuth connection
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(userId);
+        console.log("Google Connection for user", userId, googleConnection);
+
+        // 5️⃣ Send mail (NON-BLOCKING)
+        if (googleConnection) {
+            try {
+                const urgencyLabel = courier.urgency === 1 ? "Low" : courier.urgency === 2 ? "Medium" : "High";
+
+                const mailContext = {
+                    to_name: courier.toName,
+                    to_org: courier.toOrg,
+                    to_addr: courier.toAddr,
+                    to_pin: courier.toPin,
+                    to_mobile: courier.toMobile,
+                    expected_delivery_date: courier.delDate.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                    }),
+                    dispatch_urgency: urgencyLabel,
+                    dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
+                };
+
+                await this.mailerService.sendMail(
+                    CourierMailTemplates.COURIER_REQUEST,
+                    mailContext,
+                    {
+                        to: ["abhijeetgaur.dev@gmail.com"],
+                        cc: ["abhijeetgaur777@gmail.com"],
+                        subject: "Courier Dispatch Request",
+                        attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
+                    },
+                    googleConnection
+                );
+            } catch (e) {
+                console.warn(`[Courier ${courier.id}] Failed to send mail`, e);
+            }
+        }
+
+        return courier;
+    }
+
     async update(id: number, data: UpdateCourierDto, userId: number) {
         const existing = await this.findOne(id);
 
@@ -268,10 +275,16 @@ export class CourierService {
             deliveryDate?: string;
             withinTime?: boolean;
         },
-        userId: number
+        file: Express.Multer.File | undefined
     ) {
-        const existing = await this.findOne(id);
-        if (!existing) throw new NotFoundException("Courier not found");
+        const courierCheck = await this.findOne(id);
+        if (!courierCheck) throw new NotFoundException("Courier not found");
+
+        const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.userId)).limit(1);
+
+        // 4️⃣ Fetch Google OAuth connection
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(user.userId);
+        console.log("Google Connection for user", user.userId, googleConnection);
 
         const updateData: Record<string, any> = {
             status: statusData.status,
@@ -279,20 +292,75 @@ export class CourierService {
         };
 
         if (statusData.status === COURIER_STATUS.DELIVERED) {
+            if (file) {
+                const deliveryPod: string | null = file.filename;
+                updateData.deliveryPod = deliveryPod;
+            }
             if (statusData.deliveryDate) updateData.deliveryDate = new Date(statusData.deliveryDate);
             if (statusData.withinTime !== undefined) updateData.withinTime = statusData.withinTime;
         }
+        const data = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
+        console.log("Updated courier status:", data);
+        //sending mail for status update
 
-        const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
-        return result[0];
+        if (statusData.status == COURIER_STATUS.DELIVERED) {
+            try {
+                if (!googleConnection) {
+                    throw new BadRequestException("No Google connection found for user");
+                }
+                const mailData = {
+                    ...data[0],
+                    status: COURIER_STATUS_LABELS[statusData.status],
+                    fromName: user.name,
+                    pickup: courierCheck.pickupDate
+                        ? courierCheck.pickupDate.toLocaleString("en-IN", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                          })
+                        : undefined,
+                    deliveryDateAndTime: statusData.deliveryDate
+                        ? new Date(statusData.deliveryDate).toLocaleString("en-IN", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                          })
+                        : undefined,
+                    withinTimeCheck: statusData.withinTime ? "Yes" : "No",
+                };
+
+                console.log("Mail data prepared:", mailData);
+
+                //actual mail sending logic Gyannu boi
+                await this.mailerService.sendMail(
+                    CourierMailTemplates.COURIER_STATUS_UPDATE,
+                    mailData,
+                    {
+                        to: ["abhijeetgaur.dev@gmail.com"],
+                        cc: ["dietcodeco@gmail.com"],
+                        subject: `Courier sent to ${data[0].toOrg}`,
+                        attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                    },
+                    googleConnection
+                );
+            } catch (e) {
+                throw new BadRequestException("Failed to send delivery status mail", e);
+            }
+        }
+
+        return data[0];
     }
 
     /**
      * Dispatch with optional docket slip file (POST endpoint)
      */
     async createDispatch(id: number, dispatchData: DispatchCourierDto, file: Express.Multer.File | undefined, userId: number) {
-        const existing = await this.findOne(id);
-        if (!existing) throw new NotFoundException("Courier not found");
+        const courierCheck = await this.findOne(id);
+        if (!courierCheck) throw new NotFoundException("Courier not found");
 
         // Validate dispatch data
         this.validateDispatchData(dispatchData);
@@ -305,15 +373,51 @@ export class CourierService {
             updatedAt: new Date(),
         };
 
-        // If file present, add doc to courierDocs
+        // If file present, add doc to docketslip
         if (file) {
-            // existing.courierDocs may be JSONB array or null
-            const existingDocs: string[] = Array.isArray(existing.courierDocs) ? existing.courierDocs : [];
-            updateData.courierDocs = [...existingDocs, file?.filename];
+            const docketSlip: string | null = file.filename;
+            updateData.docketSlip = docketSlip;
         }
 
-        const result = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
-        return result[0];
+        const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.userId)).limit(1);
+
+        // 4️⃣ Fetch Google OAuth connection
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(user.userId);
+        console.log("Google Connection for user", userId, googleConnection);
+
+        const courier = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
+        console.log("Updated courier dispatch:", courier);
+        const mailContext = {
+            ...courier[0],
+            fromName: user.name,
+            pickupDateTime: updateData.pickupDate.toLocaleString("en-IN", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+        };
+
+        if (googleConnection) {
+            try {
+                await this.mailerService.sendMail(
+                    CourierMailTemplates.COURIER_DISPATCH,
+                    mailContext,
+                    {
+                        to: ["abhijeetgaur.dev@gmail.com"],
+                        cc: ["abhijeetgaur777@gmail.com"],
+                        subject: `Courier sent to ${courier[0].toOrg}`,
+                        attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                    },
+                    googleConnection
+                );
+            } catch (e) {
+                console.warn(`[Courier ${courier[0].id}] Failed to send dispatch mail`, e);
+            }
+        }
+
+        return courier[0];
     }
 
     // Update dispatch info without file
