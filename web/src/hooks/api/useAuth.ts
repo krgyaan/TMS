@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authService } from "@/services/api";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { setStoredUser, clearAuthSession, getStoredUser } from "@/lib/auth";
 import type { AuthUser } from "@/types/auth.types";
 
@@ -33,7 +33,7 @@ export const useCurrentUser = () => {
     });
 };
 
-export const useLogin = () => {
+export const useLogin = (redirectTo: string = "/") => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
@@ -47,12 +47,12 @@ export const useLogin = () => {
 
             console.log("✅ Login successful");
             console.log("   User:", user.name);
-            console.log("   Role:", user.role?.name ?? "No role");
-            console.log("   Team:", user.team?.name ?? "No team");
-            console.log("   Data Scope:", user.role?.dataScope ?? "self");
 
             toast.success(`Welcome back, ${user.name}!`);
-            navigate("/", { replace: true });
+
+            // Clean up stored redirect URL and navigate
+            sessionStorage.removeItem("auth_redirect");
+            navigate(redirectTo, { replace: true });
         },
         onError: error => {
             console.error("❌ Login failed:", error);
@@ -91,9 +91,20 @@ export const useGoogleLogin = () => {
 export const useLogout = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const location = useLocation();
 
     return useMutation({
-        mutationFn: () => authService.logout(),
+        mutationFn: () => {
+            return authService.logout();
+        },
+        onMutate: () => {
+            // Store current URL for redirect after re-login
+            const currentPath = location.pathname + location.search;
+
+            if (currentPath !== '/') {
+                sessionStorage.setItem('auth_redirect', currentPath);
+            }
+        },
         onSuccess: () => {
             clearAuthSession();
             queryClient.clear();
