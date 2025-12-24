@@ -29,6 +29,7 @@ const GoogleLoginCallback = () => {
             const state = params.get("state");
             const errorParam = params.get("error");
             const successParam = params.get("success");
+            const redirectTo = sessionStorage.getItem("auth_redirect") || "/";
 
             console.log("🔍 Google Callback - Processing...");
             console.log("📋 URL Params:", { code: !!code, state: !!state, error: errorParam, success: successParam });
@@ -40,7 +41,7 @@ const GoogleLoginCallback = () => {
                 setMessage("");
                 clearAuthSession();
                 toast.error(`Google sign-in failed: ${errorParam}`);
-                setTimeout(() => navigate("/login", { replace: true }), 2000);
+                setTimeout(() => navigate(redirectTo, { replace: true }), 2000);
                 return;
             }
 
@@ -55,9 +56,6 @@ const GoogleLoginCallback = () => {
                     const user = response.user as AuthUser;
 
                     console.log("✅ User authenticated");
-                    console.log("👤 User:", user.name);
-                    console.log("🎭 Role:", user.role?.name ?? "No role");
-                    console.log("👥 Team:", user.team?.name ?? "No team");
 
                     // Store user data
                     setStoredUser(user);
@@ -66,9 +64,10 @@ const GoogleLoginCallback = () => {
                     setMessage("Success! Redirecting...");
                     toast.success(`Welcome, ${user.name}!`);
 
-                    // Navigate to dashboard
+                    // Clean up stored redirect and navigate
+                    sessionStorage.removeItem("auth_redirect");
                     setTimeout(() => {
-                        navigate("/", { replace: true });
+                        navigate(redirectTo, { replace: true });
                     }, 500);
                 } catch (err) {
                     console.error("❌ Failed to verify authentication:", err);
@@ -100,9 +99,6 @@ const GoogleLoginCallback = () => {
                 const user = response.user as AuthUser;
 
                 console.log("✅ Google auth successful");
-                console.log("👤 User:", user.name);
-                console.log("🎭 Role:", user.role?.name ?? "No role");
-                console.log("👥 Team:", user.team?.name ?? "No team");
 
                 // Store user data
                 setStoredUser(user);
@@ -111,9 +107,10 @@ const GoogleLoginCallback = () => {
                 setMessage("Success! Redirecting...");
                 toast.success(`Welcome, ${user.name}!`);
 
-                // Navigate to dashboard
+                // Clean up stored redirect and navigate
+                sessionStorage.removeItem("auth_redirect");
                 setTimeout(() => {
-                    navigate("/", { replace: true });
+                    navigate(redirectTo, { replace: true });
                 }, 500);
 
             } catch (err) {

@@ -19,6 +19,7 @@ class AuthService extends BaseApiService {
     }
 
     async logout(): Promise<void> {
+        console.log("🔍 Logout - calling API");
         return this.post<void>("/logout");
     }
 

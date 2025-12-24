@@ -12,6 +12,7 @@ import { getStoredUser, clearAuthSession } from "@/lib/auth";
 import { useCurrentUser } from "@/hooks/api/useAuth";
 import { filterMenuItemsByPermissions } from "@/lib/menu-permissions";
 import type { ParentMenuItem } from "@/lib/menu-permissions";
+import type { AuthUser } from "@/types/auth.types";
 
 const data = {
     user: {
@@ -379,6 +380,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }, [currentUser]);
 
     const handleLogout = React.useCallback(() => {
+        // Store current URL for redirect after re-login
+        const currentPath = window.location.pathname + window.location.search;
+        if (currentPath !== '/') {
+            sessionStorage.setItem('auth_redirect', currentPath);
+        }
         clearAuthSession();
         window.location.href = "/login";
     }, []);
@@ -392,7 +398,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavMain items={filteredMenuItems} />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser user={displayUser} onLogout={handleLogout} />
+                <NavUser user={displayUser as AuthUser} onLogout={handleLogout} />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
