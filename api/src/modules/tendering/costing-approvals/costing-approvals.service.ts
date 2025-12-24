@@ -11,6 +11,7 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { users } from '@/db/schemas/auth/users.schema';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -49,6 +50,7 @@ export class CostingApprovalsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     private costingStatusWhere(status?: 'Submitted' | 'Approved' | 'Rejected/Redo') {

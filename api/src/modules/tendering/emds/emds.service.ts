@@ -40,10 +40,7 @@ import {
     BT_STATUSES,
     PORTAL_STATUSES,
 } from '@/modules/tendering/emds/constants/emd-statuses';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { EmailService } from '@/modules/email/email.service';
 
 export interface PendingTenderRow {
     tenderId: number;
@@ -113,10 +110,6 @@ export interface RequestTabResponse {
 
 export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
 
-// ============================================================================
-// Status Mapping Constants
-// ============================================================================
-
 const APPROVED_STATUSES = [
     // Accounts form accepted
     DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
@@ -158,10 +151,6 @@ const RETURNED_STATUSES = [
 ];
 
 const REJECTED_STATUS_PATTERN = '_REJECTED';
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 const mapInstrumentType = (mode: string): InstrumentType => {
     const mapping: Record<string, InstrumentType> = {
@@ -216,10 +205,6 @@ const getDisplayTab = (instrumentStatus: string | null): DashboardTab => {
     return 'sent';
 };
 
-// ============================================================================
-// Service
-// ============================================================================
-
 @Injectable()
 export class EmdsService {
     constructor(
@@ -228,11 +213,8 @@ export class EmdsService {
         private readonly instrumentStatusService: InstrumentStatusService,
         private readonly historyService: InstrumentStatusHistoryService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
-
-    // ========================================================================
-    // Dashboard Methods (Refactored)
-    // ========================================================================
 
     /**
      * Get dashboard data based on tab
@@ -925,10 +907,6 @@ export class EmdsService {
         }
     }
 
-    // ========================================================================
-    // Read Operations
-    // ========================================================================
-
     async findByTenderId(tenderId: number) {
         await this.tenderInfosService.validateExists(tenderId);
 
@@ -1072,10 +1050,6 @@ export class EmdsService {
                 return null;
         }
     }
-
-    // ========================================================================
-    // Update Operations
-    // ========================================================================
 
     async update(requestId: number, payload: UpdatePaymentRequestDto) {
         const [existing] = await this.db
@@ -1301,10 +1275,6 @@ export class EmdsService {
 
         return this.findById(requestId);
     }
-
-    // ========================================================================
-    // Instrument Status Operations (delegated to InstrumentStatusService)
-    // ========================================================================
 
     async transitionInstrumentStatus(
         instrumentId: number,

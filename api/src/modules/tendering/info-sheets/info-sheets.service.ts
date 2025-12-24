@@ -16,11 +16,7 @@ import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { DrizzleError } from 'drizzle-orm';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { EmailService } from '@/modules/email/email.service';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
@@ -28,16 +24,13 @@ export type TenderInfoSheetWithRelations = TenderInformation & {
     commercialDocuments: TenderFinancialDocument[];
 };
 
-// ============================================================================
-// Service
-// ============================================================================
-
 @Injectable()
 export class TenderInfoSheetsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     async findByTenderId(

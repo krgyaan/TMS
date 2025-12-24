@@ -11,6 +11,7 @@ import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { EmailService } from '@/modules/email/email.service';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -34,7 +35,10 @@ export type DocumentChecklistFilters = {
 
 @Injectable()
 export class DocumentChecklistsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly emailService: EmailService
+    ) { }
 
     async findAll(filters?: DocumentChecklistFilters): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
         const page = filters?.page || 1;

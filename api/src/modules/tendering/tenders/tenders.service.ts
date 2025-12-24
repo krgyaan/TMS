@@ -12,6 +12,7 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
@@ -115,6 +116,7 @@ export class TenderInfosService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {

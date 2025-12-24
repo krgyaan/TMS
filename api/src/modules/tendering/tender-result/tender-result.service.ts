@@ -18,6 +18,7 @@ import {
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
 
@@ -76,6 +77,7 @@ export class TenderResultService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     async findAll(filters?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {

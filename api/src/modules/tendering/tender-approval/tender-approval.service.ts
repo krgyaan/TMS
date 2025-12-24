@@ -11,6 +11,7 @@ import { items } from '@db/schemas/master/items.schema';
 import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type TenderApprovalFilters = {
     tlStatus?: '0' | '1' | '2' | '3' | number;
@@ -52,6 +53,7 @@ export class TenderApprovalService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {

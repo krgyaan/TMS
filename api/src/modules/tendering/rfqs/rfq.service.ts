@@ -18,6 +18,7 @@ import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.sc
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
 
 export type RfqFilters = {
     rfqStatus?: 'pending' | 'sent';
@@ -26,10 +27,6 @@ export type RfqFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
-
-// ============================================================================
-// Types
-// ============================================================================
 
 type RfqRow = {
     tenderId: number;
@@ -70,9 +67,6 @@ type RfqDetails = {
     }>;
 };
 
-// ============================================================================
-// Service
-// ============================================================================
 
 @Injectable()
 export class RfqsService {
@@ -80,6 +74,7 @@ export class RfqsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
     ) { }
 
     async findAll(filters?: RfqFilters): Promise<PaginatedResult<RfqRow>> {
