@@ -69,7 +69,7 @@ const multerConfig = {
 
 const podMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/courier/pod",
+        destination: "./uploads/courier",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -81,7 +81,7 @@ const podMulterConfig = {
 // Multer config for docket slip
 const docketSlipMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/courier/docket-slips",
+        destination: "./uploads/courier",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -179,6 +179,7 @@ export class CourierController {
 
     // Update status
     @Patch(":id/status")
+    @UseInterceptors(FileInterceptor("podDoc", podMulterConfig))
     updateStatus(
         @Param("id", ParseIntPipe) id: number,
         @Body()
@@ -187,9 +188,9 @@ export class CourierController {
             delivery_date?: string;
             within_time?: boolean;
         },
-        @CurrentUser("id") userId: number
+        @UploadedFile() file: Express.Multer.File | undefined
     ) {
-        return this.service.updateStatus(id, body, userId);
+        return this.service.updateStatus(id, body, file);
     }
 
     @Delete(":id")
