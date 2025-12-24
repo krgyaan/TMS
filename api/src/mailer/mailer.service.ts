@@ -116,7 +116,7 @@ export class MailerService {
         });
     }
 
-    async sendTemplateAsUser(
+    async sendMail(
         template: {
             name: string;
             basePath: string;
