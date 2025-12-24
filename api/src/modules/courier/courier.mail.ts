@@ -3,4 +3,12 @@ export const CourierMailTemplates = {
         name: "create-courier",
         basePath: "modules/courier/mails",
     },
+    COURIER_DISPATCH: {
+        name: "dispatch-courier",
+        basePath: "modules/courier/mails",
+    },
+    COURIER_STATUS_UPDATE: {
+        name: "courier-status-update",
+        basePath: "modules/courier/mails",
+    },
 };
