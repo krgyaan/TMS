@@ -1,4 +1,5 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
+import { clearAuthSession } from './auth'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 
@@ -40,10 +41,16 @@ axiosInstance.interceptors.response.use(
             isRedirecting = true
 
             // Clear user data (token is in httpOnly cookie, can't access it)
-            localStorage.removeItem('user')
+            // localStorage.removeItem('tms_auth_user')
+            clearAuthSession()
 
             // Only redirect if not already on login page
             if (!window.location.pathname.startsWith('/login')) {
+                // Store current URL for redirect after login
+                const currentPath = window.location.pathname + window.location.search
+                if (currentPath !== '/') {
+                    sessionStorage.setItem('auth_redirect', currentPath)
+                }
                 // Use a small delay to ensure localStorage is cleared before redirect
                 setTimeout(() => {
                     window.location.href = '/login'
