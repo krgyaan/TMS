@@ -83,7 +83,12 @@ export const courierApi = {
 
     // Update status
     updateStatus: async (id: number, data: UpdateStatusInput): Promise<Courier> => {
-        const response = await api.patch(`${ENDPOINT}/${id}/status`, data);
+        console.log("Updating status with data:", data);
+        const response = await api.patch(`${ENDPOINT}/${id}/status`, data, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
         return response.data;
     },
 

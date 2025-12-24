@@ -13,6 +13,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import { RefreshCw, FileEdit, Eye, Trash, Loader2, Plus } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
+import { toast } from "sonner";
 
 // API & Hooks
 import { useCourierDashboard, useUpdateCourierStatus, useDeleteCourier, useUploadDeliveryPod } from "@/modules/shared/courier/courier.hooks";
@@ -102,26 +103,23 @@ const CourierDashboard: React.FC = () => {
 
         try {
             // Update status
+
             await updateStatusMutation.mutateAsync({
                 id: selectedCourier.id,
                 data: {
                     status: statusNum,
                     delivery_date: statusNum === COURIER_STATUS.DELIVERED ? deliveryDate : undefined,
                     within_time: statusNum === COURIER_STATUS.DELIVERED ? withinTime === "1" : undefined,
+                    podDoc: deliveryPod ? deliveryPod : undefined,
                 },
             });
 
-            // Upload POD if delivered and file selected
-            if (statusNum === COURIER_STATUS.DELIVERED && deliveryPod) {
-                await uploadPodMutation.mutateAsync({
-                    id: selectedCourier.id,
-                    file: deliveryPod,
-                });
-            }
+            toast.success("Courier status updated successfully", { duration: 4000 });
 
             setStatusModalOpen(false);
-        } catch (error) {
+        } catch (error: unknown) {
             // Error handled by mutation
+            toast.error(`Failed to update courier status ${(error as Error).message}`, { duration: 4000 });
         }
     };
 

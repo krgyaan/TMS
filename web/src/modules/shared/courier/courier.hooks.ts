@@ -111,10 +111,9 @@ export const useUpdateCourierStatus = () => {
         mutationFn: ({ id, data }: { id: number; data: UpdateStatusInput }) => courierApi.updateStatus(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: courierKeys.all });
-            toast.success("Status updated successfully");
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.message || "Failed to update status");
+            console.warn("Error updating courier status:", error);
         },
     });
 };

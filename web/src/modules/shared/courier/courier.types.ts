@@ -82,6 +82,7 @@ export type UpdateStatusInput = {
     status: number;
     deliveryDate?: string;
     withinTime?: boolean;
+    podDoc?: File;
 };
 
 export type CreateDispatchInput = {
