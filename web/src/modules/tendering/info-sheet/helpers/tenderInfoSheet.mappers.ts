@@ -22,7 +22,7 @@ const toStringArray = (val: (string | { id?: string | number; value?: string | n
             if ('id' in item && item.id != null) return String(item.id);
             if ('value' in item && item.value != null) return String(item.value);
             // Fallback: try to find first string/number property
-            for (const [key, value] of Object.entries(item)) {
+            for (const [, value] of Object.entries(item)) {
                 if (typeof value === 'string' || typeof value === 'number') {
                     return String(value);
                 }
@@ -62,7 +62,7 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
 
     deliveryTimeSupply: 0,
     deliveryTimeInstallationInclusive: false,
-    deliveryTimeInstallation: null,
+    deliveryTimeInstallation: undefined,
 
     pbgRequired: undefined,
     pbgForm: undefined,
@@ -146,7 +146,7 @@ export const mapResponseToForm = (
 
         deliveryTimeSupply: toNumber(data.deliveryTimeSupply),
         deliveryTimeInstallationInclusive: data.deliveryTimeInstallationInclusive ?? false,
-        deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : null,
+        deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : undefined,
 
         pbgRequired: data.pbgRequired ?? undefined,
         pbgForm: data.pbgMode as TenderInfoSheetFormValues['pbgForm'],
@@ -205,14 +205,74 @@ export const mapResponseToForm = (
     };
 };
 
+// Helper to safely convert YES/NO enum values
+const safeYesNoValue = (value: 'YES' | 'NO' | undefined | null | string): 'YES' | 'NO' | null => {
+    // Return null for falsy values (null, undefined, empty string, etc.)
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    // Always convert to string first, then trim and uppercase
+    const stringValue = String(value).trim().toUpperCase();
+
+    // Check for valid YES/NO values
+    if (stringValue === 'YES' || stringValue === 'NO') {
+        return stringValue as 'YES' | 'NO';
+    }
+
+    // Log warning for invalid values
+    if (stringValue.length > 0) {
+        console.warn(`Invalid YES/NO value detected: "${value}" (normalized: "${stringValue}")`);
+    }
+
+    // Return null for any invalid value
+    return null;
+};
+
+// Helper to convert number to null if 0 or undefined
+const safeNumber = (value: number | null | undefined): number | null => {
+    if (value === null || value === undefined || value === 0) {
+        return null;
+    }
+    return value;
+};
+
+// Clean payload: ensure all YES/NO fields are valid
+const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto => {
+    const cleaned = { ...payload };
+
+    // List of YES/NO fields that must be 'YES', 'NO', or null
+    const yesNoFields: (keyof SaveTenderInfoSheetDto)[] = [
+        'processingFeeRequired',
+        'tenderFeeRequired',
+        'pbgRequired',
+        'sdRequired',
+        'ldRequired',
+        'physicalDocsRequired',
+        'reverseAuctionApplicable',
+    ];
+
+    // Validate and clean YES/NO fields
+    yesNoFields.forEach(field => {
+        const value = cleaned[field];
+        if (value !== null && value !== 'YES' && value !== 'NO' && value !== undefined) {
+            // If invalid value, set to null
+            console.warn(`Invalid value for ${field}: ${JSON.stringify(value)}, setting to null`);
+            (cleaned as any)[field] = null;
+        }
+    });
+
+    return cleaned;
+};
+
 // Map form values to API payload
 export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderInfoSheetDto => {
-    return {
+    const payload: SaveTenderInfoSheetDto = {
         teRecommendation: values.teRecommendation,
         teRejectionReason: values.teRecommendation === 'NO' ? (values.teRejectionReason ?? null) : null,
         teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
 
-        processingFeeRequired: values.processingFeeRequired ?? null,
+        processingFeeRequired: safeYesNoValue(values.processingFeeRequired),
         processingFeeModes: values.processingFeeRequired === 'YES' && values.processingFeeModes?.length
             ? values.processingFeeModes
             : null,
@@ -220,7 +280,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             ? (values.processingFeeAmount ?? null)
             : null,
 
-        tenderFeeRequired: values.tenderFeeRequired ?? null,
+        tenderFeeRequired: safeYesNoValue(values.tenderFeeRequired),
         tenderFeeModes: values.tenderFeeRequired === 'YES' && values.tenderFeeModes?.length
             ? values.tenderFeeModes
             : null,
@@ -228,7 +288,9 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             ? (values.tenderFeeAmount ?? null)
             : null,
 
-        emdRequired: values.emdRequired ?? null,
+        emdRequired: values.emdRequired === 'YES' || values.emdRequired === 'NO' || values.emdRequired === 'EXEMPT'
+            ? values.emdRequired
+            : null,
         emdModes: values.emdRequired === 'YES' && values.emdModes?.length
             ? values.emdModes
             : null,
@@ -238,45 +300,45 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
 
         tenderValueGstInclusive: values.tenderValueGstInclusive ?? null,
 
-        bidValidityDays: values.bidValidityDays ?? null,
+        bidValidityDays: safeNumber(values.bidValidityDays),
         commercialEvaluation: values.commercialEvaluation ?? null,
         mafRequired: values.mafRequired ?? null,
-        reverseAuctionApplicable: values.reverseAuctionApplicable ?? null,
+        reverseAuctionApplicable: safeYesNoValue(values.reverseAuctionApplicable),
 
-        paymentTermsSupply: values.paymentTermsSupply ?? null,
-        paymentTermsInstallation: values.paymentTermsInstallation ?? null,
+        paymentTermsSupply: safeNumber(values.paymentTermsSupply),
+        paymentTermsInstallation: safeNumber(values.paymentTermsInstallation),
 
-        deliveryTimeSupply: values.deliveryTimeSupply ?? null,
+        deliveryTimeSupply: safeNumber(values.deliveryTimeSupply),
         deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
         deliveryTimeInstallationDays: !values.deliveryTimeInstallationInclusive
-            ? (values.deliveryTimeInstallation ?? null)
+            ? safeNumber(values.deliveryTimeInstallation)
             : null,
 
-        pbgRequired: values.pbgRequired ?? null,
+        pbgRequired: safeYesNoValue(values.pbgRequired),
         pbgMode: values.pbgRequired === 'YES' ? (values.pbgForm ?? null) : null,
-        pbgPercentage: values.pbgRequired === 'YES' ? (values.pbgPercentage ?? null) : null,
-        pbgDurationMonths: values.pbgRequired === 'YES' ? (values.pbgDurationMonths ?? null) : null,
+        pbgPercentage: values.pbgRequired === 'YES' ? safeNumber(values.pbgPercentage) : null,
+        pbgDurationMonths: values.pbgRequired === 'YES' ? safeNumber(values.pbgDurationMonths) : null,
 
-        sdRequired: values.sdRequired ?? null,
+        sdRequired: safeYesNoValue(values.sdRequired),
         sdMode: values.sdRequired === 'YES' ? (values.sdForm ?? null) : null,
-        sdPercentage: values.sdRequired === 'YES' ? (values.securityDepositPercentage ?? null) : null,
-        sdDurationMonths: values.sdRequired === 'YES' ? (values.sdDurationMonths ?? null) : null,
+        sdPercentage: values.sdRequired === 'YES' ? safeNumber(values.securityDepositPercentage) : null,
+        sdDurationMonths: values.sdRequired === 'YES' ? safeNumber(values.sdDurationMonths) : null,
 
-        ldRequired: values.ldRequired ?? null,
-        ldPercentagePerWeek: values.ldPercentagePerWeek ?? null,
-        maxLdPercentage: values.maxLdPercentage ?? null,
+        ldRequired: safeYesNoValue(values.ldRequired),
+        ldPercentagePerWeek: safeNumber(values.ldPercentagePerWeek),
+        maxLdPercentage: safeNumber(values.maxLdPercentage),
 
-        physicalDocsRequired: values.physicalDocsRequired ?? null,
+        physicalDocsRequired: safeYesNoValue(values.physicalDocsRequired),
         physicalDocsDeadline: values.physicalDocsRequired === 'YES'
             ? (values.physicalDocsDeadline || null)
             : null,
 
-        techEligibilityAge: values.techEligibilityAgeYears ?? null,
+        techEligibilityAge: safeNumber(values.techEligibilityAgeYears),
 
         workValueType: values.workValueType ?? null,
-        orderValue1: values.workValueType === 'WORKS_VALUES' ? (values.orderValue1 ?? null) : null,
-        orderValue2: values.workValueType === 'WORKS_VALUES' ? (values.orderValue2 ?? null) : null,
-        orderValue3: values.workValueType === 'WORKS_VALUES' ? (values.orderValue3 ?? null) : null,
+        orderValue1: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue1) : null,
+        orderValue2: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue2) : null,
+        orderValue3: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue3) : null,
         customEligibilityCriteria: values.workValueType === 'CUSTOM'
             ? (values.customEligibilityCriteria || null)
             : null,
@@ -286,19 +348,19 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
 
         avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null,
         avgAnnualTurnoverValue: values.avgAnnualTurnoverCriteria === 'AMOUNT'
-            ? (values.avgAnnualTurnoverValue ?? null)
+            ? safeNumber(values.avgAnnualTurnoverValue)
             : null,
         workingCapitalType: values.workingCapitalCriteria ?? null,
         workingCapitalValue: values.workingCapitalCriteria === 'AMOUNT'
-            ? (values.workingCapitalValue ?? null)
+            ? safeNumber(values.workingCapitalValue)
             : null,
         solvencyCertificateType: values.solvencyCertificateCriteria ?? null,
         solvencyCertificateValue: values.solvencyCertificateCriteria === 'AMOUNT'
-            ? (values.solvencyCertificateValue ?? null)
+            ? safeNumber(values.solvencyCertificateValue)
             : null,
         netWorthType: values.netWorthCriteria ?? null,
         netWorthValue: values.netWorthCriteria === 'AMOUNT'
-            ? (values.netWorthValue ?? null)
+            ? safeNumber(values.netWorthValue)
             : null,
 
         clientOrganization: values.clientOrganization || null,
@@ -313,4 +375,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
 
         teFinalRemark: values.teRemark || null,
     };
+
+    // Clean and return payload
+    return cleanPayload(payload);
 };

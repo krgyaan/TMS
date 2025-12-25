@@ -96,6 +96,84 @@ export class TenderInfoSheetsService {
         };
     }
 
+    /**
+     * Validate YES/NO fields before database insertion
+     */
+    private validateYesNoFields(payload: TenderInfoSheetPayload): void {
+        const yesNoFields = [
+            { name: 'processingFeeRequired', value: payload.processingFeeRequired },
+            { name: 'tenderFeeRequired', value: payload.tenderFeeRequired },
+            { name: 'pbgRequired', value: payload.pbgRequired },
+            { name: 'sdRequired', value: payload.sdRequired },
+            { name: 'ldRequired', value: payload.ldRequired },
+            { name: 'physicalDocsRequired', value: payload.physicalDocsRequired },
+            { name: 'reverseAuctionApplicable', value: payload.reverseAuctionApplicable },
+        ];
+
+        const invalidFields: string[] = [];
+        for (const field of yesNoFields) {
+            if (field.value !== null && field.value !== undefined) {
+                const strValue = String(field.value).trim();
+                if (strValue.length > 5) {
+                    invalidFields.push(`${field.name}="${strValue}" (length: ${strValue.length}, exceeds 5)`);
+                } else if (strValue !== 'YES' && strValue !== 'NO') {
+                    invalidFields.push(`${field.name}="${strValue}" (must be YES or NO)`);
+                }
+            }
+        }
+
+        // EMD can also be EXEMPT
+        if (payload.emdRequired !== null && payload.emdRequired !== undefined) {
+            const strValue = String(payload.emdRequired).trim();
+            if (strValue.length > 10) {
+                invalidFields.push(`emdRequired="${strValue}" (length: ${strValue.length}, exceeds 10)`);
+            } else if (strValue !== 'YES' && strValue !== 'NO' && strValue !== 'EXEMPT') {
+                invalidFields.push(`emdRequired="${strValue}" (must be YES, NO, or EXEMPT)`);
+            }
+        }
+
+        // MAF Required - Database column is VARCHAR(30) as per schema
+        // Valid values are: YES_GENERAL (11 chars), YES_PROJECT_SPECIFIC (20 chars), NO (2 chars)
+        if (payload.mafRequired !== null && payload.mafRequired !== undefined) {
+            const strValue = String(payload.mafRequired).trim();
+            // Check if value exceeds VARCHAR(30) constraint
+            if (strValue.length > 30) {
+                invalidFields.push(`mafRequired="${strValue}" (length: ${strValue.length}) exceeds database VARCHAR(30) constraint.`);
+            }
+            // Validate enum values
+            if (strValue !== 'YES_GENERAL' && strValue !== 'YES_PROJECT_SPECIFIC' && strValue !== 'NO') {
+                invalidFields.push(`mafRequired="${strValue}" (must be YES_GENERAL, YES_PROJECT_SPECIFIC, or NO)`);
+            }
+        }
+
+        // Validate other VARCHAR fields that might have length constraints
+        // clientOrganization - Database column is VARCHAR(255) as per schema
+        if (payload.clientOrganization !== null && payload.clientOrganization !== undefined) {
+            const strValue = String(payload.clientOrganization).trim();
+            if (strValue.length > 255) {
+                invalidFields.push(`clientOrganization="${strValue}" (length: ${strValue.length}) exceeds database VARCHAR(255) constraint.`);
+            }
+        }
+
+        // workValueType - Database column is VARCHAR(20) as per schema
+        if (payload.workValueType !== null && payload.workValueType !== undefined) {
+            const strValue = String(payload.workValueType).trim();
+            if (strValue.length > 20) {
+                invalidFields.push(`workValueType="${strValue}" (length: ${strValue.length}) exceeds database VARCHAR(20) constraint.`);
+            }
+            // Validate enum values
+            if (strValue !== 'WORKS_VALUES' && strValue !== 'CUSTOM') {
+                invalidFields.push(`workValueType="${strValue}" (must be WORKS_VALUES or CUSTOM)`);
+            }
+        }
+
+        if (invalidFields.length > 0) {
+            throw new BadRequestException(
+                `Invalid field values: ${invalidFields.join(', ')}. Please check the field constraints.`
+            );
+        }
+    }
+
     async create(
         tenderId: number,
         payload: TenderInfoSheetPayload,
@@ -103,6 +181,9 @@ export class TenderInfoSheetsService {
     ): Promise<TenderInfoSheetWithRelations> {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
+
+        // Validate YES/NO fields before database insertion
+        this.validateYesNoFields(payload);
 
         // Check if info sheet already exists
         const existing = await this.findByTenderId(tenderId);
@@ -121,6 +202,20 @@ export class TenderInfoSheetsService {
 
         try {
             await this.db.transaction(async (tx) => {
+                // Prepare values with logging for debugging
+                const mafRequiredValue = payload.mafRequired ? String(payload.mafRequired).trim() : null;
+                const processingFeeRequiredValue = payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null;
+                const tenderFeeRequiredValue = payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null;
+                const emdRequiredValue = payload.emdRequired ? String(payload.emdRequired).trim() : null;
+                const reverseAuctionApplicableValue = payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null;
+                const pbgRequiredValue = payload.pbgRequired ? String(payload.pbgRequired).trim() : null;
+                const sdRequiredValue = payload.sdRequired ? String(payload.sdRequired).trim() : null;
+                const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
+                const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
+
+                // Log all VARCHAR(5) field values before insertion
+                this.logger.log(`Inserting values - mafRequired: "${mafRequiredValue}" (length: ${mafRequiredValue?.length || 0}), processingFeeRequired: "${processingFeeRequiredValue}" (length: ${processingFeeRequiredValue?.length || 0}), tenderFeeRequired: "${tenderFeeRequiredValue}" (length: ${tenderFeeRequiredValue?.length || 0}), emdRequired: "${emdRequiredValue}" (length: ${emdRequiredValue?.length || 0}), reverseAuctionApplicable: "${reverseAuctionApplicableValue}" (length: ${reverseAuctionApplicableValue?.length || 0}), pbgRequired: "${pbgRequiredValue}" (length: ${pbgRequiredValue?.length || 0}), sdRequired: "${sdRequiredValue}" (length: ${sdRequiredValue?.length || 0}), ldRequired: "${ldRequiredValue}" (length: ${ldRequiredValue?.length || 0}), physicalDocsRequired: "${physicalDocsRequiredValue}" (length: ${physicalDocsRequiredValue?.length || 0})`);
+
                 // Insert main info sheet
                 const [infoSheet] = await tx
                     .insert(tenderInformation)
@@ -129,38 +224,38 @@ export class TenderInfoSheetsService {
                         teRecommendation: payload.teRecommendation,
                         teRejectionReason: payload.teRejectionReason ?? null,
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                        processingFeeRequired: payload.processingFeeRequired ?? null,
+                        processingFeeRequired: processingFeeRequiredValue,
                         processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
                         processingFeeMode: payload.processingFeeModes ?? null,
-                        tenderFeeRequired: payload.tenderFeeRequired ?? null,
+                        tenderFeeRequired: tenderFeeRequiredValue,
                         tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
                         tenderFeeMode: payload.tenderFeeModes ?? null,
-                        emdRequired: payload.emdRequired ?? null,
+                        emdRequired: emdRequiredValue,
                         emdAmount: payload.emdAmount?.toString() ?? null,
                         emdMode: payload.emdModes ?? null,
-                        reverseAuctionApplicable: payload.reverseAuctionApplicable ?? null,
+                        reverseAuctionApplicable: reverseAuctionApplicableValue,
                         paymentTermsSupply: payload.paymentTermsSupply ?? null,
                         paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
                         bidValidityDays: payload.bidValidityDays ?? null,
                         commercialEvaluation: payload.commercialEvaluation ?? null,
-                        mafRequired: payload.mafRequired ?? null,
+                        mafRequired: mafRequiredValue,
                         deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
                         deliveryTimeInstallationInclusive:
                             payload.deliveryTimeInstallationInclusive ?? false,
                         deliveryTimeInstallationDays:
                             payload.deliveryTimeInstallationDays ?? null,
-                        pbgRequired: payload.pbgRequired ?? null,
-                        pbgMode: payload.pbgMode ?? null,
+                        pbgRequired: pbgRequiredValue,
+                        pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
                         pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                         pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                        sdRequired: payload.sdRequired ?? null,
-                        sdMode: payload.sdMode ?? null,
+                        sdRequired: sdRequiredValue,
+                        sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
                         sdPercentage: payload.sdPercentage?.toString() ?? null,
                         sdDurationMonths: payload.sdDurationMonths ?? null,
-                        ldRequired: payload.ldRequired ?? null,
+                        ldRequired: ldRequiredValue,
                         ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
                         maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                        physicalDocsRequired: payload.physicalDocsRequired ?? null,
+                        physicalDocsRequired: physicalDocsRequiredValue,
                         physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
                         techEligibilityAge: payload.techEligibilityAge ?? null,
                         workValueType: payload.workValueType ?? null,
@@ -246,13 +341,49 @@ export class TenderInfoSheetsService {
             if (error?.cause?.code === '22001') {
                 // PostgreSQL error code for "value too long for type"
                 const message = error?.cause?.message || error?.message || '';
+
+                // Log the full error structure for debugging
+                this.logger.error(`Database constraint error - Full error object:`, JSON.stringify(error, null, 2));
+                this.logger.error(`Error message: ${message}`);
+
+                // Validate YES/NO fields and find the problematic one
+                const yesNoFields = {
+                    processingFeeRequired: payload.processingFeeRequired,
+                    tenderFeeRequired: payload.tenderFeeRequired,
+                    emdRequired: payload.emdRequired,
+                    pbgRequired: payload.pbgRequired,
+                    sdRequired: payload.sdRequired,
+                    ldRequired: payload.ldRequired,
+                    physicalDocsRequired: payload.physicalDocsRequired,
+                    reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                };
+
+                // Check each field for invalid values
+                const invalidFields: string[] = [];
+                for (const [fieldName, value] of Object.entries(yesNoFields)) {
+                    if (value !== null && value !== undefined) {
+                        const strValue = String(value);
+                        if (strValue.length > 5) {
+                            invalidFields.push(`${fieldName}="${strValue}" (length: ${strValue.length})`);
+                        } else if (strValue !== 'YES' && strValue !== 'NO' && strValue !== 'EXEMPT') {
+                            invalidFields.push(`${fieldName}="${strValue}"`);
+                        }
+                    }
+                }
+
+                this.logger.error(`YES/NO field values:`, JSON.stringify(yesNoFields));
+                if (invalidFields.length > 0) {
+                    this.logger.error(`Invalid fields detected: ${invalidFields.join(', ')}`);
+                }
+
                 if (message.includes('character varying(5)')) {
-                    throw new BadRequestException(
-                        'One or more fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO".'
-                    );
+                    const errorMsg = invalidFields.length > 0
+                        ? `Invalid YES/NO field values detected: ${invalidFields.join(', ')}. Please ensure YES/NO fields contain only "YES" or "NO".`
+                        : `One or more YES/NO fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO". Original error: ${message}`;
+                    throw new BadRequestException(errorMsg);
                 }
                 throw new BadRequestException(
-                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed.' : message}`
+                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed. ' : ''}${message}`
                 );
             }
 
@@ -282,6 +413,9 @@ export class TenderInfoSheetsService {
         // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
 
+        // Validate YES/NO fields before database insertion
+        this.validateYesNoFields(payload);
+
         const existing = await this.findByTenderId(tenderId);
         if (!existing) {
             throw new NotFoundException(
@@ -297,16 +431,16 @@ export class TenderInfoSheetsService {
                     teRecommendation: payload.teRecommendation,
                     teRejectionReason: payload.teRejectionReason ?? null,
                     teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                    processingFeeRequired: payload.processingFeeRequired ?? null,
+                    processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
                     processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
                     processingFeeMode: payload.processingFeeModes ?? null,
-                    tenderFeeRequired: payload.tenderFeeRequired ?? null,
+                    tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
                     tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
                     tenderFeeMode: payload.tenderFeeModes ?? null,
-                    emdRequired: payload.emdRequired ?? null,
+                    emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
                     emdAmount: payload.emdAmount?.toString() ?? null,
                     emdMode: payload.emdModes ?? null,
-                    reverseAuctionApplicable: payload.reverseAuctionApplicable ?? null,
+                    reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
                     paymentTermsSupply: payload.paymentTermsSupply ?? null,
                     paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
                     bidValidityDays: payload.bidValidityDays ?? null,
@@ -317,18 +451,18 @@ export class TenderInfoSheetsService {
                         payload.deliveryTimeInstallationInclusive ?? false,
                     deliveryTimeInstallationDays:
                         payload.deliveryTimeInstallationDays ?? null,
-                    pbgRequired: payload.pbgRequired ?? null,
-                    pbgMode: payload.pbgMode ?? null,
+                    pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
+                    pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
                     pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                     pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                    sdRequired: payload.sdRequired ?? null,
-                    sdMode: payload.sdMode ?? null,
+                    sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
+                    sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
                     sdPercentage: payload.sdPercentage?.toString() ?? null,
                     sdDurationMonths: payload.sdDurationMonths ?? null,
-                    ldRequired: payload.ldRequired ?? null,
+                    ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
                     ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
                     maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                    physicalDocsRequired: payload.physicalDocsRequired ?? null,
+                    physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
                     physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
                     techEligibilityAge: payload.techEligibilityAge ?? null,
                     workValueType: payload.workValueType ?? null,
@@ -408,13 +542,49 @@ export class TenderInfoSheetsService {
             // Same error handling as create method
             if (error?.cause?.code === '22001') {
                 const message = error?.cause?.message || error?.message || '';
+
+                // Log the full error structure for debugging
+                this.logger.error(`Database constraint error - Full error object:`, JSON.stringify(error, null, 2));
+                this.logger.error(`Error message: ${message}`);
+
+                // Validate YES/NO fields and find the problematic one
+                const yesNoFields = {
+                    processingFeeRequired: payload.processingFeeRequired,
+                    tenderFeeRequired: payload.tenderFeeRequired,
+                    emdRequired: payload.emdRequired,
+                    pbgRequired: payload.pbgRequired,
+                    sdRequired: payload.sdRequired,
+                    ldRequired: payload.ldRequired,
+                    physicalDocsRequired: payload.physicalDocsRequired,
+                    reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                };
+
+                // Check each field for invalid values
+                const invalidFields: string[] = [];
+                for (const [fieldName, value] of Object.entries(yesNoFields)) {
+                    if (value !== null && value !== undefined) {
+                        const strValue = String(value);
+                        if (strValue.length > 5) {
+                            invalidFields.push(`${fieldName}="${strValue}" (length: ${strValue.length})`);
+                        } else if (strValue !== 'YES' && strValue !== 'NO' && strValue !== 'EXEMPT') {
+                            invalidFields.push(`${fieldName}="${strValue}"`);
+                        }
+                    }
+                }
+
+                this.logger.error(`YES/NO field values:`, JSON.stringify(yesNoFields));
+                if (invalidFields.length > 0) {
+                    this.logger.error(`Invalid fields detected: ${invalidFields.join(', ')}`);
+                }
+
                 if (message.includes('character varying(5)')) {
-                    throw new BadRequestException(
-                        'One or more fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO".'
-                    );
+                    const errorMsg = invalidFields.length > 0
+                        ? `Invalid YES/NO field values detected: ${invalidFields.join(', ')}. Please ensure YES/NO fields contain only "YES" or "NO".`
+                        : `One or more YES/NO fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO". Original error: ${message}`;
+                    throw new BadRequestException(errorMsg);
                 }
                 throw new BadRequestException(
-                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed.' : message}`
+                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed. ' : ''}${message}`
                 );
             }
 
