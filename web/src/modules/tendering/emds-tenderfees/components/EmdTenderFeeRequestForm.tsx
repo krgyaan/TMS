@@ -16,18 +16,40 @@ import { Button } from '@/components/ui/button';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { toast } from 'sonner';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { parseAllowedModes } from '../constants';
+import { parseAllowedModes, DELIVERY_OPTIONS } from '../constants';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ============================================================================
 // Schema
 // ============================================================================
 
+// Extract delivery option values for enum validation
+const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
+
+// Helper to create enum field that accepts empty strings and transforms them to undefined
+// Also handles cases where SelectField converts numeric strings to numbers
+const deliveryEnumField = () =>
+    z.preprocess(
+        (val) => {
+            // Handle empty/null/undefined
+            if (val === '' || val === null || val === undefined) {
+                return undefined;
+            }
+            // Convert numbers back to strings (SelectField converts "72" to 72)
+            if (typeof val === 'number') {
+                return String(val);
+            }
+            // Ensure string values match enum
+            return val;
+        },
+        z.enum(DELIVERY_OPTION_VALUES).optional()
+    );
+
 const PaymentDetailsSchema = z.object({
     // DD fields
     ddFavouring: z.string().optional(),
     ddPayableAt: z.string().optional(),
-    ddDeliverBy: z.string().optional(),
+    ddDeliverBy: deliveryEnumField(),
     ddPurpose: z.string().optional(),
     ddCourierAddress: z.string().optional(),
     ddCourierHours: z.coerce.number().optional(),
@@ -37,7 +59,7 @@ const PaymentDetailsSchema = z.object({
     // FDR fields
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: z.string().optional(),
+    fdrDeliverBy: deliveryEnumField(),
     fdrPurpose: z.string().optional(),
     fdrCourierAddress: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
@@ -75,7 +97,7 @@ const PaymentDetailsSchema = z.object({
     // Cheque fields
     chequeFavouring: z.string().optional(),
     chequeDate: z.string().optional(),
-    chequeNeededIn: z.string().optional(),
+    chequeNeededIn: deliveryEnumField(),
     chequePurpose: z.string().optional(),
     chequeAccount: z.string().optional(),
 });
