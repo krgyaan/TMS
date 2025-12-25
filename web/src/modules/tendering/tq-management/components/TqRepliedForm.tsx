@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
+import { type SubmitHandler, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useUpdateTqReplied } from '@/hooks/api/useTqManagement';
 import type { TenderQuery } from '@/types/api.types';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const TqRepliedFormSchema = z.object({
@@ -43,7 +42,7 @@ export default function TqRepliedForm({
     const updateMutation = useUpdateTqReplied();
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(TqRepliedFormSchema),
+        resolver: zodResolver(TqRepliedFormSchema) as Resolver<FormValues>,
         defaultValues: {
             repliedDatetime: '',
             repliedDocument: [],
@@ -59,7 +58,7 @@ export default function TqRepliedForm({
         if (mode === 'edit' && tqData) {
             form.reset({
                 repliedDatetime: tqData.repliedDatetime
-                    ? formatDateTime(tqData.repliedDatetime)
+                    ? new Date(tqData.repliedDatetime).toISOString().slice(0, 16)
                     : '',
                 repliedDocument: tqData.repliedDocument ? [tqData.repliedDocument] : [],
                 proofOfSubmission: tqData.proofOfSubmission ? [tqData.proofOfSubmission] : [],
