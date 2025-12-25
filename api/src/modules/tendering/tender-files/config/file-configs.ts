@@ -17,7 +17,9 @@ export type TenderFileContext =
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
-    | 'reverse-auctions';
+    | 'reverse-auctions'
+    | 'ra-screenshots'
+    | 'result-screenshots';
 
 export interface FileConfig {
     maxFiles: number;
@@ -234,6 +236,26 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     'reverse-auctions': {
         maxFiles: 1,
         maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'ra-screenshots': {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'result-screenshots': {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
         compressImages: true,

@@ -15,9 +15,14 @@ import {
 } from '@db/schemas/tendering/rfqs.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type RfqFilters = {
     rfqStatus?: 'pending' | 'sent';
@@ -26,10 +31,6 @@ export type RfqFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
-
-// ============================================================================
-// Types
-// ============================================================================
 
 type RfqRow = {
     tenderId: number;
@@ -70,16 +71,17 @@ type RfqDetails = {
     }>;
 };
 
-// ============================================================================
-// Service
-// ============================================================================
 
 @Injectable()
 export class RfqsService {
+    private readonly logger = new Logger(RfqsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findAll(filters?: RfqFilters): Promise<PaginatedResult<RfqRow>> {
@@ -339,11 +341,16 @@ export class RfqsService {
             );
         });
 
-        return {
+        const rfqDetails = {
             ...newRfq,
             items: createdItems,
             documents: createdDocuments,
         } as RfqDetails;
+
+        // Send email notification
+        await this.sendRfqSentEmail(data.tenderId, rfqDetails, changedBy);
+
+        return rfqDetails;
     }
 
     async update(id: number, data: UpdateRfqDto): Promise<RfqDetails> {
@@ -544,5 +551,138 @@ export class RfqsService {
                 totalPages: Math.ceil(total / limit),
             },
         };
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send RFQ sent email to vendors
+     */
+    private async sendRfqSentEmail(
+        tenderId: number,
+        rfqDetails: RfqDetails,
+        sentBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember || !tender.rfqTo) return;
+
+        // Get TE user details
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get vendor organization IDs from rfqTo (comma-separated)
+        const vendorOrgIds = tender.rfqTo.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+
+        if (vendorOrgIds.length === 0) return;
+
+        // Get vendor organization details
+        const vendorOrgs = await this.db
+            .select({
+                id: vendorOrganizations.id,
+                name: vendorOrganizations.name,
+            })
+            .from(vendorOrganizations)
+            .where(sql`${vendorOrganizations.id} = ANY(${vendorOrgIds})`);
+
+        if (vendorOrgs.length === 0) return;
+
+        // Get user profile for mobile number
+        const [userProfile] = await this.db
+            .select({ mobile: users.mobile })
+            .from(users)
+            .where(eq(users.id, tender.teamMember))
+            .limit(1);
+
+        // Format due date
+        const dueDate = rfqDetails.dueDate ? new Date(rfqDetails.dueDate).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }) : 'Not specified';
+
+        // Check document types
+        const hasScope = rfqDetails.documents.some(doc => doc.docType === 'scope');
+        const hasTechnical = rfqDetails.documents.some(doc => doc.docType === 'technical');
+        const hasBoq = rfqDetails.documents.some(doc => doc.docType === 'boq');
+        const hasMaf = rfqDetails.documents.some(doc => doc.docType === 'maf');
+        const hasMii = rfqDetails.documents.some(doc => doc.docType === 'mii');
+
+        // Send email to each vendor organization
+        for (const vendorOrg of vendorOrgs) {
+            // Get vendors for this organization with emails
+            const orgVendors = await this.db
+                .select({
+                    email: vendors.email,
+                })
+                .from(vendors)
+                .where(
+                    and(
+                        eq(vendors.organizationId, vendorOrg.id),
+                        isNotNull(vendors.email)
+                    )
+                );
+
+            // Skip if no vendors with emails found
+            const vendorEmails = orgVendors.map(v => v.email).filter((email): email is string => email !== null);
+            if (vendorEmails.length === 0) continue;
+
+            const emailData = {
+                org: vendorOrg.name,
+                items: rfqDetails.items.map(item => ({
+                    requirement: item.requirement,
+                    qty: item.qty || 'N/A',
+                    unit: item.unit || 'N/A',
+                })),
+                hasScope,
+                hasTechnical,
+                hasBoq,
+                hasMaf,
+                hasMii,
+                list_of_docs: rfqDetails.docList || 'As per tender requirements',
+                due_date: dueDate,
+                te_name: teUser.name,
+                teMob: userProfile?.mobile || 'Not available',
+                teMail: teUser.email,
+            };
+
+            await this.sendEmail(
+                'rfq.sent',
+                tenderId,
+                sentBy,
+                `RFQ: ${tender.tenderNo}`,
+                'rfq-sent',
+                emailData,
+                {
+                    to: [{ type: 'emails', emails: vendorEmails }],
+                }
+            );
+        }
     }
 }

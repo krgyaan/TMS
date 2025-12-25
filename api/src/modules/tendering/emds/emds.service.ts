@@ -21,6 +21,7 @@ import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
@@ -40,10 +41,10 @@ import {
     BT_STATUSES,
     PORTAL_STATUSES,
 } from '@/modules/tendering/emds/constants/emd-statuses';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export interface PendingTenderRow {
     tenderId: number;
@@ -113,10 +114,6 @@ export interface RequestTabResponse {
 
 export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
 
-// ============================================================================
-// Status Mapping Constants
-// ============================================================================
-
 const APPROVED_STATUSES = [
     // Accounts form accepted
     DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
@@ -158,10 +155,6 @@ const RETURNED_STATUSES = [
 ];
 
 const REJECTED_STATUS_PATTERN = '_REJECTED';
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 const mapInstrumentType = (mode: string): InstrumentType => {
     const mapping: Record<string, InstrumentType> = {
@@ -216,23 +209,19 @@ const getDisplayTab = (instrumentStatus: string | null): DashboardTab => {
     return 'sent';
 };
 
-// ============================================================================
-// Service
-// ============================================================================
-
 @Injectable()
 export class EmdsService {
+    private readonly logger = new Logger(EmdsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly instrumentStatusService: InstrumentStatusService,
         private readonly historyService: InstrumentStatusHistoryService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
-
-    // ========================================================================
-    // Dashboard Methods (Refactored)
-    // ========================================================================
 
     /**
      * Get dashboard data based on tab
@@ -636,6 +625,7 @@ export class EmdsService {
             .limit(1);
 
         const createdRequests: PaymentRequest[] = [];
+        const createdInstruments: Array<{ requestId: number; instrumentId: number; mode: string; purpose: PaymentPurpose; amount: number; details: any }> = [];
         let emdRequested = false;
 
         await this.db.transaction(async (tx) => {
@@ -654,7 +644,7 @@ export class EmdsService {
                     createdRequests.push(request);
                     emdRequested = true;
 
-                    await this.createInstrumentWithDetails(
+                    const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
                         payload.emd.mode,
@@ -662,6 +652,14 @@ export class EmdsService {
                         emdAmount,
                         userId
                     );
+                    createdInstruments.push({
+                        requestId: request.id,
+                        instrumentId: instrument.id,
+                        mode: payload.emd.mode,
+                        purpose: 'EMD',
+                        amount: emdAmount,
+                        details: payload.emd.details,
+                    });
                 }
             }
 
@@ -679,7 +677,7 @@ export class EmdsService {
                     );
                     createdRequests.push(request);
 
-                    await this.createInstrumentWithDetails(
+                    const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
                         payload.tenderFee.mode,
@@ -687,6 +685,14 @@ export class EmdsService {
                         tenderFeeAmount,
                         userId
                     );
+                    createdInstruments.push({
+                        requestId: request.id,
+                        instrumentId: instrument.id,
+                        mode: payload.tenderFee.mode,
+                        purpose: 'Tender Fee',
+                        amount: tenderFeeAmount,
+                        details: payload.tenderFee.details,
+                    });
                 }
             }
 
@@ -710,7 +716,7 @@ export class EmdsService {
                     );
                     createdRequests.push(request);
 
-                    await this.createInstrumentWithDetails(
+                    const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
                         payload.processingFee.mode,
@@ -718,6 +724,14 @@ export class EmdsService {
                         processingFeeAmount,
                         userId
                     );
+                    createdInstruments.push({
+                        requestId: request.id,
+                        instrumentId: instrument.id,
+                        mode: payload.processingFee.mode,
+                        purpose: 'Processing Fee',
+                        amount: processingFeeAmount,
+                        details: payload.processingFee.details,
+                    });
                 }
             }
 
@@ -739,6 +753,11 @@ export class EmdsService {
                 );
             }
         });
+
+        // Send email notifications for each created instrument
+        for (const instrumentInfo of createdInstruments) {
+            await this.sendPaymentRequestEmail(tenderId, instrumentInfo, tender, userId || 0);
+        }
 
         return createdRequests;
     }
@@ -925,10 +944,6 @@ export class EmdsService {
         }
     }
 
-    // ========================================================================
-    // Read Operations
-    // ========================================================================
-
     async findByTenderId(tenderId: number) {
         await this.tenderInfosService.validateExists(tenderId);
 
@@ -1072,10 +1087,6 @@ export class EmdsService {
                 return null;
         }
     }
-
-    // ========================================================================
-    // Update Operations
-    // ========================================================================
 
     async update(requestId: number, payload: UpdatePaymentRequestDto) {
         const [existing] = await this.db
@@ -1302,10 +1313,6 @@ export class EmdsService {
         return this.findById(requestId);
     }
 
-    // ========================================================================
-    // Instrument Status Operations (delegated to InstrumentStatusService)
-    // ========================================================================
-
     async transitionInstrumentStatus(
         instrumentId: number,
         newStatus: string,
@@ -1350,5 +1357,248 @@ export class EmdsService {
 
     async getInstrumentHistory(instrumentId: number) {
         return this.historyService.getInstrumentChain(instrumentId);
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send payment request email based on instrument type
+     */
+    private async sendPaymentRequestEmail(
+        tenderId: number,
+        instrumentInfo: { requestId: number; instrumentId: number; mode: string; purpose: PaymentPurpose; amount: number; details: any },
+        tender: any,
+        requestedBy: number
+    ) {
+        // Get instrument with details from database
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentInfo.instrumentId))
+            .limit(1);
+
+        if (!instrument) return;
+
+        // Get accounts team ID
+        const accountsTeamId = await this.getAccountsTeamId();
+        if (!accountsTeamId) {
+            this.logger.warn('Accounts team not found, skipping email');
+            return;
+        }
+
+        // Format currency
+        const formatCurrency = (amount: number) => {
+            return `₹${amount.toLocaleString('en-IN')}`;
+        };
+
+        // Format date
+        const formatDate = (dateStr: string | null) => {
+            if (!dateStr) return 'Not specified';
+            return new Date(dateStr).toLocaleDateString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            });
+        };
+
+        // Format date time
+        const formatDateTime = (date: Date | null) => {
+            if (!date) return 'Not specified';
+            return new Date(date).toLocaleString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        };
+
+        const mode = instrumentInfo.mode.toUpperCase();
+        let template = '';
+        let emailData: Record<string, any> = {};
+        let subject = '';
+
+        // Get instrument details based on type
+        if (mode === 'DD' || mode === 'CHEQUE') {
+            const [ddDetails] = await this.db
+                .select()
+                .from(instrumentDdDetails)
+                .where(eq(instrumentDdDetails.instrumentId, instrumentInfo.instrumentId))
+                .limit(1);
+
+            if (mode === 'DD') {
+                template = 'demand-draft-request';
+                subject = `Demand Draft Request: ${tender.tenderNo}`;
+                emailData = {
+                    chequeNo: ddDetails?.ddNo || 'N/A',
+                    dueDate: formatDate(tender.dueDate),
+                    amountFormatted: formatCurrency(instrumentInfo.amount),
+                    timeLimit: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
+                    beneficiaryName: instrument.favouring || 'Not specified',
+                    payableAt: instrument.payableAt || 'Not specified',
+                    link: `#/tendering/emds/${instrumentInfo.requestId}`, // TODO: Update with actual frontend URL
+                    courierAddress: instrument.courierAddress || 'Not specified',
+                };
+            } else {
+                template = 'cheque-request';
+                subject = `Cheque Request: ${tender.tenderNo}`;
+                emailData = {
+                    purpose: instrumentInfo.purpose,
+                    partyName: instrument.favouring || 'Not specified',
+                    chequeDate: formatDate(instrument.issueDate),
+                    amount: formatCurrency(instrumentInfo.amount),
+                    chequeNeeds: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
+                    link: `#/tendering/emds/${instrumentInfo.requestId}`,
+                    assignee: 'Tender Executive', // TODO: Get from user
+                    tlName: 'Team Leader', // TODO: Get from team leader
+                };
+            }
+        } else if (mode === 'BG') {
+            const [bgDetails] = await this.db
+                .select()
+                .from(instrumentBgDetails)
+                .where(eq(instrumentBgDetails.instrumentId, instrumentInfo.instrumentId))
+                .limit(1);
+
+            template = 'bank-guarantee-request';
+            subject = `Bank Guarantee Request: ${tender.tenderNo}`;
+            emailData = {
+                purpose: instrumentInfo.purpose,
+                bg_in_favor_of: instrument.favouring || 'Not specified',
+                bg_address: instrument.courierAddress || 'Not specified',
+                bg_expiry_date: formatDate(instrument.expiryDate),
+                bg_claim_date: formatDate(instrument.claimExpiryDate),
+                amount: formatCurrency(instrumentInfo.amount),
+                bg_stamp: bgDetails?.stampCharges?.toString() || 'Not specified',
+                beneficiary_name: bgDetails?.beneficiaryName || 'Not specified',
+                account_no: bgDetails?.bgBankAcc || 'Not specified',
+                ifsc_code: bgDetails?.bgBankIfsc || 'Not specified',
+                bg_needs: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
+                link_to_acc_form: `#/tendering/emds/${instrumentInfo.requestId}`,
+                courier_address: instrument.courierAddress || 'Not specified',
+                sign: 'Shivani', // TODO: Get from config or user
+            };
+        } else if (mode === 'FDR') {
+            const [fdrDetails] = await this.db
+                .select()
+                .from(instrumentFdrDetails)
+                .where(eq(instrumentFdrDetails.instrumentId, instrumentInfo.instrumentId))
+                .limit(1);
+
+            template = 'fixed-deposit-receipt-request';
+            subject = `Fixed Deposit Receipt Request: ${tender.tenderNo}`;
+            emailData = {
+                purpose: instrumentInfo.purpose,
+                beneficiaryName: instrument.favouring || 'Not specified',
+                expiryDate: formatDate(instrument.expiryDate),
+                amount: formatCurrency(instrumentInfo.amount),
+                timeLimit: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
+                link: `#/tendering/emds/${instrumentInfo.requestId}`,
+                courierAddress: instrument.courierAddress || 'Not specified',
+            };
+        } else if (mode === 'BANK_TRANSFER' || mode === 'BT') {
+            const [btDetails] = await this.db
+                .select()
+                .from(instrumentTransferDetails)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentInfo.instrumentId))
+                .limit(1);
+
+            template = 'bank-transfer-request';
+            subject = `Bank Transfer Request: ${tender.tenderNo}`;
+            emailData = {
+                tenderNo: tender.tenderNo,
+                tenderName: tender.tenderName,
+                dueDateTime: formatDateTime(tender.dueDate),
+                dueTime: tender.dueDate ? new Date(tender.dueDate).toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }) : 'Not specified',
+                btAccName: btDetails?.accountName || 'Not specified',
+                btAcc: btDetails?.accountNumber || 'Not specified',
+                btIfsc: btDetails?.ifsc || 'Not specified',
+                amount: formatCurrency(instrumentInfo.amount),
+                link: `#/tendering/emds/${instrumentInfo.requestId}`,
+                sign: 'Shivani', // TODO: Get from config or user
+                tlName: 'Team Leader', // TODO: Get from team leader
+            };
+        } else if (mode === 'PORTAL' || mode === 'POP') {
+            const [portalDetails] = await this.db
+                .select()
+                .from(instrumentTransferDetails)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentInfo.instrumentId))
+                .limit(1);
+
+            template = 'pay-on-portal-request';
+            subject = `Portal Payment Request: ${tender.tenderNo}`;
+            emailData = {
+                portal: portalDetails?.portalName || 'Payment Portal',
+                purpose: instrumentInfo.purpose,
+                isOthersPurpose: instrumentInfo.purpose !== 'EMD' && instrumentInfo.purpose !== 'Tender Fee',
+                tender_no: tender.tenderNo,
+                tender_name: tender.tenderName,
+                dueDate: formatDateTime(tender.dueDate),
+                amount: formatCurrency(instrumentInfo.amount),
+                netbanking: portalDetails?.isNetbanking === 'Yes' ? 'Yes' : 'No',
+                debit: portalDetails?.isDebit === 'Yes' ? 'Yes' : 'No',
+                link: `#/tendering/emds/${instrumentInfo.requestId}`,
+                sign: 'Shivani', // TODO: Get from config or user
+                tlName: 'Team Leader', // TODO: Get from team leader
+            };
+        } else {
+            // Unknown instrument type, skip email
+            return;
+        }
+
+        await this.sendEmail(
+            `payment-request.${mode.toLowerCase()}`,
+            tenderId,
+            requestedBy,
+            subject,
+            template,
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Admin', teamId: accountsTeamId }],
+            }
+        );
+    }
+
+    /**
+     * Get Accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
     }
 }

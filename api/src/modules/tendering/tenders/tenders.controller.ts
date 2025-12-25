@@ -175,13 +175,17 @@ export class TenderInfoController {
         @CurrentUser() user: ValidatedUser
     ) {
         const parsed = CreateTenderInfoSchema.parse(body);
-        return this.tenderInfosService.create(parsed);
+        return this.tenderInfosService.create(parsed, user.sub);
     }
 
     @Patch(':id')
-    async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    async update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
+    ) {
         const parsed = UpdateTenderInfoSchema.parse(body);
-        return this.tenderInfosService.update(id, parsed as unknown as Partial<NewTenderInfo>);
+        return this.tenderInfosService.update(id, parsed as unknown as Partial<NewTenderInfo>, user.sub);
     }
 
     @Delete(':id')
@@ -202,10 +206,11 @@ export class TenderInfoController {
     @Put(':id/approval')
     async updateApproval(
         @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
     ) {
         const parsed = SaveTenderApprovalSchema.parse(body);
-        return this.tenderInfosService.updateApproval(id, parsed);
+        return this.tenderInfosService.updateApproval(id, parsed, user.sub);
     }
 
     @Patch(':id/status')

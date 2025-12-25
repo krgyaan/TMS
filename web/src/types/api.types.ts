@@ -913,7 +913,7 @@ export interface CreateDocumentChecklistDto {
 }
 
 export interface UpdateDocumentChecklistDto {
-    id: number;
+    tenderId: number;
     selectedDocuments?: string[];
     extraDocuments?: ExtraDocument[];
 }
@@ -1571,7 +1571,7 @@ export interface Rfq {
     statusName: string;
     dueDate: Date;
     rfqId: number | null;
-    vendorOrganizationNames: string | null;
+    requestedVendor: string | null;
     items: RfqItem[];
     documents: RfqDocument[];
     docList: string | null;

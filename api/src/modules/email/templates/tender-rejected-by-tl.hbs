@@ -1,0 +1,51 @@
+<div>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+    </style>
+    <p>Dear {{data.assignee}},</p>
+
+    <p>
+        I have reviewed the Tender Info sheet and the Tender documents and decided
+        {{#if data.isBidApproved}}
+            to bid for the tender
+        {{else if data.isRejected}}
+            to not bid for this tender
+        {{else if data.isReview}}
+            to review the Tender info sheet again.
+        {{/if}}
+    </p>
+
+    <p>
+        <b>Remarks: </b><br />
+        {{#if data.isReview}}
+            {{data.remarks}}
+        {{/if}}
+        {{#if data.isRejected}}
+            {{data.rej_remark}}
+        {{/if}}
+    </p>
+
+    {{#if data.isBidApproved}}
+        <p>Please do the necessary next steps:</p>
+        <ul>
+            <li>Request EMD and Tender fees from - <a href="{{data.emdLink}}">EMD Link</a> and <a href="{{data.tenderFeesLink}}">Tender Fees Link</a>.</li>
+            <li>The selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
+            <li>The selected mode of EMD: {{data.emdMode}}</li>
+            <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            <li>Courier Physical Documents: {{data.phyDocs}}</li>
+        </ul>
+        <p>PQR Selection is {{#if data.pqrApproved}}approved{{else}}Rejected, please use the revised PQR documents{{/if}}.</p>
+        <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}Rejected, please use the revised Finance Docs{{/if}}.</p>
+    {{else if data.isReview}}
+        <p>Please complete the tender info form and resend it.</p>
+    {{else if data.isRejected}}
+        <p>Please avoid this tender and move on to the next available tender.</p>
+    {{/if}}
+
+    <p>
+        <b>Regards,</b><br />
+        {{data.tlName}}
+    </p>
+</div>

@@ -4,9 +4,10 @@ import { CostingApprovalsController } from '@/modules/tendering/costing-approval
 import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
     controllers: [CostingApprovalsController],
     providers: [CostingApprovalsService],
     exports: [CostingApprovalsService],

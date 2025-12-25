@@ -1,0 +1,50 @@
+<div>
+    <p>Dear {{data.assignee}},</p>
+
+    {{#if data.changed}}
+        {{#if data.isTeamMemberChange}}
+            <p>Congratulations! A new tender has been assigned to you.</p>
+        {{else if data.isTeamChange}}
+            <b>The team for this tender has been changed.</b>
+        {{else if data.isTenderNoChange}}
+            <b>The tender number has been updated.</b>
+        {{else}}
+            <p>The following changes have been made to your tender:</p>
+            <ul>
+                {{#each data.changedFields}}
+                    <li>{{this}} has been updated</li>
+                {{/each}}
+            </ul>
+        {{/if}}
+    {{else}}
+        Tender Status has been updated from
+        <strong>{{data.oldStatus}}</strong>
+        to
+        <strong>{{data.newStatus}}</strong>
+    {{/if}}
+
+    <p>Here are the tender details:</p>
+    <ul>
+        <li>Tender Name : {{data.tenderName}}</li>
+        <li>Tender is to be bid on: {{data.website}}</li>
+        <li>Tender ID.: {{data.tenderNo}}</li>
+        <li>Due Date & Time: {{data.dueDate}}</li>
+        <br />
+        <li>Tender Value: {{data.tenderValue}}</li>
+        <li>Tender Fees: {{data.tenderFees}}</li>
+        <li>EMD: {{data.emd}}</li>
+        {{#if data.status_remark}}
+            <li><strong>Remarks: {{data.status_remark}}</strong></li>
+        {{/if}}
+    </ul>
+
+    <p>
+        The tender documents are attached to the mail.
+    </p>
+
+    <p>
+        <b>Regards,</b><br />
+        {{data.coordinator}}<br />
+        Volks Energie Pvt. Ltd.
+    </p>
+</div>

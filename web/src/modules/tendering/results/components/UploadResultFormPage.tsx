@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
+import { type Resolver, type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { FileUploadField } from "@/components/form/FileUploadField";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUploadResult, useTenderResult } from "@/hooks/api/useTenderResults";
 import { ArrowLeft, IndianRupee, Plus, X } from "lucide-react";
 
@@ -26,8 +26,8 @@ const UploadResultSchema = z.object({
     l1Price: z.string().optional(),
     l2Price: z.string().optional(),
     ourPrice: z.string().optional(),
-    qualifiedPartiesScreenshot: z.string().optional(),
-    finalResultScreenshot: z.string().optional(),
+    qualifiedPartiesScreenshot: z.array(z.string()).default([]),
+    finalResultScreenshot: z.array(z.string()).default([]),
 }).refine((data) => {
     if (data.technicallyQualified === 'No' && !data.disqualificationReason) {
         return false;
@@ -73,7 +73,7 @@ export default function UploadResultFormPage({
     const [showResultDetails, setShowResultDetails] = useState(isEditMode);
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(UploadResultSchema),
+        resolver: zodResolver(UploadResultSchema) as Resolver<FormValues>,
         defaultValues: {
             technicallyQualified: 'Yes',
             disqualificationReason: '',
@@ -83,10 +83,14 @@ export default function UploadResultFormPage({
             l1Price: '',
             l2Price: '',
             ourPrice: '',
-            qualifiedPartiesScreenshot: '',
-            finalResultScreenshot: '',
+            qualifiedPartiesScreenshot: [],
+            finalResultScreenshot: [],
         },
     });
+
+    // Watch file values for display
+    const qualifiedPartiesScreenshot = useWatch({ control: form.control, name: 'qualifiedPartiesScreenshot' });
+    const finalResultScreenshot = useWatch({ control: form.control, name: 'finalResultScreenshot' });
 
     // Pre-populate form in edit mode
     useEffect(() => {
@@ -106,8 +110,8 @@ export default function UploadResultFormPage({
                 l1Price: result.l1Price ?? '',
                 l2Price: result.l2Price ?? '',
                 ourPrice: result.ourPrice ?? '',
-                qualifiedPartiesScreenshot: result.qualifiedPartiesScreenshot ?? '',
-                finalResultScreenshot: result.finalResultScreenshot ?? '',
+                qualifiedPartiesScreenshot: result.qualifiedPartiesScreenshot ? [result.qualifiedPartiesScreenshot] : [],
+                finalResultScreenshot: result.finalResultScreenshot ? [result.finalResultScreenshot] : [],
             });
 
             // If result fields exist, show Form 2
@@ -121,13 +125,6 @@ export default function UploadResultFormPage({
         control: form.control,
         name: 'technicallyQualified',
     });
-
-    // #region agent log
-    useEffect(() => {
-        const formValue = form.getValues('technicallyQualified');
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'UploadResultFormPage.tsx:117', message: 'technicallyQualified value changed', data: { watchValue: technicallyQualified, watchType: typeof technicallyQualified, formValue, formType: typeof formValue, isYes: technicallyQualified === 'Yes', isNo: technicallyQualified === 'No', isYesForm: formValue === 'Yes', isNoForm: formValue === 'No' }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-    }, [technicallyQualified, form]);
-    // #endregion
 
     const qualifiedPartiesNames = useWatch({
         control: form.control,
@@ -162,7 +159,7 @@ export default function UploadResultFormPage({
                 // Qualified: Always include qualified parties data
                 submitData.qualifiedPartiesCount = data.qualifiedPartiesCount;
                 submitData.qualifiedPartiesNames = data.qualifiedPartiesNames;
-                submitData.qualifiedPartiesScreenshot = data.qualifiedPartiesScreenshot;
+                submitData.qualifiedPartiesScreenshot = data.qualifiedPartiesScreenshot.length > 0 ? data.qualifiedPartiesScreenshot[0] : null;
 
                 // Only include result details if checkbox is checked (or in edit mode with result details visible)
                 // Check if result details should be included based on checkbox state or if result data exists
@@ -172,7 +169,7 @@ export default function UploadResultFormPage({
                     submitData.l1Price = data.l1Price;
                     submitData.l2Price = data.l2Price;
                     submitData.ourPrice = data.ourPrice;
-                    submitData.finalResultScreenshot = data.finalResultScreenshot;
+                    submitData.finalResultScreenshot = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
                 }
             }
 
@@ -386,17 +383,19 @@ export default function UploadResultFormPage({
                                                     Upload Screenshots
                                                 </h4>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <FileUploadField
-                                                        control={form.control}
-                                                        name="qualifiedPartiesScreenshot"
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={qualifiedPartiesScreenshot}
+                                                        onChange={(paths) => form.setValue('qualifiedPartiesScreenshot', paths)}
                                                         label="Screenshot of Qualified Parties"
-                                                        acceptedFileTypes={['image/*', 'application/pdf']}
+                                                        disabled={isSubmitting}
                                                     />
-                                                    <FileUploadField
-                                                        control={form.control}
-                                                        name="finalResultScreenshot"
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={finalResultScreenshot}
+                                                        onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
                                                         label="Final Result Screenshot"
-                                                        acceptedFileTypes={['image/*', 'application/pdf']}
+                                                        disabled={isSubmitting}
                                                     />
                                                 </div>
                                             </div>

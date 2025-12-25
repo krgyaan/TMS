@@ -12,6 +12,9 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -46,6 +49,8 @@ export class CostingSheetsService {
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly googleDriveService: GoogleDriveService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findAll(filters?: CostingSheetFilters): Promise<PaginatedResult<CostingSheetDashboardRow>> {
@@ -353,6 +358,9 @@ export class CostingSheetsService {
             return costingSheet;
         });
 
+        // Send email notification
+        await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
+
         return result[0];
     }
 
@@ -407,6 +415,9 @@ export class CostingSheetsService {
 
             return updated;
         });
+
+        // Send email notification
+        await this.sendCostingSheetSubmittedEmail(costingSheet.tenderId, result, changedBy);
 
         return result;
     }
@@ -631,5 +642,109 @@ export class CostingSheetsService {
             sheetUrl: sheetResult.sheetUrl,
             sheetId: sheetResult.sheetId,
         };
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send costing sheet submitted email
+     */
+    private async sendCostingSheetSubmittedEmail(
+        tenderId: number,
+        costingSheet: { googleSheetUrl: string | null; submittedFinalPrice: string | null; submittedReceiptPrice: string | null; submittedBudgetPrice: string | null; submittedGrossMargin: string | null; teRemarks: string | null },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format due date and time
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }) : 'Not specified';
+        const dueTime = tender.dueDate ? new Date(tender.dueDate).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Format currency values
+        const formatCurrency = (value: string | null) => {
+            if (!value) return '₹0';
+            const num = Number(value);
+            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+        };
+
+        const emailData = {
+            tlName,
+            tender_name: tender.tenderName,
+            costingSheetLink: costingSheet.googleSheetUrl || '#',
+            tenderValue: formatCurrency(tender.gstValues),
+            finalPrice: formatCurrency(costingSheet.submittedFinalPrice),
+            receipt: formatCurrency(costingSheet.submittedReceiptPrice),
+            budget: formatCurrency(costingSheet.submittedBudgetPrice),
+            grossMargin: costingSheet.submittedGrossMargin ? `${costingSheet.submittedGrossMargin}%` : '0%',
+            remarks: costingSheet.teRemarks || 'None',
+            dueDate,
+            dueTime,
+            teName,
+        };
+
+        await this.sendEmail(
+            'costing-sheet.submitted',
+            tenderId,
+            submittedBy,
+            `Costing Sheet Submitted: ${tender.tenderNo}`,
+            'costing-sheet-submitted',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
     }
 }

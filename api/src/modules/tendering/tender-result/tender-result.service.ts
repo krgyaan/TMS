@@ -18,6 +18,10 @@ import {
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
 
@@ -72,10 +76,14 @@ const RESULT_STATUS = {
 
 @Injectable()
 export class TenderResultService {
+    private readonly logger = new Logger(TenderResultService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findAll(filters?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
@@ -642,6 +650,11 @@ export class TenderResultService {
             return updated;
         });
 
+        // Send email notification if result details are provided
+        if (dto.result && dto.technicallyQualified === 'Yes') {
+            await this.sendTenderResultEmail(tenderId, result, changedBy, dto);
+        }
+
         return result;
     }
 
@@ -659,5 +672,96 @@ export class TenderResultService {
             .limit(1);
 
         return ra || null;
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send tender result email
+     */
+    private async sendTenderResultEmail(
+        tenderId: number,
+        resultRecord: {
+            qualifiedPartiesScreenshot: string | null;
+            finalResultScreenshot: string | null;
+        },
+        uploadedBy: number,
+        dto: UploadResultDto
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get costing sheet data
+        const costingSheet = await this.db
+            .select({
+                submittedReceiptPrice: tenderCostingSheets.submittedReceiptPrice,
+                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
+                submittedGrossMargin: tenderCostingSheets.submittedGrossMargin,
+            })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1);
+
+        // Format currency values
+        const formatCurrency = (value: string | null) => {
+            if (!value) return '₹0';
+            const num = Number(value);
+            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+        };
+
+        const emailData = {
+            tender_no: tender.tenderNo,
+            tender_name: tender.tenderName,
+            result: dto.result || 'Not specified',
+            l1_price_formatted: formatCurrency(dto.l1Price ?? null),
+            l2_price_formatted: formatCurrency(dto.l2Price ?? null),
+            our_price_formatted: formatCurrency(dto.ourPrice ?? null),
+            costing_receipt_formatted: formatCurrency(costingSheet[0]?.submittedReceiptPrice || null),
+            costing_budget_formatted: formatCurrency(costingSheet[0]?.submittedBudgetPrice || null),
+            costing_gross_margin: costingSheet[0]?.submittedGrossMargin ? `${costingSheet[0].submittedGrossMargin}%` : '0%',
+            qualified_parties_screenshot: !!resultRecord.qualifiedPartiesScreenshot,
+            final_result_screenshot: !!resultRecord.finalResultScreenshot,
+            isWon: dto.result === 'Won',
+        };
+
+        await this.sendEmail(
+            'tender.result',
+            tenderId,
+            uploadedBy,
+            `Tender Result: ${tender.tenderNo}`,
+            'tender-result',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
     }
 }

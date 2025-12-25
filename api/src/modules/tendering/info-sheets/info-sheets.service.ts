@@ -16,11 +16,12 @@ import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { DrizzleError } from 'drizzle-orm';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { organizations } from '@db/schemas/master/organizations.schema';
+import { websites } from '@db/schemas/master/websites.schema';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
@@ -28,16 +29,16 @@ export type TenderInfoSheetWithRelations = TenderInformation & {
     commercialDocuments: TenderFinancialDocument[];
 };
 
-// ============================================================================
-// Service
-// ============================================================================
-
 @Injectable()
 export class TenderInfoSheetsService {
+    private readonly logger = new Logger(TenderInfoSheetsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findByTenderId(
@@ -234,9 +235,12 @@ export class TenderInfoSheetsService {
                 );
             });
 
-            return this.findByTenderId(
-                tenderId
-            ) as Promise<TenderInfoSheetWithRelations>;
+            const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
+
+            // Send email notification
+            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+
+            return result;
         } catch (error: any) {
             // Handle database constraint errors
             if (error?.cause?.code === '22001') {
@@ -394,9 +398,12 @@ export class TenderInfoSheetsService {
                 );
             }
 
-            return this.findByTenderId(
-                tenderId
-            ) as Promise<TenderInfoSheetWithRelations>;
+            const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
+
+            // Send email notification
+            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+
+            return result;
         } catch (error: any) {
             // Same error handling as create method
             if (error?.cause?.code === '22001') {
@@ -424,5 +431,155 @@ export class TenderInfoSheetsService {
                 'Failed to update tender information. Please check your input and try again.'
             );
         }
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send info sheet filled email
+     */
+    private async sendInfoSheetFilledEmail(
+        tenderId: number,
+        infoSheet: TenderInfoSheetWithRelations,
+        changedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const assignee = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!assignee) return;
+
+        // Get organization and website names
+        const [orgData, websiteData] = await Promise.all([
+            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
+            tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
+        ]);
+
+        const orgName = orgData[0]?.name || 'Not specified';
+        const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
+
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Format currency values
+        const formatCurrency = (value: string | null) => {
+            if (!value) return '0';
+            const num = Number(value);
+            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+        };
+
+        // Format percentage
+        const formatPercent = (value: string | null) => {
+            if (!value) return '0';
+            return `${value}%`;
+        };
+
+        // Build document lists
+        const teDocs = infoSheet.technicalWorkOrders.map(doc => `<li>${doc.documentName}</li>`).join('');
+        const tenderDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
+        const ceDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
+
+        // Build email data matching template
+        const emailData: Record<string, any> = {
+            organization: orgName,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            website: websiteName,
+            dueDate,
+            recommendation_by_te: infoSheet.teRecommendation || 'Not specified',
+            reason: infoSheet.teRejectionReason || infoSheet.teRejectionRemarks || 'N/A',
+            tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
+            tender_fees_in_form_of: infoSheet.tenderFeeMode || 'Not specified',
+            emd: formatCurrency(infoSheet.emdAmount),
+            emd_required: infoSheet.emdRequired || 'No',
+            emd_in_form_of: infoSheet.emdMode || 'Not specified',
+            tender_value: formatCurrency(tender.gstValues),
+            bid_validity: infoSheet.bidValidityDays?.toString() || 'Not specified',
+            commercial_evaluation: infoSheet.commercialEvaluation || 'Not specified',
+            ra_applicable: infoSheet.reverseAuctionApplicable || 'No',
+            maf_required: infoSheet.mafRequired || 'No',
+            delivery_time: infoSheet.deliveryTimeSupply?.toString() || 'Not specified',
+            delivery_time_ic: infoSheet.deliveryTimeInstallationDays?.toString() || 'Not specified',
+            pbg_percentage: formatPercent(infoSheet.pbgPercentage),
+            pbg_duration: infoSheet.pbgDurationMonths?.toString() || 'Not specified',
+            payment_terms: formatPercent(infoSheet.paymentTermsSupply?.toString() || null),
+            payment_terms_ic: formatPercent(infoSheet.paymentTermsInstallation?.toString() || null),
+            ld_percentage: formatPercent(infoSheet.ldPercentagePerWeek),
+            max_ld: formatPercent(infoSheet.maxLdPercentage),
+            phydocs_submission_required: infoSheet.physicalDocsRequired || 'No',
+            phydocsRequired: infoSheet.physicalDocsRequired === 'Yes',
+            phydocs_submission_deadline: infoSheet.physicalDocsDeadline || 'N/A',
+            eligibility_criterion: infoSheet.techEligibilityAge?.toString() || 'Not specified',
+            work_value1: formatCurrency(infoSheet.orderValue1),
+            name1: infoSheet.workValueType === 'orderValue1' ? 'Selected' : '',
+            work_value2: formatCurrency(infoSheet.orderValue2),
+            name2: infoSheet.workValueType === 'orderValue2' ? 'Selected' : '',
+            work_value3: formatCurrency(infoSheet.orderValue3),
+            name3: infoSheet.workValueType === 'orderValue3' ? 'Selected' : '',
+            aat_display: infoSheet.avgAnnualTurnoverType || 'Not specified',
+            aat_amt: formatCurrency(infoSheet.avgAnnualTurnoverValue),
+            wc_display: infoSheet.workingCapitalType || 'Not specified',
+            wc_amt: formatCurrency(infoSheet.workingCapitalValue),
+            nw_display: infoSheet.netWorthType || 'Not specified',
+            nw_amt: formatCurrency(infoSheet.netWorthValue),
+            sc_display: infoSheet.solvencyCertificateType || 'Not specified',
+            sc_amt: formatCurrency(infoSheet.solvencyCertificateValue),
+            te_docs: teDocs || '<li>None</li>',
+            tender_docs: tenderDocs || '<li>None</li>',
+            ce_docs: ceDocs || '<li>None</li>',
+            clients: infoSheet.clients.map(client => ({
+                client_name: client.clientName,
+                client_designation: client.clientDesignation || '',
+                client_email: client.clientEmail || '',
+                client_mobile: client.clientMobile || '',
+            })),
+            link: `#/tendering/tender-approvals/${tenderId}/approval`, // TODO: Update with actual frontend URL
+            assignee: assignee.name,
+        };
+
+        await this.sendEmail(
+            'info-sheet.filled',
+            tenderId,
+            changedBy,
+            `Tender Info Sheet Filled: ${tender.tenderNo}`,
+            'tender-info-sheet-filled',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
     }
 }

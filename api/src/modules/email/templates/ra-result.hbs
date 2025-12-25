@@ -1,0 +1,58 @@
+<div>
+    <p>Dear Sir,</p>
+    <p>
+        The RA for Tender No.
+        {{data.tender_no}}, Tender Name
+        {{data.tender_name}}
+        has concluded.
+    </p>
+    <p>
+        The Result of the RA is
+        {{data.ra_result}}<br />
+        Our Price was L1 at the start of the RA:
+        {{#if data.ve_l1_start_yes}}Yes{{else}}No{{/if}}<br />
+        RA Start Price:
+        {{data.ra_start_price}}<br />
+        RA Close Price:
+        {{data.ra_close_price}}<br />
+        RA Duration:
+        {{data.ra_duration}}
+    </p>
+    <p>Attached Below:</p>
+    <ul>
+        <li>
+            Screenshot of Qualified Parties:
+            {{#if data.qualified_parties_screenshot}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+        <li>
+            Screenshot of all decrements:
+            {{#if data.decrements_screenshot}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+        <li>
+            Screenshot of the Final result:
+            {{#if data.final_result}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+    </ul>
+    <p>
+        {{#if data.isWon}}
+            Congratulations on the win.
+        {{else if data.isLost}}
+            We will try harder next time.
+        {{else if data.isH1Elimination}}
+            We will talk to the OEM to get better prices.
+        {{/if}}
+    </p>
+    <p>Regards,<br />Team Leader<br />Volks Energie Pvt. Ltd.</p>
+</div>

@@ -4,9 +4,10 @@ import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
 import { RfqsController } from '@/modules/tendering/rfqs/rfq.controller';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
     controllers: [RfqsController],
     providers: [RfqsService],
     exports: [RfqsService],

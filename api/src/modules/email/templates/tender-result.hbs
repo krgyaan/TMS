@@ -1,0 +1,53 @@
+<div>
+    <p>Dear Sir,</p>
+    <p>
+        The Result for Tender No.
+        {{data.tender_no}}, Tender Name
+        {{data.tender_name}}
+        has been declared.
+    </p>
+    <p>
+        The Result of the tender is
+        {{data.result}}<br />
+        L1 Price:
+        {{data.l1_price_formatted}}<br />
+        L2 Price:
+        {{data.l2_price_formatted}}<br />
+        Our Price:
+        {{data.our_price_formatted}}<br /><br />
+
+        Receipt:
+        {{data.costing_receipt_formatted}}<br />
+        Budget:
+        {{data.costing_budget_formatted}}<br />
+        Gross Margin %:
+        {{data.costing_gross_margin}}<br />
+    </p>
+    <p>Attached Below:</p>
+    <ul>
+        <li>
+            Screenshot of Qualified Parties:
+            {{#if data.qualified_parties_screenshot}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+        <li>
+            Screenshot of the Final result:
+            {{#if data.final_result_screenshot}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+    </ul>
+    <p>
+        {{#if data.isWon}}
+            Congratulations on the win.
+        {{else}}
+            Best of luck for the next Tender.
+        {{/if}}
+    </p>
+    <p>Regards,<br />Team Leader<br />Volks Energie Pvt. Ltd.</p>
+</div>

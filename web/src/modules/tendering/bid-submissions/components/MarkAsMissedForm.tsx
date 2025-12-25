@@ -126,28 +126,28 @@ export default function MarkAsMissedForm({
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Tender Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
+                            <div className="grid gap-4 md:grid-cols-5 bg-muted/30 p-4 rounded-lg">
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
+                                    <p className="font-medium text-muted-foreground">Tender No</p>
+                                    <p className="font-semibold">{tenderDetails.tenderNo}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                                    <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
+                                    <p className="font-medium text-muted-foreground">Team Member</p>
+                                    <p className="font-semibold">{tenderDetails.teamMemberName || '—'}</p>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
+                                    <p className="font-medium text-muted-foreground">Tender Name</p>
+                                    <p className="font-semibold">{tenderDetails.tenderName}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                                    <p className="text-base font-semibold">
+                                    <p className="font-medium text-muted-foreground">Due Date</p>
+                                    <p className="font-semibold">
                                         {tenderDetails.dueDate ? formatDateTime(tenderDetails.dueDate) : '—'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Final Costing</p>
-                                    <p className="text-base font-semibold text-green-600">
+                                    <p className="font-medium text-muted-foreground">Final Costing</p>
+                                    <p className="font-semibold text-green-600">
                                         {tenderDetails.finalCosting
                                             ? formatINR(parseFloat(tenderDetails.finalCosting))
                                             : '—'}

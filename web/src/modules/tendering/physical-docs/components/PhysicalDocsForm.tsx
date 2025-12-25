@@ -11,7 +11,7 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { SelectField } from '@/components/form/SelectField';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, Users } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';

@@ -4,9 +4,10 @@ import { TqManagementController } from '@/modules/tendering/tq-management/tq-man
 import { TqManagementService } from '@/modules/tendering/tq-management/tq-management.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
+import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
     controllers: [TqManagementController],
     providers: [TqManagementService],
     exports: [TqManagementService],

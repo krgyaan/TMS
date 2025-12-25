@@ -11,6 +11,10 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { users } from '@/db/schemas/auth/users.schema';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -45,10 +49,14 @@ export type CostingApprovalDashboardCounts = {
 
 @Injectable()
 export class CostingApprovalsService {
+    private readonly logger = new Logger(CostingApprovalsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     private costingStatusWhere(status?: 'Submitted' | 'Approved' | 'Rejected/Redo') {
@@ -283,6 +291,9 @@ export class CostingApprovalsService {
             return updated;
         });
 
+        // Send email notification
+        await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
+
         return result;
     }
 
@@ -313,6 +324,9 @@ export class CostingApprovalsService {
             })
             .where(eq(tenderCostingSheets.id, id))
             .returning();
+
+        // Send email notification
+        await this.sendCostingSheetRejectedEmail(result.tenderId, result, userId);
 
         return result;
     }
@@ -354,5 +368,164 @@ export class CostingApprovalsService {
             .returning();
 
         return result;
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send costing sheet approved email
+     */
+    private async sendCostingSheetApprovedEmail(
+        tenderId: number,
+        costingSheet: { googleSheetUrl: string | null; finalPrice: string | null; tlRemarks: string | null },
+        approvedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Format due date and time
+        const dueDateTime = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Format currency values
+        const formatCurrency = (value: string | null) => {
+            if (!value) return '₹0';
+            const num = Number(value);
+            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+        };
+
+        const emailData = {
+            te_name: teUser.name,
+            tender_name: tender.tenderName,
+            costing_sheet_link: costingSheet.googleSheetUrl || '#',
+            tender_value: formatCurrency(tender.gstValues),
+            approved_final_price: formatCurrency(costingSheet.finalPrice),
+            remarks: costingSheet.tlRemarks || 'None',
+            due_date_time: dueDateTime,
+            tl_name: tlName,
+        };
+
+        await this.sendEmail(
+            'costing-sheet.approved',
+            tenderId,
+            approvedBy,
+            `Costing Sheet Approved: ${tender.tenderNo}`,
+            'costing-sheet-approved',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+            }
+        );
+    }
+
+    /**
+     * Send costing sheet rejected email
+     */
+    private async sendCostingSheetRejectedEmail(
+        tenderId: number,
+        costingSheet: { googleSheetUrl: string | null; rejectionReason: string | null },
+        rejectedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Format due date and time
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }) : 'Not specified';
+        const dueTime = tender.dueDate ? new Date(tender.dueDate).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            teName: teUser.name,
+            tenderName: tender.tenderName,
+            costingSheetLink: costingSheet.googleSheetUrl || '#',
+            dueDate,
+            dueTime,
+            tlName,
+        };
+
+        await this.sendEmail(
+            'costing-sheet.rejected',
+            tenderId,
+            rejectedBy,
+            `Costing Sheet Rejected: ${tender.tenderNo}`,
+            'costing-sheet-rejected',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
     }
 }
