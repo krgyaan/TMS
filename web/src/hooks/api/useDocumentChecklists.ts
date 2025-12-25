@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
-import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow, CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/types/api.types';
 
 export const documentChecklistKeys = {
     all: ['documentChecklists'] as const,
@@ -55,9 +55,10 @@ export const useCreateDocumentChecklist = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: documentChecklistService.create,
-        onSuccess: () => {
+        mutationFn: (data: CreateDocumentChecklistDto) => documentChecklistService.create(data),
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.all });
+            queryClient.invalidateQueries({ queryKey: documentChecklistKeys.byTender(variables.tenderId) });
             toast.success('Document checklist submitted successfully');
         },
         onError: (error: any) => {
@@ -70,9 +71,10 @@ export const useUpdateDocumentChecklist = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: documentChecklistService.update,
-        onSuccess: () => {
+        mutationFn: (data: UpdateDocumentChecklistDto) => documentChecklistService.update(data),
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.all });
+            queryClient.invalidateQueries({ queryKey: documentChecklistKeys.byTender(variables.tenderId) });
             toast.success('Document checklist updated successfully');
         },
         onError: (error: any) => {

@@ -8,7 +8,8 @@ import { Form } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText } from 'lucide-react';
+import { CompactTenderFileUploader } from '@/components/tender-file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useEffect } from 'react';
@@ -23,7 +24,17 @@ const DocumentChecklistFormSchema = z.object({
         name: z.string().min(1, 'Document name is required'),
         path: z.string().optional(),
     })).optional(),
-});
+}).refine(
+    (data) => {
+        const hasSelectedDocuments = data.selectedDocuments && data.selectedDocuments.length > 0;
+        const hasExtraDocuments = data.extraDocuments && data.extraDocuments.length > 0;
+        return hasSelectedDocuments || hasExtraDocuments;
+    },
+    {
+        message: 'At least one document (standard or additional) must be selected',
+        path: ['selectedDocuments'],
+    }
+);
 
 type FormValues = z.infer<typeof DocumentChecklistFormSchema>;
 
@@ -88,14 +99,40 @@ export default function DocumentChecklistForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
+            // Filter out empty extra documents (those with empty names)
+            const filteredExtraDocuments = data.extraDocuments?.filter(
+                doc => doc.name && doc.name.trim().length > 0
+            );
+
+            // Clean up extra documents: convert empty strings to undefined for optional path field
+            const cleanedExtraDocuments = filteredExtraDocuments?.map(doc => ({
+                name: doc.name.trim(),
+                path: doc.path && doc.path.trim().length > 0 ? doc.path.trim() : undefined,
+            }));
+
+            // Prepare payload: use undefined for empty arrays to match backend expectations
+            const payload = {
+                tenderId: data.tenderId,
+                selectedDocuments: data.selectedDocuments && data.selectedDocuments.length > 0
+                    ? data.selectedDocuments
+                    : undefined,
+                extraDocuments: cleanedExtraDocuments && cleanedExtraDocuments.length > 0
+                    ? cleanedExtraDocuments
+                    : undefined,
+            };
+
             if (mode === 'create') {
-                await createMutation.mutateAsync(data as CreateDocumentChecklistDto);
+                await createMutation.mutateAsync(payload as CreateDocumentChecklistDto);
             } else if (existingData?.id) {
-                await updateMutation.mutateAsync(data as UpdateDocumentChecklistDto);
+                await updateMutation.mutateAsync({
+                    id: existingData.id,
+                    ...payload,
+                } as UpdateDocumentChecklistDto);
             }
             navigate(paths.tendering.checklists);
         } catch (error) {
             console.error('Error submitting document checklist:', error);
+            // Error is already handled by the mutation hooks with toast notifications
         }
     };
 
@@ -197,7 +234,7 @@ export default function DocumentChecklistForm({
                                             <tr>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Sr. No.</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Document Name</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Document Path (Optional)</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold">File</th>
                                                 <th className="px-4 py-3 text-center text-sm font-semibold w-20">Action</th>
                                             </tr>
                                         </thead>
@@ -232,14 +269,12 @@ export default function DocumentChecklistForm({
                                                             label=""
                                                         >
                                                             {(field) => (
-                                                                <div className="relative">
-                                                                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                                    <Input
-                                                                        {...field}
-                                                                        className="pl-10"
-                                                                        placeholder="Enter document path/URL"
-                                                                    />
-                                                                </div>
+                                                                <CompactTenderFileUploader
+                                                                    context="checklists"
+                                                                    value={field.value || undefined}
+                                                                    onChange={(path) => field.onChange(path || '')}
+                                                                    disabled={isSubmitting}
+                                                                />
                                                             )}
                                                         </FieldWrapper>
                                                     </td>
@@ -275,7 +310,21 @@ export default function DocumentChecklistForm({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                onClick={() => form.reset()}
+                                onClick={() => {
+                                    if (mode === 'edit' && existingData) {
+                                        form.reset({
+                                            tenderId: tenderId,
+                                            selectedDocuments: existingData.selectedDocuments || [],
+                                            extraDocuments: existingData.extraDocuments || [],
+                                        });
+                                    } else {
+                                        form.reset({
+                                            tenderId: tenderId,
+                                            selectedDocuments: [],
+                                            extraDocuments: [],
+                                        });
+                                    }
+                                }}
                                 disabled={isSubmitting}
                             >
                                 Reset

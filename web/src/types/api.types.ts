@@ -913,6 +913,7 @@ export interface CreateDocumentChecklistDto {
 }
 
 export interface UpdateDocumentChecklistDto {
+    id: number;
     tenderId: number;
     selectedDocuments?: string[];
     extraDocuments?: ExtraDocument[];

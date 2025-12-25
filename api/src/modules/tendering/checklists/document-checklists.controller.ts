@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { DocumentChecklistsService, type DocumentChecklistFilters } from '@/modules/tendering/checklists/document-checklists.service';
 import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 
 @Controller('document-checklists')
+@UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 export class DocumentChecklistsController {
     constructor(private readonly documentChecklistsService: DocumentChecklistsService) { }
 

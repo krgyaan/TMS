@@ -6,6 +6,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import type { TenderDocumentChecklist } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface DocumentChecklistViewProps {
     checklist?: TenderDocumentChecklist | null;
@@ -126,9 +127,14 @@ export function DocumentChecklistView({
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={2}>
                                             {doc.path ? (
-                                                <span className="text-xs text-muted-foreground font-mono break-all">
-                                                    {doc.path}
-                                                </span>
+                                                <a
+                                                    href={tenderFilesService.getFileUrl(doc.path)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-primary hover:underline break-all"
+                                                >
+                                                    {doc.path.split('/').pop() || doc.path}
+                                                </a>
                                             ) : (
                                                 '—'
                                             )}
@@ -138,7 +144,7 @@ export function DocumentChecklistView({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => window.open(doc.path, '_blank')}
+                                                    onClick={() => window.open(tenderFilesService.getFileUrl(doc.path!), '_blank')}
                                                 >
                                                     <ExternalLink className="h-4 w-4 mr-1" />
                                                     View

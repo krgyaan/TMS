@@ -21,9 +21,7 @@ class DocumentChecklistService extends BaseApiService {
         super('/document-checklists');
     }
 
-    async getAll(
-        params?: DocumentChecklistListParams
-    ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
+    async getAll(params?: DocumentChecklistListParams): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {
@@ -54,23 +52,17 @@ class DocumentChecklistService extends BaseApiService {
         return this.get<DocumentChecklistsDashboardCounts>('/counts');
     }
 
-    async getByTenderId(
-        tenderId: number
-    ): Promise<TenderDocumentChecklist | null> {
+    async getByTenderId(tenderId: number): Promise<TenderDocumentChecklist | null> {
         return this.get<TenderDocumentChecklist>(`/tender/${tenderId}`);
     }
 
-    async create(
-        data: CreateDocumentChecklistDto
-    ): Promise<TenderDocumentChecklist> {
+    async create(data: CreateDocumentChecklistDto): Promise<TenderDocumentChecklist> {
         return this.post<TenderDocumentChecklist>('', data);
     }
 
-    async update(
-        data: UpdateDocumentChecklistDto
-    ): Promise<TenderDocumentChecklist> {
+    async update(data: UpdateDocumentChecklistDto): Promise<TenderDocumentChecklist> {
         const { id, ...updateData } = data;
-        return this.patch<TenderDocumentChecklist>(`/${id}`,updateData);
+        return this.patch<TenderDocumentChecklist>(`/${id}`, updateData);
     }
 }
 

@@ -19,10 +19,6 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { parseAllowedModes, DELIVERY_OPTIONS } from '../constants';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// ============================================================================
-// Schema
-// ============================================================================
-
 // Extract delivery option values for enum validation
 const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
 

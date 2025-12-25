@@ -199,8 +199,13 @@ export class DocumentChecklistsService {
             })
             .returning();
 
-        // Send email notification
-        await this.sendDocumentChecklistSubmittedEmail(createDocumentChecklistDto.tenderId, result);
+        // Send email notification (don't fail the operation if email fails)
+        try {
+            await this.sendDocumentChecklistSubmittedEmail(createDocumentChecklistDto.tenderId, result);
+        } catch (error) {
+            this.logger.error(`Failed to send document checklist submitted email for tender ${createDocumentChecklistDto.tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Continue execution - email failure shouldn't break the main operation
+        }
 
         return result;
     }
