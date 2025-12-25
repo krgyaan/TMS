@@ -141,6 +141,34 @@ export function TenderInformationForm({
         try {
             const payload = mapFormToPayload(values);
 
+            // Debug: Log payload to identify problematic fields
+            console.log('Payload being sent:', JSON.stringify(payload, null, 2));
+
+            // Validate YES/NO fields before sending
+            const yesNoFields = [
+                'processingFeeRequired',
+                'tenderFeeRequired',
+                'pbgRequired',
+                'sdRequired',
+                'ldRequired',
+                'physicalDocsRequired',
+                'reverseAuctionApplicable',
+            ];
+
+            const invalidFields: string[] = [];
+            yesNoFields.forEach(field => {
+                const value = (payload as any)[field];
+                if (value !== null && value !== 'YES' && value !== 'NO' && value !== undefined) {
+                    invalidFields.push(`${field}: ${JSON.stringify(value)}`);
+                }
+            });
+
+            if (invalidFields.length > 0) {
+                console.error('Invalid YES/NO field values:', invalidFields);
+                toast.error(`Invalid field values detected: ${invalidFields.join(', ')}`);
+                return;
+            }
+
             if (mode === 'create') {
                 await createInfoSheet.mutateAsync({ tenderId, data: payload });
             } else {
@@ -149,7 +177,9 @@ export function TenderInformationForm({
 
             navigate(paths.tendering.tenders);
         } catch (error) {
-            toast.error("Failed to submit info sheet");
+            // Error is already handled by the mutation's onError callback
+            // Only log for debugging
+            console.error('Info sheet submission error:', error);
         }
     };
 
