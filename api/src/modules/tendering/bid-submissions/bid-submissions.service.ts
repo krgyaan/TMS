@@ -12,6 +12,9 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -46,11 +49,14 @@ export type BidSubmissionDashboardCounts = {
 
 @Injectable()
 export class BidSubmissionsService {
+    private readonly logger = new Logger(BidSubmissionsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     /**
@@ -385,6 +391,9 @@ export class BidSubmissionsService {
             return bidSubmission;
         });
 
+        // Send email notification
+        await this.sendBidSubmittedEmail(data.tenderId, result, data.submittedBy);
+
         return result;
     }
 
@@ -461,6 +470,9 @@ export class BidSubmissionsService {
 
             return bidSubmission;
         });
+
+        // Send email notification
+        await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
         return result;
     }
@@ -653,5 +665,172 @@ export class BidSubmissionsService {
                 totalPages: Math.ceil(total / limit),
             },
         };
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send bid submitted email
+     */
+    private async sendBidSubmittedEmail(
+        tenderId: number,
+        bidSubmission: { submissionDatetime: Date | null },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format dates
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const bidSubmissionDate = bidSubmission.submissionDatetime ? new Date(bidSubmission.submissionDatetime).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Calculate time before deadline
+        let timeBeforeDeadline = 'N/A';
+        if (tender.dueDate && bidSubmission.submissionDatetime) {
+            const diffMs = new Date(tender.dueDate).getTime() - new Date(bidSubmission.submissionDatetime).getTime();
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            timeBeforeDeadline = `${diffHours} hours ${diffMinutes} minutes`;
+        }
+
+        const emailData = {
+            tlName,
+            tenderName: tender.tenderName,
+            dueDate,
+            bidSubmissionDate,
+            timeBeforeDeadline,
+            teName,
+        };
+
+        await this.sendEmail(
+            'bid.submitted',
+            tenderId,
+            submittedBy,
+            `Bid Submitted: ${tender.tenderNo}`,
+            'bid-submitted',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
+    }
+
+    /**
+     * Send bid missed email
+     */
+    private async sendBidMissedEmail(
+        tenderId: number,
+        bidSubmission: { reasonForMissing: string | null; preventionMeasures: string | null; tmsImprovements: string | null },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format due date and time
+        const dueDateTime = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tl_name: tlName,
+            tender_name: tender.tenderName,
+            due_date_time: dueDateTime,
+            reason: bidSubmission.reasonForMissing || 'Not specified',
+            prevention: bidSubmission.preventionMeasures || 'Not specified',
+            tms_improvements: bidSubmission.tmsImprovements || 'None',
+            te_name: teName,
+        };
+
+        await this.sendEmail(
+            'bid.missed',
+            tenderId,
+            submittedBy,
+            `Bid Missed: ${tender.tenderNo}`,
+            'bid-missed',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
     }
 }

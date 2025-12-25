@@ -12,6 +12,9 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -35,9 +38,13 @@ export type DocumentChecklistFilters = {
 
 @Injectable()
 export class DocumentChecklistsService {
+    private readonly logger = new Logger(DocumentChecklistsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly emailService: EmailService
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
+        private readonly tenderInfosService: TenderInfosService,
     ) { }
 
     async findAll(filters?: DocumentChecklistFilters): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
@@ -192,6 +199,9 @@ export class DocumentChecklistsService {
             })
             .returning();
 
+        // Send email notification
+        await this.sendDocumentChecklistSubmittedEmail(createDocumentChecklistDto.tenderId, result);
+
         return result;
     }
 
@@ -212,5 +222,92 @@ export class DocumentChecklistsService {
             .returning();
 
         return result;
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send document checklist submitted email
+     */
+    private async sendDocumentChecklistSubmittedEmail(
+        tenderId: number,
+        checklist: { selectedDocuments: string[] | null; extraDocuments: Array<{ name: string; path: string }> | null }
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Build documents list
+        const documents: string[] = [];
+        if (checklist.selectedDocuments && checklist.selectedDocuments.length > 0) {
+            documents.push(...checklist.selectedDocuments);
+        }
+        if (checklist.extraDocuments && checklist.extraDocuments.length > 0) {
+            documents.push(...checklist.extraDocuments.map(doc => doc.name));
+        }
+
+        const emailData = {
+            tl: tlName,
+            tenderNo: tender.tenderNo,
+            tenderName: tender.tenderName,
+            documents: documents.length > 0 ? documents : ['No documents specified'],
+            te: teName,
+        };
+
+        await this.sendEmail(
+            'document-checklist.submitted',
+            tenderId,
+            tender.teamMember,
+            `Document Checklist Submitted: ${tender.tenderNo}`,
+            'document-checklist-submitted',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
     }
 }

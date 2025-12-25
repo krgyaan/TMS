@@ -12,6 +12,9 @@ import { tenderQueryItems } from '@db/schemas/tendering';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -48,11 +51,14 @@ export type TqManagementDashboardRow = {
 
 @Injectable()
 export class TqManagementService {
+    private readonly logger = new Logger(TqManagementService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findAll(filters?: TqManagementFilters): Promise<PaginatedResult<TqManagementDashboardRow>> {
@@ -524,6 +530,9 @@ export class TqManagementService {
             return tqRecord;
         });
 
+        // Send email notification
+        await this.sendTqReceivedEmail(data.tenderId, result, data.receivedBy, data.tqItems);
+
         return result;
     }
 
@@ -581,6 +590,9 @@ export class TqManagementService {
             return updated;
         });
 
+        // Send email notification
+        await this.sendTqRepliedEmail(tqRecord.tenderId, result[0], data.repliedBy);
+
         return result[0];
     }
 
@@ -634,6 +646,9 @@ export class TqManagementService {
 
             return updated;
         });
+
+        // Send email notification
+        await this.sendTqMissedEmail(tqRecord.tenderId, result[0], changedBy);
 
         return result[0];
     }
@@ -769,5 +784,246 @@ export class TqManagementService {
         }
 
         return tqRecord;
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send TQ received email
+     */
+    private async sendTqReceivedEmail(
+        tenderId: number,
+        tqRecord: { id: number; tqSubmissionDeadline: Date | null },
+        receivedBy: number,
+        tqItems: Array<{ tqTypeId: number; queryDescription: string }>
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get coordinator name
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', tender.team);
+        let coordinatorName = 'Coordinator';
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            if (coordinatorUser?.name) {
+                coordinatorName = coordinatorUser.name;
+            }
+        }
+
+        // Get TQ types for display
+        const tqTypeIds = tqItems.map(item => item.tqTypeId);
+        const tqTypes = await this.db
+            .select()
+            .from(tenderQueryItems)
+            .where(inArray(tenderQueryItems.tqTypeId, tqTypeIds))
+            .limit(100); // Reasonable limit
+
+        // Build TQ data array
+        const tqData = tqItems.map(item => ({
+            type: `TQ Type ${item.tqTypeId}`, // TODO: Get actual type name from master data
+            desc: item.queryDescription,
+        }));
+
+        // Format due date
+        const due = tqRecord.tqSubmissionDeadline ? new Date(tqRecord.tqSubmissionDeadline).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            te: teUser.name,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            due,
+            tqData,
+            coordinator: coordinatorName,
+        };
+
+        await this.sendEmail(
+            'tq.received',
+            tenderId,
+            receivedBy,
+            `TQ Received: ${tender.tenderNo}`,
+            'tq-received',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
+    }
+
+    /**
+     * Send TQ replied email
+     */
+    private async sendTqRepliedEmail(
+        tenderId: number,
+        tqRecord: { repliedDatetime: Date | null },
+        repliedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Format dates
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const tqSubmissionDate = tqRecord.repliedDatetime ? new Date(tqRecord.repliedDatetime).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Calculate time before deadline
+        let timeBeforeDeadline = 'N/A';
+        if (tender.dueDate && tqRecord.repliedDatetime) {
+            const diffMs = new Date(tender.dueDate).getTime() - new Date(tqRecord.repliedDatetime).getTime();
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            timeBeforeDeadline = `${diffHours} hours ${diffMinutes} minutes`;
+        }
+
+        const emailData = {
+            tlName,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            dueDate,
+            tqSubmissionDate,
+            timeBeforeDeadline,
+            teName: teUser.name,
+        };
+
+        await this.sendEmail(
+            'tq.replied',
+            tenderId,
+            repliedBy,
+            `TQ Replied: ${tender.tenderNo}`,
+            'tq-replied',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
+    }
+
+    /**
+     * Send TQ missed email
+     */
+    private async sendTqMissedEmail(
+        tenderId: number,
+        tqRecord: { missedReason: string | null; preventionMeasures: string | null; tmsImprovements: string | null; tqSubmissionDeadline: Date | null },
+        changedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Format TQ due date and time
+        const tqDueDateTime = tqRecord.tqSubmissionDeadline ? new Date(tqRecord.tqSubmissionDeadline).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tl_name: tlName,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            tq_due_date_time: tqDueDateTime,
+            reason_missing: tqRecord.missedReason || 'Not specified',
+            would_repeated: tqRecord.preventionMeasures || 'Not specified',
+            tms_system: tqRecord.tmsImprovements || 'None',
+            te_name: teUser.name,
+        };
+
+        await this.sendEmail(
+            'tq.missed',
+            tenderId,
+            changedBy,
+            `TQ Missed: ${tender.tenderNo}`,
+            'tq-missed',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
     }
 }

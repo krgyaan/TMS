@@ -14,6 +14,9 @@ import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/te
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -80,11 +83,14 @@ const STATUS_GROUPS = {
 
 @Injectable()
 export class ReverseAuctionService {
+    private readonly logger = new Logger(ReverseAuctionService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     /**
@@ -542,6 +548,11 @@ export class ReverseAuctionService {
             return updated;
         });
 
+        // Send email notification if RA was scheduled (not disqualified)
+        if (dto.technicallyQualified === 'Yes' && result.status === RA_STATUS.RA_SCHEDULED) {
+            await this.sendRaScheduledEmail(tenderId, result, changedBy);
+        }
+
         return result;
     }
 
@@ -618,6 +629,9 @@ export class ReverseAuctionService {
 
             return updated;
         });
+
+        // Send email notification
+        await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
 
         return result;
     }
@@ -879,5 +893,187 @@ export class ReverseAuctionService {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
         }).format(num);
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send RA scheduled email
+     */
+    private async sendRaScheduledEmail(
+        tenderId: number,
+        raRecord: { raStartTime: Date | null; raEndTime: Date | null },
+        scheduledBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Format RA times
+        const raStartTime = raRecord.raStartTime ? new Date(raRecord.raStartTime).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const raEndTime = raRecord.raEndTime ? new Date(raRecord.raEndTime).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        // Calculate time until start
+        let timeUntilStart = 'N/A';
+        if (raRecord.raStartTime) {
+            const now = new Date();
+            const startTime = new Date(raRecord.raStartTime);
+            const diffMs = startTime.getTime() - now.getTime();
+            if (diffMs > 0) {
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                if (diffDays > 0) {
+                    timeUntilStart = `${diffDays} day(s) ${diffHours} hour(s)`;
+                } else if (diffHours > 0) {
+                    timeUntilStart = `${diffHours} hour(s) ${diffMinutes} minute(s)`;
+                } else {
+                    timeUntilStart = `${diffMinutes} minute(s)`;
+                }
+            } else {
+                timeUntilStart = 'RA has started';
+            }
+        }
+
+        const emailData = {
+            tl_name: tlName,
+            tender_no: tender.tenderNo,
+            tender_name: tender.tenderName,
+            ra_start_time: raStartTime,
+            ra_end_time: raEndTime,
+            time_until_start: timeUntilStart,
+        };
+
+        await this.sendEmail(
+            'ra.scheduled',
+            tenderId,
+            scheduledBy,
+            `RA Scheduled: ${tender.tenderNo}`,
+            'ra-scheduled',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
+    }
+
+    /**
+     * Send RA result email
+     */
+    private async sendRaResultEmail(
+        tenderId: number,
+        raRecord: {
+            raResult: string | null;
+            veL1AtStart: string | null;
+            raStartPrice: string | null;
+            raClosePrice: string | null;
+            raStartTime: Date | null;
+            raCloseTime: Date | null;
+            screenshotQualifiedParties: string | null;
+            screenshotDecrements: string | null;
+            finalResultScreenshot: string | null;
+        },
+        uploadedBy: number,
+        dto: UploadRaResultDto
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender) return;
+
+        // Format RA duration
+        let raDuration = 'N/A';
+        if (raRecord.raStartTime && raRecord.raCloseTime) {
+            const diffMs = new Date(raRecord.raCloseTime).getTime() - new Date(raRecord.raStartTime).getTime();
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            raDuration = `${diffHours} hour(s) ${diffMinutes} minute(s)`;
+        }
+
+        // Format currency
+        const formatCurrency = (value: string | null) => {
+            if (!value) return '₹0';
+            const num = Number(value);
+            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+        };
+
+        const emailData = {
+            tender_no: tender.tenderNo,
+            tender_name: tender.tenderName,
+            ra_result: raRecord.raResult || 'Not specified',
+            ve_l1_start_yes: raRecord.veL1AtStart === 'Yes',
+            ra_start_price: formatCurrency(raRecord.raStartPrice),
+            ra_close_price: formatCurrency(raRecord.raClosePrice),
+            ra_duration: raDuration,
+            qualified_parties_screenshot: !!raRecord.screenshotQualifiedParties,
+            decrements_screenshot: !!raRecord.screenshotDecrements,
+            final_result: !!raRecord.finalResultScreenshot,
+            isWon: raRecord.raResult === 'Won',
+            isLost: raRecord.raResult === 'Lost',
+            isH1Elimination: raRecord.raResult === 'H1 Elimination',
+        };
+
+        await this.sendEmail(
+            'ra.result',
+            tenderId,
+            uploadedBy,
+            `RA Result: ${tender.tenderNo}`,
+            'ra-result',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+            }
+        );
     }
 }
