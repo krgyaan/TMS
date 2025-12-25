@@ -1457,7 +1457,7 @@ export class EmdsService {
                 template = 'demand-draft-request';
                 subject = `Demand Draft Request: ${tender.tenderNo}`;
                 emailData = {
-                    chequeNo: instrument.chequeNo || 'N/A',
+                    chequeNo: ddDetails?.ddNo || 'N/A',
                     dueDate: formatDate(tender.dueDate),
                     amountFormatted: formatCurrency(instrumentInfo.amount),
                     timeLimit: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
@@ -1496,10 +1496,10 @@ export class EmdsService {
                 bg_expiry_date: formatDate(instrument.expiryDate),
                 bg_claim_date: formatDate(instrument.claimExpiryDate),
                 amount: formatCurrency(instrumentInfo.amount),
-                bg_stamp: bgDetails?.bgStampPaperValue || 'Not specified',
-                beneficiary_name: bgDetails?.bgBeneficiaryName || 'Not specified',
-                account_no: bgDetails?.bgBeneficiaryAccountNo || 'Not specified',
-                ifsc_code: bgDetails?.bgBeneficiaryIfsc || 'Not specified',
+                bg_stamp: bgDetails?.stampCharges?.toString() || 'Not specified',
+                beneficiary_name: bgDetails?.beneficiaryName || 'Not specified',
+                account_no: bgDetails?.bgBankAcc || 'Not specified',
+                ifsc_code: bgDetails?.bgBankIfsc || 'Not specified',
                 bg_needs: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
                 link_to_acc_form: `#/tendering/emds/${instrumentInfo.requestId}`,
                 courier_address: instrument.courierAddress || 'Not specified',
@@ -1540,9 +1540,9 @@ export class EmdsService {
                     hour: '2-digit',
                     minute: '2-digit',
                 }) : 'Not specified',
-                btAccName: btDetails?.btAccountName || 'Not specified',
-                btAcc: btDetails?.btAccountNumber || 'Not specified',
-                btIfsc: btDetails?.btIfscCode || 'Not specified',
+                btAccName: btDetails?.accountName || 'Not specified',
+                btAcc: btDetails?.accountNumber || 'Not specified',
+                btIfsc: btDetails?.ifsc || 'Not specified',
                 amount: formatCurrency(instrumentInfo.amount),
                 link: `#/tendering/emds/${instrumentInfo.requestId}`,
                 sign: 'Shivani', // TODO: Get from config or user
@@ -1565,8 +1565,8 @@ export class EmdsService {
                 tender_name: tender.tenderName,
                 dueDate: formatDateTime(tender.dueDate),
                 amount: formatCurrency(instrumentInfo.amount),
-                netbanking: portalDetails?.netbankingAvailable === 'Yes' ? 'Yes' : 'No',
-                debit: portalDetails?.debitCardAllowed === 'Yes' ? 'Yes' : 'No',
+                netbanking: portalDetails?.isNetbanking === 'Yes' ? 'Yes' : 'No',
+                debit: portalDetails?.isDebit === 'Yes' ? 'Yes' : 'No',
                 link: `#/tendering/emds/${instrumentInfo.requestId}`,
                 sign: 'Shivani', // TODO: Get from config or user
                 tlName: 'Team Leader', // TODO: Get from team leader

@@ -206,10 +206,11 @@ export class TenderInfoController {
     @Put(':id/approval')
     async updateApproval(
         @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser
     ) {
         const parsed = SaveTenderApprovalSchema.parse(body);
-        return this.tenderInfosService.updateApproval(id, parsed);
+        return this.tenderInfosService.updateApproval(id, parsed, user.sub);
     }
 
     @Patch(':id/status')

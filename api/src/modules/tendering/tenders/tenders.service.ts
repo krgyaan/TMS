@@ -611,7 +611,8 @@ export class TenderInfosService {
             tenderApprovalStatus?: string;
             oemNotAllowed?: string;
             tlRejectionRemarks?: string;
-        }
+        },
+        changedBy: number
     ): Promise<TenderInfo> {
         const updateData: Partial<NewTenderInfo> = {
             tlStatus: data.tlStatus ?? null,
@@ -637,7 +638,7 @@ export class TenderInfosService {
             updateData.tlRejectionRemarks = null;
         }
 
-        return this.update(id, updateData);
+        return this.update(id, updateData, changedBy);
     }
 
     /**

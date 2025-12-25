@@ -458,8 +458,8 @@ export class TenderApprovalService {
             emdMode: payload.emdMode || 'Not specified',
             vendor,
             phyDocs,
-            pqrApproved: payload.approvePqrSelection === 'Yes',
-            finApproved: payload.approveFinanceDocSelection === 'Yes',
+            pqrApproved: payload.approvePqrSelection === '1',
+            finApproved: payload.approveFinanceDocSelection === '1',
             tlName,
         };
 

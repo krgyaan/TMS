@@ -15,6 +15,7 @@ import {
 } from '@db/schemas/tendering/rfqs.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -606,7 +607,6 @@ export class RfqsService {
             .select({
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
-                email: vendorOrganizations.email,
             })
             .from(vendorOrganizations)
             .where(sql`${vendorOrganizations.id} = ANY(${vendorOrgIds})`);
@@ -636,7 +636,22 @@ export class RfqsService {
 
         // Send email to each vendor organization
         for (const vendorOrg of vendorOrgs) {
-            if (!vendorOrg.email) continue;
+            // Get vendors for this organization with emails
+            const orgVendors = await this.db
+                .select({
+                    email: vendors.email,
+                })
+                .from(vendors)
+                .where(
+                    and(
+                        eq(vendors.organizationId, vendorOrg.id),
+                        isNotNull(vendors.email)
+                    )
+                );
+
+            // Skip if no vendors with emails found
+            const vendorEmails = orgVendors.map(v => v.email).filter((email): email is string => email !== null);
+            if (vendorEmails.length === 0) continue;
 
             const emailData = {
                 org: vendorOrg.name,
@@ -665,7 +680,7 @@ export class RfqsService {
                 'rfq-sent',
                 emailData,
                 {
-                    to: [{ type: 'emails', emails: [vendorOrg.email] }],
+                    to: [{ type: 'emails', emails: vendorEmails }],
                 }
             );
         }
