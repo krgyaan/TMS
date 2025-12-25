@@ -175,7 +175,7 @@ export function TenderView({
                                 Website
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                <Link to={tender.websiteLink ?? '#'} target='_blank' className='hover:text-primary'>{tender.websiteName || '—'}</Link>
+                                <Link to={'/' + (tender.websiteLink ?? '#')} target='_blank' className='hover:text-primary'>{tender.websiteName || '—'}</Link>
                             </TableCell>
                         </TableRow>
 
