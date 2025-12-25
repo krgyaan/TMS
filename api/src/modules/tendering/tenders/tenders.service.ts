@@ -13,6 +13,9 @@ import { StatusCache } from '@/utils/status-cache';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
@@ -113,10 +116,13 @@ export type TenderListFilters = {
 
 @Injectable()
 export class TenderInfosService {
+    private readonly logger = new Logger(TenderInfosService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
@@ -514,7 +520,7 @@ export class TenderInfosService {
         });
     }
 
-    async create(data: NewTenderInfo): Promise<TenderInfo> {
+    async create(data: NewTenderInfo, createdBy: number): Promise<TenderInfo> {
         const rows = await this.db.insert(tenderInfos).values(data).returning();
         const newTender = rows[0];
 
@@ -523,15 +529,24 @@ export class TenderInfosService {
         await this.tenderStatusHistoryService.trackStatusChange(
             newTender.id as number,
             initialStatus,
-            data.teamMember ?? 0,
+            createdBy,
             null,
             'Tender created'
         );
 
+        // Send email notification
+        await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
+
         return newTender;
     }
 
-    async update(id: number, data: Partial<NewTenderInfo>): Promise<TenderInfo> {
+    async update(id: number, data: Partial<NewTenderInfo>, updatedBy: number): Promise<TenderInfo> {
+        // Get current tender before update
+        const currentTender = await this.findById(id);
+        if (!currentTender) {
+            throw new NotFoundException(`Tender with ID ${id} not found`);
+        }
+
         const rows = await this.db
             .update(tenderInfos)
             .set({ ...data, updatedAt: new Date() })
@@ -541,6 +556,14 @@ export class TenderInfosService {
         if (!rows[0]) {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
+
+        // Get updated tender with names
+        const updatedTender = await this.findById(id);
+        if (updatedTender) {
+            // Send email notification for major updates
+            await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
+        }
+
         return rows[0];
     }
 
@@ -633,6 +656,15 @@ export class TenderInfosService {
             throw new BadRequestException('Status is already set to this value');
         }
 
+        // Get status names
+        const [oldStatusRow, newStatusRow] = await Promise.all([
+            this.db.select({ name: statuses.name }).from(statuses).where(eq(statuses.id, prevStatus)).limit(1),
+            this.db.select({ name: statuses.name }).from(statuses).where(eq(statuses.id, newStatus)).limit(1),
+        ]);
+
+        const oldStatusName = oldStatusRow[0]?.name || `Status ${prevStatus}`;
+        const newStatusName = newStatusRow[0]?.name || `Status ${newStatus}`;
+
         // Update status in transaction
         const updated = await this.db.transaction(async (tx) => {
             // Update tender status
@@ -658,7 +690,270 @@ export class TenderInfosService {
             return updatedTender;
         });
 
+        // Send email notification for status update
+        await this.sendTenderStatusUpdateEmail(tenderId, oldStatusName, newStatusName, comment, changedBy);
+
         return updated;
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Get coordinator name for a team
+     */
+    private async getCoordinatorName(teamId: number): Promise<string> {
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', teamId);
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            return coordinatorUser?.name || 'Coordinator';
+        }
+        return 'Coordinator';
+    }
+
+    /**
+     * Send tender created email (assigned or unallocated)
+     */
+    private async sendTenderCreatedEmail(tenderId: number, data: NewTenderInfo, createdBy: number) {
+        const tender = await this.findById(tenderId);
+        if (!tender) return;
+
+        const teamId = tender.team;
+        const coordinatorName = await this.getCoordinatorName(teamId);
+
+        // Format date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tenderName: tender.tenderName,
+            tenderNo: tender.tenderNo,
+            website: tender.websiteName || tender.websiteLink || 'Not specified',
+            dueDate,
+            tenderValue: tender.gstValues ? `₹${Number(tender.gstValues).toLocaleString('en-IN')}` : 'Not specified',
+            tenderFees: tender.tenderFees ? `₹${Number(tender.tenderFees).toLocaleString('en-IN')}` : 'Not specified',
+            emd: tender.emd ? `₹${Number(tender.emd).toLocaleString('en-IN')}` : 'Not specified',
+            remarks: tender.remarks || 'None',
+            coordinator: coordinatorName,
+        };
+
+        if (tender.teamMember) {
+            // Tender assigned - send to team member
+            const assignee = await this.recipientResolver.getUserById(tender.teamMember);
+            if (assignee) {
+                await this.sendEmail(
+                    'tender.created',
+                    tenderId,
+                    createdBy,
+                    `New Tender Assigned: ${tender.tenderNo}`,
+                    'tender-created',
+                    {
+                        ...emailData,
+                        assignee: assignee.name,
+                        tenderInfoSheet: '#', // TODO: Add actual link
+                    },
+                    {
+                        to: [{ type: 'user', userId: tender.teamMember }],
+                        cc: [{ type: 'role', role: 'Team Leader', teamId }],
+                    }
+                );
+            }
+        } else {
+            // Tender unallocated - send to coordinator
+            const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', teamId);
+            if (coordinatorEmails.length > 0) {
+                const [coordinatorUser] = await this.db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, coordinatorEmails[0]))
+                    .limit(1);
+
+                if (coordinatorUser?.id) {
+                    await this.sendEmail(
+                        'tender.created.unallocated',
+                        tenderId,
+                        createdBy,
+                        `New Tender Awaiting Allocation: ${tender.tenderNo}`,
+                        'tender-created-unallocated',
+                        emailData,
+                        {
+                            to: [{ type: 'role', role: 'Coordinator', teamId }],
+                        }
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Send tender update email for major changes
+     */
+    private async sendTenderUpdateEmail(
+        oldTender: TenderInfoWithNames,
+        newTender: TenderInfoWithNames,
+        changedData: Partial<NewTenderInfo>,
+        updatedBy: number
+    ) {
+        if (!newTender.teamMember) return; // Skip if unallocated
+
+        const teamId = newTender.team;
+        const coordinatorName = await this.getCoordinatorName(teamId);
+
+        // Detect major changes
+        const changedFields: string[] = [];
+        let isTeamMemberChange = false;
+        let isTeamChange = false;
+        let isTenderNoChange = false;
+
+        if (changedData.teamMember !== undefined && changedData.teamMember !== oldTender.teamMember) {
+            isTeamMemberChange = true;
+            changedFields.push('Team Member');
+        }
+        if (changedData.team !== undefined && changedData.team !== oldTender.team) {
+            isTeamChange = true;
+            changedFields.push('Team');
+        }
+        if (changedData.tenderNo !== undefined && changedData.tenderNo !== oldTender.tenderNo) {
+            isTenderNoChange = true;
+            changedFields.push('Tender Number');
+        }
+        if (changedData.dueDate !== undefined && changedData.dueDate !== oldTender.dueDate) {
+            changedFields.push('Due Date');
+        }
+        if (changedData.tenderName !== undefined && changedData.tenderName !== oldTender.tenderName) {
+            changedFields.push('Tender Name');
+        }
+        if (changedData.gstValues !== undefined && changedData.gstValues !== oldTender.gstValues) {
+            changedFields.push('Tender Value');
+        }
+        if (changedData.tenderFees !== undefined && changedData.tenderFees !== oldTender.tenderFees) {
+            changedFields.push('Tender Fees');
+        }
+        if (changedData.emd !== undefined && changedData.emd !== oldTender.emd) {
+            changedFields.push('EMD');
+        }
+
+        // Only send email if there are significant changes
+        if (changedFields.length === 0 && !isTeamMemberChange && !isTeamChange && !isTenderNoChange) {
+            return;
+        }
+
+        const dueDate = newTender.dueDate ? new Date(newTender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const assignee = await this.recipientResolver.getUserById(newTender.teamMember);
+        if (!assignee) return;
+
+        await this.sendEmail(
+            'tender.updated',
+            newTender.id as number,
+            updatedBy,
+            `Tender Updated: ${newTender.tenderNo}`,
+            'tender-major-update',
+            {
+                assignee: assignee.name,
+                tenderName: newTender.tenderName,
+                tenderNo: newTender.tenderNo,
+                website: newTender.websiteName || newTender.websiteLink || 'Not specified',
+                dueDate,
+                tenderValue: newTender.gstValues ? `₹${Number(newTender.gstValues).toLocaleString('en-IN')}` : 'Not specified',
+                tenderFees: newTender.tenderFees ? `₹${Number(newTender.tenderFees).toLocaleString('en-IN')}` : 'Not specified',
+                emd: newTender.emd ? `₹${Number(newTender.emd).toLocaleString('en-IN')}` : 'Not specified',
+                status_remark: newTender.remarks || '',
+                coordinator: coordinatorName,
+                changed: changedFields.length > 0 || isTeamMemberChange || isTeamChange || isTenderNoChange,
+                changedFields,
+                isTeamMemberChange,
+                isTeamChange,
+                isTenderNoChange,
+            },
+            {
+                to: [{ type: 'user', userId: newTender.teamMember }],
+                cc: [{ type: 'role', role: 'Team Leader', teamId }],
+            }
+        );
+    }
+
+    /**
+     * Send tender status update email
+     */
+    private async sendTenderStatusUpdateEmail(
+        tenderId: number,
+        oldStatus: string,
+        newStatus: string,
+        comment: string,
+        changedBy: number
+    ) {
+        const tender = await this.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const assignee = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!assignee) return;
+
+        // Get coordinator name
+        const cooName = await this.getCoordinatorName(tender.team);
+
+        // Generate link (TODO: Update with actual frontend URL)
+        const link = `#/tendering/tenders/${tenderId}`;
+
+        await this.sendEmail(
+            'tender.status-updated',
+            tenderId,
+            changedBy,
+            `Tender Status Updated: ${tender.tenderNo}`,
+            'tender-major-status-update',
+            {
+                assignee: assignee.name,
+                tenderNo: tender.tenderNo,
+                projectName: tender.tenderName,
+                status: newStatus,
+                link,
+                cooName,
+            },
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
     }
 
     /**

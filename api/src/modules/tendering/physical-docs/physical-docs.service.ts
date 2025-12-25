@@ -19,6 +19,10 @@ import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/te
 import { items } from '@db/schemas/master/items.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -61,11 +65,14 @@ export type PhysicalDocWithPersons = {
 
 @Injectable()
 export class PhysicalDocsService {
+    private readonly logger = new Logger(PhysicalDocsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async findAll(filters?: PhysicalDocFilters): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
@@ -391,6 +398,10 @@ export class PhysicalDocsService {
                 updatedAt: physicalDoc.updatedAt || '',
                 persons,
             };
+        }).then(async (result) => {
+            // Send email notification after transaction
+            await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+            return result;
         });
     }
 
@@ -512,6 +523,100 @@ export class PhysicalDocsService {
             .returning();
         if (!result[0]) {
             throw new NotFoundException(`Physical doc with ID ${id} not found`);
+        }
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send physical docs sent email to clients
+     */
+    private async sendPhysicalDocsSentEmail(
+        tenderId: number,
+        physicalDoc: PhysicalDocWithPersons,
+        sentBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get TE user details
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get client emails from tender clients
+        const clients = await this.db
+            .select({
+                clientName: tenderClients.clientName,
+                clientEmail: tenderClients.clientEmail,
+            })
+            .from(tenderClients)
+            .where(eq(tenderClients.tenderId, tenderId));
+
+        if (clients.length === 0) return;
+
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }) : 'Not specified';
+
+        // Get courier provider from persons if available, otherwise use placeholder
+        const courierProvider = physicalDoc.persons.length > 0 ? physicalDoc.persons[0].name : 'Courier Service';
+        const deliveryTime = 'As per courier service'; // TODO: Get from courier service if available
+
+        // Send email to each client
+        for (const client of clients) {
+            if (!client.clientEmail) continue;
+
+            const emailData = {
+                clientName: client.clientName || 'Sir/Madam',
+                tenderNo: tender.tenderNo,
+                dueDate,
+                courierProvider,
+                docketNo: physicalDoc.courierNo.toString(),
+                deliveryTime,
+                tenderExecutive: teUser.name,
+            };
+
+            await this.sendEmail(
+                'physical-docs.sent',
+                tenderId,
+                sentBy,
+                `Physical Documents Sent: ${tender.tenderNo}`,
+                'physical-docs-sent',
+                emailData,
+                {
+                    to: [{ type: 'emails', emails: [client.clientEmail] }],
+                }
+            );
         }
     }
 

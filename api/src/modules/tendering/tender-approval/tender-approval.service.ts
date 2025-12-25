@@ -12,6 +12,9 @@ import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-
 import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
 
 export type TenderApprovalFilters = {
     tlStatus?: '0' | '1' | '2' | '3' | number;
@@ -49,11 +52,14 @@ type TenderRow = {
 
 @Injectable()
 export class TenderApprovalService {
+    private readonly logger = new Logger(TenderApprovalService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
     ) { }
 
     async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
@@ -354,6 +360,124 @@ export class TenderApprovalService {
             }
         });
 
+        // Send email notification for approval/rejection
+        if (payload.tlStatus === '1' || payload.tlStatus === '2') {
+            await this.sendApprovalEmail(tenderId, payload, changedBy);
+        }
+
         return this.getByTenderId(tenderId);
+    }
+
+    /**
+     * Helper method to send email notifications
+     */
+    private async sendEmail(
+        eventType: string,
+        tenderId: number,
+        fromUserId: number,
+        subject: string,
+        template: string,
+        data: Record<string, any>,
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+    ) {
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+            });
+        } catch (error) {
+            this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Send approval/rejection email
+     */
+    private async sendApprovalEmail(
+        tenderId: number,
+        payload: TenderApprovalPayload,
+        changedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const assignee = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!assignee) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        const isBidApproved = payload.tlStatus === '1';
+        const isRejected = payload.tlStatus === '2';
+        const isReview = payload.tlStatus === '3';
+
+        // Generate links (TODO: Update with actual frontend URLs)
+        const emdLink = `#/tendering/emds?tenderId=${tenderId}`;
+        const tenderFeesLink = `#/tendering/tender-fees?tenderId=${tenderId}`;
+        const rfqLink = `#/tendering/rfqs?tenderId=${tenderId}`;
+
+        // Get vendor names from rfqTo
+        let vendor = 'Selected Vendors';
+        if (payload.rfqTo && payload.rfqTo.length > 0) {
+            // TODO: Fetch vendor organization names from rfqTo IDs
+            vendor = `${payload.rfqTo.length} vendor(s)`;
+        }
+
+        // Get physical docs requirement
+        const phyDocs = 'As per tender requirements'; // TODO: Get from tender data if available
+
+        const emailData = {
+            assignee: assignee.name,
+            isBidApproved,
+            isRejected,
+            isReview,
+            remarks: payload.tlRejectionRemarks || '',
+            rej_remark: payload.tlRejectionRemarks || '',
+            emdLink,
+            tenderFeesLink,
+            rfqLink,
+            tenderFeesMode: payload.tenderFeeMode || 'Not specified',
+            emdMode: payload.emdMode || 'Not specified',
+            vendor,
+            phyDocs,
+            pqrApproved: payload.approvePqrSelection === 'Yes',
+            finApproved: payload.approveFinanceDocSelection === 'Yes',
+            tlName,
+        };
+
+        const template = isBidApproved ? 'tender-approved-by-tl' : 'tender-rejected-by-tl';
+        const subject = isBidApproved
+            ? `Tender Approved: ${tender.tenderNo}`
+            : `Tender Rejected: ${tender.tenderNo}`;
+
+        await this.sendEmail(
+            isBidApproved ? 'tender.approved' : 'tender.rejected',
+            tenderId,
+            changedBy,
+            subject,
+            template,
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+            }
+        );
     }
 }
