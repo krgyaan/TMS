@@ -1,4 +1,5 @@
 import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "@/app.module";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
@@ -33,6 +34,15 @@ async function bootstrap() {
      * Files → /uploads/*
      */
     app.setGlobalPrefix(appCfg?.apiPrefix ?? "api/v1");
+
+    // Global validation pipe with transform enabled
+    app.useGlobalPipes(
+        new ValidationPipe({
+            transform: true,
+            whitelist: true,
+            forbidNonWhitelisted: false,
+        })
+    );
 
     // Enable cookies
     app.use(cookieParser());

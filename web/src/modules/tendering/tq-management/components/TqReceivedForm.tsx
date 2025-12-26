@@ -24,7 +24,7 @@ const TqReceivedFormSchema = z.object({
     tqSubmissionDeadline: z.string().min(1, 'TQ submission deadline is required'),
     tqDocumentReceived: z.array(z.string()).default([]),
     tqItems: z.array(z.object({
-        tqTypeId: z.number({ error: 'TQ type is required' }).min(1, 'TQ type is required'),
+        tqTypeId: z.coerce.number({ error: 'TQ type is required' }).min(1, 'TQ type is required'),
         queryDescription: z.string().min(1, 'Query description is required'),
     })).min(1, 'At least one TQ item is required'),
 });
@@ -100,12 +100,18 @@ export default function TqReceivedForm({
         try {
             const tqDocumentReceivedPath = data.tqDocumentReceived.length > 0 ? data.tqDocumentReceived[0] : null;
 
+            // Ensure tqTypeId is always a number (safety net for production)
+            const normalizedTqItems = data.tqItems.map(item => ({
+                tqTypeId: typeof item.tqTypeId === 'string' ? Number(item.tqTypeId) : item.tqTypeId,
+                queryDescription: item.queryDescription,
+            }));
+
             if (mode === 'create') {
                 await createMutation.mutateAsync({
                     tenderId: data.tenderId,
                     tqSubmissionDeadline: data.tqSubmissionDeadline,
                     tqDocumentReceived: tqDocumentReceivedPath,
-                    tqItems: data.tqItems,
+                    tqItems: normalizedTqItems,
                 });
             } else if (existingData?.id) {
                 await updateMutation.mutateAsync({
@@ -114,7 +120,7 @@ export default function TqReceivedForm({
                         tenderId: data.tenderId,
                         tqSubmissionDeadline: data.tqSubmissionDeadline,
                         tqDocumentReceived: tqDocumentReceivedPath,
-                        tqItems: data.tqItems,
+                        tqItems: normalizedTqItems,
                     },
                 });
             }
