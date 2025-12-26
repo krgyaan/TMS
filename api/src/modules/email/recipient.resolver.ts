@@ -8,10 +8,7 @@ import type { DbInstance } from '@/db';
 @Injectable()
 export class RecipientResolver implements OnModuleInit {
     private readonly logger = new Logger(RecipientResolver.name);
-
-    // Cache role_name -> role_id
     private roleCache = new Map<string, number>();
-    // Cache team_id -> team_name
     private teamNameCache = new Map<number, string>();
 
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
@@ -94,7 +91,6 @@ export class RecipientResolver implements OnModuleInit {
             .from(users)
             .where(eq(users.id, userId))
             .limit(1);
-
         return result.length > 0 ? result[0] : null;
     }
 
@@ -102,25 +98,62 @@ export class RecipientResolver implements OnModuleInit {
      * Get emails by role in a team
      */
     async getEmailsByRole(roleName: string, teamId: number): Promise<string[]> {
+        // Debug: Log role cache contents
+        this.logger.debug(`Looking up role: "${roleName}" in cache. Available roles: ${Array.from(this.roleCache.keys()).join(', ')}`);
+
         const roleId = this.roleCache.get(roleName);
         if (!roleId) {
-            this.logger.warn(`Role not found: ${roleName}`);
+            // Try case-insensitive lookup
+            let foundRoleId: number | undefined;
+            let foundRoleName: string | undefined;
+            for (const [name, id] of this.roleCache.entries()) {
+                if (name.toLowerCase() === roleName.toLowerCase()) {
+                    foundRoleId = id;
+                    foundRoleName = name;
+                    break;
+                }
+            }
+
+            if (foundRoleId) {
+                this.logger.warn(`Role "${roleName}" not found exactly, but found "${foundRoleName}" (case-insensitive match). Using it.`);
+                const result = await this.db
+                    .select({ email: users.email })
+                    .from(users)
+                    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+                    /*.innerJoin(userProfiles, eq(userProfiles.userId, users.id))*/
+                    .where(
+                        and(
+                            eq(userRoles.roleId, foundRoleId),
+                            eq(users.team, teamId),
+                            eq(users.isActive, true),
+                        ),
+                    );
+
+                this.logger.debug(`getEmailsByRole "${roleName}" (matched "${foundRoleName}") teamId ${teamId}: Found ${result.length} users`);
+                return result.map((r) => r.email);
+            }
+
+            this.logger.warn(`Role not found: "${roleName}". Available roles: ${Array.from(this.roleCache.keys()).join(', ')}`);
             return [];
         }
+
+        // Debug: Log query parameters
+        this.logger.debug(`Querying users with roleId=${roleId}, teamId=${teamId}`);
 
         const result = await this.db
             .select({ email: users.email })
             .from(users)
             .innerJoin(userRoles, eq(userRoles.userId, users.id))
-            .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+            /*.innerJoin(userProfiles, eq(userProfiles.userId, users.id))*/
             .where(
                 and(
                     eq(userRoles.roleId, roleId),
-                    eq(userProfiles.primaryTeamId, teamId),
+                    eq(users.team, teamId),
                     eq(users.isActive, true),
                 ),
             );
 
+        this.logger.debug(`getEmailsByRole "${roleName}" teamId ${teamId}: Found ${result.length} users: ${result.map(r => r.email).join(', ') || 'none'}`);
         return result.map((r) => r.email);
     }
 

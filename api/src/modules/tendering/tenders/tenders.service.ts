@@ -789,7 +789,11 @@ export class TenderInfosService {
                     },
                     {
                         to: [{ type: 'user', userId: tender.teamMember }],
-                        cc: [{ type: 'role', role: 'Team Leader', teamId }],
+                        cc: [
+                            { type: 'role', role: 'Team Leader', teamId },
+                            { type: 'role', role: 'Coordinator', teamId },
+                            { type: 'role', role: 'Admin', teamId },
+                        ],
                     }
                 );
             }
@@ -813,6 +817,11 @@ export class TenderInfosService {
                         emailData,
                         {
                             to: [{ type: 'role', role: 'Coordinator', teamId }],
+                            cc: [
+                                { type: 'role', role: 'Team Leader', teamId },
+                                { type: 'role', role: 'Coordinator', teamId },
+                                { type: 'role', role: 'Admin', teamId },
+                            ],
                         }
                     );
                 }
@@ -931,24 +940,41 @@ export class TenderInfosService {
         if (!assignee) return;
 
         // Get coordinator name
-        const cooName = await this.getCoordinatorName(tender.team);
+        const coordinatorName = await this.getCoordinatorName(tender.team);
 
-        // Generate link (TODO: Update with actual frontend URL)
-        const link = `#/tendering/tenders/${tenderId}`;
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
 
         await this.sendEmail(
             'tender.status-updated',
             tenderId,
             changedBy,
             `Tender Status Updated: ${tender.tenderNo}`,
-            'tender-major-status-update',
+            'tender-major-update',
             {
-                assignee: assignee.name,
-                tenderNo: tender.tenderNo,
-                projectName: tender.tenderName,
-                status: newStatus,
-                link,
-                cooName,
+                assignee: assignee.name || 'Team Member',
+                tenderName: tender.tenderName || 'Not specified',
+                tenderNo: tender.tenderNo || 'Not specified',
+                website: tender.websiteName || tender.websiteLink || 'Not specified',
+                dueDate,
+                tenderValue: tender.gstValues ? `₹${Number(tender.gstValues).toLocaleString('en-IN')}` : 'Not specified',
+                tenderFees: tender.tenderFees ? `₹${Number(tender.tenderFees).toLocaleString('en-IN')}` : 'Not specified',
+                emd: tender.emd ? `₹${Number(tender.emd).toLocaleString('en-IN')}` : 'Not specified',
+                status_remark: comment || tender.remarks || '',
+                coordinator: coordinatorName || 'Coordinator',
+                changed: false,
+                oldStatus: oldStatus || 'Not specified',
+                newStatus: newStatus || 'Not specified',
+                changedFields: [],
+                isTeamMemberChange: false,
+                isTeamChange: false,
+                isTenderNoChange: false,
             },
             {
                 to: [{ type: 'user', userId: tender.teamMember }],

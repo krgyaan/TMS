@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
-import { eq, and, lt, sql } from 'drizzle-orm';
+import { eq, and, lt, sql, isNotNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import { emailLogs, tenderInfos } from '@/db/schemas';
 import { GmailClient } from './gmail.client';
@@ -21,6 +21,7 @@ export class EmailService {
     private readonly logger = new Logger(EmailService.name);
     private readonly templatesDir: string;
     private readonly maxRetries: number;
+    private readonly isProd: boolean;
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
@@ -28,7 +29,9 @@ export class EmailService {
         private readonly recipientResolver: RecipientResolver,
         private readonly config: ConfigService,
     ) {
-        this.templatesDir = path.join(__dirname, 'templates');
+        this.isProd = this.config.get('NODE_ENV') === 'production';
+        const rootDir = this.isProd ? 'dist' : 'src';
+        this.templatesDir = path.join(process.cwd(), rootDir, 'modules', 'email', 'templates');
         this.maxRetries = this.config.get('EMAIL_MAX_RETRIES', 2);
         this.registerHandlebarsHelpers();
     }
@@ -63,10 +66,7 @@ export class EmailService {
      * Render template with data
      */
     private renderTemplate(templateName: string, data: Record<string, any>): string {
-        const templatePath = path.join(
-            this.templatesDir,
-            templateName.endsWith('.hbs') ? templateName : `${templateName}.hbs`,
-        );
+        const templatePath = path.join(this.templatesDir, templateName.endsWith('.hbs') ? templateName : `${templateName}.hbs`);
 
         if (!fs.existsSync(templatePath)) {
             throw new Error(`Template not found: ${templatePath}`);
@@ -103,7 +103,7 @@ export class EmailService {
             }
 
             // 3. Resolve recipients
-            const [toEmails, ccEmails] = await Promise.all([
+            const [toEmails, ccEmailsResolved] = await Promise.all([
                 this.recipientResolver.resolveAll(options.to),
                 options.cc ? this.recipientResolver.resolveAll(options.cc) : [],
             ]);
@@ -112,22 +112,30 @@ export class EmailService {
                 return { success: false, error: 'No valid recipients.' };
             }
 
-            // 4. Render template
+            // 4. Handle CC/BCC in non-production: log but don't send
+            let ccEmails = ccEmailsResolved;
+            if (!this.isProd && ccEmailsResolved.length > 0) {
+                this.logger.log(`[NON-PROD] CC recipients (logged, not sent): ${ccEmailsResolved.join(', ')}`);
+                ccEmails = []; // Don't send CC in non-production
+            }
+
+            // 5. Render template
             const htmlBody = this.renderTemplate(options.template, {
                 ...options.data,
                 senderName: sender.name,
             });
 
-            // 5. Get thread info
+            // 6. Get thread info
             const threadInfo = await this.gmail.getThreadInfo(
                 options.referenceType,
                 options.referenceId,
             );
 
-            // 6. Generate message ID
+            // 7. Generate message ID
             const messageId = this.gmail.generateMessageId();
 
-            // 7. Create email log (status: pending)
+            // 8. Create email log (status: pending)
+            // Save original CC emails to log even if not sending in non-prod
             const [log] = await this.db
                 .insert(emailLogs)
                 .values({
@@ -137,7 +145,7 @@ export class EmailService {
                     fromUserId: options.fromUserId,
                     fromEmail: sender.email,
                     toEmails,
-                    ccEmails,
+                    ccEmails: ccEmailsResolved, // Save original CC for audit trail
                     subject: options.subject,
                     templateName: options.template,
                     templateData: options.data,
@@ -149,7 +157,8 @@ export class EmailService {
 
             const emailLogId = log.id;
 
-            // 8. Send email (async - fire and forget)
+            // 9. Send email (async - fire and forget)
+            // Use filtered CC emails (empty in non-prod)
             this.sendEmailAsync({
                 emailLogId,
                 fromUserId: options.fromUserId,
@@ -157,7 +166,7 @@ export class EmailService {
                     fromEmail: sender.email,
                     fromUserId: options.fromUserId,
                     toEmails,
-                    ccEmails,
+                    ccEmails, // Will be empty in non-prod
                     subject: options.subject,
                     htmlBody,
                     labelPath: options.labelPath || '',
@@ -307,10 +316,16 @@ export class EmailService {
      */
     async retryFailedEmails(): Promise<{ retried: number; failed: number }> {
         // Get failed emails with attempts < maxRetries
+        // Handle NULL attempts by treating them as 0 using COALESCE
         const failedEmails = await this.db
             .select()
             .from(emailLogs)
-            .where(and(eq(emailLogs.status, 'failed'), lt(emailLogs.attempts, this.maxRetries)));
+            .where(
+                and(
+                    eq(emailLogs.status, 'failed'),
+                    lt(sql`COALESCE(${emailLogs.attempts}, 0)`, this.maxRetries)
+                )
+            );
 
         let retried = 0;
         let failed = 0;

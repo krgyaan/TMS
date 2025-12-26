@@ -28,9 +28,11 @@ export class EmailRetryCron {
 
             if (result.retried > 0 || result.failed > 0) {
                 this.logger.log(`Email retry: ${result.retried} success, ${result.failed} failed`);
+            } else {
+                this.logger.log('No emails to retry');
             }
         } catch (error) {
-            this.logger.error('Email retry job failed:', error.message);
+            this.logger.error('Email retry job failed:', error instanceof Error ? error.stack : String(error));
         }
     }
 }

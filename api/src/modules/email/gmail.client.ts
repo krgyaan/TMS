@@ -433,7 +433,10 @@ export class GmailClient {
         labelPath: string,
     ): Promise<void> {
         const gmail = await this.getGmailClient(recipientUserId);
-        if (!gmail) return;
+        if (!gmail) {
+            // No OAuth - expected, skip silently
+            return;
+        }
 
         // Wait for message to arrive
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -458,8 +461,22 @@ export class GmailClient {
                     });
                 }
             }
-        } catch (error) {
-            this.logger.debug(`Could not label recipient mailbox: ${error.message}`);
+        } catch (error: any) {
+            const errorMessage = error?.message || String(error);
+
+            // Distinguish between error types
+            if (errorMessage.includes('Insufficient Permission') ||
+                errorMessage.includes('insufficient') ||
+                errorMessage.includes('permission')) {
+                // Permission denied - expected if recipient hasn't granted full access
+                this.logger.debug(`Could not label recipient mailbox (permission denied): User ${recipientUserId} may need to grant additional Gmail permissions`);
+            } else if (errorMessage.includes('Not Found') || errorMessage.includes('not found')) {
+                // Message not found yet - might need more time
+                this.logger.debug(`Could not label recipient mailbox (message not found): Message may not have arrived yet for user ${recipientUserId}`);
+            } else {
+                // Other errors - log as warning
+                this.logger.warn(`Could not label recipient mailbox for user ${recipientUserId}: ${errorMessage}`);
+            }
         }
     }
 }
