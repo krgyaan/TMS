@@ -172,9 +172,6 @@ export const UpdateFollowUpSchema = z.object({
     proofText: z.string().nullable().optional(),
     proofImagePath: z.string().nullable().optional(),
     stopRemarks: z.string().nullable().optional(),
-
-    // Attachments
-    attachments: z.array(z.string()).optional(),
 });
 
 export type UpdateFollowUpDto = z.infer<typeof UpdateFollowUpSchema>;
