@@ -12,14 +12,19 @@ export const updateFollowUpSchema = z
     .object({
         area: z.string().min(1).optional(),
         partyName: z.string().min(1).optional(),
+
         amount: z
             .union([z.string(), z.number()])
             .transform(val => (typeof val === "string" ? parseFloat(val) || 0 : val))
             .optional(),
+
         followupFor: z.string().nullable().optional(),
-        assignedToId: z.number().positive().nullable(), // DB allows NULL
-        createdById: z.number().positive().nullable(), // DB allows NULL
+
+        assignedToId: z.number().nullable().optional(),
+        createdById: z.number().nullable().optional(),
+
         details: z.string().optional(),
+
         contacts: z.array(contactPersonSchema).optional(),
 
         // Scheduling
@@ -32,13 +37,12 @@ export const updateFollowUpSchema = z
         proofImagePath: z.string().nullable().optional(),
         stopRemarks: z.string().nullable().optional(),
 
-        // Attachments
-        attachments: z.array(z.string()).optional(),
+        // Attachments (control only)
+        removedAttachments: z.array(z.string()).optional(),
     })
     .refine(
         data => {
-            // If frequency is 'stopped', stopReason is required
-            if (data.frequency == 4 && !data.stopReason) {
+            if (data.frequency === 6 && !data.stopReason) {
                 return false;
             }
             return true;
@@ -50,8 +54,7 @@ export const updateFollowUpSchema = z
     )
     .refine(
         data => {
-            // If stopReason is 'objective_achieved', proofText is required
-            if (data.stopReason == 2 && !data.proofText) {
+            if (data.stopReason === 2 && !data.proofText) {
                 return false;
             }
             return true;

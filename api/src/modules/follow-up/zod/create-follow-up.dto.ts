@@ -2,6 +2,8 @@ import { z } from "zod";
 
 // Contact person schema
 export const contactPersonSchema = z.object({
+    id: z.number().optional(),
+    followUpId: z.number().optional(),
     name: z.string().min(1, "Contact name is required"),
     email: z.string().email().nullable().optional(),
     phone: z.string().nullable().optional(),

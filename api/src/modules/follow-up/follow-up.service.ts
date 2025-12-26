@@ -1,13 +1,23 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from "@nestjs/common";
-import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL } from "drizzle-orm";
+import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray } from "drizzle-orm";
 
 import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "@/db/schemas/shared/follow-ups.schema";
 import { clientDirectory } from "@/db/schemas/shared/client-directory.schema";
+import { followUpPersons } from "@/db/schemas/shared/follow-up-persons.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import * as fs from "fs";
 
-import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpDetailsDto } from "@/modules/follow-up/zod";
+import {
+    type CreateFollowUpDto,
+    type UpdateFollowUpDto,
+    type UpdateFollowUpStatusDto,
+    type FollowUpQueryDto,
+    type FollowUpDetailsDto,
+    updateFollowUpSchema,
+} from "@/modules/follow-up/zod";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import path from "path";
 
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
@@ -24,6 +34,8 @@ export const STOP_REASON_LABELS: Record<number, string> = {
     3: "Not Reachable",
     4: "Other",
 };
+
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts");
 
 @Injectable()
 export class FollowUpService {
@@ -259,65 +271,140 @@ export class FollowUpService {
     // UPDATE
     // ========================
 
-    async update(id: number, dto: UpdateFollowUpDto, currentUser: { id: number; name: string }): Promise<FollowUp> {
-        console.log("✅ DTO RECEIVED BY BACKEND:", dto);
-
+    async update(
+        id: number,
+        dto: any, // multipart-safe raw body
+        files: Express.Multer.File[],
+        currentUser: { id: number; name: string }
+    ): Promise<FollowUp> {
+        // ========================
+        // FETCH FOLLOW-UP
+        // ========================
         const existing = await this.db
             .select()
             .from(followUps)
             .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
             .limit(1)
-            .then(r => r[0] ?? null);
+            .then(r => r[0]);
 
         if (!existing) {
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
 
+        // ========================
+        // NORMALIZE MULTIPART INPUT
+        // ========================
+        const normalizedDto = {
+            ...dto,
+            assignedToId: dto.assignedToId !== undefined ? Number(dto.assignedToId) : undefined,
+            frequency: dto.frequency !== undefined ? Number(dto.frequency) : undefined,
+            stopReason: dto.stopReason !== undefined ? Number(dto.stopReason) : undefined,
+            amount: dto.amount !== undefined ? Number(dto.amount) : undefined,
+            contacts: dto.contacts ? JSON.parse(Array.isArray(dto.contacts) ? dto.contacts[dto.contacts.length - 1] : dto.contacts) : [],
+            removedAttachments: dto.removedAttachments ? (Array.isArray(dto.removedAttachments) ? dto.removedAttachments : [dto.removedAttachments]) : [],
+        };
+
+        // ========================
+        // VALIDATE
+        // ========================
+        const parsed = updateFollowUpSchema.safeParse(normalizedDto);
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        const data = parsed.data;
+
+        // ========================
+        // UPDATE FOLLOW-UP (PARENT)
+        // ========================
         const updateData: Partial<typeof followUps.$inferInsert> = {
             updatedAt: new Date(),
         };
 
-        // ✅ BASIC FIELDS
-        if (dto.area !== undefined) updateData.area = dto.area;
-        if (dto.partyName !== undefined) updateData.partyName = dto.partyName;
-        if (dto.amount !== undefined) updateData.amount = String(dto.amount);
-        if (dto.assignedToId !== undefined) updateData.assignedToId = dto.assignedToId;
+        // Basic fields
+        if (data.area !== undefined) updateData.area = data.area;
+        if (data.partyName !== undefined) updateData.partyName = data.partyName;
+        if (data.amount !== undefined) updateData.amount = String(data.amount);
+        if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+        if (data.details !== undefined) updateData.details = data.details;
 
-        // ✅ DETAILS
-        if (dto.details !== undefined) updateData.details = dto.details;
+        // Scheduling
+        if (data.frequency !== undefined) updateData.frequency = data.frequency;
+        if (data.startFrom !== undefined) updateData.startFrom = data.startFrom;
 
-        // ✅ SCHEDULING
-        if (dto.frequency !== undefined) updateData.frequency = dto.frequency;
-        if (dto.startFrom !== undefined) updateData.startFrom = dto.startFrom;
+        // Stop fields
+        if (data.stopReason !== undefined) updateData.stopReason = data.stopReason;
+        if (data.proofText !== undefined) updateData.proofText = data.proofText;
+        if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
 
-        // ✅ STOP FIELDS
-        if (dto.stopReason !== undefined) updateData.stopReason = dto.stopReason;
-        if (dto.proofText !== undefined) updateData.proofText = dto.proofText;
-        if (dto.proofImagePath !== undefined) updateData.proofImagePath = dto.proofImagePath;
-        if (dto.stopRemarks !== undefined) updateData.stopRemarks = dto.stopRemarks;
+        // ========================
+        // ATTACHMENTS (UNCHANGED LOGIC)
+        // ========================
+        const existingAttachments = existing.attachments ?? [];
 
-        // ✅ ATTACHMENTS
-        if (dto.attachments !== undefined) updateData.attachments = dto.attachments;
+        const removedAttachments = (data.removedAttachments ?? []).filter(f => !f.includes("..") && !path.isAbsolute(f));
 
-        // ✅ CONTACTS
-        if (dto.contacts !== undefined) {
-            updateData.contacts = dto.contacts.map(c => ({
-                name: c.name,
-                email: c.email ?? null, // ✅ undefined → null
-                phone: c.phone ?? null, // ✅ undefined → null
-                org: c.org ?? null, // ✅ undefined → null
-                addedAt: new Date().toISOString(), // ✅ required field
-            }));
+        // delete removed files from disk
+        for (const file of removedAttachments) {
+            const filePath = path.join(UPLOAD_DIR, file);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
         }
 
-        console.log("✅ FINAL UPDATE OBJECT SENT TO DRIZZLE:", updateData);
+        const remainingAttachments = existingAttachments.filter(f => !removedAttachments.includes(f));
 
-        const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
+        const newFiles = Array.isArray(files) ? files.map(f => f.filename) : [];
 
-        console.log("✅ UPDATED ROW FROM DB:", updated);
+        updateData.attachments = Array.from(new Set([...remainingAttachments, ...newFiles]));
+
+        // ========================
+        // SAVE FOLLOW-UP
+        // ========================
+        const followUp = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id));
+
+        // ========================
+        // CONTACTS LOGIC (SIMPLE CREATE / DELETE)
+        // ========================
+
+        const existingContacts = await this.db.select().from(followUpPersons).where(eq(followUpPersons.followUpId, id));
+
+        const incomingContacts = data.contacts ?? [];
+
+        // existing contact IDs coming from frontend
+        const incomingIds = incomingContacts.filter(c => c.id !== undefined && c.id !== null).map(c => Number(c.id));
+
+        // delete removed contacts
+        const contactsToDelete = existingContacts.filter(ec => !incomingIds.includes(ec.id));
+
+        if (contactsToDelete.length > 0) {
+            const idsToDelete = contactsToDelete.map(c => Number(c.id));
+
+            await this.db.delete(followUpPersons).where(and(eq(followUpPersons.followUpId, id), inArray(followUpPersons.id, idsToDelete)));
+        }
+
+        // insert new contacts (same as CREATE)
+        const newContacts = incomingContacts.filter(c => !c.id);
+
+        if (newContacts.length > 0) {
+            await this.db.insert(followUpPersons).values(
+                newContacts.map(c => ({
+                    followUpId: existing.id,
+                    name: c.name,
+                    email: c.email ?? null,
+                    phone: c.phone ?? null,
+                }))
+            );
+        }
+
+        // ========================
+        // RETURN UPDATED FOLLOW-UP
+        // ========================
+        const [updated] = await this.db.select().from(followUps).where(eq(followUps.id, id)).limit(1);
 
         return updated;
     }
+
     // ========================
     // DELETE
     // ========================

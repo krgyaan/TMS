@@ -79,7 +79,6 @@ const FollowupPage: React.FC = () => {
     });
 
     const followups = data?.data ?? [];
-    console.log("Follow-ups Data:", followups);
 
     const updateStatusMutation = useUpdateFollowUpStatus();
 

@@ -44,11 +44,11 @@ const EmployeeImprestForm: React.FC = () => {
     const { register, handleSubmit, formState, setValue } = useForm<CreateImprestInput>({
         resolver: zodResolver(createImprestSchema),
         defaultValues: {
-            party_name: "",
-            project_name: "",
+            partyName: null,
+            projectName: null,
             amount: undefined,
-            category: "",
-            team_id: undefined,
+            categoryId: null,
+            teamId: undefined,
             remark: "",
         },
     });
@@ -116,15 +116,15 @@ const EmployeeImprestForm: React.FC = () => {
                             {/* Party Name */}
                             <div className="space-y-2">
                                 <Label>Party Name</Label>
-                                <Input placeholder="Party Name" {...register("party_name")} />
-                                {errors.party_name && <p className="text-sm text-red-600">{errors.party_name.message}</p>}
+                                <Input placeholder="Party Name" {...register("partyName")} />
+                                {errors.partyName && <p className="text-sm text-red-600">{errors.partyName.message}</p>}
                             </div>
 
                             {/* Project Name */}
                             <div className="space-y-2">
                                 <Label>Project Name</Label>
-                                <Input placeholder="Project Name" {...register("project_name")} />
-                                {errors.project_name && <p className="text-sm text-red-600">{errors.project_name.message}</p>}
+                                <Input placeholder="Project Name" {...register("projectName")} />
+                                {errors.projectName && <p className="text-sm text-red-600">{errors.projectName.message}</p>}
                             </div>
 
                             {/* Amount */}
@@ -137,7 +137,7 @@ const EmployeeImprestForm: React.FC = () => {
                             {/* Team ID */}
                             <div className="space-y-2">
                                 <Label>Team (ID)</Label>
-                                <Input type="number" placeholder="Team member id" {...register("team_id", { valueAsNumber: true })} />
+                                <Input type="number" placeholder="Team member id" {...register("teamId", { valueAsNumber: true })} />
                             </div>
 
                             {/* Proof Upload */}

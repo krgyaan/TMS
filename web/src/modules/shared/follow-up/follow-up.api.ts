@@ -4,7 +4,6 @@ import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, Fol
 // ✅ LIST
 export const getFollowUps = async (query: FollowUpQueryDto) => {
     const { data } = await api.get("/follow-up", { params: query });
-    console.log(data);
     return data;
 };
 
@@ -22,11 +21,13 @@ export const createFollowUp = async (payload: CreateFollowUpDto) => {
 };
 
 // ✅ UPDATE
-export const updateFollowUp = async ({ id, data }: { id: number; data: UpdateFollowUpDto }) => {
-    console.log("API called from frontend");
-    console.log(id);
-    console.log(data);
-    const res = await api.put(`/follow-up/${id}`, data);
+export const updateFollowUp = async ({ id, data }: { id: number; data: FormData }) => {
+    console.log("API called from frontend", { id, data });
+    const res = await api.put(`/follow-up/${id}`, data, {
+        headers: {
+            "Content-type": "multipart/form-data",
+        },
+    });
     return res.data;
 };
 
@@ -38,6 +39,7 @@ export const updateFollowUpStatus = async ({ id, data }: { id: number; data: Upd
     console.log(res);
     return res.data;
 };
+
 // ✅ get
 export const getAreas = async () => {
     const res = await api.get("/follow-up/areas");

@@ -57,7 +57,7 @@ export const useUpdateFollowUp = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: (payload: { id: number; data: UpdateFollowUpDto }) => updateFollowUp(payload),
+        mutationFn: (payload: { id: number; data: FormData }) => updateFollowUp(payload),
         onSuccess: () => qc.invalidateQueries({ queryKey: ["follow-ups"] }),
     });
 };
