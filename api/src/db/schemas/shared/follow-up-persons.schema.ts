@@ -4,7 +4,7 @@ import { followUps } from "./follow-ups.schema";
 export const followUpPersons = pgTable(
     "follow_up_persons",
     {
-        id: bigint("id", { mode: "number" }).primaryKey(), // MySQL ID preserved
+        id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(), // MySQL ID preserved
 
         followUpId: bigint("follow_up_id", { mode: "number" }).notNull(),
 
