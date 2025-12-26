@@ -13,10 +13,9 @@ import {
 export const tqStatusEnum = pgEnum('tq_status', [
     'TQ Received',
     'TQ Replied',
-    'TQ Missed',
-    'TQ Qualified',
-    'No TQ, Qualified',
-    'No TQ Disqualified',
+    'Disqualified, TQ missed',
+    'Qualified, No TQ received',
+    'TQ Replied, Qualified',
 ]);
 
 export const tenderQueries = pgTable('tender_queries', {
