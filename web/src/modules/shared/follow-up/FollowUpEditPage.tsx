@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { TiptapEditor } from "@/components/tiptapeditor";
 import { MockUploadDropzone } from "@/components/mock-uploadthing";
 import { DatePicker } from "@/components/ui/date-picker";
+import { FilePond, registerPlugin } from "react-filepond";
+import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
+import FilePondPluginImagePreview from "filepond-plugin-image-preview";
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +29,7 @@ import { useFollowUp, useUpdateFollowUp } from "./follow-up.hooks";
 import { toast } from "sonner";
 import { useUsers } from "@/hooks/api/useUsers";
 import { paths } from "@/app/routes/paths";
+import { FileUploadField } from "@/components/form/FileUploadField";
 
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
@@ -66,7 +70,8 @@ const FollowUpEditPage: React.FC = () => {
     const [persons, setPersons] = useState<Array<{ name: string; phone: string; email: string }>>([]);
     const [existingPersons, setExistingPersons] = useState<any[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
-    const [files, setFiles] = useState<File[]>([]);
+    const [removedAttachments, setRemovedAttachments] = useState<string[]>([]);
+    const [newFiles, setNewFiles] = useState<File[]>([]);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -108,51 +113,39 @@ const FollowUpEditPage: React.FC = () => {
         setExistingPersons(prev => prev.filter(p => p.id !== personId));
     };
 
-    /* ✅ FILE UPLOAD */
-    const onDropFiles = useCallback(
-        (incoming: FileList | null) => {
-            if (!incoming) return;
-            const arr = Array.from(incoming);
-
-            const MAX_FILES = 5;
-            if (existingAttachments.length + files.length + arr.length > MAX_FILES) {
-                alert(`Max ${MAX_FILES} files allowed.`);
-                return;
-            }
-
-            const totalNewSize = arr.reduce((s, f) => s + f.size, 0);
-            if (totalNewSize / 1024 / 1024 > 25) {
-                alert("Upload size exceeds 25MB.");
-                return;
-            }
-
-            setFiles(f => [...f, ...arr]);
-        },
-        [files, existingAttachments]
-    );
-
-    const removeExistingAttachment = (name: string) => {
-        setExistingAttachments(a => a.filter(x => x !== name));
+    const handleFiles = (items: any[]) => {
+        setNewFiles(items.map(i => i.file).filter(Boolean));
     };
 
     /* ✅ SUBMIT HANDLER */
     const onSubmit = () => {
         const values = form.getValues();
 
-        const payload: UpdateFollowUpDto = {
-            ...values,
-            contacts: [...existingPersons, ...persons],
-            attachments: existingAttachments,
-        };
+        const formData = new FormData();
 
-        const parsed = UpdateFollowUpSchema.safeParse(payload);
-        if (!parsed.success) {
-            alert(parsed.error.issues[0]?.message || "Invalid form data");
-            return;
-        }
+        // 1️⃣ Append scalar fields
+        Object.entries(values).forEach(([key, value]) => {
+            if (key === "contacts" || key === "attachments") return;
+            if (value === undefined || value === null) return;
+
+            if (typeof value === "object") {
+                formData.append(key, JSON.stringify(value));
+            } else {
+                formData.append(key, String(value));
+            }
+        });
+
+        // 2️⃣ Contacts (existing + new)
+        formData.append("contacts", JSON.stringify([...existingPersons, ...persons]));
+
+        // 3️⃣ Removed attachments
+        removedAttachments.forEach(file => formData.append("removedAttachments[]", file));
+
+        // 4️⃣ New files
+        newFiles.forEach(file => formData.append("attachments", file));
 
         updateMutation.mutate(
-            { id: followupId, data: parsed.data },
+            { id: followupId, data: formData },
             {
                 onSuccess: () => {
                     toast.success("Followup updated successfully!");
@@ -425,36 +418,47 @@ const FollowUpEditPage: React.FC = () => {
                                 Attachments
                             </h3>
 
-                            <MockUploadDropzone
-                                maxFiles={5}
-                                maxSizeMB={25}
-                                onClientUploadComplete={files => {
-                                    const uploaded = files.map(f => f.url);
-                                    setExistingAttachments(prev => [...prev, ...uploaded]);
-                                }}
+                            <FilePond
+                                files={newFiles}
+                                onupdatefiles={handleFiles}
+                                allowMultiple
+                                instantUpload={false}
+                                acceptedFileTypes={[
+                                    "image/*",
+                                    "application/pdf",
+                                    "application/msword",
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                    "text/plain",
+                                ]}
                             />
-
-                            {existingAttachments.length > 0 && (
-                                <div className="space-y-3">
-                                    <h4 className="font-medium">Current Attachments</h4>
-                                    <div className="space-y-2">
-                                        {existingAttachments.map(file => (
-                                            <div key={file} className="flex items-center justify-between p-2 border rounded-md">
-                                                <div className="flex items-center gap-2">
-                                                    <FileText className="h-4 w-4 text-muted-foreground" />
-                                                    <a className="text-sm hover:text-primary hover:underline" href={file} target="_blank" rel="noreferrer">
-                                                        {file}
-                                                    </a>
-                                                </div>
-                                                <Button size="sm" variant="ghost" onClick={() => removeExistingAttachment(file)} className="text-destructive">
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
+
+                        {existingAttachments.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-medium">Existing Attachments</h4>
+
+                                <div className="space-y-2">
+                                    {existingAttachments.map(file => (
+                                        <div key={file} className="flex items-center justify-between p-2 border rounded-md">
+                                            <span className="text-sm truncate">{file}</span>
+
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-destructive"
+                                                onClick={() => {
+                                                    setExistingAttachments(prev => prev.filter(f => f !== file));
+                                                    setRemovedAttachments(prev => [...prev, file]);
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Previous Comment */}
                         {/* <div className="space-y-2">
