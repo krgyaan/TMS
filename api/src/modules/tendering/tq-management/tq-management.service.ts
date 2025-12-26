@@ -20,14 +20,13 @@ export interface TqManagementDashboardCounts {
     awaited: number;
     received: number;
     replied: number;
-    missed: number;
-    noTq: number;
     qualified: number;
+    disqualified: number;
     total: number;
 }
-export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ Disqualified' | 'TQ Qualified' | 'No TQ, Qualified';
+export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
 export type TqManagementFilters = {
-    tqStatus?: TenderQueryStatus;
+    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -45,7 +44,7 @@ export type TqManagementDashboardRow = {
     tqSubmissionDeadline: Date | null;
     tqStatus: TenderQueryStatus;
     tqId: number | null;
-    tqCount: number; // Number of TQ records for this tender
+    tqCount: number;
     bidSubmissionId: number | null;
 }
 
@@ -65,17 +64,14 @@ export class TqManagementService {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
+        console.log('filters', filters);
 
         const tenderIdsWithTq = await this.db
-            .selectDistinct({
-                tenderId: tenderQueries.tenderId,
-            })
+            .selectDistinct({ tenderId: tenderQueries.tenderId })
             .from(tenderQueries);
 
         const tenderIdsWithBid = await this.db
-            .selectDistinct({
-                tenderId: bidSubmissions.tenderId,
-            })
+            .selectDistinct({ tenderId: bidSubmissions.tenderId })
             .from(bidSubmissions)
             .where(eq(bidSubmissions.status, 'Bid Submitted'));
 
@@ -83,7 +79,6 @@ export class TqManagementService {
             ...tenderIdsWithTq.map(r => r.tenderId),
             ...tenderIdsWithBid.map(r => r.tenderId),
         ])];
-
 
         if (allTenderIds.length === 0) {
             return {
@@ -106,7 +101,7 @@ export class TqManagementService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    TenderInfosService.getExcludeStatusCondition(['dnb']),
                     inArray(tenderInfos.id, allTenderIds)
                 )
             );
@@ -151,7 +146,7 @@ export class TqManagementService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    TenderInfosService.getExcludeStatusCondition(['dnb']),
                     inArray(tenderInfos.id, tenderIds)
                 )
             );
@@ -199,7 +194,7 @@ export class TqManagementService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    TenderInfosService.getExcludeStatusCondition(['dnb']),
                     inArray(tenderInfos.id, tenderIds)
                 )
             );
@@ -244,7 +239,11 @@ export class TqManagementService {
 
         let filteredResult = result;
         if (filters?.tqStatus) {
-            filteredResult = result.filter(row => row.tqStatus === filters.tqStatus);
+            if (Array.isArray(filters.tqStatus)) {
+                filteredResult = result.filter(row => filters.tqStatus!.includes(row.tqStatus));
+            } else {
+                filteredResult = result.filter(row => row.tqStatus === filters.tqStatus);
+            }
         }
 
         if (filters?.sortBy) {
@@ -353,7 +352,7 @@ export class TqManagementService {
         return and(
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            TenderInfosService.getExcludeStatusCondition(['dnb'])
         );
     }
 
@@ -378,89 +377,87 @@ export class TqManagementService {
         try {
             const baseWhere = this.tqManagementBaseWhere();
 
-            const [{ count: awaited }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
+            // Get all tenders that match base conditions and have bid submissions
+            const tendersWithBids = await this.db
+                .select({
+                    tenderId: tenderInfos.id,
+                })
+                .from(tenderInfos)
+                .leftJoin(
+                    bidSubmissions,
+                    and(
+                        eq(bidSubmissions.tenderId, tenderInfos.id),
+                        eq(bidSubmissions.status, 'Bid Submitted')
+                    )
+                )
                 .where(
                     and(
                         baseWhere,
-                        isNotNull(bidSubmissions.id),
-                        isNull(tenderQueries.id)
+                        isNotNull(bidSubmissions.id)
                     )
-                ) as any;
+                );
 
-            // TQ received: TQ records with status 'TQ received'
-            const [{ count: received }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(tenderQueries.id),
-                        eq(tenderQueries.status, 'TQ received')
-                    )
-                ) as any;
+            const tenderIds = tendersWithBids.map(t => t.tenderId);
 
-            // TQ replied: TQ records with status 'TQ replied'
-            const [{ count: replied }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(tenderQueries.id),
-                        eq(tenderQueries.status, 'TQ replied')
-                    )
-                ) as any;
+            if (tenderIds.length === 0) {
+                return {
+                    awaited: 0,
+                    received: 0,
+                    replied: 0,
+                    qualified: 0,
+                    disqualified: 0,
+                    total: 0,
+                };
+            }
 
-            // TQ missed: TQ records with status 'TQ missed'
-            const [{ count: missed }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(tenderQueries.id),
-                        eq(tenderQueries.status, 'TQ missed')
-                    )
-                ) as any;
+            // Get all TQ records for these tenders, ordered by createdAt DESC
+            const allTqs = await this.db
+                .select({
+                    tenderId: tenderQueries.tenderId,
+                    status: tenderQueries.status,
+                    createdAt: tenderQueries.createdAt,
+                })
+                .from(tenderQueries)
+                .where(inArray(tenderQueries.tenderId, tenderIds))
+                .orderBy(desc(tenderQueries.createdAt));
 
-            // No TQ: TQ records with status 'No TQ, Qualified' or 'No TQ Disqualified'
-            const [{ count: noTq }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(tenderQueries.id),
-                        or(
-                            eq(tenderQueries.status, 'No TQ, Qualified'),
-                            eq(tenderQueries.status, 'No TQ Disqualified')
-                        )
-                    )
-                ) as any;
+            // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
+            const statusMap = new Map<number, string>();
+            for (const tq of allTqs) {
+                if (!statusMap.has(tq.tenderId)) {
+                    statusMap.set(tq.tenderId, tq.status);
+                }
+            }
 
-            // TQ qualified: TQ records with status 'TQ Qualified'
-            const [{ count: qualified }] = await this.tqManagementBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(tenderQueries.id),
-                        eq(tenderQueries.status, 'TQ Qualified')
-                    )
-                ) as any;
+            // Count by status
+            let awaited = 0;
+            let received = 0;
+            let replied = 0;
+            let qualified = 0;
+            let disqualified = 0;
 
+            for (const tenderId of tenderIds) {
+                const status = statusMap.get(tenderId);
+                if (!status) {
+                    awaited++;
+                } else if (status === 'TQ received') {
+                    received++;
+                } else if (status === 'TQ replied') {
+                    replied++;
+                } else if (status === 'Qualified, No TQ received' || status === 'TQ replied, Qualified') {
+                    qualified++;
+                } else if (status === 'Disqualified, No TQ received' || status === 'Disqualified, TQ missed') {
+                    disqualified++;
+                }
+            }
 
             return {
-                awaited: Number(awaited || 0),
-                received: Number(received || 0),
-                replied: Number(replied || 0),
-                missed: Number(missed || 0),
-                noTq: Number(noTq || 0),
-                qualified: Number(qualified || 0),
-                total: Number(awaited || 0) + Number(received || 0) + Number(replied || 0) + Number(missed || 0) + Number(noTq || 0) + Number(qualified || 0),
+                awaited,
+                received,
+                replied,
+                qualified,
+                disqualified,
+                total: awaited + received + replied + qualified + disqualified,
             };
         } catch (error) {
             console.error('Error in getDashboardCounts:', error);
@@ -619,7 +616,7 @@ export class TqManagementService {
             const updated = await tx
                 .update(tenderQueries)
                 .set({
-                    status: 'TQ missed',
+                    status: 'Disqualified, TQ missed',
                     missedReason: data.missedReason,
                     preventionMeasures: data.preventionMeasures,
                     tmsImprovements: data.tmsImprovements,
@@ -664,7 +661,7 @@ export class TqManagementService {
 
         const result = await this.db.transaction(async (tx) => {
             // Create a TQ record with "No TQ" status based on qualification
-            const tqStatus = qualified ? 'No TQ, Qualified' : 'No TQ Disqualified';
+            const tqStatus = qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received';
             const [tqRecord] = await tx
                 .insert(tenderQueries)
                 .values({
@@ -712,11 +709,12 @@ export class TqManagementService {
         const newStatus = qualified ? 40 : 39;
 
         const result = await this.db.transaction(async (tx) => {
-            // Update TQ record with "TQ Qualified" status
+            // Update TQ record status based on qualification
+            const tqStatus = qualified ? 'TQ replied, Qualified' : 'Disqualified, TQ missed';
             const updated = await tx
                 .update(tenderQueries)
                 .set({
-                    status: 'TQ Qualified',
+                    status: tqStatus,
                     updatedAt: new Date(),
                 })
                 .where(eq(tenderQueries.id, id))
