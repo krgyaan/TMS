@@ -97,36 +97,56 @@ export default function TqReceivedForm({
     const isSubmitting = form.formState.isSubmitting;
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
+        console.log('[TQ Received Form] Form submission started', { mode, tenderId: data.tenderId });
+
         try {
+            console.log('[TQ Received Form] Raw form data:', {
+                tenderId: data.tenderId,
+                tqSubmissionDeadline: data.tqSubmissionDeadline,
+                tqDocumentReceived: data.tqDocumentReceived,
+                tqItems: data.tqItems,
+            });
+
             const tqDocumentReceivedPath = data.tqDocumentReceived.length > 0 ? data.tqDocumentReceived[0] : null;
+            console.log('[TQ Received Form] Document path extracted:', tqDocumentReceivedPath);
 
             // Ensure tqTypeId is always a number (safety net for production)
             const normalizedTqItems = data.tqItems.map(item => ({
                 tqTypeId: typeof item.tqTypeId === 'string' ? Number(item.tqTypeId) : item.tqTypeId,
                 queryDescription: item.queryDescription,
             }));
+            console.log('[TQ Received Form] Normalized TQ items:', normalizedTqItems);
+
+            const payload = {
+                tenderId: data.tenderId,
+                tqSubmissionDeadline: data.tqSubmissionDeadline,
+                tqDocumentReceived: tqDocumentReceivedPath,
+                tqItems: normalizedTqItems,
+            };
+            console.log('[TQ Received Form] Final payload to send:', payload);
 
             if (mode === 'create') {
-                await createMutation.mutateAsync({
-                    tenderId: data.tenderId,
-                    tqSubmissionDeadline: data.tqSubmissionDeadline,
-                    tqDocumentReceived: tqDocumentReceivedPath,
-                    tqItems: normalizedTqItems,
-                });
+                console.log('[TQ Received Form] Calling create mutation...');
+                await createMutation.mutateAsync(payload);
+                console.log('[TQ Received Form] Create mutation succeeded');
             } else if (existingData?.id) {
+                console.log('[TQ Received Form] Calling update mutation...', { id: existingData.id });
                 await updateMutation.mutateAsync({
                     id: existingData.id,
-                    data: {
-                        tenderId: data.tenderId,
-                        tqSubmissionDeadline: data.tqSubmissionDeadline,
-                        tqDocumentReceived: tqDocumentReceivedPath,
-                        tqItems: normalizedTqItems,
-                    },
+                    data: payload,
                 });
+                console.log('[TQ Received Form] Update mutation succeeded');
             }
+
+            console.log('[TQ Received Form] Navigation to TQ management page');
             navigate(paths.tendering.tqManagement);
         } catch (error) {
-            console.error('Error submitting TQ received:', error);
+            console.error('[TQ Received Form] Error submitting TQ received:', error);
+            console.error('[TQ Received Form] Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                error,
+                stack: error instanceof Error ? error.stack : undefined,
+            });
         }
     };
 

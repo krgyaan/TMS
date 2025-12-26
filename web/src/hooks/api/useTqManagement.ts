@@ -55,15 +55,37 @@ export const useCreateTqReceived = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: tqManagementService.createTqReceived,
-        onSuccess: () => {
+        mutationFn: async (data: any) => {
+            console.log('[useCreateTqReceived] Mutation function called with data:', data);
+            try {
+                const result = await tqManagementService.createTqReceived(data);
+                console.log('[useCreateTqReceived] Mutation function succeeded:', result);
+                return result;
+            } catch (error) {
+                console.error('[useCreateTqReceived] Mutation function error:', error);
+                throw error;
+            }
+        },
+        onSuccess: (data) => {
+            console.log('[useCreateTqReceived] onSuccess called with data:', data);
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
             queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ received successfully');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to create TQ');
+            console.error('[useCreateTqReceived] onError called:', error);
+            console.error('[useCreateTqReceived] Error details:', {
+                message: error?.message,
+                response: error?.response,
+                responseData: error?.response?.data,
+                responseStatus: error?.response?.status,
+                responseStatusText: error?.response?.statusText,
+                stack: error?.stack,
+            });
+            const errorMessage = error?.response?.data?.message || 'Failed to create TQ';
+            console.error('[useCreateTqReceived] Showing error toast:', errorMessage);
+            toast.error(errorMessage);
         },
     });
 };
