@@ -1471,13 +1471,12 @@ export interface TqManagementDashboardCounts {
     awaited: number;
     received: number;
     replied: number;
-    missed: number;
-    noTq: number;
     qualified: number;
+    disqualified: number;
     total: number;
 }
 
-export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ Disqualified' | 'TQ Qualified' | 'No TQ, Qualified';
+export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
 
 export interface PhysicalDocsDashboardCounts {
     pending: number;

@@ -74,10 +74,14 @@ export function TqView({
                 return 'default';
             case 'TQ replied':
                 return 'default';
-            case 'TQ missed':
+            case 'Disqualified, TQ missed':
                 return 'destructive';
-            case 'No TQ':
+            case 'Qualified, No TQ received':
                 return 'outline';
+            case 'Disqualified, No TQ received':
+                return 'destructive';
+            case 'TQ replied, Qualified':
+                return 'default';
             default:
                 return 'secondary';
         }
@@ -140,7 +144,7 @@ export function TqView({
                 </div>
 
                 {/* TQ Received Details */}
-                {tqData.status !== 'No TQ' && (
+                {tqData.status !== 'Qualified, No TQ received' && tqData.status !== 'Disqualified, No TQ received' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-primary border-b pb-2">
                             TQ Received Details
@@ -278,7 +282,7 @@ export function TqView({
                 )}
 
                 {/* TQ Missed Details */}
-                {tqData.status === 'TQ missed' && (
+                {tqData.status === 'Disqualified, TQ missed' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-destructive border-b pb-2">
                             Missed TQ Analysis
@@ -307,7 +311,7 @@ export function TqView({
                 )}
 
                 {/* No TQ */}
-                {tqData.status === 'No TQ' && (
+                {(tqData.status === 'Qualified, No TQ received' || tqData.status === 'Disqualified, No TQ received') && (
                     <div className="space-y-4">
                         <Alert>
                             <AlertCircle className="h-4 w-4" />

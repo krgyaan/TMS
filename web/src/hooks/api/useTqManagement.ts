@@ -13,7 +13,7 @@ export const tqManagementKey = {
 };
 
 export type TqManagementFilters = {
-    tqStatus?: TenderQueryStatus;
+    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -23,7 +23,62 @@ export type TqManagementFilters = {
 export const useTqManagement = (filters?: TqManagementFilters) => {
     return useQuery({
         queryKey: [...tqManagementKey.lists(), filters],
-        queryFn: () => tqManagementService.getAll(filters),
+        queryFn: async () => {
+            // Handle multiple statuses for the "noTq" tab
+            if (Array.isArray(filters?.tqStatus)) {
+                const statuses = filters.tqStatus;
+                const page = filters?.page || 1;
+                const limit = filters?.limit || 50;
+                const sortBy = filters?.sortBy;
+                const sortOrder = filters?.sortOrder;
+
+                // Fetch all statuses in parallel
+                const promises = statuses.map(status =>
+                    tqManagementService.getAll({
+                        tqStatus: status,
+                        page: 1, // Fetch all pages for each status
+                        limit: 1000, // Large limit to get all records
+                        sortBy,
+                        sortOrder,
+                    })
+                );
+
+                const results = await Promise.all(promises);
+
+                // Combine all results
+                const combinedData = results.flatMap(result => result.data);
+                const total = combinedData.length;
+
+                // Apply client-side pagination
+                const startIndex = (page - 1) * limit;
+                const endIndex = startIndex + limit;
+                const paginatedData = combinedData.slice(startIndex, endIndex);
+
+                // Apply sorting if needed
+                let sortedData = paginatedData;
+                if (sortBy) {
+                    sortedData = [...paginatedData].sort((a, b) => {
+                        const aValue = (a as any)[sortBy];
+                        const bValue = (b as any)[sortBy];
+                        const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                        return sortOrder === 'desc' ? -comparison : comparison;
+                    });
+                }
+
+                return {
+                    data: sortedData,
+                    meta: {
+                        total,
+                        page,
+                        limit,
+                        totalPages: Math.ceil(total / limit),
+                    },
+                };
+            }
+
+            // Single status - use normal API call
+            return tqManagementService.getAll(filters);
+        },
     });
 };
 
@@ -55,37 +110,15 @@ export const useCreateTqReceived = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (data: any) => {
-            console.log('[useCreateTqReceived] Mutation function called with data:', data);
-            try {
-                const result = await tqManagementService.createTqReceived(data);
-                console.log('[useCreateTqReceived] Mutation function succeeded:', result);
-                return result;
-            } catch (error) {
-                console.error('[useCreateTqReceived] Mutation function error:', error);
-                throw error;
-            }
-        },
-        onSuccess: (data) => {
-            console.log('[useCreateTqReceived] onSuccess called with data:', data);
+        mutationFn: tqManagementService.createTqReceived,
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
             queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
             toast.success('TQ received successfully');
         },
         onError: (error: any) => {
-            console.error('[useCreateTqReceived] onError called:', error);
-            console.error('[useCreateTqReceived] Error details:', {
-                message: error?.message,
-                response: error?.response,
-                responseData: error?.response?.data,
-                responseStatus: error?.response?.status,
-                responseStatusText: error?.response?.statusText,
-                stack: error?.stack,
-            });
-            const errorMessage = error?.response?.data?.message || 'Failed to create TQ';
-            console.error('[useCreateTqReceived] Showing error toast:', errorMessage);
-            toast.error(errorMessage);
+            toast.error(error?.response?.data?.message || 'Failed to create TQ');
         },
     });
 };

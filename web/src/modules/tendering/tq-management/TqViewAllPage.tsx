@@ -36,8 +36,10 @@ export default function TqViewAllPage() {
             case 'TQ awaited': return 'secondary';
             case 'TQ received': return 'default';
             case 'TQ replied': return 'default';
-            case 'TQ missed': return 'destructive';
-            case 'No TQ': return 'outline';
+            case 'Disqualified, TQ missed': return 'destructive';
+            case 'Qualified, No TQ received': return 'outline';
+            case 'Disqualified, No TQ received': return 'destructive';
+            case 'TQ replied, Qualified': return 'default';
             default: return 'secondary';
         }
     };
@@ -148,7 +150,7 @@ export default function TqViewAllPage() {
                                                 </p>
                                             </div>
                                         )}
-                                        {tq.status === 'TQ missed' && tq.missedReason && (
+                                        {tq.status === 'Disqualified, TQ missed' && tq.missedReason && (
                                             <div className="md:col-span-2">
                                                 <p className="text-muted-foreground">Missed Reason</p>
                                                 <p className="font-medium text-destructive line-clamp-2">

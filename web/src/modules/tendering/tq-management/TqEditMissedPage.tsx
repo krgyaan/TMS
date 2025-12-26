@@ -27,7 +27,7 @@ export default function TqEditMissedPage() {
         </Alert>
     );
 
-    if (tqData.status !== 'TQ missed') {
+    if (tqData.status !== 'Disqualified, TQ missed') {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />

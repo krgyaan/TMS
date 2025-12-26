@@ -17,7 +17,7 @@ import type { TenderQueryStatus, TqManagementDashboardRow } from '@/types/api.ty
 import { tenderNameCol } from '@/components/data-grid/columns';
 import QualificationDialog from './components/QualificationDialog';
 
-type TabKey = 'awaited' | 'received' | 'replied' | 'missed' | 'noTq' | 'qualified';
+type TabKey = 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified';
 
 const TqManagementListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('awaited');
@@ -44,22 +44,21 @@ const TqManagementListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    // Map tab key to tqStatus
-    const getTqStatusFromTab = (tab: TabKey): TenderQueryStatus | undefined => {
+    // Map tab key to tqStatus(es)
+    const getTqStatusesFromTab = (tab: TabKey): TenderQueryStatus[] | TenderQueryStatus | undefined => {
         switch (tab) {
             case 'awaited': return 'TQ awaited';
             case 'received': return 'TQ received';
             case 'replied': return 'TQ replied';
-            case 'missed': return 'TQ missed';
-            case 'noTq': return 'No TQ Disqualified';
-            case 'qualified': return 'TQ Qualified';
+            case 'qualified': return ['Qualified, No TQ received', 'TQ replied, Qualified'];
+            case 'disqualified': return ['Disqualified, No TQ received', 'Disqualified, TQ missed'];
             default: return undefined;
         }
     };
 
     // Fetch paginated data for active tab
     const { data: apiResponse, isLoading: loading, error } = useTqManagement({
-        tqStatus: getTqStatusFromTab(activeTab),
+        tqStatus: getTqStatusesFromTab(activeTab),
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
@@ -81,14 +80,13 @@ const TqManagementListPage = () => {
                 return 'default';
             case 'TQ replied':
                 return 'success';
-            case 'TQ missed':
+            case 'Disqualified, TQ missed':
                 return 'destructive';
-            case 'TQ Qualified':
+            case 'TQ replied, Qualified':
                 return 'success';
-            case 'No TQ':
-            case 'No TQ, Qualified':
+            case 'Qualified, No TQ received':
                 return 'outline';
-            case 'No TQ Disqualified':
+            case 'Disqualified, No TQ received':
                 return 'destructive';
             default:
                 return 'secondary';
@@ -174,7 +172,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqEditMissed(row.tqId!));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ missed' && row.tqId !== null,
+            visible: (row) => row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
         },
         {
             label: 'View Details',
@@ -220,19 +218,14 @@ const TqManagementListPage = () => {
                 count: counts?.replied ?? 0,
             },
             {
-                key: 'missed' as TabKey,
-                name: 'TQ Missed',
-                count: counts?.missed ?? 0,
-            },
-            {
-                key: 'noTq' as TabKey,
-                name: 'No TQ',
-                count: counts?.noTq ?? 0,
-            },
-            {
                 key: 'qualified' as TabKey,
-                name: 'TQ Qualified',
+                name: 'Qualified',
                 count: counts?.qualified ?? 0,
+            },
+            {
+                key: 'disqualified' as TabKey,
+                name: 'Disqualified',
+                count: counts?.disqualified ?? 0,
             },
         ];
     }, [counts]);
@@ -241,16 +234,14 @@ const TqManagementListPage = () => {
         tenderNameCol<TqManagementDashboardRow>('tenderNo', {
             headerName: 'Tender',
             filter: true,
-            flex: 2,
-            minWidth: 250,
+            width: 200,
             colId: 'tenderNo',
             sortable: true,
         }),
         {
             field: 'teamMemberName',
             headerName: 'Team Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 150,
             colId: 'teamMemberName',
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
@@ -259,43 +250,34 @@ const TqManagementListPage = () => {
         {
             field: 'bidSubmissionDate',
             headerName: 'Bid Submission',
-            flex: 1.5,
-            minWidth: 170,
+            width: 150,
             colId: 'bidSubmissionDate',
             valueGetter: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
         },
         {
+            field: 'statusName',
+            headerName: 'Tender Status',
+            width: 150,
+            colId: 'statusName',
+            valueGetter: (params: any) => params.data?.statusName || '—',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'tqSubmissionDeadline',
             headerName: 'TQ Deadline',
-            flex: 1.5,
-            minWidth: 170,
+            width: 150,
             colId: 'tqSubmissionDeadline',
             valueGetter: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
         },
         {
-            field: 'tqCount',
-            headerName: 'TQ Count',
-            width: 100,
-            colId: 'tqCount',
-            valueGetter: (params: any) => params.data?.tqCount || 0,
-            sortable: true,
-            cellRenderer: (params: any) => {
-                const count = params.value;
-                if (count > 0) {
-                    return <Badge variant="outline">{count}</Badge>;
-                }
-                return count;
-            },
-        },
-        {
             field: 'tqStatus',
-            headerName: 'Status',
-            flex: 1,
-            minWidth: 130,
+            headerName: 'TQ Status',
+            width: 180,
             colId: 'tqStatus',
             sortable: true,
             filter: true,
@@ -310,12 +292,27 @@ const TqManagementListPage = () => {
             },
         },
         {
+            field: 'tqCount',
+            headerName: 'TQ Count',
+            width: 120,
+            colId: 'tqCount',
+            valueGetter: (params: any) => params.data?.tqCount || 0,
+            sortable: true,
+            cellRenderer: (params: any) => {
+                const count = params.value;
+                if (count > 0) {
+                    return <Badge variant="outline">{count}</Badge>;
+                }
+                return count;
+            },
+        },
+        {
             headerName: 'Actions',
             filter: false,
             cellRenderer: createActionColumnRenderer(tqManagementActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [tqManagementActions]);
 
@@ -405,9 +402,8 @@ const TqManagementListPage = () => {
                                                 {tab.key === 'awaited' && 'Submitted bids awaiting TQ will appear here'}
                                                 {tab.key === 'received' && 'Received TQs will be shown here'}
                                                 {tab.key === 'replied' && 'Replied TQs will appear here'}
-                                                {tab.key === 'missed' && 'Missed TQs will be shown here'}
-                                                {tab.key === 'noTq' && 'Tenders qualified without TQ will appear here'}
-                                                {tab.key === 'qualified' && 'Tenders qualified with TQ will appear here'}
+                                                {tab.key === 'qualified' && 'Qualified tenders (with or without TQ) will appear here'}
+                                                {tab.key === 'disqualified' && 'Disqualified tenders (with or without TQ) will appear here'}
                                             </p>
                                         </div>
                                     ) : (

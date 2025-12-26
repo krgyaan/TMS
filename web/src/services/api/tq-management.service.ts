@@ -11,7 +11,7 @@ import type {
 } from '@/types/api.types';
 
 export type TqManagementFilters = {
-    tqStatus?: TenderQueryStatus;
+    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -30,7 +30,9 @@ class TqManagementService extends BaseApiService {
 
         if (filters) {
             if (filters.tqStatus) {
-                search.set('tqStatus', filters.tqStatus);
+                // Only handle single status in service - arrays are handled in hook
+                const status = Array.isArray(filters.tqStatus) ? filters.tqStatus[0] : filters.tqStatus;
+                search.set('tqStatus', status);
             }
             if (filters.page) {
                 search.set('page', String(filters.page));
@@ -65,30 +67,7 @@ class TqManagementService extends BaseApiService {
     }
 
     async createTqReceived(data: CreateTqReceivedDto): Promise<TenderQuery> {
-        console.log('[TQ Management Service] createTqReceived called with data:', data);
-        console.log('[TQ Management Service] Data validation:', {
-            hasTenderId: !!data.tenderId,
-            hasTqSubmissionDeadline: !!data.tqSubmissionDeadline,
-            hasTqItems: Array.isArray(data.tqItems),
-            tqItemsCount: data.tqItems?.length || 0,
-            tqItems: data.tqItems,
-        });
-
-        try {
-            console.log('[TQ Management Service] Making POST request to /received');
-            const result = await this.post<TenderQuery>('/received', data);
-            console.log('[TQ Management Service] POST request succeeded:', result);
-            return result;
-        } catch (error) {
-            console.error('[TQ Management Service] POST request failed:', error);
-            console.error('[TQ Management Service] Error details:', {
-                message: error instanceof Error ? error.message : 'Unknown error',
-                response: (error as any)?.response?.data,
-                status: (error as any)?.response?.status,
-                statusText: (error as any)?.response?.statusText,
-            });
-            throw error;
-        }
+        return this.post<TenderQuery>('/received', data);
     }
 
     async updateTqReceived(id: number, data: CreateTqReceivedDto): Promise<TenderQuery> {

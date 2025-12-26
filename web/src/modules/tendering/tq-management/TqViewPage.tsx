@@ -213,7 +213,7 @@ export default function TqViewPage() {
                                 navigate(paths.tendering.tqEditReceived(tqId));
                             } else if (tqData.status === 'TQ replied') {
                                 navigate(paths.tendering.tqEditReplied(tqId));
-                            } else if (tqData.status === 'TQ missed') {
+                            } else if (tqData.status === 'Disqualified, TQ missed') {
                                 navigate(paths.tendering.tqEditMissed(tqId));
                             }
                         }}
