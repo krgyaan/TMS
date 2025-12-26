@@ -1,13 +1,28 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, Req, NotFoundException } from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, Req, NotFoundException, UseInterceptors, UploadedFiles, ConsoleLogger } from "@nestjs/common";
 
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 
+import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
+import { diskStorage } from "multer";
+import { extname } from "path";
+
 import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto } from "@/modules/follow-up/zod";
+
+const followUpAttachmentsMulterConfig = {
+    storage: diskStorage({
+        destination: "./uploads/accounts",
+        filename: (req, file, callback) => {
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            callback(null, `fu-${uniqueSuffix}${ext}`);
+        },
+    }),
+};
 
 @Controller("follow-up")
 export class FollowUpController {
-    constructor(private readonly service: FollowUpService) { }
+    constructor(private readonly service: FollowUpService) {}
 
     // ========================
     // CREATE
@@ -25,15 +40,12 @@ export class FollowUpController {
 
     @Get()
     async findAll(@Query() query: FollowUpQueryDto, @CurrentUser() user) {
-        console.log("Follow up Called");
-
         const staticUser = {
             id: 3,
             role: "admin",
         };
 
         let data = await this.service.findAll(query, staticUser);
-        console.log(data);
         return data;
     }
 
@@ -56,9 +68,12 @@ export class FollowUpController {
     // ========================
 
     @Put(":id")
-    async update(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpDto, @Req() req) {
-        console.log("Gyan is tharki!");
-        return this.service.update(id, dto, req.user);
+    @UseInterceptors(FilesInterceptor("attachments", 10, followUpAttachmentsMulterConfig))
+    async update(@Param("id", ParseIntPipe) id: number, @Body() dto: any, @Req() req, @UploadedFiles() attachments: Express.Multer.File[]) {
+        console.log("Received DTO & files:", dto);
+        console.log("files", attachments);
+        const res = this.service.update(id, dto, attachments, req.user);
+        return res;
     }
 
     // ========================
@@ -75,7 +90,6 @@ export class FollowUpController {
     // ========================
     // DELETE (SOFT DELETE)
     // ========================
-
     @Delete(":id")
     async remove(@Param("id", ParseIntPipe) id: number) {
         return this.service.remove(id);
