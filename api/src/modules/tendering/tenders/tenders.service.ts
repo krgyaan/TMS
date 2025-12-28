@@ -742,6 +742,22 @@ export class TenderInfosService {
     }
 
     /**
+     * Get coordinator user ID for a team
+     */
+    private async getCoordinatorUserId(teamId: number): Promise<number | null> {
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', teamId);
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            return coordinatorUser?.id || null;
+        }
+        return null;
+    }
+
+    /**
      * Send tender created email (assigned or unallocated)
      */
     private async sendTenderCreatedEmail(tenderId: number, data: NewTenderInfo, createdBy: number) {
@@ -773,13 +789,15 @@ export class TenderInfosService {
         };
 
         if (tender.teamMember) {
-            // Tender assigned - send to team member
+            // Tender assigned - send to team member, from coordinator
             const assignee = await this.recipientResolver.getUserById(tender.teamMember);
-            if (assignee) {
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+
+            if (assignee && coordinatorUserId) {
                 await this.sendEmail(
                     'tender.created',
                     tenderId,
-                    createdBy,
+                    coordinatorUserId,
                     `New Tender Assigned: ${tender.tenderNo}`,
                     'tender-created',
                     {
@@ -791,40 +809,30 @@ export class TenderInfosService {
                         to: [{ type: 'user', userId: tender.teamMember }],
                         cc: [
                             { type: 'role', role: 'Team Leader', teamId },
-                            { type: 'role', role: 'Coordinator', teamId },
                             { type: 'role', role: 'Admin', teamId },
                         ],
                     }
                 );
             }
         } else {
-            // Tender unallocated - send to coordinator
-            const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', teamId);
-            if (coordinatorEmails.length > 0) {
-                const [coordinatorUser] = await this.db
-                    .select({ id: users.id })
-                    .from(users)
-                    .where(eq(users.email, coordinatorEmails[0]))
-                    .limit(1);
+            // Tender unallocated - send to team leader, from coordinator
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
 
-                if (coordinatorUser?.id) {
-                    await this.sendEmail(
-                        'tender.created.unallocated',
-                        tenderId,
-                        createdBy,
-                        `New Tender Awaiting Allocation: ${tender.tenderNo}`,
-                        'tender-created-unallocated',
-                        emailData,
-                        {
-                            to: [{ type: 'role', role: 'Coordinator', teamId }],
-                            cc: [
-                                { type: 'role', role: 'Team Leader', teamId },
-                                { type: 'role', role: 'Coordinator', teamId },
-                                { type: 'role', role: 'Admin', teamId },
-                            ],
-                        }
-                    );
-                }
+            if (coordinatorUserId) {
+                await this.sendEmail(
+                    'tender.created.unallocated',
+                    tenderId,
+                    coordinatorUserId,
+                    `New Tender Awaiting Allocation: ${tender.tenderNo}`,
+                    'tender-created-unallocated',
+                    emailData,
+                    {
+                        to: [{ type: 'role', role: 'Team Leader', teamId }],
+                        cc: [
+                            { type: 'role', role: 'Admin', teamId },
+                        ],
+                    }
+                );
             }
         }
     }
@@ -893,10 +901,13 @@ export class TenderInfosService {
         const assignee = await this.recipientResolver.getUserById(newTender.teamMember);
         if (!assignee) return;
 
+        const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+        if (!coordinatorUserId) return;
+
         await this.sendEmail(
             'tender.updated',
             newTender.id as number,
-            updatedBy,
+            coordinatorUserId,
             `Tender Updated: ${newTender.tenderNo}`,
             'tender-major-update',
             {
@@ -918,7 +929,10 @@ export class TenderInfosService {
             },
             {
                 to: [{ type: 'user', userId: newTender.teamMember }],
-                cc: [{ type: 'role', role: 'Team Leader', teamId }],
+                cc: [
+                    { type: 'role', role: 'Team Leader', teamId },
+                    { type: 'role', role: 'Admin', teamId },
+                ],
             }
         );
     }
@@ -939,8 +953,10 @@ export class TenderInfosService {
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
 
-        // Get coordinator name
+        // Get coordinator name and user ID
         const coordinatorName = await this.getCoordinatorName(tender.team);
+        const coordinatorUserId = await this.getCoordinatorUserId(tender.team);
+        if (!coordinatorUserId) return;
 
         // Format due date
         const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
@@ -954,7 +970,7 @@ export class TenderInfosService {
         await this.sendEmail(
             'tender.status-updated',
             tenderId,
-            changedBy,
+            coordinatorUserId,
             `Tender Status Updated: ${tender.tenderNo}`,
             'tender-major-update',
             {
@@ -978,6 +994,10 @@ export class TenderInfosService {
             },
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [
+                    { type: 'role', role: 'Team Leader', teamId: tender.team },
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }
