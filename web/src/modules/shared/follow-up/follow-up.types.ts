@@ -121,7 +121,6 @@ export const UpdateFollowUpStatusSchema = z
         stopReason: StopReasonEnum.nullable().optional(),
 
         proofText: z.string().nullable().optional(),
-        proofImagePath: z.string().nullable().optional(),
         stopRemarks: z.string().nullable().optional(),
     })
     .refine(
