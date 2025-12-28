@@ -4,6 +4,7 @@ import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, Fol
 // ✅ LIST
 export const getFollowUps = async (query: FollowUpQueryDto) => {
     const { data } = await api.get("/follow-up", { params: query });
+    console.log("Follow up list data", data);
     return data;
 };
 
@@ -34,7 +35,11 @@ export const updateFollowUp = async ({ id, data }: { id: number; data: FormData 
 // ✅ UPDATE STATUS
 export const updateFollowUpStatus = async ({ id, data }: { id: number; data: UpdateFollowUpStatusDto }) => {
     console.log("Making the API call");
-    const res = await api.put(`/follow-up/${id}/status`, data);
+    const res = await api.put(`/follow-up/${id}/status`, data, {
+        headers: {
+            "content-type": "multipart/form-data",
+        },
+    });
     console.log("THIS IS MY API RESPONSE");
     console.log(res);
     return res.data;
