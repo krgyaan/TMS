@@ -625,6 +625,21 @@ export default function FollowupViewPage() {
                                                 </div>
                                             )}
 
+                                            {followup.stopReason === 2 && followup.proofImagePath && (
+                                                <div className="pl-11 space-y-2">
+                                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Proof Image</p>
+
+                                                    <div className="rounded-xl overflow-hidden border bg-muted">
+                                                        <img
+                                                            src={buildFileUrl(followup.proofImagePath)}
+                                                            alt="Proof of Objective Achievement"
+                                                            className="w-full max-h-64 object-contain bg-background"
+                                                            loading="lazy"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {followup.stopReason === 4 && followup.stopRemarks && (
                                                 <div className="pl-11">
                                                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Stop Remarks</p>
