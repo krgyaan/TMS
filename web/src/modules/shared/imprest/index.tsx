@@ -4,11 +4,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 
-import { Trash, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, Badge } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle } from "lucide-react";
 
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
@@ -29,6 +29,78 @@ const formatINR = (num: number) =>
         currency: "INR",
         maximumFractionDigits: 0,
     }).format(num);
+
+/** Inline Status Toggle */
+const StatusToggle: React.FC<{
+    active: boolean;
+    label: string;
+    icon: React.ElementType;
+    onClick: () => void;
+    disabled?: boolean;
+}> = ({ active, label, icon: Icon, onClick, disabled }) => (
+    <TooltipProvider delayDuration={100}>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (!active && !disabled) onClick();
+                    }}
+                    disabled={disabled}
+                    className={cn(
+                        "inline-flex items-center justify-center h-7 w-7 rounded transition-colors",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                        active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        disabled && "opacity-50 cursor-not-allowed"
+                    )}
+                >
+                    <Icon className="h-4 w-4" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs font-medium">
+                {active ? label : `Mark as ${label}`}
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+);
+
+/** Icon Action Button */
+const IconAction: React.FC<{
+    icon: React.ElementType;
+    label: string;
+    onClick: () => void;
+    variant?: "default" | "destructive";
+    disabled?: boolean;
+}> = ({ icon: Icon, label, onClick, variant = "default", disabled }) => (
+    <TooltipProvider delayDuration={100}>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    onClick={e => {
+                        e.stopPropagation();
+                        onClick();
+                    }}
+                    disabled={disabled}
+                    className={cn(
+                        "inline-flex items-center justify-center h-7 w-7 rounded transition-colors",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                        variant === "destructive"
+                            ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        disabled && "opacity-50 cursor-not-allowed"
+                    )}
+                >
+                    <Icon className="h-4 w-4" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs font-medium">
+                {label}
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+);
 
 const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -52,6 +124,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
+    const [remarkText, setRemarkText] = useState("");
 
     /* -------------------- HANDLERS -------------------- */
 
@@ -66,6 +139,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const openAddProof = (id: number) => {
         setCurrentProofRowId(id);
+        setFilesToUpload([]);
         setAddProofOpen(true);
     };
 
@@ -73,65 +147,34 @@ const ImprestEmployeeDashboard: React.FC = () => {
         e?.preventDefault();
         if (!currentProofRowId || filesToUpload.length === 0) return;
 
-        uploadProofsMutation.mutate({ id: currentProofRowId, files: filesToUpload }, { onSuccess: () => setAddProofOpen(false) });
+        uploadProofsMutation.mutate(
+            { id: currentProofRowId, files: filesToUpload },
+            {
+                onSuccess: () => {
+                    setAddProofOpen(false);
+                    setFilesToUpload([]);
+                },
+            }
+        );
+    };
+
+    const openRemarkModal = (row: ImprestRow) => {
+        setRemarkRow(row);
+        setRemarkText("");
+        setRemarkOpen(true);
     };
 
     const submitAddRemark = (e?: React.FormEvent) => {
         e?.preventDefault();
-        if (!remarkRow) return;
+        if (!remarkRow || !remarkText.trim()) return;
+        // Add your remark mutation here
+        setRemarkOpen(false);
     };
 
     const openLightboxForRow = (row: ImprestRow) => {
         setLightboxSlides(row.invoiceProof.map(p => ({ src: p.url })));
         setLightboxOpen(true);
     };
-
-    const openRemarkModal = (row: ImprestRow) => {
-        setRemarkRow(row);
-        setRemarkOpen(true);
-    };
-
-    /* -------------------- ACTIONS -------------------- */
-
-    const actionItems = useMemo(
-        () => [
-            {
-                label: "Approve",
-                icon: <CheckCircle className="h-4 w-4 text-green-600" />,
-                hidden: (row: ImprestRow) => row.approvalStatus === 1,
-                onClick: (row: ImprestRow) => approveMutation.mutate(row.id),
-            },
-            {
-                label: "Tally",
-                icon: <ListChecks className="h-4 w-4 text-blue-600" />,
-                hidden: (row: ImprestRow) => row.tallyStatus === 1,
-                onClick: (row: ImprestRow) => tallyMutation.mutate(row.id),
-            },
-            {
-                label: "Proof OK",
-                icon: <FileCheck className="h-4 w-4 text-purple-600" />,
-                hidden: (row: ImprestRow) => row.proofStatus === 1,
-                onClick: (row: ImprestRow) => proofMutation.mutate(row.id),
-            },
-            {
-                label: "Add Remark",
-                icon: <MessageSquarePlus className="h-4 w-4 text-orange-600" />,
-                onClick: openRemarkModal,
-            },
-            {
-                label: "Add Proof",
-                icon: <Plus className="h-4 w-4" />,
-                onClick: (row: ImprestRow) => openAddProof(row.id),
-            },
-            {
-                label: "Delete",
-                icon: <Trash className="h-4 w-4" />,
-                className: "text-red-600",
-                onClick: handleDelete,
-            },
-        ],
-        [approveMutation, tallyMutation, proofMutation, handleDelete]
-    );
 
     /* -------------------- EXCEL -------------------- */
 
@@ -142,7 +185,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
             Project: r.projectName,
             Amount: r.amount,
             Approved: r.approvalStatus === 1 ? "Yes" : "No",
-            Proofs: r.invoiceProof.length,
+            Tallied: r.tallyStatus === 1 ? "Yes" : "No",
+            "Proof Verified": r.proofStatus === 1 ? "Yes" : "No",
+            "Proof Count": r.invoiceProof.length,
         }));
 
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -160,132 +205,227 @@ const ImprestEmployeeDashboard: React.FC = () => {
             {
                 field: "createdAt",
                 headerName: "Date",
+                width: 100,
                 valueGetter: p => new Date(p.data.createdAt).toLocaleDateString("en-GB"),
             },
-            { field: "partyName", headerName: "Party" },
-            { field: "projectName", headerName: "Project" },
+            {
+                field: "partyName",
+                headerName: "Party",
+                flex: 1,
+                minWidth: 140,
+            },
+            {
+                field: "projectName",
+                headerName: "Project",
+                flex: 1,
+                minWidth: 140,
+            },
             {
                 field: "amount",
                 headerName: "Amount",
+                width: 120,
                 valueFormatter: p => formatINR(p.value),
+                cellClass: "font-medium tabular-nums",
             },
             {
                 field: "invoiceProof",
-                headerName: "Proof",
+                headerName: "Proofs",
+                width: 90,
+                sortable: false,
                 cellRenderer: p => {
                     const row = p.data as ImprestRow;
-                    return row.invoiceProof.length ? (
-                        <button className="text-blue-600 underline" onClick={() => openLightboxForRow(row)}>
-                            View ({row.invoiceProof.length})
-                        </button>
-                    ) : (
-                        "-"
+                    if (!row.invoiceProof.length) {
+                        return <span className="text-muted-foreground">—</span>;
+                    }
+                    return (
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openLightboxForRow(row)}>
+                                        <Eye className="h-3.5 w-3.5" />
+                                        {row.invoiceProof.length}
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs font-medium">
+                                    View proofs
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     );
                 },
             },
             {
                 headerName: "Status",
+                width: 140,
+                sortable: false,
+                filter: false,
                 cellRenderer: p => {
                     const row = p.data as ImprestRow;
 
-                    const Chip = ({ ok, label, Icon, activeClass }: { ok: boolean; label: string; Icon: any; activeClass: string }) => (
-                        <div
-                            className={cn("flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap", ok ? activeClass : "bg-gray-100 text-gray-400")}
-                        >
-                            <Icon className="h-3.5 w-3.5" />
-                            <span>{label}</span>
-                        </div>
-                    );
-
                     return (
-                        <div className="flex items-center gap-2">
-                            <Chip ok={row.approvalStatus === 1} label="Approved" Icon={CheckCircle} activeClass="bg-green-100 text-green-700" />
-
-                            <Chip ok={row.tallyStatus === 1} label="Tallied" Icon={ListChecks} activeClass="bg-blue-100 text-blue-700" />
-
-                            <Chip ok={row.proofStatus === 1} label="Proof OK" Icon={FileCheck} activeClass="bg-purple-100 text-purple-700" />
+                        <div className="flex items-center gap-1">
+                            <StatusToggle
+                                active={row.approvalStatus === 1}
+                                label="Approved"
+                                icon={CheckCircle}
+                                onClick={() => approveMutation.mutate(row.id)}
+                                disabled={approveMutation.isPending}
+                            />
+                            <StatusToggle
+                                active={row.tallyStatus === 1}
+                                label="Tallied"
+                                icon={ListChecks}
+                                onClick={() => tallyMutation.mutate(row.id)}
+                                disabled={tallyMutation.isPending}
+                            />
+                            <StatusToggle
+                                active={row.proofStatus === 1}
+                                label="Proof Verified"
+                                icon={FileCheck}
+                                onClick={() => proofMutation.mutate(row.id)}
+                                disabled={proofMutation.isPending}
+                            />
                         </div>
                     );
                 },
             },
-            { headerName: "Action", cellRenderer: createActionColumnRenderer(actionItems), sortable: false, filter: false },
+            {
+                headerName: "Actions",
+                width: 130,
+                sortable: false,
+                filter: false,
+                cellRenderer: p => {
+                    const row = p.data as ImprestRow;
+
+                    return (
+                        <div className="flex items-center gap-1">
+                            <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                            <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
+                            <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />
+                        </div>
+                    );
+                },
+            },
         ],
-        [actionItems]
+        [approveMutation, tallyMutation, proofMutation, handleDelete]
     );
 
-    /* -------------------- UI -------------------- */
+    /* -------------------- RENDER -------------------- */
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin" />
-                <span className="ml-2">Loading…</span>
-            </div>
+            <Card>
+                <CardContent className="flex items-center justify-center h-64">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading imprests…</span>
+                </CardContent>
+            </Card>
         );
     }
 
     if (error) {
-        return <div className="text-red-600 text-center">Failed to load imprests</div>;
+        return (
+            <Card>
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm font-medium">Failed to load imprests</p>
+                    <p className="text-xs text-muted-foreground">Please try again later</p>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
         <Card>
-            <CardHeader className="flex justify-between items-center">
-                <div>
-                    <CardTitle>My Imprests</CardTitle>
-                    <CardDescription>{rows.length} records</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div className="space-y-1">
+                    <CardTitle>Imprests</CardTitle>
+                    <CardDescription>
+                        {rows.length} {rows.length === 1 ? "record" : "records"}
+                    </CardDescription>
                 </div>
 
-                <div className="flex gap-2">
-                    <Button onClick={() => navigate(paths.shared.imprestCreate)}>Add Imprest</Button>
-                    <Button variant="secondary" onClick={exportExcel}>
-                        Download Excel
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={exportExcel}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                    </Button>
+                    <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Imprest
                     </Button>
                 </div>
             </CardHeader>
 
             <CardContent>
-                <DataTable data={rows} columnDefs={columns} gridOptions={{ pagination: true }} />
+                <DataTable
+                    data={rows}
+                    columnDefs={columns}
+                    gridOptions={{
+                        pagination: true,
+                        paginationPageSize: 20,
+                        rowHeight: 48,
+                        headerHeight: 44,
+                        suppressCellFocus: true,
+                    }}
+                />
             </CardContent>
 
-            {/* ADD PROOF MODAL */}
+            {/* Upload Proof Dialog */}
             <Dialog open={addProofOpen} onOpenChange={setAddProofOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Add Proof</DialogTitle>
+                        <DialogTitle>Upload Proof</DialogTitle>
+                        <DialogDescription>Select one or more files to upload as proof documents.</DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={submitAddProof} className="space-y-4">
-                        <Input type="file" multiple onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))} />
+                        <div className="space-y-2">
+                            <Input type="file" multiple accept="image/*,.pdf" onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))} />
+                            {filesToUpload.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    {filesToUpload.length} {filesToUpload.length === 1 ? "file" : "files"} selected
+                                </p>
+                            )}
+                        </div>
+
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" type="button" onClick={() => setAddProofOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setAddProofOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit">Upload</Button>
+                            <Button type="submit" disabled={filesToUpload.length === 0 || uploadProofsMutation.isPending}>
+                                {uploadProofsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Upload
+                            </Button>
                         </div>
                     </form>
                 </DialogContent>
             </Dialog>
 
-            {/* ADD REMARK MODAL */}
+            {/* Add Remark Dialog */}
             <Dialog open={remarkOpen} onOpenChange={setRemarkOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Add Remark</DialogTitle>
+                        <DialogDescription>Add a note or comment for this imprest record.</DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={submitAddRemark} className="space-y-4">
-                        <Textarea />
+                        <Textarea value={remarkText} onChange={e => setRemarkText(e.target.value)} placeholder="Enter your remark…" rows={4} />
+
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" type="button" onClick={() => setRemarkOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setRemarkOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit">Upload</Button>
+                            <Button type="submit" disabled={!remarkText.trim()}>
+                                Save
+                            </Button>
                         </div>
                     </form>
                 </DialogContent>
             </Dialog>
 
+            {/* Lightbox */}
             {lightboxOpen && <Lightbox open close={() => setLightboxOpen(false)} slides={lightboxSlides} />}
         </Card>
     );
