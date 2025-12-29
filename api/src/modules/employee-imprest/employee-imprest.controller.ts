@@ -15,7 +15,7 @@ const multerConfig = {
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
-            callback(null, `${uniqueSuffix}${ext}`);
+            callback(null, `imp-${uniqueSuffix}${ext}`);
         },
     }),
     limits: {
@@ -27,8 +27,9 @@ export class EmployeeImprestController {
     constructor(private readonly service: EmployeeImprestService) {}
 
     @Post()
-    create(@Body() body: CreateEmployeeImprestDto, @CurrentUser("id") userId: number) {
-        let data = this.service.create(body, userId);
+    @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
+    create(@Body() body: CreateEmployeeImprestDto, @UploadedFiles() files: Express.Multer.File[], @CurrentUser("id") userId: number) {
+        let data = this.service.create(body, files, userId);
         console.log("Created Employee Imprest:", data);
         return data;
     }
@@ -84,9 +85,10 @@ export class EmployeeImprestController {
 
     // File upload code
     @Post(":id/upload")
-    @UseInterceptors(FilesInterceptor("invoice_proof[]", 10, multerConfig))
+    @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
     uploadDocs(@Param("id", ParseIntPipe) id: number, @UploadedFiles() files: Express.Multer.File[], @CurrentUser("id") userId: number) {
         console.log("file upload begins");
+        console.log("Files received:", files);
         return this.service.uploadDocs(id, files, userId);
     }
 }

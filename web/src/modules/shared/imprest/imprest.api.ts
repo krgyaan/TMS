@@ -13,6 +13,8 @@ export const getMyImprests = async (): Promise<ImprestRow[]> => {
 // ---------- GET USER IMPRESTS ----------
 export const getUserImprests = async (userId: number): Promise<ImprestRow[]> => {
     const res = await api.get(`/employee-imprest/user/${userId}`);
+    console.log("Fetching imprests for userId:", userId);
+    console.log("Response data:", res.data);
     return res.data;
 };
 
@@ -26,8 +28,27 @@ export interface CreateImprestInput {
     remark?: string | null;
 }
 
-export const createImprest = async (data: CreateImprestInput) => {
-    const res = await api.post("/employee-imprest", data);
+export const createImprest = async ({ data, files }: { data: CreateImprestInput; files: File[] }) => {
+    const formData = new FormData();
+
+    //append the form data
+    Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+        }
+    });
+
+    files.forEach(file => {
+        formData.append("files", file);
+    });
+
+    console.log("Creating imprest with data:", formData);
+
+    const res = await api.post("/employee-imprest", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
     return res.data;
 };
 
@@ -74,8 +95,8 @@ export const addImprestRemark = async (id: number, remark: string) => {
 /* ---------- UPLOAD PROOFS ---------- */
 export const uploadImprestProofs = async (id: number, files: File[]) => {
     const form = new FormData();
-    files.forEach(file => form.append("invoice_proof[]", file));
-
+    files.forEach(file => form.append("files", file));
+    console.log("Data being sent from the frontend. Uploading proofs for imprest ID:", id, "with files:", files);
     const res = await api.post(`/employee-imprest/${id}/upload`, form, {
         headers: {
             "Content-Type": "multipart/form-data",
