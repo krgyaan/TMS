@@ -36,7 +36,6 @@ const EmployeeImprestForm: React.FC = () => {
      * React Query Mutations
      */
     const createMutation = useCreateImprest();
-    const uploadProofsMutation = useUploadImprestProofs();
 
     /**
      * React Hook Form
@@ -58,28 +57,13 @@ const EmployeeImprestForm: React.FC = () => {
     /**
      * Submit handler
      */
-    const onSubmit = (data: CreateImprestInput) => {
-        createMutation.mutate(data, {
-            onSuccess: async created => {
-                toast.success("Imprest created successfully");
-
-                if (pondFiles.length > 0) {
-                    uploadProofsMutation.mutate(
-                        { id: created.id, files: pondFiles },
-                        {
-                            onSuccess: () => toast.success("Uploaded proofs"),
-                            onError: () => toast.error("Imprest created but proof upload failed"),
-                        }
-                    );
-                }
-
-                navigate(paths.shared.imprest);
-            },
-            onError: err => {
-                console.error(err);
-                toast.error("Failed to create imprest");
-            },
-        });
+    const onSubmit = async (data: CreateImprestInput) => {
+        try {
+            const res = await createMutation.mutateAsync({ data, files: pondFiles });
+            navigate(paths.shared.imprest);
+        } catch (err) {
+            console.error("Error creating imprest:", err);
+        }
     };
 
     /**
