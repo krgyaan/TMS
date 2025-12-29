@@ -1,6 +1,6 @@
 // ImprestEmployeeDashboard.tsx
-import React, { useMemo, useState, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { data, useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImp
 import type { ImprestRow } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+import type { GridApi } from "ag-grid-community";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -121,6 +123,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+    const [searchText, setSearchText] = useState("");
+    const [gridApi, setGridApi] = useState<GridApi | null>(null);
 
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
@@ -146,7 +150,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const submitAddProof = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentProofRowId || filesToUpload.length === 0) return;
-
+        console.log("data", filesToUpload);
         uploadProofsMutation.mutate(
             { id: currentProofRowId, files: filesToUpload },
             {
@@ -172,7 +176,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     };
 
     const openLightboxForRow = (row: ImprestRow) => {
-        setLightboxSlides(row.invoiceProof.map(p => ({ src: p.url })));
+        setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employee-imprest/${filename}` })));
         setLightboxOpen(true);
     };
 
@@ -197,6 +201,10 @@ const ImprestEmployeeDashboard: React.FC = () => {
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
         saveAs(new Blob([buf]), `Imprest_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
+
+    useEffect(() => {
+        console.log("QuickFilter:", searchText);
+    }, [searchText]);
 
     /* -------------------- COLUMNS -------------------- */
 
@@ -346,6 +354,17 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Input
+                        placeholder="Search imprests..."
+                        value={searchText}
+                        onChange={e => {
+                            const value = e.target.value;
+                            setSearchText(value);
+                            gridApi?.setGridOption("quickFilterText", value);
+                        }}
+                        className="w-64"
+                    />
+
                     <Button variant="outline" size="sm" onClick={exportExcel}>
                         <Download className="h-4 w-4 mr-2" />
                         Export
@@ -361,12 +380,19 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 <DataTable
                     data={rows}
                     columnDefs={columns}
+                    onGridReady={params => {
+                        setGridApi(params.api);
+                        params.api.setQuickFilter(searchText);
+                    }}
                     gridOptions={{
                         pagination: true,
                         paginationPageSize: 20,
                         rowHeight: 48,
                         headerHeight: 44,
                         suppressCellFocus: true,
+                        onGridReady: params => {
+                            setGridApi(params.api);
+                        },
                     }}
                 />
             </CardContent>
@@ -383,7 +409,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="space-y-2">
                             <Input type="file" multiple accept="image/*,.pdf" onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))} />
                             {filesToUpload.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs ">
                                     {filesToUpload.length} {filesToUpload.length === 1 ? "file" : "files"} selected
                                 </p>
                             )}
