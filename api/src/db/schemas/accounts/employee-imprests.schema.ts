@@ -12,7 +12,7 @@ export const employee_imprests = pgTable("employee_imprests", {
 
     amount: integer("amount").notNull(),
 
-    category: varchar("category", { length: 255 }),
+    category: varchar("category_id", { length: 255 }),
 
     team_id: integer("team_id"),
 
