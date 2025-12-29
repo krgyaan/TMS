@@ -1,4 +1,20 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, Req, NotFoundException, UseInterceptors, UploadedFiles, ConsoleLogger } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Post,
+    Put,
+    Delete,
+    Param,
+    Body,
+    Query,
+    ParseIntPipe,
+    Req,
+    NotFoundException,
+    UseInterceptors,
+    UploadedFiles,
+    ConsoleLogger,
+    UploadedFile,
+} from "@nestjs/common";
 
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import { CurrentUser } from "@/decorators/current-user.decorator";
@@ -16,6 +32,17 @@ const followUpAttachmentsMulterConfig = {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
             callback(null, `fu-${uniqueSuffix}${ext}`);
+        },
+    }),
+};
+
+const proofImageMulterConfig = {
+    storage: diskStorage({
+        destination: "./uploads/accounts",
+        filename: (req, file, callback) => {
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            callback(null, `fu-pi-${uniqueSuffix}${ext}`);
         },
     }),
 };
@@ -70,8 +97,6 @@ export class FollowUpController {
     @Put(":id")
     @UseInterceptors(FilesInterceptor("attachments", 10, followUpAttachmentsMulterConfig))
     async update(@Param("id", ParseIntPipe) id: number, @Body() dto: any, @Req() req, @UploadedFiles() attachments: Express.Multer.File[]) {
-        console.log("Received DTO & files:", dto);
-        console.log("files", attachments);
         const res = this.service.update(id, dto, attachments, req.user);
         return res;
     }
@@ -81,10 +106,11 @@ export class FollowUpController {
     // ========================
 
     @Put(":id/status")
-    async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpStatusDto, @Req() req) {
+    @UseInterceptors(FileInterceptor("proofImage", proofImageMulterConfig))
+    async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpStatusDto, @Req() req, @UploadedFile() proofImage: Express.Multer.File) {
         console.log("Entering API Call");
-        console.log(req);
-        return this.service.updateStatus(id, dto, req.user);
+        console.log({ id, dto, proofImage });
+        return this.service.updateStatus(id, dto, req.user, proofImage);
     }
 
     // ========================

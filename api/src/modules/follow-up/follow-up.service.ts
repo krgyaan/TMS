@@ -443,11 +443,7 @@ export class FollowUpService {
     // UPDATE STATUS (QUICK MODAL)
     // ========================
 
-    async updateStatus(
-        id: number,
-        dto: any, // keeping it loose to match your current simplified service
-        currentUser: { id: number; name: string }
-    ): Promise<FollowUp> {
+    async updateStatus(id: number, dto: any, currentUser: { id: number; name: string }, proofImage: Express.Multer.File): Promise<FollowUp> {
         const existing = await this.db
             .select()
             .from(followUps)
@@ -468,9 +464,10 @@ export class FollowUpService {
         if (dto.frequency) updateData.frequency = dto.frequency;
         if (dto.stopReason) updateData.stopReason = dto.stopReason;
         if (dto.proofText) updateData.proofText = dto.proofText;
-        if (dto.proofImagePath) updateData.proofImagePath = dto.proofImagePath;
         if (dto.stopRemarks) updateData.stopRemarks = dto.stopRemarks;
-
+        if (proofImage) {
+            updateData.proofImagePath = proofImage.filename;
+        }
         const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
 
         return updated;

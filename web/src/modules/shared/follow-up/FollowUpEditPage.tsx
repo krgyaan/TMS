@@ -144,7 +144,7 @@ const FollowUpEditPage: React.FC = () => {
         // 4️⃣ New files
         newFiles.forEach(file => formData.append("attachments", file));
 
-        updateMutation.mutate(
+        updateMutation.mutateAsync(
             { id: followupId, data: formData },
             {
                 onSuccess: () => {
