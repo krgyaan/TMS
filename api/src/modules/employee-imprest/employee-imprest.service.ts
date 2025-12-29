@@ -1,5 +1,5 @@
 // employee-imprest.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
@@ -18,13 +18,13 @@ export class EmployeeImprestService {
     ) {}
 
     /* ----------------------------- CREATE ----------------------------- */
-    async create(data: CreateEmployeeImprestDto, userId: number) {
+    async create(data: CreateEmployeeImprestDto, files: Express.Multer.File[], userId: number) {
         const result = await this.db
             .insert(employeeImprests)
             .values({
                 ...data,
                 userId, // override client input
-                invoiceProof: [], // safe explicit default
+                invoiceProof: files.map(f => f.filename), // store filenames of uploaded files
             })
             .returning();
 
@@ -70,34 +70,31 @@ export class EmployeeImprestService {
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
-
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
+        if (!files || files.length === 0) {
+            throw new BadRequestException("No files uploaded");
         }
 
-        const newDocs = files.map(file => ({
-            url: `/uploads/employee-imprest/${file.filename}`,
-            name: file.originalname,
-            type: file.mimetype.startsWith("image") ? "image" : "file",
-        }));
+        // 🛑 Guardrail (never silently fix bad data)
+        if (!Array.isArray(existing.invoiceProof)) {
+            throw new InternalServerErrorException("invoiceProof is corrupted (expected JSON array)");
+        }
 
-        const existingDocs = (existing.invoiceProof as any[]) ?? [];
-        const updatedDocs = [...existingDocs, ...newDocs];
+        const updatedDocs = [...existing.invoiceProof, ...files.map(f => f.filename)];
 
-        const result = await this.db
+        const [updated] = await this.db
             .update(employeeImprests)
             .set({
-                invoiceProof: updatedDocs,
+                invoiceProof: updatedDocs, // ← RAW JSON ARRAY
                 updatedAt: new Date(),
             })
             .where(eq(employeeImprests.id, id))
             .returning();
 
-        return result[0];
+        return updated;
     }
 
     async proofApprove({ imprestId, userId }: { imprestId: number; userId: number }) {
