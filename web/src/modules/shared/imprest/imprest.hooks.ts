@@ -61,13 +61,11 @@ export const useCreateImprest = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateImprestInput) => createImprest(data),
-
+        mutationFn: createImprest,
         onSuccess: () => {
             toast.success("Imprest created successfully");
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
-
         onError: () => toast.error("Failed to create imprest"),
     });
 };
