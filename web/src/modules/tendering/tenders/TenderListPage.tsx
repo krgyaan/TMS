@@ -135,22 +135,6 @@ const TenderListPage = () => {
             minWidth: 250,
         }),
         {
-            field: "organizationAcronym",
-            headerName: "Org.",
-            width: 100,
-            cellRenderer: (params: any) => {
-                return <span title={params.data.organizationName}>{params.value || "-"}</span>;
-            },
-        },
-        {
-            field: "itemName",
-            headerName: "Item",
-            width: 150,
-            cellRenderer: (params: any) => {
-                return params.value || <span className="text-gray-400">-</span>;
-            },
-        },
-        {
             field: "teamMemberName",
             headerName: "Member",
             width: 150,
@@ -234,7 +218,6 @@ const TenderListPage = () => {
                     <div className="flex-none m-auto">
                         <TabsList>
                             {categories.map(category => {
-                                const count = tabCounts[category.name] ?? 0;
                                 return (
                                     <TabsTrigger
                                         key={category.name}
@@ -242,11 +225,6 @@ const TenderListPage = () => {
                                         className="data-[state=active]:shadow-md flex items-center gap-1"
                                     >
                                         <span className="font-semibold text-sm">{category.label}</span>
-                                        {count > 0 && (
-                                            <Badge variant="secondary" className="text-xs">
-                                                {count}
-                                            </Badge>
-                                        )}
                                     </TabsTrigger>
                                 );
                             })}

@@ -14,7 +14,7 @@ import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useRfqs, useDeleteRfq } from '@/hooks/api/useRfqs';
-import { tenderNameCol } from '@/components/data-grid';
+import { dateCol, tenderNameCol } from '@/components/data-grid';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
@@ -103,14 +103,19 @@ const Rfqs = () => {
             sortable: true,
         }),
         {
-            field: 'dueDate',
-            headerName: 'Due Date',
+            field: 'teamMemberName',
+            headerName: 'Team Member',
             width: 150,
-            colId: 'dueDate',
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
+            colId: 'teamMemberName',
+            valueGetter: (params: any) => params.data?.teamMemberName ? params.data.teamMemberName : '—',
             sortable: true,
             filter: true,
         },
+        dateCol<RfqDashboardRow>('dueDate', {
+            headerName: 'Due Date',
+            width: 150,
+            colId: 'dueDate',
+        }),
         {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',

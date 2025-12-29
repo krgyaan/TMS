@@ -92,10 +92,7 @@ export class RfqsService {
         const conditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderInfos.rfqTo),
-            ne(tenderInfos.rfqTo, '0'),
-            ne(tenderInfos.rfqTo, ''),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         // Build orderBy clause based on sortBy (if it's a database field)
@@ -155,6 +152,7 @@ export class RfqsService {
             .where(and(...conditions))
             .orderBy(orderByClause);
 
+        console.log("RFQ Rows: ", rows);
         // Filter by rfqStatus (pending = rfqId is null, sent = rfqId is not null)
         let filteredRows = rows;
         if (filters?.rfqStatus) {

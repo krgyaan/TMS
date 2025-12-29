@@ -2,6 +2,7 @@ import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import { BooleanIconCell } from "./renderers/BooleanIconCell";
 import TenderNameCell from "./renderers/TenderNameCell";
 import { currencyFormatter, dateFormatter } from "./formatters";
+import { formatDateTime } from "@/hooks/useFormatedDate";
 
 type Field<T> = keyof T | string;
 
@@ -37,7 +38,15 @@ export function dateCol<T = any>(
 ): ColDef<T> {
     return {
         field: field as string,
-        valueFormatter: dateFormatter,
+        valueFormatter: (params) => {
+            return params.value ? formatDateTime(params.value) : '—';
+        },
+        comparator: (dateA, dateB) => {
+            const timeA = dateA ? new Date(dateA).getTime() : 0;
+            const timeB = dateB ? new Date(dateB).getTime() : 0;
+            return timeA - timeB;
+        },
+        filter: 'agDateColumnFilter',
         ...overrides,
     } as ColDef<T>;
 }

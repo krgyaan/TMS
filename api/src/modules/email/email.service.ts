@@ -112,32 +112,14 @@ export class EmailService {
                 return { success: false, error: 'No valid recipients.' };
             }
 
-            // 4. Override recipients in non-production environments
-            let originalToEmails: string[] = [];
-            let originalCcEmails: string[] = [];
-
-            if (!this.isProd) {
-                // Store original recipients for logging and audit trail
-                originalToEmails = [...toEmails];
-                originalCcEmails = [...ccEmailsResolved];
-
-                // Override recipients for dev environment
-                toEmails = ['gyan+1@volksenergie.in'];
-                ccEmailsResolved = [];
-
-                this.logger.log(
-                    `[NON-PROD] Email redirected to dev address. Original TO: ${originalToEmails.join(', ')}, Original CC: ${originalCcEmails.join(', ') || 'none'}`
-                );
-            }
-
-            // 5. Handle CC/BCC in non-production: log but don't send
+            // 4. Handle CC/BCC in non-production: log but don't send
             let ccEmails = ccEmailsResolved;
             if (!this.isProd && ccEmailsResolved.length > 0) {
                 this.logger.log(`[NON-PROD] CC recipients (logged, not sent): ${ccEmailsResolved.join(', ')}`);
                 ccEmails = []; // Don't send CC in non-production
             }
 
-            // 6. Render template
+            // 5. Render template
             const htmlBody = this.renderTemplate(options.template, {
                 data: {
                     ...options.data,
@@ -145,7 +127,7 @@ export class EmailService {
                 }
             });
 
-            // 7. Get thread info
+            // 6. Get thread info
             const threadInfo = await this.gmail.getThreadInfo(
                 options.referenceType,
                 options.referenceId,
@@ -155,7 +137,7 @@ export class EmailService {
             const messageId = this.gmail.generateMessageId();
 
             // 8. Create email log (status: pending)
-            // Save original recipients to log for audit trail (even if overridden in non-prod)
+            // Save original CC emails to log even if not sending in non-prod
             const [log] = await this.db
                 .insert(emailLogs)
                 .values({
@@ -164,8 +146,8 @@ export class EmailService {
                     eventType: options.eventType,
                     fromUserId: options.fromUserId,
                     fromEmail: sender.email,
-                    toEmails: originalToEmails.length > 0 ? originalToEmails : toEmails,
-                    ccEmails: originalCcEmails.length > 0 ? originalCcEmails : ccEmailsResolved, // Save original CC for audit trail
+                    toEmails,
+                    ccEmails: ccEmailsResolved, // Save original CC for audit trail
                     subject: options.subject,
                     templateName: options.template,
                     templateData: options.data,
