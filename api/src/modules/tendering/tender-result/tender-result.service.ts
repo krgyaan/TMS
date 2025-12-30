@@ -140,8 +140,6 @@ export class TenderResultService {
                 case 'pending':
                     // Pending: result status is null OR 'Under Evaluation' AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified
                     const pendingStatusNames = ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'];
-                    console.log('Pending filter - checking status names:', pendingStatusNames);
-                    console.log('Pending filter - checking for NULL OR Under Evaluation tenderResults.status');
                     typeFilter = and(
                         or(
                             isNull(tenderResults.status),
@@ -161,7 +159,6 @@ export class TenderResultService {
                     break;
             }
         }
-        console.log('typeFilter', typeFilter);
 
         // Build where conditions
         const whereConditions = [
@@ -173,7 +170,6 @@ export class TenderResultService {
 
         if (typeFilter) {
             whereConditions.push(typeFilter);
-            console.log('Type filter added to conditions');
         } else {
             console.log('No type filter applied');
         }
@@ -239,7 +235,6 @@ export class TenderResultService {
 
             // If no rows, return empty data
             if (!rows || rows.length === 0) {
-                console.log('=== No rows found, returning empty result ===');
                 return {
                     data: [],
                     meta: {
