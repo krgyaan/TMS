@@ -53,6 +53,27 @@ export class PhysicalDocsController {
         return this.physicalDocsService.findAll(filters);
     }
 
+    @Get('dashboard')
+    async getDashboard(
+        @Query('tab') tab?: 'pending' | 'sent' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.physicalDocsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
+        return this.physicalDocsService.getDashboardCounts();
+    }
+
     @Get('counts')
     async getCounts() {
         return this.physicalDocsService.getDashboardCounts();
