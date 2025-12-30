@@ -64,11 +64,6 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.getDashboardCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        return this.bidSubmissionsService.getDashboardCounts();
-    }
-
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.bidSubmissionsService.findByTenderId(tenderId);
