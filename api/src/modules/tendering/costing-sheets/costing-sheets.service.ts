@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
-import { and, eq, inArray, or, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, or, asc, desc, sql, isNull, isNotNull, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -9,12 +9,15 @@ import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -60,9 +63,7 @@ export class CostingSheetsService {
 
         // Build WHERE conditions
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            ...getBaseDashboardConditions(['dnb', 'lost']),
         ];
 
         // Add costingStatus filter condition (based on costingSheetId and status)
@@ -214,18 +215,82 @@ export class CostingSheetsService {
         return costingSheetStatus as 'Submitted' | 'Approved' | 'Rejected/Redo';
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; rejected: number; total: number }> {
-        // Build base WHERE conditions (same as findAll)
+    /**
+     * Get dashboard data by tab - Refactored to use config
+     */
+    async getDashboardData(
+        tabKey?: 'pending' | 'submitted' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<CostingSheetDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const activeTab = tabKey || 'pending';
+        const tabConfig = getTabConfig('costing-sheets', activeTab);
+
+        if (!tabConfig) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Build base conditions
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            ...getBaseDashboardConditions(['dnb', 'lost']),
         ];
 
-        const baseWhereClause = and(...baseConditions);
+        // Build tab-specific conditions
+        const fieldMappings = {
+            costingSheetId: tenderCostingSheets.id,
+        };
 
-        // Count pending: no costingSheet OR costingSheet exists but status is null
-        const [pendingResult] = await this.db
+        const conditions = buildTabConditions(
+            'costing-sheets',
+            activeTab,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy || tabConfig.sortBy;
+        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        let orderByClause: any = asc(tenderInfos.dueDate);
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'submissionDate':
+                    orderByClause = sortFn(tenderCostingSheets.createdAt);
+                    break;
+                case 'statusChangeDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'statusName':
+                    orderByClause = sortFn(statuses.name);
+                    break;
+                default:
+                    orderByClause = sortFn(tenderInfos.dueDate);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(tenderInfos)
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
@@ -233,54 +298,115 @@ export class CostingSheetsService {
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .where(
-                and(
-                    baseWhereClause,
-                    or(
-                        isNull(tenderCostingSheets.id),
-                        isNull(tenderCostingSheets.status),
-                        eq(tenderCostingSheets.status, 'Pending')
-                    )!
-                )
-            );
-        const pending = Number(pendingResult?.count || 0);
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
 
-        // Count submitted: status must be 'Submitted' or 'Approved'
-        const [submittedResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+                itemName: items.name,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                emdAmount: tenderInfos.emd,
+                gstValues: tenderInfos.gstValues,
+                costingSheetId: tenderCostingSheets.id,
+                costingSheetStatus: tenderCostingSheets.status,
+                submittedFinalPrice: tenderCostingSheets.submittedFinalPrice,
+                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
+                googleSheetUrl: tenderCostingSheets.googleSheetUrl,
+            })
             .from(tenderInfos)
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .where(
-                and(
-                    baseWhereClause,
-                    inArray(tenderCostingSheets.status, ['Submitted', 'Approved'])
-                )
-            );
-        const submitted = Number(submittedResult?.count || 0);
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
 
-        // Count rejected: status must be 'Rejected/Redo'
-        const [rejectedResult] = await this.db
+        const data = rows.map((row) => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamMemberName: row.teamMemberName,
+            itemName: row.itemName,
+            statusName: row.statusName,
+            dueDate: row.dueDate,
+            emdAmount: row.emdAmount,
+            gstValues: row.gstValues ? Number(row.gstValues) : 0,
+            costingStatus: this.determineCostingStatus(row.costingSheetId, row.costingSheetStatus),
+            submittedFinalPrice: row.submittedFinalPrice,
+            submittedBudgetPrice: row.submittedBudgetPrice,
+            googleSheetUrl: row.googleSheetUrl,
+            costingSheetId: row.costingSheetId,
+        }));
+
+        return wrapPaginatedResponse(data, total, page, limit);
+    }
+
+    async getDashboardCounts(): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
+        const config = loadDashboardConfig();
+        const dashboardConfig = config.dashboards['costing-sheets'];
+
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+        ];
+
+        const fieldMappings = {
+            costingSheetId: tenderCostingSheets.id,
+        };
+
+        const counts = await Promise.all([
+            this.countTab('costing-sheets', 'pending', baseConditions, fieldMappings),
+            this.countTab('costing-sheets', 'submitted', baseConditions, fieldMappings),
+            this.countTab('costing-sheets', 'tender-dnb', baseConditions, fieldMappings),
+        ]);
+
+        return {
+            pending: counts[0],
+            submitted: counts[1],
+            'tender-dnb': counts[2],
+            total: counts.reduce((sum, count) => sum + count, 0),
+        };
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const [result] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(tenderInfos)
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .where(
-                and(
-                    baseWhereClause,
-                    eq(tenderCostingSheets.status, 'Rejected/Redo')
-                )
-            );
-        const rejected = Number(rejectedResult?.count || 0);
+            .where(whereClause);
 
-        const total = pending + submitted + rejected;
-        return { pending, submitted, rejected, total };
+        return Number(result?.count || 0);
     }
 
     async findByTenderId(tenderId: number) {
@@ -365,11 +491,11 @@ export class CostingSheetsService {
     }
 
     async update(id: number, data: {
-        submittedFinalPrice: string;
-        submittedReceiptPrice: string;
-        submittedBudgetPrice: string;
-        submittedGrossMargin: string;
-        teRemarks: string;
+        submittedFinalPrice?: string;
+        submittedReceiptPrice?: string;
+        submittedBudgetPrice?: string;
+        submittedGrossMargin?: string;
+        teRemarks?: string;
     }, changedBy: number) {
         // Get costing sheet to find tenderId
         const costingSheet = await this.findById(id);
@@ -381,19 +507,22 @@ export class CostingSheetsService {
         // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) when resubmitted
         const newStatus = 6; // Status ID for "Price Bid ready"
 
+        const updateData: any = {
+            status: 'Submitted',
+            submittedAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        if (data.submittedFinalPrice !== undefined) updateData.submittedFinalPrice = data.submittedFinalPrice;
+        if (data.submittedReceiptPrice !== undefined) updateData.submittedReceiptPrice = data.submittedReceiptPrice;
+        if (data.submittedBudgetPrice !== undefined) updateData.submittedBudgetPrice = data.submittedBudgetPrice;
+        if (data.submittedGrossMargin !== undefined) updateData.submittedGrossMargin = data.submittedGrossMargin;
+        if (data.teRemarks !== undefined) updateData.teRemarks = data.teRemarks;
+
         const [result] = await this.db.transaction(async (tx) => {
             const updated = await tx
                 .update(tenderCostingSheets)
-                .set({
-                    submittedFinalPrice: data.submittedFinalPrice,
-                    submittedReceiptPrice: data.submittedReceiptPrice,
-                    submittedBudgetPrice: data.submittedBudgetPrice,
-                    submittedGrossMargin: data.submittedGrossMargin,
-                    teRemarks: data.teRemarks,
-                    status: 'Submitted',
-                    submittedAt: new Date(),
-                    updatedAt: new Date(),
-                })
+                .set(updateData)
                 .where(eq(tenderCostingSheets.id, id))
                 .returning();
 

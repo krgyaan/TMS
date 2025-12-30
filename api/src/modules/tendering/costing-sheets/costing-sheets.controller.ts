@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
-import { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
+import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -31,6 +31,27 @@ export class CostingSheetsController {
         };
 
         return this.costingSheetsService.findAll(filters);
+    }
+
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'pending' | 'submitted' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.costingSheetsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
+    getDashboardCounts() {
+        return this.costingSheetsService.getDashboardCounts();
     }
 
     @Get('counts')
