@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, or } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { and, eq, isNotNull, ne, sql, asc, desc, isNull, or, inArray, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -17,12 +17,16 @@ import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getTabConfig, getCategoryStatusIds, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type RfqFilters = {
     rfqStatus?: 'pending' | 'sent';
@@ -431,55 +435,71 @@ export class RfqsService {
     }
 
     /**
-     * Get RFQ Dashboard data - Updated implementation per requirements
-     * Type: 'pending' = rfqId IS NULL, 'sent' = rfqId IS NOT NULL
+     * Get RFQ Dashboard data - Refactored to use dashboard config
      */
     async getRfqData(
-        type?: 'pending' | 'sent',
+        tabKey?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
     ): Promise<PaginatedResult<RfqRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
+        // Use default tab if not provided
+        const activeTab = tabKey || 'pending';
+        const tabConfig = getTabConfig('rfq', activeTab);
+
+        if (!tabConfig) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
         // Build base conditions
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            ...getBaseDashboardConditions(['dnb', 'lost']),
             isNotNull(tenderInfos.rfqTo),
             ne(tenderInfos.rfqTo, '0'),
             ne(tenderInfos.rfqTo, ''),
         ];
 
-        // Add type filter
-        if (type === 'pending') {
-            baseConditions.push(isNull(rfqs.id));
-        } else if (type === 'sent') {
-            baseConditions.push(isNotNull(rfqs.id));
-        }
+        // Build tab-specific conditions using helper
+        const fieldMappings = {
+            rfqId: rfqs.id,
+        };
 
-        const whereClause = and(...baseConditions);
+        const conditions = buildTabConditions(
+            'rfq',
+            activeTab,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
 
         // Build orderBy clause
+        const sortBy = filters?.sortBy || tabConfig.sortBy;
+        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
         let orderByClause: any = asc(tenderInfos.dueDate); // Default
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
                 case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
                 case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    orderByClause = sortFn(tenderInfos.tenderName);
                     break;
                 case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
+                    orderByClause = sortFn(users.name);
                     break;
                 case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'statusChangeDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
                 default:
-                    orderByClause = asc(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
             }
         }
 
@@ -540,15 +560,81 @@ export class RfqsService {
             vendorOrganizationNames: row.vendorOrganizationNames,
         }));
 
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+        return wrapPaginatedResponse(data, total, page, limit);
+    }
+
+    /**
+     * Get counts for all RFQ dashboard tabs
+     */
+    async getDashboardCounts(): Promise<{
+        pending: number;
+        sent: number;
+        'rfq-rejected': number;
+        'tender-dnb': number;
+        total: number;
+    }> {
+        const config = loadDashboardConfig();
+        const rfqConfig = config.dashboards.rfq;
+
+        // Base conditions for all tabs
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+            isNotNull(tenderInfos.rfqTo),
+            ne(tenderInfos.rfqTo, '0'),
+            ne(tenderInfos.rfqTo, ''),
+        ];
+
+        const fieldMappings = {
+            rfqId: rfqs.id,
         };
+
+        // Count for each tab
+        const counts = await Promise.all([
+            this.countTab('rfq', 'pending', baseConditions, fieldMappings),
+            this.countTab('rfq', 'sent', baseConditions, fieldMappings),
+            this.countTab('rfq', 'rfq-rejected', baseConditions, fieldMappings),
+            this.countTab('rfq', 'tender-dnb', baseConditions, fieldMappings),
+        ]);
+
+        return {
+            pending: counts[0],
+            sent: counts[1],
+            'rfq-rejected': counts[2],
+            'tender-dnb': counts[3],
+            total: counts.reduce((sum, count) => sum + count, 0),
+        };
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            .where(whereClause);
+
+        return Number(result?.count || 0);
     }
 
     /**

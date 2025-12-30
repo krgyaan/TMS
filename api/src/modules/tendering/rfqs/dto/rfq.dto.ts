@@ -1,201 +1,106 @@
+import { z } from 'zod';
 import {
-    IsArray,
-    IsDateString,
-    IsNotEmpty,
-    IsNumber,
-    IsObject,
-    IsOptional,
-    IsString,
-    MaxLength,
-    ValidateNested,
-    Min
-} from 'class-validator';
-import { Type } from 'class-transformer';
+    optionalString,
+    optionalNumber,
+    optionalTextField,
+    dateField,
+    requiredDateField,
+    decimalField,
+    textField,
+    jsonbField,
+    bigintField,
+} from '@/utils/zod-schema-generator';
 
-export class RfqItemDto {
-    @IsString()
-    @IsNotEmpty()
-    requirement: string;
+/**
+ * RFQ Item Schema - Based on rfqItems table
+ */
+export const RfqItemSchema = z.object({
+    requirement: textField().min(1, 'Requirement is required'),
+    unit: optionalTextField(64),
+    qty: optionalNumber(z.coerce.number().nonnegative()),
+});
 
-    @IsOptional()
-    @IsString()
-    @MaxLength(64)
-    unit?: string;
+export type RfqItemDto = z.infer<typeof RfqItemSchema>;
 
-    @IsOptional()
-    @IsNumber()
-    qty?: number;
-}
+/**
+ * RFQ Document Schema - Based on rfqDocuments table
+ */
+export const RfqDocumentSchema = z.object({
+    docType: textField(50).min(1, 'Document type is required'),
+    path: textField().min(1, 'Path is required'),
+    metadata: jsonbField(z.record(z.any())).optional(),
+});
 
-export class RfqDocumentDto {
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(50)
-    docType: string;
+export type RfqDocumentDto = z.infer<typeof RfqDocumentSchema>;
 
-    @IsString()
-    @IsNotEmpty()
-    path: string;
+/**
+ * Create RFQ Schema - Based on rfqs table + nested rfqItems + rfqDocuments
+ */
+export const CreateRfqSchema = z.object({
+    tenderId: bigintField().positive('Tender ID must be positive'),
+    dueDate: dateField,
+    docList: optionalString,
+    requestedVendor: optionalTextField(255),
+    items: z.array(RfqItemSchema).min(1, 'At least one item is required'),
+    documents: z.array(RfqDocumentSchema).optional(),
+});
 
-    @IsOptional()
-    @IsObject()
-    metadata?: Record<string, any>;
-}
+export type CreateRfqDto = z.infer<typeof CreateRfqSchema>;
 
-export class CreateRfqDto {
-    @IsNumber()
-    @IsNotEmpty()
-    tenderId: number;
+/**
+ * Update RFQ Schema - Partial of CreateRfqSchema
+ */
+export const UpdateRfqSchema = z.object({
+    dueDate: dateField,
+    docList: optionalString,
+    requestedVendor: optionalTextField(255),
+    items: z.array(RfqItemSchema).optional(),
+    documents: z.array(RfqDocumentSchema).optional(),
+});
 
-    @IsOptional()
-    @IsDateString()
-    dueDate?: string;
+export type UpdateRfqDto = z.infer<typeof UpdateRfqSchema>;
 
-    @IsOptional()
-    @IsString()
-    docList?: string;
+/**
+ * RFQ Response Item Schema - Based on rfqResponseItems table
+ */
+export const RfqResponseItemSchema = z.object({
+    requirement: textField().min(1, 'Requirement is required'),
+    unit: optionalTextField(64),
+    qty: optionalNumber(z.coerce.number().nonnegative()),
+    unitPrice: optionalNumber(z.coerce.number().min(0)),
+    totalPrice: optionalNumber(z.coerce.number().min(0)),
+});
 
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    requestedVendor?: string;
+export type RfqResponseItemDto = z.infer<typeof RfqResponseItemSchema>;
 
-    // Nested Items
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqItemDto)
-    items: RfqItemDto[];
+/**
+ * Create RFQ Response Schema - Based on rfqResponses table
+ */
+export const CreateRfqResponseSchema = z.object({
+    rfqId: bigintField().positive('RFQ ID must be positive'),
+    vendorId: bigintField().positive('Vendor ID must be positive'),
+    receiptDatetime: requiredDateField,
+    gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
+    gstType: optionalTextField(50),
+    deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
+    freightType: optionalTextField(50),
+    notes: optionalString,
+    items: z.array(RfqResponseItemSchema).min(1, 'At least one item is required'),
+    documents: z.array(RfqDocumentSchema).optional(),
+});
 
-    // Nested Documents (Optional)
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqDocumentDto)
-    documents?: RfqDocumentDto[];
-}
+export type CreateRfqResponseDto = z.infer<typeof CreateRfqResponseSchema>;
 
-export class UpdateRfqDto {
-    @IsOptional()
-    @IsDateString()
-    dueDate?: string;
+/**
+ * Update RFQ Response Schema - Partial update
+ */
+export const UpdateRfqResponseSchema = z.object({
+    receiptDatetime: dateField,
+    gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
+    gstType: optionalTextField(50),
+    deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
+    freightType: optionalTextField(50),
+    notes: optionalString,
+});
 
-    @IsOptional()
-    @IsString()
-    docList?: string;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    requestedVendor?: string;
-
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqItemDto)
-    items?: RfqItemDto[];
-
-    // Nested Documents (Optional)
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqDocumentDto)
-    documents?: RfqDocumentDto[];
-}
-
-export class RfqResponseItemDto {
-    @IsString()
-    @IsNotEmpty()
-    requirement: string;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(64)
-    unit?: string;
-
-    @IsOptional()
-    @IsNumber()
-    qty?: number;
-
-    @IsOptional()
-    @IsNumber()
-    unitPrice?: number;
-
-    @IsOptional()
-    @IsNumber()
-    totalPrice?: number;
-}
-
-export class CreateRfqResponseDto {
-    @IsNumber()
-    @IsNotEmpty()
-    rfqId: number;
-
-    @IsNumber()
-    @IsNotEmpty()
-    vendorId: number;
-
-    @IsDateString()
-    @IsNotEmpty()
-    receiptDatetime: string;
-
-    @IsOptional()
-    @IsNumber()
-    gstPercentage?: number;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(50)
-    gstType?: string;
-
-    @IsOptional()
-    @IsNumber()
-    deliveryTime?: number;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(50)
-    freightType?: string;
-
-    @IsOptional()
-    @IsString()
-    notes?: string;
-
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqResponseItemDto)
-    items: RfqResponseItemDto[];
-
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => RfqDocumentDto)
-    documents?: RfqDocumentDto[];
-}
-
-export class UpdateRfqResponseDto {
-    @IsOptional()
-    @IsDateString()
-    receiptDatetime?: string;
-
-    @IsOptional()
-    @IsNumber()
-    gstPercentage?: number;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(50)
-    gstType?: string;
-
-    @IsOptional()
-    @IsNumber()
-    deliveryTime?: number;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(50)
-    freightType?: string;
-
-    @IsOptional()
-    @IsString()
-    notes?: string;
-}
+export type UpdateRfqResponseDto = z.infer<typeof UpdateRfqResponseSchema>;

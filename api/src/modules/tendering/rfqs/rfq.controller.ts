@@ -13,7 +13,7 @@ import {
     Query,
 } from '@nestjs/common';
 import { RfqsService, type RfqFilters } from '@/modules/tendering/rfqs/rfq.service';
-import { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
+import type { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -37,6 +37,27 @@ export class RfqsController {
             sortBy,
             sortOrder,
         });
+    }
+
+    @Get('dashboard')
+    async getDashboard(
+        @Query('tab') tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.rfqsService.getRfqData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
+    getDashboardCounts() {
+        return this.rfqsService.getDashboardCounts();
     }
 
     @Get('by-tender/:tenderId')
