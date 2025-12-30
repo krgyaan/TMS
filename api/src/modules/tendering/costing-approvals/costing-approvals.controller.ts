@@ -73,11 +73,6 @@ export class CostingApprovalsController {
         return this.costingApprovalsService.getDashboardCounts();
     }
 
-    @Get('counts')
-    async getCounts() {
-        return this.costingApprovalsService.getDashboardCounts();
-    }
-
     @Get(':id')
     findById(
         @Param('id', ParseIntPipe) id: number,
