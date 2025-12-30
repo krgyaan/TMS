@@ -12,9 +12,17 @@ class TenderResultService extends BaseApiService {
         console.log('=== tenderResultService.getAll ===');
         console.log('params:', params);
 
+        // Map type to tab for dashboard endpoint
+        const tabMap: Record<string, string> = {
+            'pending': 'result-awaited',
+            'won': 'won',
+            'lost': 'lost',
+            'disqualified': 'disqualified',
+        };
+
         if (params) {
             if (params.type !== undefined) {
-                search.set('type', params.type);
+                search.set('tab', tabMap[params.type] || params.type);
             }
             if (params.page) {
                 search.set('page', String(params.page));
@@ -31,7 +39,7 @@ class TenderResultService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        const url = queryString ? `?${queryString}` : '';
+        const url = `/dashboard${queryString ? `?${queryString}` : ''}`;
         console.log('Request URL:', url);
         console.log('Full URL:', `${this.basePath}${url}`);
 
@@ -68,11 +76,11 @@ class TenderResultService extends BaseApiService {
 
     async getCounts(): Promise<ResultDashboardCounts> {
         console.log('=== tenderResultService.getCounts ===');
-        console.log('Request URL: /counts');
-        console.log('Full URL:', `${this.basePath}/counts`);
+        console.log('Request URL: /dashboard/counts');
+        console.log('Full URL:', `${this.basePath}/dashboard/counts`);
 
         try {
-            const result = await this.get<ResultDashboardCounts>('/counts');
+            const result = await this.get<ResultDashboardCounts>('/dashboard/counts');
             console.log('=== tenderResultService.getCounts Response ===');
             console.log('result:', result);
             console.log('result.pending:', result?.pending);

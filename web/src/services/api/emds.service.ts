@@ -21,7 +21,7 @@ class EmdsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<EmdDashboardCounts> {
-        return this.get<EmdDashboardCounts>('/counts');
+        return this.get<EmdDashboardCounts>('/dashboard/counts');
     }
 
     // Existing endpoints

@@ -91,7 +91,7 @@ class TqManagementService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
-        return this.get<TqManagementDashboardCounts>('/counts');
+        return this.get<TqManagementDashboardCounts>('/dashboard/counts');
     }
 }
 
