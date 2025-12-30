@@ -1,55 +1,38 @@
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { z } from 'zod';
+import {
+    optionalString,
+    optionalTextField,
+    bigintField,
+    textField,
+} from '@/utils/zod-schema-generator';
 
-export class IncompleteFieldDto {
-    @IsString()
-    fieldName: string;
+/**
+ * Incomplete Field Schema
+ */
+const IncompleteFieldSchema = z.object({
+    fieldName: textField().min(1, 'Field name is required'),
+    comment: textField().min(1, 'Comment is required'),
+});
 
-    @IsString()
-    comment: string;
-}
+export type IncompleteFieldDto = z.infer<typeof IncompleteFieldSchema>;
 
-export class TenderApprovalPayload {
-    @IsEnum(['0', '1', '2', '3'], { message: 'tlStatus must be one of: 0, 1, 2, 3' })
-    tlStatus: '0' | '1' | '2' | '3';
+/**
+ * Tender Approval Payload Schema - Based on tenders.schema.ts (approval fields)
+ */
+export const TenderApprovalPayloadSchema = z.object({
+    tlStatus: z.enum(['0', '1', '2', '3'], {
+        required_error: 'TL status is required',
+        invalid_type_error: 'TL status must be one of: 0, 1, 2, 3',
+    }),
+    rfqTo: z.array(bigintField().positive()).optional(),
+    tenderFeeMode: optionalTextField(100),
+    emdMode: optionalTextField(100),
+    approvePqrSelection: z.enum(['1', '2']).optional(),
+    approveFinanceDocSelection: z.enum(['1', '2']).optional(),
+    tenderStatus: bigintField().positive().optional(),
+    oemNotAllowed: optionalTextField(50),
+    tlRejectionRemarks: optionalTextField(1000),
+    incompleteFields: z.array(IncompleteFieldSchema).optional(),
+});
 
-    @IsOptional()
-    @IsArray()
-    @IsNumber({}, { each: true })
-    rfqTo?: number[];
-
-    @IsOptional()
-    @IsString()
-    tenderFeeMode?: string;
-
-    @IsOptional()
-    @IsString()
-    emdMode?: string;
-
-    @IsOptional()
-    @IsEnum(['1', '2'])
-    approvePqrSelection?: '1' | '2';
-
-    @IsOptional()
-    @IsEnum(['1', '2'])
-    approveFinanceDocSelection?: '1' | '2';
-
-    @IsOptional()
-    @IsNumber()
-    tenderStatus?: number;
-
-    @IsOptional()
-    @IsString()
-    oemNotAllowed?: string;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(1000)
-    tlRejectionRemarks?: string;
-
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => IncompleteFieldDto)
-    incompleteFields?: IncompleteFieldDto[];
-}
+export type TenderApprovalPayload = z.infer<typeof TenderApprovalPayloadSchema>;
