@@ -54,11 +54,6 @@ export class CostingSheetsController {
         return this.costingSheetsService.getDashboardCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        return this.costingSheetsService.getDashboardCounts();
-    }
-
     @Get('check-drive-scopes')
     async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
         return this.costingSheetsService.checkDriveScopes(user.sub);
