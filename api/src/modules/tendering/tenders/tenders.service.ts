@@ -93,16 +93,8 @@ export type TenderForApproval = {
     tlStatus: number;
 };
 
-// Define the response structure
-export type PaginatedResult<T> = {
-    data: T[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
-};
+// Import shared types
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 
 export type TenderListFilters = {
     statusIds?: number[];
