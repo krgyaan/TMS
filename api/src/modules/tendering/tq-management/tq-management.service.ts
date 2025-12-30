@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, desc, isNotNull, isNull, or, sql, asc, inArray } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, sql, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -9,12 +9,15 @@ import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
 import { tenderQueryItems } from '@db/schemas/tendering';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -99,9 +102,8 @@ export class TqManagementService {
             .from(tenderInfos)
             .where(
                 and(
-                    TenderInfosService.getActiveCondition(),
-                    TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb']),
+                    ...getBaseDashboardConditions(['dnb']),
+                    eq(tenderInfos.status, 17), // Entry condition: Status 17
                     inArray(tenderInfos.id, allTenderIds)
                 )
             );
@@ -305,15 +307,7 @@ export class TqManagementService {
         const totalFiltered = filteredResult.length;
         const paginatedData = filteredResult.slice(offset, offset + limit);
 
-        return {
-            data: paginatedData,
-            meta: {
-                total: totalFiltered,
-                page,
-                limit,
-                totalPages: Math.ceil(totalFiltered / limit),
-            },
-        };
+        return wrapPaginatedResponse(paginatedData, totalFiltered, page, limit);
     }
 
     async findById(id: number) {
@@ -350,9 +344,8 @@ export class TqManagementService {
 
     private tqManagementBaseWhere() {
         return and(
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb'])
+            ...getBaseDashboardConditions(['dnb']),
+            eq(tenderInfos.status, 17) // Entry condition: Status 17
         );
     }
 
