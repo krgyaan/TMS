@@ -17,10 +17,10 @@ import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks
 import type { CostingApprovalDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'submitted' | 'approved' | 'rejected';
+type TabKey = 'pending' | 'approved';
 
 const CostingApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('submitted');
+    const [activeTab, setActiveTab] = useState<TabKey>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -88,19 +88,14 @@ const CostingApprovalListPage = () => {
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'submitted' as TabKey,
+                key: 'pending' as TabKey,
                 name: 'Pending Approval',
-                count: counts?.submitted ?? 0,
+                count: counts?.pending ?? 0,
             },
             {
                 key: 'approved' as TabKey,
                 name: 'Approved',
                 count: counts?.approved ?? 0,
-            },
-            {
-                key: 'rejected' as TabKey,
-                name: 'Rejected',
-                count: counts?.rejected ?? 0,
             },
         ];
     }, [counts]);

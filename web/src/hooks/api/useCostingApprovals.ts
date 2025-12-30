@@ -13,14 +13,13 @@ export const costingApprovalsKey = {
 };
 
 export const useCostingApprovals = (
-    tab?: 'submitted' | 'approved' | 'rejected',
+    tab?: 'pending' | 'approved',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const costingStatusMap: Record<string, 'Submitted' | 'Approved' | 'Rejected/Redo'> = {
-        submitted: 'Submitted',
+        pending: 'Submitted', // Backend 'pending' tab corresponds to 'Submitted' status
         approved: 'Approved',
-        rejected: 'Rejected/Redo',
     };
 
     const params: CostingApprovalListParams = {
@@ -65,6 +64,7 @@ export const useApproveCosting = () => {
             costingApprovalsService.approve(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
             toast.success('Costing sheet approved successfully');
         },
         onError: (error: any) => {
@@ -81,6 +81,7 @@ export const useRejectCosting = () => {
             costingApprovalsService.reject(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
             toast.success('Costing sheet rejected');
         },
         onError: (error: any) => {
@@ -97,6 +98,7 @@ export const useUpdateApprovedCosting = () => {
             costingApprovalsService.updateApproved(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
             toast.success('Approved costing updated successfully');
         },
         onError: (error: any) => {
