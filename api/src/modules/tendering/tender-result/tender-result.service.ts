@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, asc, desc, inArray, sql, isNull, or } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, sql, isNull, or, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -15,13 +15,17 @@ import {
     paymentRequests,
     paymentInstruments,
 } from '@db/schemas/tendering/emds.schema';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
 
@@ -161,9 +165,8 @@ export class TenderResultService {
 
         // Build where conditions
         const whereConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
+            ...getBaseDashboardConditions(['dnb']),
+            eq(tenderInfos.status, 17), // Entry condition: Status 17
             eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1])
         ];
         console.log('whereConditions', whereConditions);
@@ -283,15 +286,7 @@ export class TenderResultService {
 
             const total = Number(totalRows[0]?.count || 0);
 
-            return {
-                data,
-                meta: {
-                    total,
-                    page,
-                    limit,
-                    totalPages: Math.ceil(total / limit),
-                },
-            };
+            return wrapPaginatedResponse(data, total, page, limit);
         } catch (error) {
             console.error('Error details:', error);
             console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
@@ -740,9 +735,9 @@ export class TenderResultService {
             tender_no: tender.tenderNo,
             tender_name: tender.tenderName,
             result: dto.result || 'Not specified',
-            l1_price_formatted: formatCurrency(dto.l1Price ?? null),
-            l2_price_formatted: formatCurrency(dto.l2Price ?? null),
-            our_price_formatted: formatCurrency(dto.ourPrice ?? null),
+            l1_price_formatted: formatCurrency(dto.l1Price?.toString() ?? null),
+            l2_price_formatted: formatCurrency(dto.l2Price?.toString() ?? null),
+            our_price_formatted: formatCurrency(dto.ourPrice?.toString() ?? null),
             costing_receipt_formatted: formatCurrency(costingSheet[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingSheet[0]?.submittedBudgetPrice || null),
             costing_gross_margin: costingSheet[0]?.submittedGrossMargin ? `${costingSheet[0].submittedGrossMargin}%` : '0%',

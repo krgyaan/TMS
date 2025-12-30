@@ -8,8 +8,8 @@ import {
     ParseIntPipe,
     Query,
 } from '@nestjs/common';
-import { TenderResultService, type ResultDashboardFilters } from '@/modules/tendering/tender-result/tender-result.service';
-import { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { TenderResultService, type ResultDashboardFilters, type ResultDashboardType } from '@/modules/tendering/tender-result/tender-result.service';
+import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -21,6 +21,36 @@ export class TenderResultController {
     findAll(@Query() filters?: ResultDashboardFilters) {
         console.log('filters', filters);
         return this.tenderResultService.findAll(filters);
+    }
+
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'result-awaited' | 'won' | 'lost' | 'disqualified',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        // Map tab to type for backward compatibility
+        const typeMap: Record<string, ResultDashboardType> = {
+            'result-awaited': 'pending',
+            'won': 'won',
+            'lost': 'lost',
+            'disqualified': 'disqualified',
+        };
+
+        return this.tenderResultService.findAll({
+            type: tab ? typeMap[tab] : undefined,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
+    getDashboardCounts() {
+        return this.tenderResultService.getCounts();
     }
 
     @Get('counts')
