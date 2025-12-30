@@ -9,7 +9,7 @@ import {
     Query
 } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
-import { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
+import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 import type { BidSubmissionFilters } from './bid-submissions.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -43,8 +43,29 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.findAll(filters);
     }
 
-    @Get('counts')
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.bidSubmissionsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
     getDashboardCounts() {
+        return this.bidSubmissionsService.getDashboardCounts();
+    }
+
+    @Get('counts')
+    getCounts() {
         return this.bidSubmissionsService.getDashboardCounts();
     }
 
@@ -64,7 +85,7 @@ export class BidSubmissionsController {
             submittedDocs: dto.submittedDocs || [],
             proofOfSubmission: dto.proofOfSubmission,
             finalPriceSs: dto.finalPriceSs,
-            finalBiddingPrice: dto.finalBiddingPrice,
+            finalBiddingPrice: dto.finalBiddingPrice !== null && dto.finalBiddingPrice !== undefined ? String(dto.finalBiddingPrice) : null,
             submittedBy: user.sub,
         });
     }
@@ -96,12 +117,12 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.update(id, {
             submissionDatetime: dto.submissionDatetime ? new Date(dto.submissionDatetime) : undefined,
             submittedDocs: dto.submittedDocs,
-            proofOfSubmission: dto.proofOfSubmission,
-            finalPriceSs: dto.finalPriceSs,
-            finalBiddingPrice: dto.finalBiddingPrice,
-            reasonForMissing: dto.reasonForMissing,
-            preventionMeasures: dto.preventionMeasures,
-            tmsImprovements: dto.tmsImprovements,
+            proofOfSubmission: dto.proofOfSubmission ?? undefined,
+            finalPriceSs: dto.finalPriceSs ?? undefined,
+            finalBiddingPrice: dto.finalBiddingPrice !== null && dto.finalBiddingPrice !== undefined ? String(dto.finalBiddingPrice) : null,
+            reasonForMissing: dto.reasonForMissing ?? undefined,
+            preventionMeasures: dto.preventionMeasures ?? undefined,
+            tmsImprovements: dto.tmsImprovements ?? undefined,
         });
     }
 }
