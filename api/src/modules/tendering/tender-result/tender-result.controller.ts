@@ -53,12 +53,6 @@ export class TenderResultController {
         return this.tenderResultService.getCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        console.log('getCounts');
-        return this.tenderResultService.getCounts();
-    }
-
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.tenderResultService.findByTenderId(tenderId);
