@@ -1438,10 +1438,10 @@ export interface EmdDashboardRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    sent: number;
-    approved: number;
+    'request-sent': number;
+    paid: number;
     rejected: number;
-    returned: number;
+    'tender-dnb': number;
     total: number;
 }
 
@@ -1462,9 +1462,9 @@ export interface CostingApprovalDashboardCounts {
 
 export interface TenderApprovalDashboardCounts {
     pending: number;
-    approved: number;
+    accepted: number;
     rejected: number;
-    incomplete: number;
+    'tender-dnb': number;
     total: number;
 }
 
@@ -1497,6 +1497,23 @@ export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;
     'tender-dnb': number;
+    total: number;
+}
+
+export interface RfqDashboardCounts {
+    pending: number;
+    sent: number;
+    'rfq-rejected': number;
+    'tender-dnb': number;
+    total: number;
+}
+
+export interface TenderInfoDashboardCounts {
+    'under-preparation': number;
+    'did-not-bid': number;
+    'tenders-bid': number;
+    'tender-won': number;
+    'tender-lost': number;
     total: number;
 }
 
@@ -1665,10 +1682,10 @@ export interface PaymentRequestRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    sent: number;
-    approved: number;
+    'request-sent': number;
+    paid: number;
     rejected: number;
-    returned: number;
+    'tender-dnb': number;
     total: number;
 }
 
