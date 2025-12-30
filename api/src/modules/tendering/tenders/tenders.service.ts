@@ -16,6 +16,8 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
 
 export type TenderInfoWithNames = TenderInfo & {
     organizationName: string | null;
@@ -1063,5 +1065,71 @@ export class TenderInfosService {
         }
         console.log("Tender Name: ", uniqueName);
         return { tenderName: uniqueName };
+    }
+
+    async getDashboardCounts(): Promise<{
+        'under-preparation': number;
+        'did-not-bid': number;
+        'tenders-bid': number;
+        'tender-won': number;
+        'tender-lost': number;
+        total: number;
+    }> {
+        const config = loadDashboardConfig();
+        const dashboardConfig = config.dashboards['tender-info'];
+
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+        ];
+
+        const fieldMappings = {};
+
+        const counts = await Promise.all([
+            this.countTab('tender-info', 'under-preparation', baseConditions, fieldMappings),
+            this.countTab('tender-info', 'did-not-bid', baseConditions, fieldMappings),
+            this.countTab('tender-info', 'tenders-bid', baseConditions, fieldMappings),
+            this.countTab('tender-info', 'tender-won', baseConditions, fieldMappings),
+            this.countTab('tender-info', 'tender-lost', baseConditions, fieldMappings),
+        ]);
+
+        return {
+            'under-preparation': counts[0],
+            'did-not-bid': counts[1],
+            'tenders-bid': counts[2],
+            'tender-won': counts[3],
+            'tender-lost': counts[4],
+            total: counts.reduce((sum, count) => sum + count, 0),
+        };
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .where(whereClause);
+
+        return result?.count ?? 0;
     }
 }

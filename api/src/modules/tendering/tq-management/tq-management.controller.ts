@@ -72,11 +72,6 @@ export class TqManagementController {
         return this.tqManagementService.getDashboardCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        return this.tqManagementService.getDashboardCounts();
-    }
-
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.tqManagementService.findByTenderId(tenderId);

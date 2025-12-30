@@ -126,6 +126,11 @@ type UpdateTenderDto = z.infer<typeof UpdateTenderInfoSchema>;
 export class TenderInfoController {
     constructor(private readonly tenderInfosService: TenderInfosService) { }
 
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
+        return this.tenderInfosService.getDashboardCounts();
+    }
+
     @Get()
     async list(
         @Query('statusIds') statusIds?: string,
