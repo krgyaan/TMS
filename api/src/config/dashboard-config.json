@@ -1,0 +1,477 @@
+{
+  "dashboards": {
+    "rfq": {
+      "entryCondition": {
+        "statusIds": [3],
+        "requiresField": "rfqTo",
+        "fieldCheck": "notEmpty"
+      },
+      "tabs": {
+        "pending": {
+          "name": "RFQ Pending",
+          "statusIds": [3],
+          "fieldConditions": {
+            "rfqId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "sent": {
+          "name": "RFQ Sent",
+          "statusIds": [4],
+          "fieldConditions": {
+            "rfqId": "IS_NOT_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "desc"
+        },
+        "rfq-rejected": {
+          "name": "RFQ Rejected",
+          "statusIds": [10, 14, 35],
+          "category": "rfq-rejected",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 34],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "emd": {
+      "entryCondition": {
+        "statusIds": [3],
+        "requiresField": "emd_required",
+        "fieldValue": "YES",
+        "table": "tender_information"
+      },
+      "tabs": {
+        "pending": {
+          "name": "EMD Request Pending",
+          "statusIds": [3],
+          "fieldConditions": {
+            "emdRequestId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "request-sent": {
+          "name": "EMD Request Sent",
+          "statusIds": [5],
+          "fieldConditions": {
+            "emdRequestId": "IS_NOT_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "desc"
+        },
+        "paid": {
+          "name": "EMD Paid",
+          "statusIds": [5],
+          "fieldConditions": {
+            "emdStatus": "EQUALS",
+            "emdStatusValue": "paid"
+          },
+          "sortBy": "paymentDate",
+          "sortOrder": "desc"
+        },
+        "rejected": {
+          "name": "EMD Rejected",
+          "statusIds": [10, 14, 35, 33],
+          "fieldConditions": {
+            "emdStatus": "EQUALS",
+            "emdStatusValue": "rejected"
+          },
+          "sortBy": "rejectionDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 16, 34],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "physical-docs": {
+      "entryCondition": {
+        "statusIds": [3],
+        "requiresField": "physicalDocsRequired"
+      },
+      "tabs": {
+        "pending": {
+          "name": "Physical Docs Pending",
+          "statusIds": [3],
+          "fieldConditions": {
+            "physicalDocsId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "sent": {
+          "name": "Physical Docs Sent",
+          "statusIds": [30],
+          "fieldConditions": {
+            "physicalDocsId": "IS_NOT_NULL"
+          },
+          "sortBy": "dispatchDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 10, 14, 34, 35],
+          "category": "dnb",
+          "excludeStatusIds": [30],
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "document-checklist": {
+      "entryCondition": {
+        "statusIds": [3]
+      },
+      "tabs": {
+        "pending": {
+          "name": "Document Checklist Pending",
+          "statusIds": [3],
+          "fieldConditions": {
+            "checklistId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "submitted": {
+          "name": "Document Checklist Submitted",
+          "statusIds": [3],
+          "fieldConditions": {
+            "checklistId": "IS_NOT_NULL",
+            "checklistStatus": "EQUALS",
+            "checklistStatusValue": "submitted"
+          },
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 10, 14, 34, 35],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "costing-sheets": {
+      "entryCondition": {
+        "statusIds": [3]
+      },
+      "tabs": {
+        "pending": {
+          "name": "Costing Sheet Pending",
+          "statusIds": [3],
+          "fieldConditions": {
+            "costingSheetId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "submitted": {
+          "name": "Costing Sheet Submitted",
+          "statusIds": [6],
+          "fieldConditions": {
+            "costingSheetId": "IS_NOT_NULL"
+          },
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 34],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "costing-approval": {
+      "entryCondition": {
+        "statusIds": [6]
+      },
+      "tabs": {
+        "pending": {
+          "name": "Costing Approval Pending",
+          "statusIds": [6],
+          "fieldConditions": {
+            "costingApprovalStatus": "EQUALS",
+            "costingApprovalStatusValue": "pending"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "approved": {
+          "name": "Costing Approved",
+          "statusIds": [7],
+          "fieldConditions": {
+            "costingApprovalStatus": "EQUALS",
+            "costingApprovalStatusValue": "approved"
+          },
+          "sortBy": "approvalDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 34],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "bid-submission": {
+      "entryCondition": {
+        "statusIds": [7]
+      },
+      "tabs": {
+        "pending": {
+          "name": "Bid Submission Pending",
+          "statusIds": [7],
+          "fieldConditions": {
+            "bidSubmissionId": "IS_NULL"
+          },
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "submitted": {
+          "name": "Bid Submitted",
+          "statusIds": [17],
+          "fieldConditions": {
+            "bidSubmissionId": "IS_NOT_NULL",
+            "bidStatus": "EQUALS",
+            "bidStatusValue": "Bid Submitted"
+          },
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "disqualified": {
+          "name": "Disqualified",
+          "statusIds": [33],
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 16, 34, 36],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "tq-management": {
+      "entryCondition": {
+        "statusIds": [17]
+      },
+      "tabs": {
+        "awaited": {
+          "name": "TQ Awaited",
+          "statusIds": [17],
+          "fieldConditions": {
+            "tqId": "IS_NULL"
+          },
+          "sortBy": "bidSubmissionDate",
+          "sortOrder": "asc"
+        },
+        "received": {
+          "name": "TQ Received",
+          "statusIds": [19],
+          "sortBy": "bidSubmissionDate",
+          "sortOrder": "asc"
+        },
+        "replied": {
+          "name": "TQ Replied",
+          "statusIds": [20],
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "qualified": {
+          "name": "Qualified",
+          "statusIds": [37, 40],
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "disqualified": {
+          "name": "Disqualified",
+          "statusIds": [38, 39],
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "reverse-auction": {
+      "entryCondition": {
+        "statusIds": [17],
+        "requiresField": "reverseAuctionApplicable",
+        "fieldValue": "Yes",
+        "table": "tender_information"
+      },
+      "tabs": {
+        "under-evaluation": {
+          "name": "Under Evaluation",
+          "statusIds": [17],
+          "fieldConditions": {
+            "raId": "IS_NULL",
+            "reverseAuctionApplicable": "EQUALS",
+            "reverseAuctionApplicableValue": "Yes"
+          },
+          "sortBy": "bidSubmissionDate",
+          "sortOrder": "asc"
+        },
+        "scheduled": {
+          "name": "Scheduled",
+          "statusIds": [23],
+          "sortBy": "bidSubmissionDate",
+          "sortOrder": "asc"
+        },
+        "completed": {
+          "name": "Completed",
+          "statusIds": [25, 24, 22, 41],
+          "sortBy": "completionDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "result": {
+      "entryCondition": {
+        "statusIds": [17]
+      },
+      "tabs": {
+        "result-awaited": {
+          "name": "Result Awaited",
+          "statusIds": [17, 19, 20, 37, 38, 39, 40],
+          "fieldConditions": {
+            "resultId": "IS_NULL"
+          },
+          "sortBy": "bidSubmissionDate",
+          "sortOrder": "asc"
+        },
+        "won": {
+          "name": "Won",
+          "statusIds": [25, 26, 27, 28],
+          "fieldConditions": {
+            "resultStatus": "EQUALS",
+            "resultStatusValue": "won"
+          },
+          "sortBy": "resultDate",
+          "sortOrder": "desc"
+        },
+        "lost": {
+          "name": "Lost",
+          "statusIds": [18, 21, 22, 24],
+          "fieldConditions": {
+            "resultStatus": "EQUALS",
+            "resultStatusValue": "lost"
+          },
+          "sortBy": "resultDate",
+          "sortOrder": "desc"
+        },
+        "disqualified": {
+          "name": "Disqualified",
+          "statusIds": [22, 39, 41],
+          "fieldConditions": {
+            "resultStatus": "EQUALS",
+            "resultStatusValue": "disqualified"
+          },
+          "sortBy": "disqualificationDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "tender-info": {
+      "entryCondition": {
+        "statusIds": [1]
+      },
+      "tabs": {
+        "under-preparation": {
+          "name": "Under Preparation",
+          "category": "prep",
+          "statusIds": [1, 2, 3, 4, 5, 6, 7, 29, 30],
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "did-not-bid": {
+          "name": "Did not Bid",
+          "category": "dnb",
+          "statusIds": [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 33, 34, 35, 36],
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "tenders-bid": {
+          "name": "Tenders Bid",
+          "category": "bid",
+          "statusIds": [17],
+          "sortBy": "submissionDate",
+          "sortOrder": "desc"
+        },
+        "tender-won": {
+          "name": "Tender Won",
+          "category": "won",
+          "statusIds": [25, 26, 27, 28],
+          "sortBy": "resultDate",
+          "sortOrder": "desc"
+        },
+        "tender-lost": {
+          "name": "Tender Lost",
+          "category": "lost",
+          "statusIds": [18, 21, 22, 24],
+          "sortBy": "resultDate",
+          "sortOrder": "desc"
+        }
+      }
+    },
+    "tender-approval": {
+      "entryCondition": {
+        "statusIds": [2]
+      },
+      "tabs": {
+        "pending": {
+          "name": "Pending",
+          "statusIds": [2],
+          "sortBy": "dueDate",
+          "sortOrder": "asc"
+        },
+        "accepted": {
+          "name": "Accepted",
+          "statusIds": [3],
+          "sortBy": "approvalDate",
+          "sortOrder": "desc"
+        },
+        "rejected": {
+          "name": "Rejected",
+          "statusIds": [9, 10, 11, 12, 13, 14, 15, 31, 32],
+          "category": "rejected-later",
+          "sortBy": "rejectionDate",
+          "sortOrder": "desc"
+        },
+        "tender-dnb": {
+          "name": "Tender DNB",
+          "statusIds": [8, 34],
+          "category": "dnb",
+          "sortBy": "statusChangeDate",
+          "sortOrder": "desc"
+        }
+      }
+    }
+  },
+  "categories": {
+    "prep": [1, 2, 3, 4, 5, 6, 7, 29, 30],
+    "dnb": [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 33, 34, 35, 36],
+    "bid": [17, 19, 20, 39, 37, 38, 40, 23, 41],
+    "won": [25, 26, 27, 28],
+    "lost": [18, 21, 22, 24],
+    "rejected-later": [10, 14, 35],
+    "rfq-rejected": [10, 14, 35]
+  }
+}
