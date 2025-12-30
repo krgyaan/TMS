@@ -23,11 +23,26 @@ export type RfqFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
+export type RfqDashboardFilters = {
+    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
 export const useRfqs = (filters?: RfqFilters) => {
     return useQuery({
         queryKey: rfqsKey.list(filters),
         queryFn: () => rfqsService.getAll(filters),
     })
+};
+
+export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
+    return useQuery({
+        queryKey: [...rfqsKey.all, 'dashboard', filters],
+        queryFn: () => rfqsService.getDashboard(filters),
+    });
 };
 
 export const useRfq = (id: number | null) => {
