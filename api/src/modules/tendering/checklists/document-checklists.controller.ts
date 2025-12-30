@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { DocumentChecklistsService, type DocumentChecklistFilters } from '@/modules/tendering/checklists/document-checklists.service';
-import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
+import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 
 @Controller('document-checklists')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -36,6 +36,27 @@ export class DocumentChecklistsController {
         };
 
         return this.documentChecklistsService.findAll(filters);
+    }
+
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'pending' | 'submitted' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        return this.documentChecklistsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
+    getDashboardCounts() {
+        return this.documentChecklistsService.getDashboardCounts();
     }
 
     @Get('counts')
