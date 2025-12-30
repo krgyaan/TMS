@@ -65,7 +65,7 @@ class CostingSheetsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<CostingSheetDashboardCounts> {
-        return this.get<CostingSheetDashboardCounts>('/counts');
+        return this.get<CostingSheetDashboardCounts>('/dashboard/counts');
     }
 
     async checkDriveScopes(): Promise<DriveScopesResponse> {

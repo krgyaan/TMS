@@ -62,7 +62,7 @@ class BidSubmissionsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<BidSubmissionDashboardCounts> {
-        return this.get<BidSubmissionDashboardCounts>('/counts');
+        return this.get<BidSubmissionDashboardCounts>('/dashboard/counts');
     }
 }
 

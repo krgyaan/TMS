@@ -61,7 +61,7 @@ class CostingApprovalsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
-        return this.get<CostingApprovalDashboardCounts>('/counts');
+        return this.get<CostingApprovalDashboardCounts>('/dashboard/counts');
     }
 }
 
