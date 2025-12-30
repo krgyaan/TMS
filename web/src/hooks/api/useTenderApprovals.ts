@@ -1,16 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { tenderApprovalsService, type TenderApprovalFilters } from '@/services/api/tender-approvals.service';
+import { tenderApprovalsService } from '@/services/api/tender-approvals.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts } from '@/types/api.types';
-
-// export const tenderApprovalsKey = {
-//     all: ['tender-approvals'] as const,
-//     lists: () => [...tenderApprovalsKey.all, 'list'] as const,
-//     list: (filters?: TenderApprovalFilters) => [...tenderApprovalsKey.lists(), { filters }] as const,
-//     details: () => [...tenderApprovalsKey.all, 'detail'] as const,
-//     detail: (tenderId: number) => [...tenderApprovalsKey.details(), tenderId] as const,
-// };
+import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts, TenderApprovalFilters } from '@/types/api.types';
 
 export const tenderApprovalsKey = {
     all: ['tender-approvals'] as const,
@@ -23,7 +15,7 @@ export const tenderApprovalsKey = {
 }
 
 export const useTenderApprovals = (
-    tab?: '0' | '1' | '2' | '3',
+    tab?: '0' | '1' | '2' | '3' | 'tender-dnb',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
@@ -51,11 +43,6 @@ export const useTenderApprovals = (
             return undefined;
         },
     })
-
-    // return useQuery({
-    //     queryKey: tenderApprovalsKey.list(filters),
-    //     queryFn: () => tenderApprovalsService.getAll(filters),
-    // });
 };
 
 export const useTenderApproval = (tenderId: number | null) => {

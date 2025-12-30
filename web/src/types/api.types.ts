@@ -731,7 +731,7 @@ export interface TenderApprovalRow {
 }
 
 export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3' | number;
+    tlStatus?: '0' | '1' | '2' | '3' | 'tender-dnb' | number;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -739,7 +739,7 @@ export type TenderApprovalFilters = {
 };
 
 export type TenderApprovalTabData = {
-    key: '0' | '1' | '2' | '3';
+    key: '0' | '1' | '2' | '3' | 'tender-dnb';
     name: string;
     count: number;
     data: TenderApprovalRow[];

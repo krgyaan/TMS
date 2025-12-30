@@ -274,7 +274,7 @@ const TenderApprovalListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as '0' | '1' | '2' | '3')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as '0' | '1' | '2' | 'tender-dnb')}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
