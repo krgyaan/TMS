@@ -12,6 +12,7 @@ export const tendersKey = {
     details: () => [...tendersKey.all, 'detail'] as const,
     detail: (id: number) => [...tendersKey.details(), id] as const,
     list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...tendersKey.all, 'dashboard-counts'] as const,
 };
 
 export const useTenders = (
@@ -114,5 +115,13 @@ export const useGenerateTenderName = () => {
         onError: error => {
             console.error("Error generating tender name:", error);
         },
+    });
+};
+
+export const useTendersDashboardCounts = () => {
+    return useQuery({
+        queryKey: tendersKey.dashboardCounts(),
+        queryFn: () => tenderInfosService.getDashboardCounts(),
+        staleTime: 30000,
     });
 };

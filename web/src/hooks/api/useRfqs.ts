@@ -12,6 +12,7 @@ export const rfqsKey = {
     details: () => [...rfqsKey.all, "detail"] as const,
     detail: (id: number) => [...rfqsKey.details(), id] as const,
     byTender: (tenderId: number) => [...rfqsKey.all, "by-tender", tenderId] as const,
+    dashboardCounts: () => [...rfqsKey.all, "dashboard-counts"] as const,
 };
 
 export type RfqFilters = {
@@ -121,5 +122,13 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
             return responses;
         },
         enabled: !!rfqToIds && rfqToIds !== "0" && rfqToIds.trim() !== "",
+    });
+};
+
+export const useRfqsDashboardCounts = () => {
+    return useQuery({
+        queryKey: rfqsKey.dashboardCounts(),
+        queryFn: () => rfqsService.getDashboardCounts(),
+        staleTime: 30000,
     });
 };
