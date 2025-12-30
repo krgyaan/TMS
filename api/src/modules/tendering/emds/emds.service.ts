@@ -26,6 +26,7 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
@@ -431,15 +432,10 @@ export class EmdsService {
             .limit(limit)
             .offset(offset);
 
+        const wrapped = wrapPaginatedResponse(rows as PendingTenderRow[], totalCount, page, limit);
         return {
-            data: rows as PendingTenderRow[],
+            ...wrapped,
             counts: counts || await this.getDashboardCounts(userId),
-            meta: {
-                total: totalCount,
-                page,
-                limit,
-                totalPages: Math.ceil(totalCount / limit),
-            },
         };
     }
 
@@ -595,15 +591,10 @@ export class EmdsService {
             createdAt: row.createdAt,
         }));
 
+        const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
         return {
-            data,
+            ...wrapped,
             counts: counts || await this.getDashboardCounts(userId),
-            meta: {
-                total: totalCount,
-                page,
-                limit,
-                totalPages: Math.ceil(totalCount / limit),
-            },
         };
     }
 
