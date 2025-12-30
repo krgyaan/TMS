@@ -25,15 +25,6 @@ export type TenderApprovalFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
-const TABS_NAMES = {
-    '0': 'Pending',
-    '1': 'Approved',
-    '2': 'Rejected',
-    '3': 'Incomplete',
-} as const;
-
-type TabCategory = (typeof TABS_NAMES)[keyof typeof TABS_NAMES];
-
 type TenderRow = {
     tenderId: number;
     tenderNo: string;
@@ -67,8 +58,6 @@ export class TenderApprovalService {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
-
-        console.log("Filters: ", filters);
 
         const conditions = [
             TenderInfosService.getActiveCondition(),
