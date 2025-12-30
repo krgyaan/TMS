@@ -49,7 +49,7 @@ class DocumentChecklistService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<DocumentChecklistsDashboardCounts> {
-        return this.get<DocumentChecklistsDashboardCounts>('/counts');
+        return this.get<DocumentChecklistsDashboardCounts>('/dashboard/counts');
     }
 
     async getByTenderId(tenderId: number): Promise<TenderDocumentChecklist | null> {

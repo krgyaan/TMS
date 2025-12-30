@@ -60,7 +60,7 @@ class PhysicalDocsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<PhysicalDocsDashboardCounts> {
-        return this.get<PhysicalDocsDashboardCounts>('/counts');
+        return this.get<PhysicalDocsDashboardCounts>('/dashboard/counts');
     }
 }
 

@@ -72,6 +72,10 @@ class TenderInfosService extends BaseApiService {
     async generateName(params: { organization: number; item: number; location?: number }): Promise<{ tenderName: string }> {
         return this.post<{ tenderName: string }>('/generate-name', params);
     }
+
+    async getDashboardCounts(): Promise<any> {
+        return this.get<any>('/dashboard/counts');
+    }
 }
 
 export const tenderInfosService = new TenderInfosService();

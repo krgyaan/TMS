@@ -45,4 +45,9 @@ export const rfqsService = {
     delete: async (id: number): Promise<void> => {
         await axiosInstance.delete(`/rfqs/${id}`);
     },
+
+    getDashboardCounts: async (): Promise<any> => {
+        const response = await axiosInstance.get<any>('/rfqs/dashboard/counts');
+        return response.data;
+    },
 };

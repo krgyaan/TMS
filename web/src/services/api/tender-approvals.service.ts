@@ -43,7 +43,7 @@ class TenderApprovalsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<TenderApprovalDashboardCounts> {
-        return this.get<TenderApprovalDashboardCounts>('/counts');
+        return this.get<TenderApprovalDashboardCounts>('/dashboard/counts');
     }
 }
 
