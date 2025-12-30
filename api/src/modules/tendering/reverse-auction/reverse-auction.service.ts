@@ -10,13 +10,17 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -184,12 +188,9 @@ export class ReverseAuctionService {
         };
 
         if (filters?.page && filters?.limit) {
-            response.meta = {
-                total,
-                page: filters.page,
-                limit: filters.limit,
-                totalPages: Math.ceil(total / filters.limit),
-            };
+            const wrapped = wrapPaginatedResponse(paginatedData, total, filters.page, filters.limit);
+            response.data = wrapped.data;
+            response.meta = wrapped.meta;
         }
 
         return response;
@@ -255,9 +256,9 @@ export class ReverseAuctionService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(
                 and(
-                    TenderInfosService.getActiveCondition(),
-                    TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+                    ...getBaseDashboardConditions(['dnb', 'lost']),
+                    eq(tenderInfos.status, 17), // Entry condition: Status 17
+                    eq(tenderInformation.reverseAuctionApplicable, 'Yes') // Entry condition: RA applicable
                 )
             )
             .orderBy(asc(bidSubmissions.submissionDatetime));
@@ -594,8 +595,8 @@ export class ReverseAuctionService {
                     status,
                     raResult: dto.raResult,
                     veL1AtStart: dto.veL1AtStart,
-                    raStartPrice: dto.raStartPrice,
-                    raClosePrice: dto.raClosePrice,
+                    raStartPrice: dto.raStartPrice?.toString() ?? null,
+                    raClosePrice: dto.raClosePrice?.toString() ?? null,
                     raCloseTime: dto.raCloseTime ? new Date(dto.raCloseTime) : null,
                     screenshotQualifiedParties: dto.screenshotQualifiedParties,
                     screenshotDecrements: dto.screenshotDecrements,
@@ -869,15 +870,7 @@ export class ReverseAuctionService {
             hasRaEntry: row.raId !== null,
         }));
 
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     /**

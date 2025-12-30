@@ -1,62 +1,44 @@
-import { IsString, IsNotEmpty, IsOptional, IsDateString, IsArray } from 'class-validator';
+import { z } from 'zod';
+import {
+    optionalString,
+    optionalTextField,
+    dateField,
+    decimalField,
+    optionalNumber,
+} from '@/utils/zod-schema-generator';
 
-export class ScheduleRaDto {
-    @IsString()
-    @IsNotEmpty()
-    technicallyQualified: 'Yes' | 'No';
+/**
+ * Schedule RA Schema - Based on reverseAuctions table (schedule fields)
+ */
+export const ScheduleRaSchema = z.object({
+    technicallyQualified: z.enum(['Yes', 'No'], {
+        required_error: 'Technical qualification status is required',
+    }),
+    disqualificationReason: optionalString,
+    qualifiedPartiesCount: optionalTextField(50),
+    qualifiedPartiesNames: z.array(z.string()).optional(),
+    raStartTime: dateField,
+    raEndTime: dateField,
+});
 
-    @IsString()
-    @IsOptional()
-    disqualificationReason?: string;
+export type ScheduleRaDto = z.infer<typeof ScheduleRaSchema>;
 
-    @IsString()
-    @IsOptional()
-    qualifiedPartiesCount?: string;
+/**
+ * Upload RA Result Schema - Based on reverseAuctions table (result fields)
+ */
+export const UploadRaResultSchema = z.object({
+    raResult: z.enum(['Won', 'Lost', 'H1 Elimination'], {
+        required_error: 'RA result is required',
+    }),
+    veL1AtStart: z.enum(['Yes', 'No'], {
+        required_error: 'VE L1 at start status is required',
+    }),
+    raStartPrice: optionalNumber(z.coerce.number().min(0, 'RA start price must be non-negative')),
+    raClosePrice: optionalNumber(z.coerce.number().min(0, 'RA close price must be non-negative')),
+    raCloseTime: dateField,
+    screenshotQualifiedParties: optionalString,
+    screenshotDecrements: optionalString,
+    finalResultScreenshot: optionalString,
+});
 
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    qualifiedPartiesNames?: string[];
-
-    @IsDateString()
-    @IsOptional()
-    raStartTime?: string;
-
-    @IsDateString()
-    @IsOptional()
-    raEndTime?: string;
-}
-
-export class UploadRaResultDto {
-    @IsString()
-    @IsNotEmpty()
-    raResult: 'Won' | 'Lost' | 'H1 Elimination';
-
-    @IsString()
-    @IsNotEmpty()
-    veL1AtStart: 'Yes' | 'No';
-
-    @IsString()
-    @IsOptional()
-    raStartPrice?: string;
-
-    @IsString()
-    @IsOptional()
-    raClosePrice?: string;
-
-    @IsDateString()
-    @IsOptional()
-    raCloseTime?: string;
-
-    @IsString()
-    @IsOptional()
-    screenshotQualifiedParties?: string;
-
-    @IsString()
-    @IsOptional()
-    screenshotDecrements?: string;
-
-    @IsString()
-    @IsOptional()
-    finalResultScreenshot?: string;
-}
+export type UploadRaResultDto = z.infer<typeof UploadRaResultSchema>;

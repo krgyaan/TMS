@@ -9,7 +9,7 @@ import {
     Query,
 } from '@nestjs/common';
 import { ReverseAuctionService, type RaDashboardFilters } from '@/modules/tendering/reverse-auction/reverse-auction.service';
-import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
+import type { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import type { RaDashboardType } from '@/modules/tendering/reverse-auction/reverse-auction.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -45,6 +45,11 @@ export class ReverseAuctionController {
 
     @Get('dashboard/counts')
     getDashboardCounts() {
+        return this.reverseAuctionService.getDashboardCounts();
+    }
+
+    @Get('counts')
+    getCounts() {
         return this.reverseAuctionService.getDashboardCounts();
     }
 
