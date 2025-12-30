@@ -59,11 +59,6 @@ export class DocumentChecklistsController {
         return this.documentChecklistsService.getDashboardCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        return this.documentChecklistsService.getDashboardCounts();
-    }
-
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.documentChecklistsService.findByTenderId(tenderId);
