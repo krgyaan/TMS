@@ -1448,14 +1448,15 @@ export interface EmdDashboardCounts {
 export interface BidSubmissionDashboardCounts {
     pending: number;
     submitted: number;
-    missed: number;
+    disqualified: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface CostingApprovalDashboardCounts {
-    submitted: number;
+    pending: number;
     approved: number;
-    rejected: number;
+    'tender-dnb': number;
     total: number;
 }
 
@@ -1481,19 +1482,21 @@ export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'D
 export interface PhysicalDocsDashboardCounts {
     pending: number;
     sent: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface DocumentChecklistsDashboardCounts {
     pending: number;
     submitted: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;
-    rejected: number;
+    'tender-dnb': number;
     total: number;
 }
 

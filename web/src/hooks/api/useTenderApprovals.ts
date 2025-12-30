@@ -74,6 +74,7 @@ export const useCreateTenderApproval = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.dashboardCounts() });
             toast.success("Tender approval submitted successfully");
         },
         onError: error => {
@@ -90,6 +91,7 @@ export const useUpdateTenderApproval = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.dashboardCounts() });
             toast.success("Tender approval updated successfully");
         },
         onError: error => {

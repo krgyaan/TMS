@@ -78,6 +78,7 @@ export const useCreatePhysicalDoc = () => {
         mutationFn: (data: CreatePhysicalDocsDto) => physicalDocsService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.dashboardCounts() });
             toast.success("Physical doc created successfully");
         },
         onError: error => {
@@ -94,6 +95,7 @@ export const useUpdatePhysicalDoc = () => {
         onSuccess: data => {
             queryClient.invalidateQueries({ queryKey: physicalDocsKey.lists() });
             queryClient.invalidateQueries({ queryKey: physicalDocsKey.detail(data.id) });
+            queryClient.invalidateQueries({ queryKey: physicalDocsKey.dashboardCounts() });
             toast.success("Physical doc updated successfully");
         },
         onError: error => {
