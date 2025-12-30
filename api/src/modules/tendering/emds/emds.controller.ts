@@ -55,7 +55,7 @@ export class EmdsController {
         );
     }
 
-    @Get('/counts')
+    @Get('/dashboard/counts')
     async getDashboardCounts(
         @Req() req: AuthenticatedRequest,
     ): Promise<DashboardCounts> {
