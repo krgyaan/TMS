@@ -16,7 +16,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'submitted' | 'missed';
+type TabKey = 'pending' | 'submitted' | 'disqualified';
 
 const BidSubmissionListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -118,9 +118,9 @@ const BidSubmissionListPage = () => {
                 count: counts?.submitted ?? 0,
             },
             {
-                key: 'missed' as TabKey,
+                key: 'disqualified' as TabKey,
                 name: 'Tender Missed',
-                count: counts?.missed ?? 0,
+                count: counts?.disqualified ?? 0,
             },
         ];
     }, [counts]);
