@@ -8,8 +8,8 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TenderApprovalController {
     constructor(private readonly tenderApprovalService: TenderApprovalService) { }
 
-    @Get('counts')
-    async getCounts() {
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
         return this.tenderApprovalService.getCounts();
     }
 
