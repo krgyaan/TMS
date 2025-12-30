@@ -48,11 +48,6 @@ export class ReverseAuctionController {
         return this.reverseAuctionService.getDashboardCounts();
     }
 
-    @Get('counts')
-    getCounts() {
-        return this.reverseAuctionService.getDashboardCounts();
-    }
-
     @Get()
     findAll() {
         return this.reverseAuctionService.findAll();
