@@ -7,8 +7,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import { useDeleteTender, useTenders } from "@/hooks/api/useTenders";
-import { useStatuses } from "@/hooks/api/useStatuses";
+import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations } from "@/types/api.types";
 import { Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,60 +16,35 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
 
-const TenderListPage = () => {
-    const { data: statuses } = useStatuses();
-    const [activeTab, setActiveTab] = useState<string>("");
-    const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost';
 
+const TenderListPage = () => {
+    const [activeTab, setActiveTab] = useState<TenderDashboardTab>('under-preparation');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab]);
 
-    const TC = {
-        prep: "Under Preperation",
-        dnb: "Did Not BId",
-        bid: "Bid Submitted",
-        won: "Won",
-        lost: "Lost",
-        unallocated: "Unallocated",
-    } as const;
-    type TenderCategoryKey = keyof typeof TC;
+    const { data: counts } = useTendersDashboardCounts();
 
-    const categories = useMemo(() => {
-        if (!statuses) return [];
-        const categoryMap = new Map<string, number[]>();
-        statuses.forEach(status => {
-            if (status.tenderCategory) {
-                const category = status.tenderCategory;
-                if (!categoryMap.has(category)) categoryMap.set(category, []);
-                categoryMap.get(category)?.push(status.id);
-            }
-        });
-        const categoriesArray = Array.from(categoryMap.entries()).map(([name, statusIds]) => ({
-            name,
-            label: TC[name as TenderCategoryKey] ?? name.charAt(0).toUpperCase() + name.slice(1),
-            statusIds,
-        }));
-
-        categoriesArray.push({ name: "unallocated", label: "Unallocated", statusIds: [] });
-        return categoriesArray;
-    }, [statuses]);
-
-    useEffect(() => {
-        if (categories.length > 0 && !activeTab) setActiveTab(categories[0].name);
-    }, [categories, activeTab]);
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
-
-    const selectedStatusIds = useMemo(() => categories.find(c => c.name === activeTab)?.statusIds || [], [categories, activeTab]);
+    // Map dashboard tabs to status categories for filtering
+    // Note: This is a temporary solution until dashboard endpoint is added
+    // Categories from dashboard-config.json: prep, dnb, bid, won, lost
+    const getStatusIdsForTab = (tab: TenderDashboardTab): string => {
+        const categoryMap: Record<TenderDashboardTab, string> = {
+            'under-preparation': 'prep',
+            'did-not-bid': 'dnb',
+            'tenders-bid': 'bid',
+            'tender-won': 'won',
+            'tender-lost': 'lost',
+        };
+        return categoryMap[tab];
+    };
 
     const { data: apiResponse, isLoading: tendersLoading } = useTenders(
-        activeTab,
-        selectedStatusIds,
+        getStatusIdsForTab(activeTab),
+        [],
         { page: pagination.pageIndex + 1, limit: pagination.pageSize }
     );
 
@@ -85,15 +59,35 @@ const TenderListPage = () => {
         ? apiResponse.length
         : (apiResponse?.meta?.total || 0);
 
-    // Cache the count for the active tab
-    useEffect(() => {
-        if (activeTab && totalRows > 0) {
-            setTabCounts(prev => ({
-                ...prev,
-                [activeTab]: totalRows
-            }));
-        }
-    }, [activeTab, totalRows]);
+    const tabsConfig = useMemo(() => {
+        return [
+            {
+                key: 'under-preparation' as TenderDashboardTab,
+                name: 'Under Preparation',
+                count: counts?.['under-preparation'] ?? 0,
+            },
+            {
+                key: 'did-not-bid' as TenderDashboardTab,
+                name: 'Did not Bid',
+                count: counts?.['did-not-bid'] ?? 0,
+            },
+            {
+                key: 'tenders-bid' as TenderDashboardTab,
+                name: 'Tenders Bid',
+                count: counts?.['tenders-bid'] ?? 0,
+            },
+            {
+                key: 'tender-won' as TenderDashboardTab,
+                name: 'Tender Won',
+                count: counts?.['tender-won'] ?? 0,
+            },
+            {
+                key: 'tender-lost' as TenderDashboardTab,
+                name: 'Tender Lost',
+                count: counts?.['tender-lost'] ?? 0,
+            },
+        ];
+    }, [counts]);
 
     const tenderActions: ActionItem<TenderInfoWithNames>[] = [
         {
@@ -212,19 +206,22 @@ const TenderListPage = () => {
             <CardContent className="flex-1 px-0">
                 <Tabs
                     value={activeTab}
-                    onValueChange={setActiveTab}
+                    onValueChange={(value) => setActiveTab(value as TenderDashboardTab)}
                     className="flex flex-col w-full"
                 >
                     <div className="flex-none m-auto">
                         <TabsList>
-                            {categories.map(category => {
+                            {tabsConfig.map(tab => {
                                 return (
                                     <TabsTrigger
-                                        key={category.name}
-                                        value={category.name}
+                                        key={tab.key}
+                                        value={tab.key}
                                         className="data-[state=active]:shadow-md flex items-center gap-1"
                                     >
-                                        <span className="font-semibold text-sm">{category.label}</span>
+                                        <span className="font-semibold text-sm">{tab.name}</span>
+                                        <Badge variant="secondary" className="text-xs">
+                                            {tab.count}
+                                        </Badge>
                                     </TabsTrigger>
                                 );
                             })}
@@ -232,13 +229,13 @@ const TenderListPage = () => {
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        {categories.map(category => (
+                        {tabsConfig.map(tab => (
                             <TabsContent
-                                key={category.name}
-                                value={category.name}
+                                key={tab.key}
+                                value={tab.key}
                                 className="m-0 data-[state=inactive]:hidden"
                             >
-                                {activeTab === category.name && (
+                                {activeTab === tab.key && (
                                     <DataTable
                                         data={tenders}
                                         columnDefs={colDefs}

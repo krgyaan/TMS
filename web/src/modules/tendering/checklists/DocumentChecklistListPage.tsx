@@ -18,7 +18,7 @@ import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid';
 
 const Checklists = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'submitted'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -77,13 +77,18 @@ const Checklists = () => {
         return [
             {
                 key: 'pending' as const,
-                name: 'Pending',
+                name: 'Document Checklist Pending',
                 count: counts?.pending ?? 0,
             },
             {
                 key: 'submitted' as const,
-                name: 'Checklist Submitted',
+                name: 'Document Checklist Submitted',
                 count: counts?.submitted ?? 0,
+            },
+            {
+                key: 'tender-dnb' as const,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
     }, [counts]);
@@ -220,7 +225,7 @@ const Checklists = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'submitted')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'submitted' | 'tender-dnb')}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger

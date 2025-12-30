@@ -17,7 +17,7 @@ import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/use
 import { tenderNameCol } from '@/components/data-grid';
 
 const PhysicalDocsListPage = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -67,13 +67,18 @@ const PhysicalDocsListPage = () => {
         return [
             {
                 key: 'pending' as const,
-                name: 'Pending',
+                name: 'Physical Docs Pending',
                 count: counts?.pending ?? 0,
             },
             {
                 key: 'sent' as const,
-                name: 'Sent',
+                name: 'Physical Docs Sent',
                 count: counts?.sent ?? 0,
+            },
+            {
+                key: 'tender-dnb' as const,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
     }, [counts]);
@@ -200,7 +205,7 @@ const PhysicalDocsListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'tender-dnb')}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger

@@ -12,11 +12,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useRfqs, useDeleteRfq } from '@/hooks/api/useRfqs';
+import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
 
 const Rfqs = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -36,13 +36,15 @@ const Rfqs = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const { data: apiResponse, isLoading: loading, error } = useRfqs({
-        rfqStatus: activeTab,
+    const { data: apiResponse, isLoading: loading, error } = useRfqsDashboard({
+        tab: activeTab,
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
     });
+
+    const { data: counts } = useRfqsDashboardCounts();
 
     const rfqsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
@@ -74,24 +76,30 @@ const Rfqs = () => {
         },
     ];
 
-    const tabsConfig = useMemo<{ key: 'pending' | 'sent'; name: string; count: number }[]>(() => {
-        // Counts will come from backend, but we can calculate from current data for display
-        const pendingCount = activeTab === 'pending' ? totalRows : 0;
-        const sentCount = activeTab === 'sent' ? totalRows : 0;
-
+    const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending',
-                name: 'Pending',
-                count: pendingCount,
+                key: 'pending' as const,
+                name: 'RFQ Pending',
+                count: counts?.pending ?? 0,
             },
             {
-                key: 'sent',
-                name: 'Sent',
-                count: sentCount,
+                key: 'sent' as const,
+                name: 'RFQ Sent',
+                count: counts?.sent ?? 0,
+            },
+            {
+                key: 'rfq-rejected' as const,
+                name: 'RFQ Rejected',
+                count: counts?.['rfq-rejected'] ?? 0,
+            },
+            {
+                key: 'tender-dnb' as const,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
-    }, [activeTab, totalRows]);
+    }, [counts]);
 
     const colDefs = useMemo<ColDef<RfqDashboardRow>[]>(() => [
         tenderNameCol<RfqDashboardRow>('tenderNo', {
@@ -209,7 +217,7 @@ const Rfqs = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb')}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
@@ -240,7 +248,11 @@ const Rfqs = () => {
                                             <p className="text-sm mt-2">
                                                 {tab.key === 'pending'
                                                     ? 'Tenders requiring RFQs will appear here'
-                                                    : 'Sent RFQs will be shown here'}
+                                                    : tab.key === 'sent'
+                                                    ? 'Sent RFQs will be shown here'
+                                                    : tab.key === 'rfq-rejected'
+                                                    ? 'Rejected RFQs will be shown here'
+                                                    : 'Tender DNB RFQs will be shown here'}
                                             </p>
                                         </div>
                                     ) : (

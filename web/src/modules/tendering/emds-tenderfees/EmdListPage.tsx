@@ -9,7 +9,7 @@ import { EyeIcon, Pencil, Plus, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { usePaymentDashboard } from "@/hooks/api/useEmds";
+import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/useEmds";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 // Tab configuration
 const TABS = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'sent', label: 'Sent' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'returned', label: 'Returned' },
+    { value: 'pending', label: 'EMD Request Pending' },
+    { value: 'request-sent', label: 'EMD Request Sent' },
+    { value: 'paid', label: 'EMD Paid' },
+    { value: 'rejected', label: 'EMD Rejected' },
+    { value: 'tender-dnb', label: 'Tender DNB' },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -89,8 +89,8 @@ const EmdsAndTenderFeesPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = usePaymentDashboardCounts();
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
-    const counts = dashboardData?.counts as EmdDashboardCounts | undefined;
 
     // ========================================================================
     // Column Definitions
@@ -349,15 +349,32 @@ const EmdsAndTenderFeesPage = () => {
 
     // Render tab with count badge
     const renderTabTrigger = (tab: typeof TABS[number]) => {
-        const count = counts?.[tab.value as keyof EmdDashboardCounts] ?? 0;
+        let count = 0;
+        if (counts) {
+            switch (tab.value) {
+                case 'pending':
+                    count = counts.pending ?? 0;
+                    break;
+                case 'request-sent':
+                    count = counts['request-sent'] ?? 0;
+                    break;
+                case 'paid':
+                    count = counts.paid ?? 0;
+                    break;
+                case 'rejected':
+                    count = counts.rejected ?? 0;
+                    break;
+                case 'tender-dnb':
+                    count = counts['tender-dnb'] ?? 0;
+                    break;
+            }
+        }
         return (
             <TabsTrigger key={tab.value} value={tab.value} className="relative">
                 {tab.label}
-                {count > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
-                        {count}
-                    </Badge>
-                )}
+                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
+                    {count}
+                </Badge>
             </TabsTrigger>
         );
     };
@@ -433,12 +450,12 @@ const EmdsAndTenderFeesPage = () => {
                             Tenders requiring payment but no request created yet. Click <strong>Create Request</strong> to submit.
                         </p>
                     )}
-                    {activeTab === 'sent' && (
+                    {activeTab === 'request-sent' && (
                         <p className="text-sm text-muted-foreground">
                             Payment requests submitted and awaiting processing.
                         </p>
                     )}
-                    {activeTab === 'approved' && (
+                    {activeTab === 'paid' && (
                         <p className="text-sm text-muted-foreground">
                             Payment requests that have been approved/paid.
                         </p>
@@ -448,9 +465,9 @@ const EmdsAndTenderFeesPage = () => {
                             Payment requests that were rejected. You can resubmit with corrections.
                         </p>
                     )}
-                    {activeTab === 'returned' && (
+                    {activeTab === 'tender-dnb' && (
                         <p className="text-sm text-muted-foreground">
-                            EMDs and deposits that have been returned after tender completion.
+                            Tenders that did not bid.
                         </p>
                     )}
                 </div>

@@ -33,7 +33,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-type TabKey = 'pending' | 'submitted';
+type TabKey = 'pending' | 'submitted' | 'tender-dnb';
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -187,13 +187,18 @@ const CostingSheets = () => {
         return [
             {
                 key: 'pending' as TabKey,
-                name: 'Pending',
+                name: 'Costing Sheet Pending',
                 count: counts?.pending || 0,
             },
             {
                 key: 'submitted' as TabKey,
-                name: 'Submitted',
+                name: 'Costing Sheet Submitted',
                 count: counts?.submitted || 0,
+            },
+            {
+                key: 'tender-dnb' as TabKey,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] || 0,
             },
         ];
     }, [counts]);

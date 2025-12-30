@@ -17,7 +17,7 @@ import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks
 import type { CostingApprovalDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'approved';
+type TabKey = 'pending' | 'approved' | 'tender-dnb';
 
 const CostingApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -96,6 +96,11 @@ const CostingApprovalListPage = () => {
                 key: 'approved' as TabKey,
                 name: 'Approved',
                 count: counts?.approved ?? 0,
+            },
+            {
+                key: 'tender-dnb' as TabKey,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
     }, [counts]);

@@ -17,10 +17,10 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
 import { tenderNameCol } from '@/components/data-grid';
 
-const TABS_NAMES = { '0': 'Pending', '1': 'Approved', '2': 'Rejected', '3': 'Incomplete' } as const;
+const TABS_NAMES = { '0': 'Pending', '1': 'Accepted', '2': 'Rejected', 'tender-dnb': 'Tender DNB' } as const;
 
 const TenderApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | '3'>('0');
+    const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | 'tender-dnb'>('0');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -87,18 +87,18 @@ const TenderApprovalListPage = () => {
                         count = counts.pending ?? 0;
                         break;
                     case '1':
-                        count = counts.approved ?? 0;
+                        count = counts.accepted ?? 0;
                         break;
                     case '2':
                         count = counts.rejected ?? 0;
                         break;
-                    case '3':
-                        count = counts.incomplete ?? 0;
+                    case 'tender-dnb':
+                        count = counts['tender-dnb'] ?? 0;
                         break;
                 }
             }
             return {
-                key: key as '0' | '1' | '2' | '3',
+                key: key as '0' | '1' | '2' | 'tender-dnb',
                 name,
                 count,
             };

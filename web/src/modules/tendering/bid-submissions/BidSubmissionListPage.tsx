@@ -16,7 +16,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'submitted' | 'disqualified';
+type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
 const BidSubmissionListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -109,7 +109,7 @@ const BidSubmissionListPage = () => {
         return [
             {
                 key: 'pending' as TabKey,
-                name: 'Pending',
+                name: 'Bid Submission Pending',
                 count: counts?.pending ?? 0,
             },
             {
@@ -119,8 +119,13 @@ const BidSubmissionListPage = () => {
             },
             {
                 key: 'disqualified' as TabKey,
-                name: 'Tender Missed',
+                name: 'Disqualified',
                 count: counts?.disqualified ?? 0,
+            },
+            {
+                key: 'tender-dnb' as TabKey,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
     }, [counts]);
@@ -318,7 +323,8 @@ const BidSubmissionListPage = () => {
                                             <p className="text-sm mt-2">
                                                 {tab.key === 'pending' && 'Tenders with approved costings will appear here for bid submission'}
                                                 {tab.key === 'submitted' && 'Submitted bids will be shown here'}
-                                                {tab.key === 'missed' && 'Missed tenders will appear here'}
+                                                {tab.key === 'disqualified' && 'Disqualified bids will appear here'}
+                                                {tab.key === 'tender-dnb' && 'Tender DNB bids will appear here'}
                                             </p>
                                         </div>
                                     ) : (
