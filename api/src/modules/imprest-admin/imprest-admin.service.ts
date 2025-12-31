@@ -31,42 +31,82 @@ export class ImprestAdminService {
      * Only users having at least one imprest entry are returned.
      */
     async getEmployeeSummary(): Promise<EmployeeImprestSummaryDto[]> {
+        const voucherAgg = this.db
+            .select({
+                userId: employeeImprestVouchers.beneficiaryName,
+
+                totalVouchers: sql<number>`
+      COUNT(${employeeImprestVouchers.id})
+    `.as("totalVouchers"),
+
+                accountsApproved: sql<number>`
+      SUM(
+        CASE 
+          WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
+          THEN 1 
+          ELSE 0 
+        END
+      )
+    `.as("accountsApproved"),
+
+                adminApproved: sql<number>`
+      SUM(
+        CASE 
+          WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
+          THEN 1 
+          ELSE 0 
+        END
+      )
+    `.as("adminApproved"),
+            })
+            .from(employeeImprestVouchers)
+            .groupBy(employeeImprestVouchers.beneficiaryName)
+            .as("voucher_agg");
+
         const rows = await this.db
             .select({
                 userId: employeeImprests.userId,
                 userName: users.name,
 
                 amountSpent: sql<number>`
-                    COALESCE(SUM(${employeeImprests.amount}), 0)
-                `,
+        COALESCE(SUM(${employeeImprests.amount}), 0)
+      `,
 
                 amountApproved: sql<number>`
-                    COALESCE(
-                        SUM(
-                            CASE 
-                                WHEN ${employeeImprests.approvalStatus} = 1 
-                                THEN ${employeeImprests.amount} 
-                                ELSE 0 
-                            END
-                        ),
-                        0
-                    )
-                `,
+        COALESCE(
+          SUM(
+            CASE 
+              WHEN ${employeeImprests.approvalStatus} = 1 
+              THEN ${employeeImprests.amount} 
+              ELSE 0 
+            END
+          ),
+          0
+        )
+      `,
 
                 amountReceived: sql<number>`
-                    COALESCE(
-                        SUM(${employeeImprestTransactions.amount}),
-                        0
-                    )
-                `,
+        COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
+      `,
+
+                // 👇 voucher fields
+                totalVouchers: sql<number>`
+        COALESCE(${voucherAgg.totalVouchers}, 0)
+      `,
+                accountsApproved: sql<number>`
+        COALESCE(${voucherAgg.accountsApproved}, 0)
+      `,
+                adminApproved: sql<number>`
+        COALESCE(${voucherAgg.adminApproved}, 0)
+      `,
             })
             .from(employeeImprests)
             .innerJoin(users, eq(users.id, employeeImprests.userId))
             .leftJoin(employeeImprestTransactions, eq(employeeImprestTransactions.userId, employeeImprests.userId))
-            .groupBy(employeeImprests.userId, users.name)
+            .leftJoin(voucherAgg, eq(voucherAgg.userId, sql`${employeeImprests.userId}::text`))
+            .groupBy(employeeImprests.userId, users.name, voucherAgg.totalVouchers, voucherAgg.accountsApproved, voucherAgg.adminApproved)
             .orderBy(users.name);
 
-        // Final mapping + amountLeft calculation
         return rows.map(row => ({
             userId: row.userId!,
             userName: row.userName,
@@ -74,8 +114,13 @@ export class ImprestAdminService {
             amountSpent: Number(row.amountSpent),
             amountApproved: Number(row.amountApproved),
             amountReceived: Number(row.amountReceived),
-
             amountLeft: Number(row.amountApproved) - Number(row.amountReceived),
+
+            voucherInfo: {
+                totalVouchers: Number(row.totalVouchers),
+                accountsApproved: Number(row.accountsApproved),
+                adminApproved: Number(row.adminApproved),
+            },
         }));
     }
 
@@ -101,9 +146,7 @@ export class ImprestAdminService {
     //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
     // }
 
-    async listVouchers({ user, page, limit }: { user?: { id: number }; page: number; limit: number }) {
-        const offset = (page - 1) * limit;
-
+    async listVouchers({ user }: { user?: { id: number } }) {
         const conditions: SQL[] = [];
 
         if (user) {
@@ -127,9 +170,7 @@ export class ImprestAdminService {
                 })
                 .from(employeeImprestVouchers)
                 .where(whereClause)
-                .orderBy(desc(employeeImprestVouchers.validFrom))
-                .limit(limit)
-                .offset(offset),
+                .orderBy(desc(employeeImprestVouchers.validFrom)),
 
             this.db
                 .select({ count: sql<number>`count(*)` })
@@ -152,8 +193,6 @@ export class ImprestAdminService {
         return {
             data,
             meta: {
-                page,
-                limit,
                 total: Number(totalResult[0].count),
             },
         };
