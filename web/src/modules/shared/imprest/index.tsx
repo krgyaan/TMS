@@ -23,6 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import type { GridApi } from "ag-grid-community";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/hooks/api/useUsers";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -106,10 +108,37 @@ const IconAction: React.FC<{
 
 const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { userId } = useParams<{ userId?: string }>();
+    const { user, hasPermission, canUpdate } = useAuth();
+    const { id } = useParams<{ id?: string }>();
+    let userDetails = null;
 
-    const numericUserId = userId ? Number(userId) : undefined;
+    const canMutateStatus = canUpdate("shared.imprestss");
 
+    const isAuthorized = hasPermission("shared.imprests", "read");
+
+    const requestedUserId = id ? Number(id) : null;
+    const isOwnPage = !requestedUserId || requestedUserId === user?.id;
+    console.log(requestedUserId, isOwnPage);
+    if (requestedUserId) {
+        userDetails = useUser(requestedUserId).data;
+    }
+
+    console.log("user details", userDetails);
+
+    if (!isOwnPage && !isAuthorized) {
+        return (
+            <Card>
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm font-medium">Access Denied</p>
+                    <p className="text-xs text-muted-foreground">You do not have permission to view this user's imprests.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const numericUserId = isOwnPage ? user?.id : requestedUserId;
+    console.log(numericUserId);
     const { data: rows = [], isLoading, error } = useImprestList(numericUserId);
 
     const deleteMutation = useDeleteImprest();
@@ -136,6 +165,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
         (row: ImprestRow) => {
             if (confirm("Are you sure you want to delete this record?")) {
                 deleteMutation.mutate(row.id);
+                2;
             }
         },
         [deleteMutation]
@@ -176,7 +206,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     };
 
     const openLightboxForRow = (row: ImprestRow) => {
-        setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employee-imprest/${filename}` })));
+        setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employeeimprest/${filename}` })));
         setLightboxOpen(true);
     };
 
@@ -277,21 +307,23 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 label="Approved"
                                 icon={CheckCircle}
                                 onClick={() => approveMutation.mutate(row.id)}
-                                disabled={approveMutation.isPending}
+                                disabled={!canMutateStatus || approveMutation.isPending}
                             />
+
                             <StatusToggle
                                 active={row.tallyStatus === 1}
                                 label="Tallied"
                                 icon={ListChecks}
                                 onClick={() => tallyMutation.mutate(row.id)}
-                                disabled={tallyMutation.isPending}
+                                disabled={!canMutateStatus || tallyMutation.isPending}
                             />
+
                             <StatusToggle
                                 active={row.proofStatus === 1}
                                 label="Proof Verified"
                                 icon={FileCheck}
                                 onClick={() => proofMutation.mutate(row.id)}
-                                disabled={proofMutation.isPending}
+                                disabled={!canMutateStatus || proofMutation.isPending}
                             />
                         </div>
                     );
@@ -309,7 +341,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />
+                            {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
                     );
                 },
@@ -343,11 +375,13 @@ const ImprestEmployeeDashboard: React.FC = () => {
         );
     }
 
+    const pageTitle = isOwnPage ? "My Imprests" : `${userDetails?.name ?? "User"}'s Imprests`;
+
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <div className="space-y-1">
-                    <CardTitle>Imprests</CardTitle>
+                    <CardTitle>{pageTitle}</CardTitle>
                     <CardDescription>
                         {rows.length} {rows.length === 1 ? "record" : "records"}
                     </CardDescription>
