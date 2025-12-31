@@ -11,7 +11,7 @@ import { CurrentUser } from "@/decorators/current-user.decorator";
 // Multer config
 const multerConfig = {
     storage: diskStorage({
-        destination: "./uploads/employee-imprest",
+        destination: "./uploads/employeeimprest",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -41,6 +41,7 @@ export class EmployeeImprestController {
 
     @Get("user/:userId")
     getByUser(@Param("userId", ParseIntPipe) userId: number) {
+        console.log("Fetching imprests for userId (controller):", userId);
         return this.service.findAllByUser(userId);
     }
 
