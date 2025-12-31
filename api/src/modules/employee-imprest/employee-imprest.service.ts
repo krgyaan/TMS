@@ -33,7 +33,6 @@ export class EmployeeImprestService {
 
     /* ----------------------------- READ ------------------------------ */
     async findAllByUser(userId: number) {
-        userId = 31; // temp testing fix
         return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(employeeImprests.createdAt);
     }
 
