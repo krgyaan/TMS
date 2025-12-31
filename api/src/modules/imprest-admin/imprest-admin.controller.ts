@@ -39,10 +39,9 @@ export class ImprestAdminController {
     // LIST VOUCHERS
     // ========================
     @Get("voucher")
-    async listAllVouchers(@Query("page") page = "1", @Query("limit") limit = "10") {
+    async listAllVouchers() {
         return this.service.listVouchers({
-            page: Number(page),
-            limit: Number(limit),
+            user: undefined,
         });
     }
 
@@ -50,8 +49,6 @@ export class ImprestAdminController {
     async listUserVouchers(@Param("id", ParseIntPipe) userId: number, @Query("page") page = "1", @Query("limit") limit = "10") {
         return this.service.listVouchers({
             user: { id: userId },
-            page: Number(page),
-            limit: Number(limit),
         });
     }
     // ========================
