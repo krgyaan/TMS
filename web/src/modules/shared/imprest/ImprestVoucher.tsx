@@ -4,11 +4,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { Eye } from "lucide-react";
+import { Eye, ArrowLeft } from "lucide-react";
 
 import { useImprestVoucherList } from "./imprest.hooks";
 import type { ImprestVoucherRow } from "./imprest.types";
 import { paths } from "@/app/routes/paths";
+import { useUser } from "@/hooks/api/useUsers";
 
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -22,10 +23,11 @@ const ImprestVoucherList: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     console.log("UserId from params:", id);
 
-    const parsedUserId = id ? Number(id) : undefined;
+    const parsedUserId = Number(id);
 
     console.log("parsedUserId:", parsedUserId);
-
+    const userDetails = useUser(parsedUserId).data;
+    console.log("user details:", userDetails);
     const { data: rows = [], isLoading } = useImprestVoucherList(parsedUserId);
     console.log("Fetched vouchers:", rows);
     const actionItems = useMemo(
@@ -83,7 +85,13 @@ const ImprestVoucherList: React.FC = () => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Imprest Vouchers</CardTitle>
+                <div className="flex items-center justify-between">
+                    <CardTitle>{"Imprest Vouchers - " + (userDetails?.name ?? "")}</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
+                        <ArrowLeft className="h-4 w-4 " />
+                        Back
+                    </Button>
+                </div>
             </CardHeader>
 
             <CardContent>
