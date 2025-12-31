@@ -16,90 +16,11 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
-
-export type TenderInfoWithNames = TenderInfo & {
-    organizationName: string | null;
-    teamMemberName: string | null;
-    teamMemberUsername: string | null;
-    statusName: string | null;
-    itemName: string | null;
-    organizationAcronym: string | null;
-    locationName: string | null;
-    locationState: string | null;
-    websiteName: string | null;
-    websiteLink: string | null;
-};
-
-export type TenderReference = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    organizationName: string | null;
-    organizationAcronym: string | null;
-    teamMemberName: string | null;
-    statusName: string | null;
-    dueDate: Date;
-};
-
-export type TenderForPayment = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    gstValues: string;
-    tenderFees: string;
-    emd: string;
-    dueDate: Date;
-    organizationName: string | null;
-    teamMemberName: string | null;
-};
-
-export type TenderForRfq = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMember: number;
-    teamMemberName: string | null;
-    status: number;
-    statusName: string | null;
-    itemName: string | null;
-    rfqTo: string | null;
-    dueDate: Date;
-};
-
-export type TenderForPhysicalDocs = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    courierAddress: string | null;
-    teamMemberName: string | null;
-    statusName: string | null;
-    dueDate: Date;
-};
-
-export type TenderForApproval = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    item: number;
-    itemName: string | null;
-    gstValues: string;
-    tenderFees: string;
-    emd: string;
-    teamMember: number;
-    teamMemberName: string | null;
-    dueDate: Date;
-    status: number;
-    statusName: string | null;
-    tlStatus: number;
-};
-
-// Import shared types
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 
 export type TenderListFilters = {
     statusIds?: number[];
+    category?: string;
     unallocated?: boolean;
     page?: number;
     limit?: number;
@@ -150,7 +71,7 @@ export class TenderInfosService {
         return and(
             this.getActiveCondition(),
             this.getApprovedCondition(),
-            this.getExcludeStatusCondition(['dnb'])
+            this.getExcludeStatusCondition(['lost'])
         );
     }
 
@@ -178,49 +99,6 @@ export class TenderInfosService {
             websiteLink: row.websites?.url ?? null,
         };
     };
-
-    private getTenderBaseSelect() {
-        return {
-            tenderInfos,
-            users: {
-                name: users.name,
-                username: users.username,
-                isActive: users.isActive,
-            },
-            statuses: {
-                id: statuses.id,
-                name: statuses.name,
-            },
-            items: {
-                id: items.id,
-                name: items.name,
-            },
-            organizations: {
-                acronym: organizations.acronym,
-                name: organizations.name,
-            },
-            locations: {
-                state: locations.state,
-                name: locations.name,
-            },
-            websites: {
-                name: websites.name,
-                url: websites.url,
-            },
-        };
-    }
-
-    private getBaseQueryBuilder() {
-        return this.db
-            .select(this.getTenderBaseSelect())
-            .from(tenderInfos)
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
-            .leftJoin(locations, eq(locations.id, tenderInfos.location))
-            .leftJoin(websites, eq(websites.id, tenderInfos.website));
-    }
 
     async exists(id: number): Promise<boolean> {
         const [result] = await this.db
@@ -424,6 +302,49 @@ export class TenderInfosService {
         );
     }
 
+    private getTenderBaseSelect() {
+        return {
+            tenderInfos,
+            users: {
+                name: users.name,
+                username: users.username,
+                isActive: users.isActive,
+            },
+            statuses: {
+                id: statuses.id,
+                name: statuses.name,
+            },
+            items: {
+                id: items.id,
+                name: items.name,
+            },
+            organizations: {
+                acronym: organizations.acronym,
+                name: organizations.name,
+            },
+            locations: {
+                state: locations.state,
+                name: locations.name,
+            },
+            websites: {
+                name: websites.name,
+                url: websites.url,
+            },
+        };
+    }
+
+    private getBaseQueryBuilder() {
+        return this.db
+            .select(this.getTenderBaseSelect())
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(websites, eq(websites.id, tenderInfos.website));
+    }
+
     async findAll(filters?: TenderListFilters): Promise<PaginatedResult<TenderInfoWithNames>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -433,23 +354,48 @@ export class TenderInfosService {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters?.unallocated) {
+            // Status = 1 required: unallocated tenders that are missed/cancelled/not biddable
+            // before assignment should appear in their respective status tabs, not unallocated tab
             conditions.push(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1));
-        } else if (filters?.statusIds?.length) {
-            conditions.push(inArray(tenderInfos.status, filters.statusIds));
+        } else {
+            // Use category if provided, otherwise fallback to statusIds
+            let statusIdsToUse: number[] = [];
+            if (filters?.category) {
+                statusIdsToUse = StatusCache.getIds(filters.category);
+            } else if (filters?.statusIds?.length) {
+                statusIdsToUse = filters.statusIds;
+            }
+
+            if (statusIdsToUse.length > 0) {
+                conditions.push(inArray(tenderInfos.status, statusIdsToUse));
+            }
         }
 
-        // Search Logic (Server-side search is best for pagination)
+        // TODO: Add role-based filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator/Operation Leader: filter by user.team
+        // - Others: filter by team_member = user.id
+
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(sql`(${tenderInfos.tenderName} ILIKE ${searchStr} OR ${tenderInfos.tenderNo} ILIKE ${searchStr})`);
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.gstValues}::text ILIKE ${searchStr} OR
+                    ${tenderInfos.emd}::text ILIKE ${searchStr} OR
+                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${organizations.name} ILIKE ${searchStr} OR
+                    ${statuses.name} ILIKE ${searchStr}
+                )`
+            );
         }
 
-        // Team filter - skip when unallocated is true (unallocated means no team member assigned)
         if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
             conditions.push(eq(tenderInfos.team, filters.teamId));
         }
 
-        // Assigned to filter - skip when unallocated is true (conflicts with teamMember IS NULL)
         if (!filters?.unallocated && filters?.assignedTo !== undefined && filters?.assignedTo !== null) {
             conditions.push(eq(tenderInfos.teamMember, filters.assignedTo));
         }
@@ -457,10 +403,20 @@ export class TenderInfosService {
         const whereClause = and(...conditions);
 
         // 2. Get Total Count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .where(whereClause);
+        // Use same joins as data query when searching joined table fields
+        let countQuery: any = this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos);
+
+        // Add joins if search is being used (searches in joined tables)
+        if (filters?.search) {
+            countQuery = countQuery
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+        }
+
+        const [countResult] = await countQuery.where(whereClause);
         const total = Number(countResult?.count || 0);
 
         // 3. Get Data (Paginated)
@@ -1073,23 +1029,27 @@ export class TenderInfosService {
         'tenders-bid': number;
         'tender-won': number;
         'tender-lost': number;
+        'unallocated': number;
         total: number;
     }> {
-        const config = loadDashboardConfig();
-        const dashboardConfig = config.dashboards['tender-info'];
+        // Base condition
+        const baseCondition = TenderInfosService.getActiveCondition();
 
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-        ];
+        // Tab-specific status IDs using StatusCache
+        const underPreparationStatusIds = StatusCache.getIds('prep');
+        const didNotBidStatusIds = StatusCache.getIds('dnb');
+        const tendersBidStatusIds = StatusCache.getIds('bid');
+        const tenderWonStatusIds = StatusCache.getIds('won');
+        const tenderLostStatusIds = StatusCache.getIds('lost');
 
-        const fieldMappings = {};
-
+        // Count for each tab
         const counts = await Promise.all([
-            this.countTab('tender-info', 'under-preparation', baseConditions, fieldMappings),
-            this.countTab('tender-info', 'did-not-bid', baseConditions, fieldMappings),
-            this.countTab('tender-info', 'tenders-bid', baseConditions, fieldMappings),
-            this.countTab('tender-info', 'tender-won', baseConditions, fieldMappings),
-            this.countTab('tender-info', 'tender-lost', baseConditions, fieldMappings),
+            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, underPreparationStatusIds))),
+            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, didNotBidStatusIds))),
+            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tendersBidStatusIds))),
+            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderWonStatusIds))),
+            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderLostStatusIds))),
+            this.countTabItems(and(baseCondition, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
         ]);
 
         return {
@@ -1098,33 +1058,15 @@ export class TenderInfosService {
             'tenders-bid': counts[2],
             'tender-won': counts[3],
             'tender-lost': counts[4],
-            total: counts.reduce((sum, count) => sum + count, 0),
+            'unallocated': counts[5],
+            total: counts.slice(0, 5).reduce((sum, count) => sum + count, 0),
         };
     }
 
     /**
-     * Helper method to count items for a specific tab
+     * Helper method to count items with given conditions
      */
-    private async countTab(
-        dashboardName: string,
-        tabKey: string,
-        baseConditions: any[],
-        fieldMappings: Record<string, any>
-    ): Promise<number> {
-        const tabConfig = getTabConfig(dashboardName, tabKey);
-        if (!tabConfig) {
-            return 0;
-        }
-
-        const conditions = buildTabConditions(
-            dashboardName,
-            tabKey,
-            baseConditions,
-            fieldMappings
-        );
-
-        const whereClause = and(...conditions);
-
+    private async countTabItems(whereClause: any): Promise<number> {
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
