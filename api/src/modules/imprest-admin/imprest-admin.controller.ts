@@ -4,10 +4,11 @@ import { ImprestAdminService } from "./imprest-admin.service";
 import { Roles } from "@/modules/auth/decorators/roles.decorator";
 import { RolesGuard } from "@/modules/auth/guards/roles.guard";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { CurrentUser } from "../auth/decorators";
+import { CanRead, CurrentUser } from "../auth/decorators";
+import { PermissionGuard } from "../auth/guards/permission.guard";
 
 @Controller("accounts/imprest")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class ImprestAdminController {
     constructor(private readonly service: ImprestAdminService) {}
 
@@ -16,7 +17,7 @@ export class ImprestAdminController {
      * Employee Imprest Summary
      */
     @Get()
-    @Roles("admin", "account", "Super User")
+    @CanRead("shared.imprests")
     async getEmployeeImprestSummary() {
         return this.service.getEmployeeSummary();
     }
