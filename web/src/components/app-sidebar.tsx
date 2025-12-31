@@ -13,6 +13,7 @@ import { useCurrentUser } from "@/hooks/api/useAuth";
 import { filterMenuItemsByPermissions } from "@/lib/menu-permissions";
 import type { ParentMenuItem } from "@/lib/menu-permissions";
 import type { AuthUser } from "@/types/auth.types";
+import api from "@/lib/axios";
 
 const data = {
     user: {
@@ -366,27 +367,39 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
-    const displayUser = currentUser ?? storedUser ?? {
-        id: 0,
-        name: data.user.name,
-        email: data.user.email,
-        username: null,
-        mobile: null,
-    };
+    const displayUser = currentUser ??
+        storedUser ?? {
+            id: 0,
+            name: data.user.name,
+            email: data.user.email,
+            username: null,
+            mobile: null,
+        };
 
     // Filter menu items based on user permissions
     const filteredMenuItems = React.useMemo(() => {
         return filterMenuItemsByPermissions(currentUser, data.navMain as ParentMenuItem[]);
     }, [currentUser]);
 
-    const handleLogout = React.useCallback(() => {
-        // Store current URL for redirect after re-login
+    const handleLogout = React.useCallback(async () => {
         const currentPath = window.location.pathname + window.location.search;
-        if (currentPath !== '/') {
-            sessionStorage.setItem('auth_redirect', currentPath);
+
+        if (currentPath !== "/") {
+            sessionStorage.setItem("auth_redirect", currentPath);
         }
-        clearAuthSession();
-        window.location.href = "/login";
+
+        try {
+            await api.post("/auth/logout", undefined, { withCredentials: true });
+        } catch {
+            // Even if logout API fails, we still clear frontend state
+            // to avoid user being stuck in a broken auth state
+        } finally {
+            // Clear frontend auth-related state (not cookies)
+            clearAuthSession();
+
+            // Hard redirect prevents back-navigation into protected pages
+            window.location.replace("/login");
+        }
     }, []);
 
     return (
