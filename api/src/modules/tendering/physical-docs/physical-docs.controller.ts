@@ -12,7 +12,7 @@ import {
     NotFoundException,
     Query,
 } from '@nestjs/common';
-import { PhysicalDocsService, type PhysicalDocFilters } from '@/modules/tendering/physical-docs/physical-docs.service';
+import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -22,37 +22,6 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class PhysicalDocsController {
     constructor(private readonly physicalDocsService: PhysicalDocsService) { }
 
-    @Get()
-    async list(
-        @Query('physicalDocsSent') physicalDocsSent?: string,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const parseBoolean = (v?: string): boolean | undefined => {
-            if (v === 'true') return true;
-            if (v === 'false') return false;
-            return undefined;
-        };
-
-        const filters: PhysicalDocFilters = {
-            ...(parseBoolean(physicalDocsSent) !== undefined && { physicalDocsSent: parseBoolean(physicalDocsSent) }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.physicalDocsService.findAll(filters);
-    }
-
     @Get('dashboard')
     async getDashboard(
         @Query('tab') tab?: 'pending' | 'sent' | 'tender-dnb',
@@ -60,12 +29,14 @@ export class PhysicalDocsController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.physicalDocsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

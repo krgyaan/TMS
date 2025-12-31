@@ -22,23 +22,6 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class RfqsController {
     constructor(private readonly rfqsService: RfqsService) { }
 
-    @Get()
-    async list(
-        @Query('rfqStatus') rfqStatus?: 'pending' | 'sent',
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        return this.rfqsService.findAll({
-            rfqStatus,
-            page: page ? parseInt(page, 10) : undefined,
-            limit: limit ? parseInt(limit, 10) : undefined,
-            sortBy,
-            sortOrder,
-        });
-    }
-
     @Get('dashboard')
     async getDashboard(
         @Query('tab') tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
@@ -46,12 +29,14 @@ export class RfqsController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.rfqsService.getRfqData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -11,6 +11,7 @@ import {
     type NewPhysicalDocs,
 } from '@db/schemas/tendering/physical-docs.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import type {
     CreatePhysicalDocDto,
     UpdatePhysicalDocDto,
@@ -24,8 +25,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type PhysicalDocFilters = {
@@ -34,6 +34,7 @@ export type PhysicalDocFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export type PhysicalDocDashboardRow = {
@@ -45,9 +46,14 @@ export type PhysicalDocDashboardRow = {
     physicalDocsRequired: string;
     physicalDocsDeadline: Date;
     teamMemberName: string;
+    status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     physicalDocs: number | null;
     courierNo: number | null;
+    courierDate: Date | null;
 };
 
 export type PhysicalDocPerson = {
@@ -79,165 +85,83 @@ export class PhysicalDocsService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    async findAll(filters?: PhysicalDocFilters): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
-        console.log("Filters:", filters);
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
-        const offset = (page - 1) * limit;
-
-        // Build WHERE conditions
-        const baseConditions = [
-            ...getBaseDashboardConditions(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, 'YES'),
-        ];
-
-        // Add physicalDocsSent filter condition (backward compatibility)
-        if (filters?.physicalDocsSent !== undefined) {
-            if (filters.physicalDocsSent) {
-                baseConditions.push(isNotNull(physicalDocs.id));
-            } else {
-                baseConditions.push(isNull(physicalDocs.id));
-            }
-        }
-
-        const whereClause = and(...baseConditions);
-
-        // Get total count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(
-                tenderInformation,
-                eq(tenderInfos.id, tenderInformation.tenderId)
-            )
-            .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(whereClause);
-        const total = Number(countResult?.count || 0);
-
-        // Apply sorting
-        let orderByClause;
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
-                    break;
-                case 'statusName':
-                    orderByClause = sortOrder(statuses.name);
-                    break;
-                default:
-                    orderByClause = asc(tenderInfos.dueDate);
-            }
-        } else {
-            orderByClause = asc(tenderInfos.dueDate);
-        }
-
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                courierAddress: tenderInfos.courierAddress,
-                physicalDocsRequired: tenderInformation.physicalDocsRequired,
-                physicalDocsDeadline: tenderInformation.physicalDocsDeadline,
-                teamMember: tenderInfos.teamMember,
-                teamMemberName: users.name,
-                status: tenderInfos.status,
-                statusName: statuses.name,
-                item: tenderInfos.item,
-                itemName: items.name,
-                dueDate: tenderInfos.dueDate,
-                physicalDocs: physicalDocs.id,
-                courierNo: physicalDocs.courierNo,
-            })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(
-                tenderInformation,
-                eq(tenderInfos.id, tenderInformation.tenderId)
-            )
-            .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(whereClause)
-            .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
-
-        const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            dueDate: row.dueDate,
-            courierAddress: row.courierAddress || '',
-            physicalDocsRequired: row.physicalDocsRequired || '',
-            physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
-            teamMemberName: row.teamMemberName || '',
-            statusName: row.statusName || '',
-            physicalDocs: row.physicalDocs,
-            courierNo: row.courierNo || null,
-        }));
-
-        return wrapPaginatedResponse(data, total, page, limit);
-    }
-
     /**
      * Get dashboard data by tab - Refactored to use config
      */
     async getDashboardData(
         tabKey?: 'pending' | 'sent' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
         const activeTab = tabKey || 'pending';
-        const tabConfig = getTabConfig('physical-docs', activeTab);
-
-        if (!tabConfig) {
-            throw new BadRequestException(`Invalid tab: ${activeTab}`);
-        }
 
         // Build base conditions
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb', 'lost']),
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(tenderInformation.physicalDocsRequired, 'YES'),
         ];
 
-        // Build tab-specific conditions
-        const fieldMappings = {
-            physicalDocsId: physicalDocs.id,
-        };
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator: filter by user.team
+        // - Others: filter by team_member = user.id
 
-        const conditions = buildTabConditions(
-            'physical-docs',
-            activeTab,
-            baseConditions,
-            fieldMappings
-        );
+        // Build tab-specific conditions
+        const conditions = [...baseConditions];
+
+        if (activeTab === 'pending') {
+            // conditions.push(eq(tenderInfos.status, 3));
+            conditions.push(isNull(physicalDocs.id));
+        } else if (activeTab === 'sent') {
+            // conditions.push(eq(tenderInfos.status, 30));
+            conditions.push(isNotNull(physicalDocs.id));
+        } else if (activeTab === 'tender-dnb') {
+            const dnbStatusIds = StatusCache.getIds('dnb');
+            const excludeStatusIds = [30];
+            if (dnbStatusIds.length > 0) {
+                conditions.push(inArray(tenderInfos.status, dnbStatusIds));
+            }
+            conditions.push(notInArray(tenderInfos.status, excludeStatusIds));
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Add search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${tenderInfos.gstValues}::text ILIKE ${searchStr} OR
+                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr}
+                )`
+            );
+        }
 
         const whereClause = and(...conditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy || tabConfig.sortBy;
-        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        const sortBy = filters?.sortBy;
+        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : activeTab === 'sent' ? 'desc' : 'desc');
         let orderByClause: any = asc(tenderInfos.dueDate);
 
-        if (sortBy) {
+        // Set default sort based on tab if no sortBy specified
+        if (!sortBy) {
+            if (activeTab === 'pending') {
+                orderByClause = asc(tenderInfos.dueDate);
+            } else if (activeTab === 'sent') {
+                orderByClause = desc(physicalDocs.createdAt);
+            } else if (activeTab === 'tender-dnb') {
+                orderByClause = desc(tenderInfos.updatedAt);
+            }
+        } else {
             const sortFn = sortOrder === 'desc' ? desc : asc;
             switch (sortBy) {
                 case 'tenderNo':
@@ -268,7 +192,7 @@ export class PhysicalDocsService {
 
         // Get total count
         const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -284,7 +208,7 @@ export class PhysicalDocsService {
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
-                courierAddress: tenderInfos.courierAddress,
+                courierAddress: tenderInformation.courierAddress,
                 physicalDocsRequired: tenderInformation.physicalDocsRequired,
                 physicalDocsDeadline: tenderInformation.physicalDocsDeadline,
                 teamMember: tenderInfos.teamMember,
@@ -296,6 +220,7 @@ export class PhysicalDocsService {
                 dueDate: tenderInfos.dueDate,
                 physicalDocs: physicalDocs.id,
                 courierNo: physicalDocs.courierNo,
+                courierDate: physicalDocs.createdAt,
             })
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -308,6 +233,68 @@ export class PhysicalDocsService {
             .offset(offset)
             .orderBy(orderByClause);
 
+        // Enrich rows with latest status log data
+        if (rows.length > 0) {
+            const tenderIds = rows.map(r => r.tenderId);
+
+            // Get latest status log for each tender
+            const allStatusLogs = await this.db
+                .select({
+                    tenderId: tenderStatusHistory.tenderId,
+                    newStatus: tenderStatusHistory.newStatus,
+                    comment: tenderStatusHistory.comment,
+                    createdAt: tenderStatusHistory.createdAt,
+                    id: tenderStatusHistory.id,
+                })
+                .from(tenderStatusHistory)
+                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
+                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
+
+            // Group by tenderId and take the first (latest) entry for each
+            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
+            for (const log of allStatusLogs) {
+                if (!latestStatusLogMap.has(log.tenderId)) {
+                    latestStatusLogMap.set(log.tenderId, log);
+                }
+            }
+
+            // Get status names for latest status logs
+            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
+            const latestStatuses = latestStatusIds.length > 0
+                ? await this.db
+                    .select({ id: statuses.id, name: statuses.name })
+                    .from(statuses)
+                    .where(inArray(statuses.id, latestStatusIds))
+                : [];
+
+            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
+
+            // Enrich rows with latest status log data
+            const enrichedRows = rows.map((row) => {
+                const latestLog = latestStatusLogMap.get(row.tenderId);
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    dueDate: row.dueDate,
+                    courierAddress: row.courierAddress || '',
+                    physicalDocsRequired: row.physicalDocsRequired || '',
+                    physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
+                    teamMemberName: row.teamMemberName || '',
+                    status: row.status,
+                    statusName: row.statusName || '',
+                    latestStatus: latestLog?.newStatus || null,
+                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
+                    statusRemark: latestLog?.comment || null,
+                    physicalDocs: row.physicalDocs,
+                    courierNo: row.courierNo || null,
+                    courierDate: row.courierDate || null,
+                };
+            });
+
+            return wrapPaginatedResponse(enrichedRows, total, page, limit);
+        }
+
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
@@ -317,31 +304,80 @@ export class PhysicalDocsService {
             physicalDocsRequired: row.physicalDocsRequired || '',
             physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
             teamMemberName: row.teamMemberName || '',
+            status: row.status,
             statusName: row.statusName || '',
+            latestStatus: null,
+            latestStatusName: null,
+            statusRemark: null,
             physicalDocs: row.physicalDocs,
             courierNo: row.courierNo || null,
+            courierDate: row.courierDate || null,
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async getDashboardCounts(): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
-        const config = loadDashboardConfig();
-        const dashboardConfig = config.dashboards['physical-docs'];
-
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb', 'lost']),
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(tenderInformation.physicalDocsRequired, 'YES'),
         ];
 
-        const fieldMappings = {
-            physicalDocsId: physicalDocs.id,
-        };
+        // Count pending: status = 3, physicalDocsId IS NULL
+        const pendingConditions = [
+            ...baseConditions,
+            // eq(tenderInfos.status, 3),
+            isNull(physicalDocs.id),
+        ];
+
+        // Count sent: status = 30, physicalDocsId IS NOT NULL
+        const sentConditions = [
+            ...baseConditions,
+            eq(tenderInfos.status, 30),
+            isNotNull(physicalDocs.id),
+        ];
+
+        // Count tender-dnb: status in dnb category, exclude status 30
+        const dnbStatusIds = StatusCache.getIds('dnb');
+        const tenderDnbConditions = [
+            ...baseConditions,
+            ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []),
+            notInArray(tenderInfos.status, [30]),
+        ];
 
         const counts = await Promise.all([
-            this.countTab('physical-docs', 'pending', baseConditions, fieldMappings),
-            this.countTab('physical-docs', 'sent', baseConditions, fieldMappings),
-            this.countTab('physical-docs', 'tender-dnb', baseConditions, fieldMappings),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
+                .where(and(...pendingConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
+                .where(and(...sentConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
+                .where(and(...tenderDnbConditions))
+                .then(([result]) => Number(result?.count || 0)),
         ]);
 
         return {
@@ -350,39 +386,6 @@ export class PhysicalDocsService {
             'tender-dnb': counts[2],
             total: counts.reduce((sum, count) => sum + count, 0),
         };
-    }
-
-    /**
-     * Helper method to count items for a specific tab
-     */
-    private async countTab(
-        dashboardName: string,
-        tabKey: string,
-        baseConditions: any[],
-        fieldMappings: Record<string, any>
-    ): Promise<number> {
-        const tabConfig = getTabConfig(dashboardName, tabKey);
-        if (!tabConfig) {
-            return 0;
-        }
-
-        const conditions = buildTabConditions(
-            dashboardName,
-            tabKey,
-            baseConditions,
-            fieldMappings
-        );
-
-        const whereClause = and(...conditions);
-
-        const [result] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-            .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-            .where(whereClause);
-
-        return Number(result?.count || 0);
     }
 
     async findById(id: number): Promise<PhysicalDocWithPersons | null> {
