@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsListParams, PhysicalDocsDashboardCounts } from '@/types/api.types'
+import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, UpdatePhysicalDocsDto, PhysicalDocsDashboardCounts } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
@@ -15,27 +15,20 @@ export const physicalDocsKey = {
 };
 
 export const usePhysicalDocs = (
-    tab?: 'pending' | 'sent',
+    tab?: 'pending' | 'sent' | 'tender-dnb',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
-    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+    search?: string
 ) => {
-    const params: PhysicalDocsListParams = {
-        ...(tab && { physicalDocsSent: tab === 'sent' }),
-        page: pagination.page,
-        limit: pagination.limit,
-        ...(sort?.sortBy && { sortBy: sort.sortBy }),
-        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
-    };
-
-    const queryKeyFilters = {
-        tab,
-        ...pagination,
-        ...sort,
-    };
-
     return useQuery<PaginatedResult<PhysicalDocsDashboardRow>>({
-        queryKey: physicalDocsKey.list(queryKeyFilters),
-        queryFn: () => physicalDocsService.getAll(params),
+        queryKey: physicalDocsKey.list({ tab, ...pagination, ...sort, search }),
+        queryFn: () => physicalDocsService.getDashboard(tab, {
+            page: pagination.page,
+            limit: pagination.limit,
+            sortBy: sort?.sortBy,
+            sortOrder: sort?.sortOrder,
+            search,
+        }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
                 return previousData;

@@ -17,14 +17,14 @@ export const tendersKey = {
 
 export const useTenders = (
     activeTab?: string,
-    statusIds: number[] = [],
+    category?: string,
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 }
 ) => {
     const { queryParams: teamParams, teamId, userId, dataScope } = useTeamFilter();
 
     const filters: TenderListParams = {
         ...(activeTab === 'unallocated' ? { unallocated: true } : {}),
-        ...(activeTab !== 'unallocated' && statusIds.length > 0 ? { statusIds } : {}),
+        ...(activeTab !== 'unallocated' && category ? { category } : {}),
         ...teamParams,
         page: pagination.page,
         limit: pagination.limit,
@@ -33,7 +33,7 @@ export const useTenders = (
 
     const queryKeyFilters = {
         activeTab,
-        statusIds,
+        category,
         teamId,
         userId,
         dataScope,
