@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 import type { GridApi } from "ag-grid-community";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -34,17 +35,17 @@ const ImprestAdminIndex: React.FC = () => {
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
+    console.log("Fetched employee imprest summary data:", data);
 
     const imprestActions: ActionItem<EmployeeImprestSummary>[] = [
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
+            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
         },
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            className: "text-blue-600",
             onClick: row => navigate(paths.accounts.imprestPaymentHistory(row.userId)),
         },
         {
@@ -53,10 +54,6 @@ const ImprestAdminIndex: React.FC = () => {
             onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
         },
     ];
-
-    useEffect(() => {
-        console.log("the employee text search", searchText);
-    }, []);
 
     /* -------------------- GLOBAL SUMMARY -------------------- */
     const totals = useMemo(() => {
@@ -82,7 +79,7 @@ const ImprestAdminIndex: React.FC = () => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.shared.imprestUser(userId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline inline-flex items-center gap-1">
+                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
                             {p.value}
                             <ExternalLink className="h-3 w-3" />
                         </a>
@@ -109,6 +106,57 @@ const ImprestAdminIndex: React.FC = () => {
                 headerName: "Amount Left",
                 valueFormatter: (p: any) => formatINR(p.value),
             },
+            {
+                headerName: "Vouchers",
+                field: "voucherInfo",
+                autoHeight: true,
+                cellRenderer: (params: any) => {
+                    const v = params.value;
+                    if (!v) return "-";
+
+                    return (
+                        <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div
+                                        className="
+                inline-flex items-center gap-2
+                rounded-full border px-3 py-1
+                text-sm font-medium
+                cursor-default
+              "
+                                    >
+                                        <span>{v.totalVouchers}</span>
+                                        <span className="text-xs opacity-60">vouchers</span>
+                                    </div>
+                                </TooltipTrigger>
+
+                                <TooltipContent side="right" align="center" className="w-52">
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold">Voucher Summary</p>
+
+                                        <div className="text-xs space-y-1">
+                                            <div className="flex justify-between">
+                                                <span>Total</span>
+                                                <span>{v.totalVouchers}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Accounts Approved</span>
+                                                <span>{v.accountsApproved}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Admin Approved</span>
+                                                <span>{v.adminApproved}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    );
+                },
+            },
+
             {
                 headerName: "Actions",
                 filter: false,
