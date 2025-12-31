@@ -12,7 +12,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useRfqs, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
 
