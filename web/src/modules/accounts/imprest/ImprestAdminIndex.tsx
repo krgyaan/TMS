@@ -1,5 +1,5 @@
 // imprest-admin.index.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { useAuth } from "@/contexts/AuthContext";
 
+import type { GridApi } from "ag-grid-community";
+import { Input } from "@/components/ui/input";
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -23,9 +25,13 @@ const formatINR = (num: number) =>
     }).format(num);
 
 const ImprestAdminIndex: React.FC = () => {
+    const [searchText, setSearchText] = useState("");
+    const [gridApi, setGridApi] = useState<GridApi | null>(null);
+
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
-    console.log(loggedInUser);
+    const { isAdmin, isSuperUser } = useAuth();
+    const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
 
@@ -47,6 +53,10 @@ const ImprestAdminIndex: React.FC = () => {
             onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
         },
     ];
+
+    useEffect(() => {
+        console.log("the employee text search", searchText);
+    }, []);
 
     /* -------------------- GLOBAL SUMMARY -------------------- */
     const totals = useMemo(() => {
@@ -179,13 +189,36 @@ const ImprestAdminIndex: React.FC = () => {
 
             {/* TABLE */}
             <Card>
-                <CardHeader>
-                    <CardTitle>All Employee Imprest Details</CardTitle>
-                    <CardDescription>{data.length} employees found</CardDescription>
+                <CardHeader className="flex items-center justify-between space-y-1 pb-0">
+                    <div className="space-y-1">
+                        <CardTitle>All Employee Imprest Details</CardTitle>
+                        <CardDescription>{data.length} employees found</CardDescription>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Input
+                            type="text"
+                            placeholder="Search employee..."
+                            value={searchText}
+                            onChange={e => {
+                                const value = e.target.value;
+                                setSearchText(value);
+                                gridApi?.setGridOption("quickFilterText", value);
+                            }}
+                            className="w-64"
+                        />
+                    </div>
                 </CardHeader>
 
                 <CardContent>
-                    <DataTable data={data} columnDefs={columns} gridOptions={{ pagination: true }} />
+                    <DataTable
+                        data={data}
+                        columnDefs={columns}
+                        onGridReady={params => {
+                            setGridApi(params.api);
+                            params.api.setQuickFilter(searchText);
+                        }}
+                        gridOptions={{ pagination: true }}
+                    />
                 </CardContent>
             </Card>
         </div>
