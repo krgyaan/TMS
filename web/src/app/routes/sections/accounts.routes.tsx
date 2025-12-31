@@ -10,6 +10,8 @@ const Accounts_TaskChecklists = lazy(() => import("@/modules/accounts/task-checl
 const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists"));
 const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
 
+const Imprest_Admin_UserView = lazy(() => import("@/modules/accounts/imprest/ImprestAdminUserView"));
+
 export default function AccountsRoutes() {
     return (
         <Routes>
@@ -21,7 +23,15 @@ export default function AccountsRoutes() {
                     </RouteWrapper>
                 }
             />
-            <Route path="imprest/payment-history/:userId" element={<ImprestPaymentHistory />} />
+            <Route path="imprests/payment-history/:userId" element={<ImprestPaymentHistory />} />
+            <Route
+                path="imprests/user/:userId"
+                element={
+                    <RouteWrapper>
+                        <Imprest_Admin_UserView />
+                    </RouteWrapper>
+                }
+            />
             {/* <Route path="imprests/payment-history" element={<ImprestPaymentHistoryPage />} />
             <Route path="imprests/voucher" element={<ImprestVoucherPage />} /> */}
             <Route

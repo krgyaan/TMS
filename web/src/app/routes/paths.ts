@@ -108,7 +108,8 @@ export const paths = {
     // ==================== ACCOUNTS ====================
     accounts: {
         imprests: "/accounts/imprests",
-        imprestPaymentHistory: (id: number) => `/accounts/imprest/payment-history/${id}`,
+        imprestsUserView: (id: number) => `/accounts/imprests/user/${id}`,
+        imprestPaymentHistory: (id: number) => `/accounts/imprests/payment-history/${id}`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
         accountChecklists: "/accounts/account-checklists",
