@@ -17,13 +17,18 @@ class TenderApprovalsService extends BaseApiService {
         params?: TenderApprovalFilters
     ): Promise<PaginatedResult<TenderApprovalRow>> {
         const search = new URLSearchParams();
-        console.log("TESSSST");
         if (params) {
-            if (params.tlStatus) search.set('tlStatus', String(params.tlStatus));
+            // Use tabKey if provided, otherwise fall back to tlStatus for backward compatibility
+            if (params.tabKey) {
+                search.set('tabKey', params.tabKey);
+            } else if (params.tlStatus) {
+                search.set('tlStatus', String(params.tlStatus));
+            }
             if (params.page) search.set('page', params.page.toString());
             if (params.limit) search.set('limit', params.limit.toString());
             if (params.sortBy) search.set('sortBy', params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
+            if (params.search) search.set('search', params.search);
         }
 
         const queryString = search.toString();

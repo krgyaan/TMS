@@ -15,6 +15,7 @@ export type RfqDashboardFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export const rfqsService = {
@@ -37,6 +38,7 @@ export const rfqsService = {
         if (filters?.limit) params.append('limit', filters.limit.toString());
         if (filters?.sortBy) params.append('sortBy', filters.sortBy);
         if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        if (filters?.search) params.append('search', filters.search);
         const query = params.toString();
         const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs/dashboard${query ? `?${query}` : ''}`);
         return response.data;

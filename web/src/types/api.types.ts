@@ -727,19 +727,21 @@ export interface TenderApprovalRow {
     teamMemberName: string;
     itemName: string;
     statusName: string;
-    tlStatus: string | number;
+    tlStatus: number;
 }
 
 export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3' | 'tender-dnb' | number;
+    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
+    tlStatus?: number;
     page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export type TenderApprovalTabData = {
-    key: '0' | '1' | '2' | '3' | 'tender-dnb';
+    key: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
     name: string;
     count: number;
     data: TenderApprovalRow[];
@@ -1079,7 +1081,7 @@ export type BidSubmissionDashboardRow = {
 };
 
 export type BidSubmissionListParams = {
-    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -1319,9 +1321,14 @@ export interface PhysicalDocsDashboardRow {
     physicalDocsRequired: string;
     physicalDocsDeadline: Date;
     teamMemberName: string;
+    status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     physicalDocs: number | null;
     courierNo: number | null;
+    courierDate: Date | null;
 };
 
 export interface PhysicalDocs {
@@ -1340,6 +1347,7 @@ export interface PhysicalDocsListParams {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 }
 
 export interface CreatePhysicalDocsDto {
@@ -1574,7 +1582,11 @@ export interface RfqDashboardRow {
     itemName: string;
     rfqTo: string;
     teamMemberName: string;
+    status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     dueDate: Date;
     rfqId: number | null;
     vendorOrganizationNames: string | null;
