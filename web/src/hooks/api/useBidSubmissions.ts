@@ -13,18 +13,12 @@ export const bidSubmissionsKey = {
 };
 
 export const useBidSubmissions = (
-    tab?: 'pending' | 'submitted' | 'disqualified',
+    tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    const bidStatusMap: Record<string, 'Submission Pending' | 'Bid Submitted' | 'Tender Missed'> = {
-        pending: 'Submission Pending',
-        submitted: 'Bid Submitted',
-        disqualified: 'Tender Missed', // Note: Backend uses 'disqualified' tab but filters by 'Tender Missed' status
-    };
-
     const params: BidSubmissionListParams = {
-        ...(tab && bidStatusMap[tab] && { bidStatus: bidStatusMap[tab] }),
+        tab,
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),

@@ -8,31 +8,6 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class CostingSheetsController {
     constructor(private readonly costingSheetsService: CostingSheetsService) { }
 
-    @Get()
-    findAll(
-        @Query('costingStatus') costingStatus?: 'pending' | 'submitted' | 'rejected',
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const filters: CostingSheetFilters = {
-            ...(costingStatus && { costingStatus }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.costingSheetsService.findAll(filters);
-    }
-
     @Get('dashboard')
     getDashboard(
         @Query('tab') tab?: 'pending' | 'submitted' | 'tender-dnb',
@@ -40,12 +15,14 @@ export class CostingSheetsController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.costingSheetsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

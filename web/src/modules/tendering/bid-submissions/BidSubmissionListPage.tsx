@@ -40,7 +40,7 @@ const BidSubmissionListPage = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useBidSubmissions(
-        activeTab,
+        activeTab as TabKey,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );

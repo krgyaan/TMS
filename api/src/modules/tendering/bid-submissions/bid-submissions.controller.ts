@@ -10,38 +10,12 @@ import {
 } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
 import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
-import type { BidSubmissionFilters } from './bid-submissions.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('bid-submissions')
 export class BidSubmissionsController {
     constructor(private readonly bidSubmissionsService: BidSubmissionsService) { }
-
-    @Get()
-    findAll(
-        @Query('bidStatus') bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed',
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const filters: BidSubmissionFilters = {
-            ...(bidStatus && { bidStatus }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.bidSubmissionsService.findAll(filters);
-    }
 
     @Get('dashboard')
     getDashboard(
@@ -50,12 +24,14 @@ export class BidSubmissionsController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.bidSubmissionsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

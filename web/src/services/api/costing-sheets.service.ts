@@ -45,7 +45,7 @@ class CostingSheetsService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<CostingSheetDashboardRow>>(queryString ? `?${queryString}` : '');
+        return this.get<PaginatedResult<CostingSheetDashboardRow>>(`/dashboard${queryString ? `?${queryString}` : ''}`);
     }
 
     async getById(id: number): Promise<TenderCostingSheet> {

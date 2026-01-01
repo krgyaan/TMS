@@ -20,17 +20,26 @@ export type TqManagementFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
-export const useTqManagement = (filters?: TqManagementFilters) => {
+export const useTqManagement = (
+    tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
+    filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' },
+    legacyFilters?: TqManagementFilters // Legacy support
+) => {
     return useQuery({
-        queryKey: [...tqManagementKey.lists(), filters],
+        queryKey: [...tqManagementKey.lists(), { tabKey, ...filters, ...legacyFilters }],
         queryFn: async () => {
-            // Handle multiple statuses for the "noTq" tab
-            if (Array.isArray(filters?.tqStatus)) {
-                const statuses = filters.tqStatus;
-                const page = filters?.page || 1;
-                const limit = filters?.limit || 50;
-                const sortBy = filters?.sortBy;
-                const sortOrder = filters?.sortOrder;
+            // Use new getDashboard method if tabKey is provided
+            if (tabKey) {
+                return tqManagementService.getDashboard(tabKey, filters);
+            }
+
+            // Legacy support: Handle multiple statuses for the "noTq" tab
+            if (legacyFilters && Array.isArray(legacyFilters.tqStatus)) {
+                const statuses = legacyFilters.tqStatus;
+                const page = legacyFilters.page || 1;
+                const limit = legacyFilters.limit || 50;
+                const sortBy = legacyFilters.sortBy;
+                const sortOrder = legacyFilters.sortOrder;
 
                 // Fetch all statuses in parallel
                 const promises = statuses.map(status =>
@@ -77,7 +86,7 @@ export const useTqManagement = (filters?: TqManagementFilters) => {
             }
 
             // Single status - use normal API call
-            return tqManagementService.getAll(filters);
+            return tqManagementService.getAll(legacyFilters);
         },
     });
 };
