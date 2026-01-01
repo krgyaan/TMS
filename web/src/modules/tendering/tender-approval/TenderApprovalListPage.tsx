@@ -11,23 +11,29 @@ import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/a
 import type { TenderApprovalRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
 import { tenderNameCol } from '@/components/data-grid';
+import { Input } from '@/components/ui/input';
 
-const TABS_NAMES = { '0': 'Pending', '1': 'Accepted', '2': 'Rejected', 'tender-dnb': 'Tender DNB' } as const;
+type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
+type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
+const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = { 'pending': 'Pending', 'accepted': 'Accepted', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB' };
+
+const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Tender DNB' };
 
 const TenderApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<'0' | '1' | '2' | 'tender-dnb'>('0');
+    const [activeTab, setActiveTab] = useState<TenderApprovalTab>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, search]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -42,7 +48,7 @@ const TenderApprovalListPage = () => {
 
     const { data: apiResponse, isLoading: loading, error } = useTenderApprovals(
         activeTab,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: search || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -83,13 +89,13 @@ const TenderApprovalListPage = () => {
             let count = 0;
             if (counts) {
                 switch (key) {
-                    case '0':
+                    case 'pending':
                         count = counts.pending ?? 0;
                         break;
-                    case '1':
+                    case 'accepted':
                         count = counts.accepted ?? 0;
                         break;
-                    case '2':
+                    case 'rejected':
                         count = counts.rejected ?? 0;
                         break;
                     case 'tender-dnb':
@@ -98,7 +104,7 @@ const TenderApprovalListPage = () => {
                 }
             }
             return {
-                key: key as '0' | '1' | '2' | 'tender-dnb',
+                key: key as 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
                 name,
                 count,
             };
@@ -109,15 +115,14 @@ const TenderApprovalListPage = () => {
         tenderNameCol<TenderApprovalRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            minWidth: 250,
+            width: 250,
             colId: 'tenderNo',
             sortable: true,
         }),
         {
             field: 'teamMemberName',
             headerName: 'Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 130,
             colId: 'teamMemberName',
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
@@ -126,8 +131,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'dueDate',
             headerName: 'Due Date/Time',
-            flex: 1.5,
-            minWidth: 150,
+            width: 150,
             colId: 'dueDate',
             valueGetter: (params: any) => {
                 if (!params.data?.dueDate) return '—';
@@ -139,8 +143,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'gstValues',
             headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             colId: 'gstValues',
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
@@ -156,20 +159,22 @@ const TenderApprovalListPage = () => {
             filter: true,
         },
         {
-            field: 'itemName',
-            headerName: 'Item',
-            flex: 0.8,
-            minWidth: 80,
-            colId: 'itemName',
-            valueGetter: (params: any) => params.data?.itemName || '—',
+            field: 'emd',
+            headerName: 'EMD',
+            width: 100,
+            colId: 'emd',
+            valueGetter: (params: any) => {
+                const value = params.data?.emd;
+                if (value === null || value === undefined) return '—';
+                return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+            },
             sortable: true,
             filter: true,
         },
         {
             field: 'statusName',
             headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
+            width: 165,
             colId: 'statusName',
             cellRenderer: (params: any) => {
                 const status = params.data?.statusName;
@@ -186,20 +191,19 @@ const TenderApprovalListPage = () => {
         {
             field: 'tlStatus',
             headerName: 'TL Status',
-            flex: 1,
-            minWidth: 120,
+            width: 150,
             colId: 'tlStatus',
             cellRenderer: (params: any) => {
                 const tlStatus = params.data?.tlStatus;
-                const statusName = TABS_NAMES[tlStatus as keyof typeof TABS_NAMES];
+                const statusName = TL_STATUS_NAMES[tlStatus as number];
                 const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-                    '0': 'outline',
-                    '1': 'default',
-                    '2': 'destructive',
-                    '3': 'secondary',
+                    0: 'outline',
+                    1: 'default',
+                    2: 'destructive',
+                    3: 'secondary',
                 };
                 const badgeVariant = variants[tlStatus as string] || 'secondary';
-                const isGreen = tlStatus === '1';
+                const isGreen = tlStatus === 1;
                 return (
                     <Badge
                         variant={badgeVariant}
@@ -218,7 +222,7 @@ const TenderApprovalListPage = () => {
             cellRenderer: createActionColumnRenderer(approvalActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [approvalActions]);
 
@@ -274,23 +278,34 @@ const TenderApprovalListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as '0' | '1' | '2' | 'tender-dnb')}>
-                    <TabsList className="m-auto">
-                        {tabsConfig.map((tab) => (
-                            <TabsTrigger
-                                key={tab.key}
-                                value={tab.key}
-                                className="data-[state=active]:shadow-md flex items-center gap-1"
-                            >
-                                <span className="font-semibold text-sm">{tab.name}</span>
-                                {tab.count > 0 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        {tab.count}
-                                    </Badge>
-                                )}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
+                    <div className="flex flex-col gap-4 mb-4 px-6">
+                        <TabsList className="m-auto">
+                            {tabsConfig.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.key}
+                                    value={tab.key}
+                                    className="data-[state=active]:shadow-md flex items-center gap-1"
+                                >
+                                    <span className="font-semibold text-sm">{tab.name}</span>
+                                    {tab.count > 0 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            {tab.count}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by tender name, number, value, due date, member, item..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent

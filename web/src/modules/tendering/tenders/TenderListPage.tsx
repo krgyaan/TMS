@@ -16,7 +16,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
 
-type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost';
+type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
 const TenderListPage = () => {
     const [activeTab, setActiveTab] = useState<TenderDashboardTab>('under-preparation');
@@ -28,23 +28,21 @@ const TenderListPage = () => {
 
     const { data: counts } = useTendersDashboardCounts();
 
-    // Map dashboard tabs to status categories for filtering
-    // Note: This is a temporary solution until dashboard endpoint is added
-    // Categories from dashboard-config.json: prep, dnb, bid, won, lost
-    const getStatusIdsForTab = (tab: TenderDashboardTab): string => {
-        const categoryMap: Record<TenderDashboardTab, string> = {
+    const getCategoryForTab = (tab: TenderDashboardTab): string | undefined => {
+        const categoryMap: Record<TenderDashboardTab, string | undefined> = {
             'under-preparation': 'prep',
             'did-not-bid': 'dnb',
             'tenders-bid': 'bid',
             'tender-won': 'won',
             'tender-lost': 'lost',
+            'unallocated': undefined, // unallocated is handled by unallocated flag
         };
         return categoryMap[tab];
     };
 
     const { data: apiResponse, isLoading: tendersLoading } = useTenders(
-        getStatusIdsForTab(activeTab),
-        [],
+        activeTab,
+        getCategoryForTab(activeTab),
         { page: pagination.pageIndex + 1, limit: pagination.pageSize }
     );
 
@@ -85,6 +83,11 @@ const TenderListPage = () => {
                 key: 'tender-lost' as TenderDashboardTab,
                 name: 'Tender Lost',
                 count: counts?.['tender-lost'] ?? 0,
+            },
+            {
+                key: 'unallocated' as TenderDashboardTab,
+                name: 'Unallocated',
+                count: counts?.['unallocated'] ?? 0,
             },
         ];
     }, [counts]);

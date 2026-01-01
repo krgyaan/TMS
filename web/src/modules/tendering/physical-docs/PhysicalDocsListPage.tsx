@@ -10,21 +10,23 @@ import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
+import { Input } from '@/components/ui/input';
 
 const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, search]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -40,7 +42,8 @@ const PhysicalDocsListPage = () => {
     const { data: apiResponse, isLoading: loading, error } = usePhysicalDocs(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort },
+        search || undefined
     );
 
     const { data: counts } = usePhysicalDocsDashboardCounts();
@@ -87,14 +90,13 @@ const PhysicalDocsListPage = () => {
         tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            minWidth: 250,
+            width: 250,
         }),
         {
             field: 'teamMemberName',
             colId: 'teamMemberName',
             headerName: 'Member',
-            flex: 1,
-            minWidth: 120,
+            width: 120,
             valueGetter: (params: any) => params.data?.teamMemberName ? params.data.teamMemberName : '—',
             sortable: true,
             filter: true,
@@ -103,8 +105,7 @@ const PhysicalDocsListPage = () => {
             field: 'physicalDocsDeadline',
             colId: 'physicalDocsDeadline',
             headerName: 'Physical Docs Deadline',
-            flex: 1.5,
-            minWidth: 150,
+            width: 160,
             valueGetter: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
             sortable: true,
             filter: true,
@@ -113,7 +114,7 @@ const PhysicalDocsListPage = () => {
             field: 'courierAddress',
             colId: 'courierAddress',
             headerName: 'Courier Address',
-            minWidth: 300,
+            width: 200,
             valueGetter: (params: any) => params.data?.courierAddress ? params.data.courierAddress : '—',
             sortable: true,
             filter: true,
@@ -122,8 +123,7 @@ const PhysicalDocsListPage = () => {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
+            width: 170,
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
             cellRenderer: (params: any) => (
                 <Badge variant={params.value ? 'default' : 'secondary'}>
@@ -137,8 +137,7 @@ const PhysicalDocsListPage = () => {
             field: 'courierNo',
             colId: 'courierNo',
             headerName: 'Courier Number',
-            flex: 1,
-            minWidth: 120,
+            width: 100,
             valueGetter: (params: any) => params.data?.courierNo ? params.data.courierNo : '—',
             sortable: true,
             filter: true,
@@ -149,7 +148,7 @@ const PhysicalDocsListPage = () => {
             cellRenderer: createActionColumnRenderer(physicalDocsActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 80,
         },
     ], [physicalDocsActions]);
 
@@ -201,6 +200,18 @@ const PhysicalDocsListPage = () => {
                         <CardDescription className="mt-2">
                             Review and approve physical docs.
                         </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-8 w-64"
+                            />
+                        </div>
                     </div>
                 </div>
             </CardHeader>

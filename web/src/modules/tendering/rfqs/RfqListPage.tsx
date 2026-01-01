@@ -10,20 +10,22 @@ import { paths } from '@/app/routes/paths';
 import type { RfqDashboardRow } from '@/types/api.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
+import { Input } from '@/components/ui/input';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, search]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -42,6 +44,7 @@ const Rfqs = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
+        search: search || undefined,
     });
 
     const { data: counts } = useRfqsDashboardCounts();
@@ -213,6 +216,18 @@ const Rfqs = () => {
                         <CardDescription className="mt-2">
                             Review and approve RFQs.
                         </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-8 w-64"
+                            />
+                        </div>
                     </div>
                 </div>
             </CardHeader>
