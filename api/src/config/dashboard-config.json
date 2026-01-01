@@ -51,7 +51,15 @@
                     "name": "Tenders Bid",
                     "category": "bid",
                     "statusIds": [
-                        17
+                        17,
+                        19,
+                        20,
+                        39,
+                        37,
+                        38,
+                        40,
+                        23,
+                        41
                     ],
                     "sortBy": "submissionDate",
                     "sortOrder": "desc"
@@ -409,7 +417,7 @@
                     ],
                     "fieldConditions": {
                         "costingApprovalStatus": "EQUALS",
-                        "costingApprovalStatusValue": "pending"
+                        "costingApprovalStatusValue": "Pending"
                     },
                     "sortBy": "dueDate",
                     "sortOrder": "asc"
@@ -421,7 +429,7 @@
                     ],
                     "fieldConditions": {
                         "costingApprovalStatus": "EQUALS",
-                        "costingApprovalStatusValue": "approved"
+                        "costingApprovalStatusValue": "Approved"
                     },
                     "sortBy": "approvalDate",
                     "sortOrder": "desc"
