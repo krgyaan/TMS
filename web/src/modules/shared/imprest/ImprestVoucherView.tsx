@@ -1,19 +1,19 @@
 import React from "react";
-import { useParams } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
+import { useNavigate, useParams } from "react-router-dom";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useImprestVoucherView, useAccountApproveVoucher, useAdminApproveVoucher } from "./imprest.hooks";
-import { useCurrentUser as useAuth } from "@/hooks/api/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { ArrowLeft } from "lucide-react";
 
 const ImprestVoucherView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const voucherId = Number(id);
+    const navigate = useNavigate();
 
-    const { data: user } = useAuth();
-    const roleName = user?.role?.name ?? "";
-    const roleId = user?.role?.id ?? null;
+    const { canRead } = useAuth();
 
     const { data, isLoading, refetch } = useImprestVoucherView(voucherId);
 
@@ -65,15 +65,25 @@ const ImprestVoucherView: React.FC = () => {
         );
     };
 
-    const isAccountUser = roleName.startsWith("account");
-    const isAdminUser = roleId === 1; // Assuming role ID 1 is for Admin/CEO
+    if (!canRead("accounts.imprests")) {
+        return <div>You do not have permission to view this voucher.</div>;
+    }
 
     return (
         <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold">Expense Report</h2>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                    </Button>
+                </div>
+            </CardHeader>
+            {/* -------------------- HEADER -------------------- */}
             <CardContent className="space-y-6">
-                {/* -------------------- HEADER -------------------- */}
-                <h2 className="text-xl font-bold">Expense Report</h2>
-
                 <div className="space-y-1">
                     <p>
                         <b>Voucher No:</b> {voucher.voucherCode}
@@ -128,13 +138,13 @@ const ImprestVoucherView: React.FC = () => {
 
                 {/* -------------------- ACTIONS -------------------- */}
                 <div className="flex justify-center gap-3 pt-4">
-                    {isAccountUser && !voucher.accountsSignedBy && (
+                    {!voucher.accountsSignedBy && (
                         <Button variant="outline" onClick={() => setAccModalOpen(true)}>
                             Approve by Accounts
                         </Button>
                     )}
 
-                    {isAdminUser && !voucher.adminSignedBy && (
+                    {!voucher.adminSignedBy && (
                         <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
                             Approve by CEO
                         </Button>

@@ -1,8 +1,15 @@
 export interface EmployeeImprestSummaryDto {
     userId: number;
     userName: string;
-    amountReceived: number;
+
     amountSpent: number;
     amountApproved: number;
+    amountReceived: number;
     amountLeft: number;
+
+    voucherInfo: {
+        totalVouchers: number;
+        accountsApproved: number;
+        adminApproved: number;
+    };
 }

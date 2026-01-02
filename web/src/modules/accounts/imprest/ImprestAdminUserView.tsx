@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft } from "lucide-react";
 
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
@@ -16,9 +16,9 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "./imprest.hooks";
+import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "../../shared/imprest/imprest.hooks";
 
-import type { ImprestRow } from "./imprest.types";
+import type { ImprestRow } from "../../shared/imprest/imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -106,22 +106,20 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
-const ImprestEmployeeDashboard: React.FC = () => {
+const ImprestAdminUserView: React.FC = () => {
     const navigate = useNavigate();
     const { user, hasPermission, canUpdate } = useAuth();
-    const { id } = useParams<{ id?: string }>();
-    let userDetails = null;
+    const { userId: id } = useParams<{ userId: string }>();
 
     const canMutateStatus = canUpdate("shared.imprestss");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
 
-    const requestedUserId = id ? Number(id) : null;
-    const isOwnPage = !requestedUserId || requestedUserId === user?.id;
+    const requestedUserId = Number(id);
+    const isOwnPage = requestedUserId === user?.id;
+
     console.log(requestedUserId, isOwnPage);
-    if (requestedUserId) {
-        userDetails = useUser(requestedUserId).data;
-    }
+    const userDetails = useUser(requestedUserId).data;
 
     console.log("user details", userDetails);
 
@@ -380,11 +378,13 @@ const ImprestEmployeeDashboard: React.FC = () => {
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="space-y-1">
-                    <CardTitle>{pageTitle}</CardTitle>
-                    <CardDescription>
-                        {rows.length} {rows.length === 1 ? "record" : "records"}
-                    </CardDescription>
+                <div className="flex items-center gap-4">
+                    <div className="space-y-1">
+                        <CardTitle>{pageTitle}</CardTitle>
+                        <CardDescription>
+                            {rows.length} {rows.length === 1 ? "record" : "records"}
+                        </CardDescription>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -403,9 +403,13 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <Download className="h-4 w-4 mr-2" />
                         Export
                     </Button>
-                    <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
+                    {/* <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add Imprest
+                    </Button> */}
+                    <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
                     </Button>
                 </div>
             </CardHeader>
@@ -491,4 +495,4 @@ const ImprestEmployeeDashboard: React.FC = () => {
     );
 };
 
-export default ImprestEmployeeDashboard;
+export default ImprestAdminUserView;

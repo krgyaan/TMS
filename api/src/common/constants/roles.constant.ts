@@ -1,18 +1,15 @@
 export enum RoleName {
-    SUPER_USER = 'Super User',
-    ADMIN = 'Admin',
-    TEAM_LEADER = 'Team Leader',
-    COORDINATOR = 'Coordinator',
-    EXECUTIVE = 'Executive',
-    ENGINEER = 'Engineer',
-    FIELD = 'Field',
+    SUPER_USER = "Super User",
+    ADMIN = "Admin",
+    TEAM_LEADER = "Team Leader",
+    COORDINATOR = "Coordinator",
+    EXECUTIVE = "Executive",
+    ENGINEER = "Engineer",
+    FIELD = "Field",
 }
 
 // Roles that can switch teams in UI
-export const TEAM_SWITCH_ALLOWED_ROLES: RoleName[] = [
-    RoleName.SUPER_USER,
-    RoleName.ADMIN,
-];
+export const TEAM_SWITCH_ALLOWED_ROLES: RoleName[] = [RoleName.SUPER_USER, RoleName.ADMIN];
 
 // Role hierarchy (higher = more permissions)
 export const ROLE_HIERARCHY: Record<RoleName, number> = {
@@ -27,9 +24,9 @@ export const ROLE_HIERARCHY: Record<RoleName, number> = {
 
 // Data visibility scope
 export enum DataScope {
-    SELF = 'self',     // Only own data (Executive, Engineer, Field)
-    TEAM = 'team',     // Team data (Team Leader, Coordinator)
-    ALL = 'all',       // All data with team switch (Admin, Super User)
+    SELF = "self", // Only own data (Executive, Engineer, Field)
+    TEAM = "team", // Team data (Team Leader, Coordinator)
+    ALL = "all", // All data with team switch (Admin, Super User)
 }
 
 export const ROLE_DATA_SCOPE: Record<RoleName, DataScope> = {

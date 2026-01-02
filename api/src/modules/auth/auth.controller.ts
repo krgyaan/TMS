@@ -8,6 +8,7 @@ import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { ConfigService } from "@nestjs/config";
 import type { AuthConfig } from "@config/auth.config";
 import authConfig from "@config/auth.config";
+import { AUTH_COOKIE_OPTIONS } from "./auth.cookies";
 
 const LoginSchema = z.object({
     email: z.string().email(),
@@ -50,14 +51,8 @@ export class AuthController {
     @Public()
     @Post("logout")
     @HttpCode(HttpStatus.OK)
-    async logout(@Res({ passthrough: true }) res: Response) {
-        res.clearCookie("access_token", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-        });
-
+    logout(@Res({ passthrough: true }) res: Response) {
+        res.clearCookie("access_token", AUTH_COOKIE_OPTIONS);
         return { message: "Logged out successfully" };
     }
 
@@ -175,11 +170,8 @@ export class AuthController {
 
     private setAuthCookie(res: Response, token: string) {
         res.cookie("access_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            path: "/",
+            ...AUTH_COOKIE_OPTIONS,
+            maxAge: 15 * 60 * 1000, // recommended
         });
     }
 }
