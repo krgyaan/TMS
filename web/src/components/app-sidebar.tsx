@@ -136,6 +136,7 @@ const navMain: NavGroup[] = [
         icon: Settings,
         items: [
             { title: "Users", url: paths.master.users, permission: "master.users" },
+            { title: "Permissions", url: paths.master.permissions, permission: "master.permissions" },
             { title: "Status", url: paths.master.statuses, permission: "master.statuses" },
             { title: "Items", url: paths.master.items, permission: "master.items" },
             { title: "Locations", url: paths.master.locations, permission: "master.locations" },
