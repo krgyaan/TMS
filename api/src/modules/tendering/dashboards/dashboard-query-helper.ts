@@ -19,23 +19,28 @@ export function buildTabConditions(
 
     const conditions = [...baseConditions];
 
-    // Add status filter
+    // Combine statusIds and category statusIds if both exist
+    let finalStatusIds: number[] = [];
+
     if (tabConfig.statusIds && tabConfig.statusIds.length > 0) {
-        conditions.push(inArray(tenderInfos.status, tabConfig.statusIds));
+        finalStatusIds = [...tabConfig.statusIds];
     }
 
-    // Add category filter (if no statusIds specified, or as additional filter)
     if (tabConfig.category) {
         const categoryStatusIds = getCategoryStatusIds(tabConfig.category);
         if (categoryStatusIds.length > 0) {
-            // If statusIds also exist, combine them
-            if (tabConfig.statusIds && tabConfig.statusIds.length > 0) {
-                const combinedIds = [...new Set([...tabConfig.statusIds, ...categoryStatusIds])];
-                conditions.push(inArray(tenderInfos.status, combinedIds));
+            // Combine with statusIds if they exist, otherwise use category statusIds
+            if (finalStatusIds.length > 0) {
+                finalStatusIds = [...new Set([...finalStatusIds, ...categoryStatusIds])];
             } else {
-                conditions.push(inArray(tenderInfos.status, categoryStatusIds));
+                finalStatusIds = categoryStatusIds;
             }
         }
+    }
+
+    // Add single status filter with combined IDs
+    if (finalStatusIds.length > 0) {
+        conditions.push(inArray(tenderInfos.status, finalStatusIds));
     }
 
     // Add field conditions

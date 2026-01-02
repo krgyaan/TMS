@@ -54,17 +54,19 @@ export class CostingApprovalsController {
     @Get('dashboard')
     async getDashboard(
         @CurrentUser() user: ValidatedUser,
-        @Query('tab') tab?: 'pending' | 'approved' | 'tender-dnb',
+        @Query('tab') tab?: 'pending' | 'approved' | 'rejected' | 'tender-dnb',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.costingApprovalsService.getDashboardData((user as any).team, tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

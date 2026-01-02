@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -7,6 +7,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { users } from '@/db/schemas/auth/users.schema';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
@@ -15,8 +16,6 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type CostingApprovalDashboardRow = {
@@ -26,7 +25,11 @@ export type CostingApprovalDashboardRow = {
     teamMember: number | null;
     teamMemberName: string | null;
     itemName: string | null;
+    status: number;
     statusName: string | null;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
@@ -41,6 +44,7 @@ export type CostingApprovalFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export type CostingApprovalDashboardCounts = {
@@ -76,8 +80,10 @@ export class CostingApprovalsService {
 
     private costingApprovalBaseWhere() {
         return and(
-            ...getBaseDashboardConditions(['dnb', 'lost']),
-            eq(tenderInfos.status, 6) // Entry condition: Status 6
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            isNotNull(tenderCostingSheets.submittedFinalPrice),
         );
     }
 
@@ -117,7 +123,7 @@ export class CostingApprovalsService {
             case 'costingStatus':
                 return sortOrder(tenderCostingSheets.status);
             default:
-                return asc(tenderInfos.dueDate);
+                return desc(tenderInfos.dueDate); // Default to desc like Laravel
         }
     }
 
@@ -131,10 +137,31 @@ export class CostingApprovalsService {
         const limit = filters?.limit ?? 50;
         const offset = (page - 1) * limit;
 
-        const whereClause = and(
+        const conditions = [
             this.costingApprovalBaseWhere(),
             this.costingStatusWhere(filters?.costingStatus),
-        );
+        ];
+
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator: filter by user.team
+        // - Others: filter by team_member = user.id
+
+        // Add search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${statuses.name} ILIKE ${searchStr}
+                )`
+            );
+        }
+
+        const whereClause = and(...conditions);
         const [{ count }] = await this.costingApprovalBaseQuery({
             count: sql<number>`count(distinct ${tenderInfos.id})`,
         })
@@ -145,6 +172,7 @@ export class CostingApprovalsService {
             tenderNo: tenderInfos.tenderNo,
             tenderName: tenderInfos.tenderName,
             teamMember: tenderInfos.teamMember,
+            status: tenderInfos.status,
             teamMemberName: users.name,
             itemName: items.name,
             statusName: statuses.name,
@@ -160,14 +188,78 @@ export class CostingApprovalsService {
             .limit(limit)
             .offset(offset) as any;
 
-        return wrapPaginatedResponse(rows.map((row) => ({
+        // Enrich rows with latest status log data
+        if (rows.length > 0) {
+            const tenderIds = rows.map((r: any) => r.tenderId);
+
+            // Get latest status log for each tender
+            const allStatusLogs = await this.db
+                .select({
+                    tenderId: tenderStatusHistory.tenderId,
+                    newStatus: tenderStatusHistory.newStatus,
+                    comment: tenderStatusHistory.comment,
+                    createdAt: tenderStatusHistory.createdAt,
+                    id: tenderStatusHistory.id,
+                })
+                .from(tenderStatusHistory)
+                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
+                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
+
+            // Group by tenderId and take the first (latest) entry for each
+            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
+            for (const log of allStatusLogs) {
+                if (!latestStatusLogMap.has(log.tenderId)) {
+                    latestStatusLogMap.set(log.tenderId, log);
+                }
+            }
+
+            // Get status names for latest status logs
+            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
+            const latestStatuses = latestStatusIds.length > 0
+                ? await this.db
+                    .select({ id: statuses.id, name: statuses.name })
+                    .from(statuses)
+                    .where(inArray(statuses.id, latestStatusIds))
+                : [];
+
+            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
+
+            return wrapPaginatedResponse(rows.map((row: any) => {
+                const latestLog = latestStatusLogMap.get(row.tenderId);
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    teamMember: row.teamMember,
+                    teamMemberName: row.teamMemberName,
+                    itemName: row.itemName,
+                    status: row.status,
+                    statusName: row.statusName,
+                    latestStatus: latestLog?.newStatus || null,
+                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
+                    statusRemark: latestLog?.comment || null,
+                    dueDate: row.dueDate,
+                    emdAmount: row.emdAmount,
+                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
+                    costingStatus: row.costingStatus,
+                    googleSheetUrl: row.googleSheetUrl,
+                    costingSheetId: row.costingSheetId,
+                };
+            }), Number(count), page, limit);
+        }
+
+        return wrapPaginatedResponse(rows.map((row: any) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
             teamMember: row.teamMember,
             teamMemberName: row.teamMemberName,
             itemName: row.itemName,
+            status: row.status,
             statusName: row.statusName,
+            latestStatus: null,
+            latestStatusName: null,
+            statusRemark: null,
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
@@ -178,47 +270,70 @@ export class CostingApprovalsService {
     }
 
     /**
-     * Get dashboard data by tab - Refactored to use config
+     * Get dashboard data by tab - Direct queries without config
      */
     async getDashboardData(
         userTeam: number,
-        tabKey?: 'pending' | 'approved' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        tabKey?: 'pending' | 'approved' | 'rejected' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
         const activeTab = tabKey || 'pending';
-        const tabConfig = getTabConfig('costing-approval', activeTab);
-
-        if (!tabConfig) {
-            throw new BadRequestException(`Invalid tab: ${activeTab}`);
-        }
 
         // Build base conditions
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb', 'lost']),
-            eq(tenderInfos.status, 6), // Entry condition
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
 
-        // Build tab-specific conditions
-        const fieldMappings = {
-            costingApprovalStatus: tenderCostingSheets.status,
-        };
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator: filter by user.team
+        // - Others: filter by team_member = user.id
 
-        const conditions = buildTabConditions(
-            'costing-approval',
-            activeTab,
-            baseConditions,
-            fieldMappings
-        );
+        // Build tab-specific conditions
+        const conditions = [...baseConditions];
+
+        // Note: Laravel uses costing_status on tender_infos, but NestJS uses tenderCostingSheets.status
+        // Pending: costing_status IS NULL (or tenderCostingSheets.status IS NULL)
+        // Approved: costing_status = 'Approved'
+        // Rejected: costing_status = 'Rejected/Redo'
+        if (activeTab === 'pending') {
+            conditions.push(isNull(tenderCostingSheets.status));
+        } else if (activeTab === 'approved') {
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+        } else if (activeTab === 'rejected') {
+            conditions.push(eq(tenderCostingSheets.status, 'Rejected/Redo'));
+        } else if (activeTab === 'tender-dnb') {
+            conditions.push(inArray(tenderInfos.status, [8, 34]));
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Add search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${statuses.name} ILIKE ${searchStr}
+                )`
+            );
+        }
 
         const whereClause = and(...conditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy || tabConfig.sortBy;
-        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        const sortBy = filters?.sortBy;
+        const sortOrder = filters?.sortOrder || 'desc'; // Default to desc like Laravel
         const orderByClause = this.getOrderBy({ sortBy, sortOrder } as CostingApprovalFilters);
 
         const [{ count }] = await this.costingApprovalBaseQuery({
@@ -231,6 +346,7 @@ export class CostingApprovalsService {
             tenderNo: tenderInfos.tenderNo,
             tenderName: tenderInfos.tenderName,
             teamMember: tenderInfos.teamMember,
+            status: tenderInfos.status,
             teamMemberName: users.name,
             itemName: items.name,
             statusName: statuses.name,
@@ -246,14 +362,80 @@ export class CostingApprovalsService {
             .limit(limit)
             .offset(offset) as any;
 
-        const data = rows.map((row) => ({
+        // Enrich rows with latest status log data
+        if (rows.length > 0) {
+            const tenderIds = rows.map((r: any) => r.tenderId);
+
+            // Get latest status log for each tender
+            const allStatusLogs = await this.db
+                .select({
+                    tenderId: tenderStatusHistory.tenderId,
+                    newStatus: tenderStatusHistory.newStatus,
+                    comment: tenderStatusHistory.comment,
+                    createdAt: tenderStatusHistory.createdAt,
+                    id: tenderStatusHistory.id,
+                })
+                .from(tenderStatusHistory)
+                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
+                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
+
+            // Group by tenderId and take the first (latest) entry for each
+            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
+            for (const log of allStatusLogs) {
+                if (!latestStatusLogMap.has(log.tenderId)) {
+                    latestStatusLogMap.set(log.tenderId, log);
+                }
+            }
+
+            // Get status names for latest status logs
+            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
+            const latestStatuses = latestStatusIds.length > 0
+                ? await this.db
+                    .select({ id: statuses.id, name: statuses.name })
+                    .from(statuses)
+                    .where(inArray(statuses.id, latestStatusIds))
+                : [];
+
+            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
+
+            const data = rows.map((row: any) => {
+                const latestLog = latestStatusLogMap.get(row.tenderId);
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    teamMember: row.teamMember,
+                    teamMemberName: row.teamMemberName,
+                    itemName: row.itemName,
+                    status: row.status,
+                    statusName: row.statusName,
+                    latestStatus: latestLog?.newStatus || null,
+                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
+                    statusRemark: latestLog?.comment || null,
+                    dueDate: row.dueDate,
+                    emdAmount: row.emdAmount,
+                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
+                    costingStatus: row.costingStatus,
+                    googleSheetUrl: row.googleSheetUrl,
+                    costingSheetId: row.costingSheetId,
+                };
+            });
+
+            return wrapPaginatedResponse(data, Number(count), page, limit);
+        }
+
+        const data = rows.map((row: any) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
             teamMember: row.teamMember,
             teamMemberName: row.teamMemberName,
             itemName: row.itemName,
+            status: row.status,
             statusName: row.statusName,
+            latestStatus: null,
+            latestStatusName: null,
+            statusRemark: null,
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
@@ -265,62 +447,72 @@ export class CostingApprovalsService {
         return wrapPaginatedResponse(data, Number(count), page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; approved: number; 'tender-dnb': number; total: number }> {
-        const config = loadDashboardConfig();
-        const dashboardConfig = config.dashboards['costing-approval'];
-
+    async getDashboardCounts(): Promise<{ pending: number; approved: number; rejected: number; 'tender-dnb': number; total: number }> {
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb', 'lost']),
-            eq(tenderInfos.status, 6), // Entry condition
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
 
-        const fieldMappings = {
-            costingApprovalStatus: tenderCostingSheets.status,
-        };
+        // Count pending: costing_status IS NULL (or tenderCostingSheets.status IS NULL)
+        const pendingConditions = [
+            ...baseConditions,
+            isNull(tenderCostingSheets.status),
+        ];
+
+        // Count approved: costing_status = 'Approved'
+        const approvedConditions = [
+            ...baseConditions,
+            eq(tenderCostingSheets.status, 'Approved'),
+        ];
+
+        // Count rejected: costing_status = 'Rejected/Redo'
+        const rejectedConditions = [
+            ...baseConditions,
+            eq(tenderCostingSheets.status, 'Rejected/Redo'),
+        ];
+
+        // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
+        const tenderDnbBaseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            isNotNull(tenderCostingSheets.submittedFinalPrice),
+        ];
+        const tenderDnbConditions = [
+            ...tenderDnbBaseConditions,
+            inArray(tenderInfos.status, [8, 34]),
+        ];
 
         const counts = await Promise.all([
-            this.countTab('costing-approval', 'pending', baseConditions, fieldMappings),
-            this.countTab('costing-approval', 'approved', baseConditions, fieldMappings),
-            this.countTab('costing-approval', 'tender-dnb', baseConditions, fieldMappings),
+            this.costingApprovalBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(and(...pendingConditions))
+                .then(([result]: any) => Number(result?.count || 0)),
+            this.costingApprovalBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(and(...approvedConditions))
+                .then(([result]: any) => Number(result?.count || 0)),
+            this.costingApprovalBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(and(...rejectedConditions))
+                .then(([result]: any) => Number(result?.count || 0)),
+            this.costingApprovalBaseQuery({
+                count: sql<number>`count(distinct ${tenderInfos.id})`,
+            })
+                .where(and(...tenderDnbConditions))
+                .then(([result]: any) => Number(result?.count || 0)),
         ]);
 
         return {
             pending: counts[0],
             approved: counts[1],
-            'tender-dnb': counts[2],
+            rejected: counts[2],
+            'tender-dnb': counts[3],
             total: counts.reduce((sum, count) => sum + count, 0),
         };
-    }
-
-    /**
-     * Helper method to count items for a specific tab
-     */
-    private async countTab(
-        dashboardName: string,
-        tabKey: string,
-        baseConditions: any[],
-        fieldMappings: Record<string, any>
-    ): Promise<number> {
-        const tabConfig = getTabConfig(dashboardName, tabKey);
-        if (!tabConfig) {
-            return 0;
-        }
-
-        const conditions = buildTabConditions(
-            dashboardName,
-            tabKey,
-            baseConditions,
-            fieldMappings
-        );
-
-        const whereClause = and(...conditions);
-
-        const [{ count }] = await this.costingApprovalBaseQuery({
-            count: sql<number>`count(distinct ${tenderInfos.id})`,
-        })
-            .where(whereClause) as any;
-
-        return Number(count || 0);
     }
 
     async findById(id: number, userTeam: number) {

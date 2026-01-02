@@ -158,11 +158,14 @@ export type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;
 export const DashboardQuerySchema = z.object({
     tab: z.enum([
         "pending",
+        "request-sent",
+        "paid",
         "sent",
         "approved",
         "rejected",
         "returned",
         "all",
+        "tender-dnb",
     ]).optional().default("all"),
     userId: z.coerce.number().optional(),
     page: z.coerce.number().int().positive().optional(),
