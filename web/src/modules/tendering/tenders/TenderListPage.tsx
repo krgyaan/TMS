@@ -35,7 +35,7 @@ const TenderListPage = () => {
             'tenders-bid': 'bid',
             'tender-won': 'won',
             'tender-lost': 'lost',
-            'unallocated': undefined, // unallocated is handled by unallocated flag
+            'unallocated': undefined,
         };
         return categoryMap[tab];
     };
@@ -128,8 +128,7 @@ const TenderListPage = () => {
         tenderNameCol<TenderInfoWithNames>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            flex: 2,
-            minWidth: 250,
+            width: 250,
         }),
         {
             field: "teamMemberName",
@@ -143,24 +142,32 @@ const TenderListPage = () => {
         {
             field: "gstValues",
             headerName: "Tender Value",
-            width: 130,
+            filter: true,
+            sortable: true,
+            width: 140,
             cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "tenderFees",
             headerName: "Tender Fee",
-            width: 130,
+            filter: true,
+            sortable: true,
+            width: 120,
             cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "emd",
             headerName: "EMD",
-            width: 130,
+            filter: true,
+            sortable: true,
+            width: 120,
             cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
             field: "dueDate",
             headerName: "Due Date",
+            filter: true,
+            sortable: true,
             width: 150,
             cellRenderer: (params: { value: string | Date }) => {
                 return params.value ? formatDateTime(params.value) : "-";
@@ -169,18 +176,23 @@ const TenderListPage = () => {
         {
             field: "statusName",
             headerName: "Status",
-            width: 150,
+            filter: true,
+            sortable: true,
+            width: 250,
             cellRenderer: (params: any) => {
-                return params.value ? <b>{params.value}</b> : <span className="text-gray-400">—</span>;
+                let status = params.data?.statusName;
+                return <Badge variant='outline'>
+                    {status}
+                </Badge>
             },
         },
         {
-            headerName: "Actions",
+            headerName: "",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(tenderActions),
             pinned: "right",
-            width: 25,
+            width: 57,
         },
     ]);
 
@@ -247,6 +259,14 @@ const TenderListPage = () => {
                                         rowCount={totalRows}
                                         paginationState={pagination}
                                         onPaginationChange={setPagination}
+                                        gridOptions={{
+                                            defaultColDef: {
+                                                filter: true,
+                                                sortable: true,
+                                            },
+                                        }}
+                                        enableFiltering={true}
+                                        enableSorting={true}
                                     />
                                 )}
                             </TabsContent>

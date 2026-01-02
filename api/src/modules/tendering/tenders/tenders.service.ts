@@ -354,11 +354,8 @@ export class TenderInfosService {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters?.unallocated) {
-            // Status = 1 required: unallocated tenders that are missed/cancelled/not biddable
-            // before assignment should appear in their respective status tabs, not unallocated tab
             conditions.push(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1));
         } else {
-            // Use category if provided, otherwise fallback to statusIds
             let statusIdsToUse: number[] = [];
             if (filters?.category) {
                 statusIdsToUse = StatusCache.getIds(filters.category);
