@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { and, eq, lte, asc, desc, sql, inArray, isNull, isNotNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -10,13 +10,15 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -24,6 +26,7 @@ export type RaDashboardFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export type RaDashboardType = 'under-evaluation' | 'scheduled' | 'completed';
@@ -94,131 +97,267 @@ export class ReverseAuctionService {
     ) { }
 
     /**
-     * Get RA Dashboard data with counts for all tabs
+     * Get RA Dashboard data with counts for all tabs - Direct queries without config
      */
-    async getDashboardData(type?: RaDashboardType, filters?: RaDashboardFilters): Promise<RaDashboardResponse> {
-        const allData = await this.findAllFromTenders();
-        const counts = this.calculateCounts(allData);
+    async getDashboardData(
+        tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+    ): Promise<RaDashboardResponse> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
 
-        let filteredData: RaDashboardRow[];
+        const activeTab = tabKey || 'under-evaluation';
 
-        switch (type) {
-            case 'under-evaluation':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.underEvaluation.includes(r.raStatus as any)
-                );
-                break;
-            case 'scheduled':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.scheduled.includes(r.raStatus as any)
-                );
-                break;
-            case 'completed':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.completed.includes(r.raStatus as any)
-                );
-                break;
-            default:
-                filteredData = allData;
+        // Build base conditions
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            eq(tenderInformation.reverseAuctionApplicable, 'YES'),
+        ];
+
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator: filter by user.team
+        // - Others: filter by team_member = user.id
+
+        const conditions = [...baseConditions];
+        if (activeTab === 'under-evaluation' || activeTab === 'scheduled') {
+            conditions.push(eq(bidSubmissions.status, 'Bid Submitted'));
         }
 
-        // Apply sorting
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
-            filteredData.sort((a, b) => {
-                let aVal: any;
-                let bVal: any;
-
-                switch (filters.sortBy) {
-                    case 'tenderNo':
-                        aVal = a.tenderNo || '';
-                        bVal = b.tenderNo || '';
-                        break;
-                    case 'tenderName':
-                        aVal = a.tenderName || '';
-                        bVal = b.tenderName || '';
-                        break;
-                    case 'teamMemberName':
-                        aVal = a.teamMemberName || '';
-                        bVal = b.teamMemberName || '';
-                        break;
-                    case 'bidSubmissionDate':
-                        aVal = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
-                        bVal = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
-                        break;
-                    case 'tenderValue':
-                        aVal = parseFloat(a.tenderValue || '0');
-                        bVal = parseFloat(b.tenderValue || '0');
-                        break;
-                    case 'raStatus':
-                        aVal = a.raStatus || '';
-                        bVal = b.raStatus || '';
-                        break;
-                    case 'raStartTime':
-                        aVal = a.raStartTime ? new Date(a.raStartTime).getTime() : 0;
-                        bVal = b.raStartTime ? new Date(b.raStartTime).getTime() : 0;
-                        break;
-                    default:
-                        return 0;
-                }
-
-                if (aVal < bVal) return -1 * sortOrder;
-                if (aVal > bVal) return 1 * sortOrder;
-                return 0;
-            });
+        if (activeTab === 'under-evaluation') {
+            // conditions.push();
+        } else if (activeTab === 'scheduled') {
+            conditions.push(
+                isNotNull(reverseAuctions.id),
+                inArray(reverseAuctions.status, ['RA Scheduled', 'RA Started', 'RA Ended'])
+            );
+        } else if (activeTab === 'completed') {
+            conditions.push(
+                isNotNull(reverseAuctions.id),
+                inArray(reverseAuctions.status, ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified'])
+            );
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Apply pagination
-        const total = filteredData.length;
-        let paginatedData = filteredData;
-        if (filters?.page && filters?.limit) {
-            const page = filters.page;
-            const limit = filters.limit;
-            const offset = (page - 1) * limit;
-            paginatedData = filteredData.slice(offset, offset + limit);
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${statuses.name} ILIKE ${searchStr}
+                )`
+            );
         }
+
+        const whereClause = and(...conditions);
+
+        const sortBy = filters?.sortBy;
+        const sortOrder = filters?.sortOrder || 'desc';
+        let orderByClause: any = desc(bidSubmissions.submissionDatetime);
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                    break;
+                case 'completionDate':
+                    orderByClause = sortFn(reverseAuctions.raEndTime);
+                    break;
+                case 'tenderValue':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'raStatus':
+                    orderByClause = sortFn(reverseAuctions.status);
+                    break;
+                case 'raStartTime':
+                    orderByClause = sortFn(reverseAuctions.raStartTime);
+                    break;
+                default:
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+            }
+        }
+
+        const query = this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderValue: tenderInfos.gstValues,
+                teamMemberName: users.name,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                bidSubmissionId: bidSubmissions.id,
+                raId: reverseAuctions.id,
+                raStatus: reverseAuctions.status,
+                raStartTime: reverseAuctions.raStartTime,
+                raEndTime: reverseAuctions.raEndTime,
+                technicallyQualified: reverseAuctions.technicallyQualified,
+                raResult: reverseAuctions.raResult,
+            })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+
+        try {
+            const sqlQuery = query.toSQL();
+            this.logger.debug(`[ReverseAuction] SQL Query: ${JSON.stringify(sqlQuery)}`);
+        } catch (error) {
+            this.logger.debug(`[ReverseAuction] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        const rows = await query;
+
+        const data: RaDashboardRow[] = rows.map((row) => ({
+            id: row.raId,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamMemberName: row.teamMemberName,
+            bidSubmissionDate: row.bidSubmissionDate,
+            tenderValue: row.tenderValue,
+            itemName: row.itemName,
+            tenderStatus: row.tenderStatus,
+            raStatus: this.calculateRaStatus(row),
+            raStartTime: row.raStartTime,
+            raEndTime: row.raEndTime,
+            technicallyQualified: row.technicallyQualified,
+            result: row.raResult,
+            hasRaEntry: row.raId !== null,
+        }));
+
+        const [totalResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const total = Number(totalResult?.count || 0);
+
+        const counts = await this.getDashboardCounts();
 
         const response: RaDashboardResponse = {
-            data: paginatedData,
+            data,
             counts,
-        };
-
-        if (filters?.page && filters?.limit) {
-            response.meta = {
+            meta: {
                 total,
-                page: filters.page,
-                limit: filters.limit,
-                totalPages: Math.ceil(total / filters.limit),
-            };
-        }
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
 
         return response;
     }
 
     async getDashboardCounts(): Promise<RaDashboardCounts> {
-        const allData = await this.findAllFromTenders();
-        return this.calculateCounts(allData);
-    }
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            eq(tenderInformation.reverseAuctionApplicable, 'YES'),
+        ];
 
-    private calculateCounts(data: RaDashboardRow[]): RaDashboardCounts {
-        const counts: RaDashboardCounts = {
-            underEvaluation: 0,
-            scheduled: 0,
-            completed: 0,
-            total: data.length,
+        // Count under-evaluation: status = 17 AND (RA doesn't exist OR technicallyQualified IS NULL)
+        const underEvaluationConditions = [
+            ...baseConditions,
+            eq(bidSubmissions.status, 'Bid Submitted'),
+            isNull(reverseAuctions.id),
+        ];
+
+        // Count scheduled: status = 17 AND RA exists with status in ['RA Scheduled', 'RA Started', 'RA Ended']
+        const scheduledConditions = [
+            ...baseConditions,
+            eq(bidSubmissions.status, 'Bid Submitted'),
+            isNotNull(reverseAuctions.id),
+            inArray(reverseAuctions.status, ['RA Scheduled', 'RA Started', 'RA Ended']),
+        ];
+
+        // Count completed: RA exists with status in ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified']
+        const completedConditions = [
+            ...baseConditions,
+            isNotNull(reverseAuctions.id),
+            inArray(reverseAuctions.status, ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified']),
+        ];
+
+        const counts = await Promise.all([
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...underEvaluationConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...scheduledConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .where(and(...completedConditions))
+                .then(([result]) => Number(result?.count || 0)),
+        ]);
+
+        return {
+            underEvaluation: counts[0],
+            scheduled: counts[1],
+            completed: counts[2],
+            total: counts.reduce((sum, count) => sum + count, 0),
         };
-
-        for (const row of data) {
-            if (STATUS_GROUPS.underEvaluation.includes(row.raStatus as any)) {
-                counts.underEvaluation++;
-            } else if (STATUS_GROUPS.scheduled.includes(row.raStatus as any)) {
-                counts.scheduled++;
-            } else if (STATUS_GROUPS.completed.includes(row.raStatus as any)) {
-                counts.completed++;
-            }
-        }
-
-        return counts;
     }
 
     async findAllFromTenders(): Promise<RaDashboardRow[]> {
@@ -257,7 +396,9 @@ export class ReverseAuctionService {
                 and(
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    eq(tenderInfos.status, 17), // Entry condition: Status 17
+                    eq(tenderInformation.reverseAuctionApplicable, 'Yes') // Entry condition: RA applicable
                 )
             )
             .orderBy(asc(bidSubmissions.submissionDatetime));
@@ -594,8 +735,8 @@ export class ReverseAuctionService {
                     status,
                     raResult: dto.raResult,
                     veL1AtStart: dto.veL1AtStart,
-                    raStartPrice: dto.raStartPrice,
-                    raClosePrice: dto.raClosePrice,
+                    raStartPrice: dto.raStartPrice?.toString() ?? null,
+                    raClosePrice: dto.raClosePrice?.toString() ?? null,
                     raCloseTime: dto.raCloseTime ? new Date(dto.raCloseTime) : null,
                     screenshotQualifiedParties: dto.screenshotQualifiedParties,
                     screenshotDecrements: dto.screenshotDecrements,
@@ -869,15 +1010,7 @@ export class ReverseAuctionService {
             hasRaEntry: row.raId !== null,
         }));
 
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     /**

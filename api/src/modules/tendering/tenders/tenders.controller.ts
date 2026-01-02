@@ -126,9 +126,15 @@ type UpdateTenderDto = z.infer<typeof UpdateTenderInfoSchema>;
 export class TenderInfoController {
     constructor(private readonly tenderInfosService: TenderInfosService) { }
 
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
+        return this.tenderInfosService.getDashboardCounts();
+    }
+
     @Get()
     async list(
         @Query('statusIds') statusIds?: string,
+        @Query('category') category?: string,
         @Query('unallocated') unallocated?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
@@ -150,6 +156,7 @@ export class TenderInfoController {
 
         return this.tenderInfosService.findAll({
             statusIds: toNumArray(statusIds),
+            category,
             unallocated: unallocated === 'true' || unallocated === '1',
             page: parseNumber(page),
             limit: parseNumber(limit),

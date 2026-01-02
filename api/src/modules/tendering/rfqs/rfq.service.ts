@@ -1,10 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, or } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { and, eq, isNotNull, ne, sql, asc, desc, isNull, or, inArray, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
+import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import {
     NewRfq,
     rfqs,
@@ -17,12 +18,15 @@ import { items } from '@db/schemas/master/items.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { CreateRfqDto, UpdateRfqDto } from './dto/rfq.dto';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { StatusCache } from '@/utils/status-cache';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type RfqFilters = {
     rfqStatus?: 'pending' | 'sent';
@@ -30,6 +34,7 @@ export type RfqFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 type RfqRow = {
@@ -40,6 +45,9 @@ type RfqRow = {
     teamMemberName: string;
     status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     itemName: string;
     rfqTo: string;
     dueDate: Date;
@@ -84,46 +92,125 @@ export class RfqsService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    async findAll(filters?: RfqFilters): Promise<PaginatedResult<RfqRow>> {
+    /**
+ * Get RFQ Dashboard data - Refactored to use dashboard config
+ */
+    async getRfqData(
+        tabKey?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+    ): Promise<PaginatedResult<RfqRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions = [
+        // Use default tab if not provided
+        const activeTab = tabKey || 'pending';
+
+        // Build base conditions
+        const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            isNotNull(tenderInfos.rfqTo),   // NOT NULL
+            ne(tenderInfos.rfqTo, ''),      // NOT empty string
+            ne(tenderInfos.rfqTo, '0'),     // NOT '0'
         ];
 
-        // Build orderBy clause based on sortBy (if it's a database field)
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Team Leader/Coordinator: filter by user.team
+        // - Others: filter by team_member = user.id
+
+        // Build tab-specific conditions
+        const conditions = [...baseConditions];
+
+        if (activeTab === 'pending') {
+            // conditions.push(eq(tenderInfos.status, 3));
+            conditions.push(isNull(rfqs.id));
+        } else if (activeTab === 'sent') {
+            // conditions.push(eq(tenderInfos.status, 4));
+            conditions.push(isNotNull(rfqs.id));
+        } else if (activeTab === 'rfq-rejected') {
+            // RFQ Rejected: status in [10, 14, 35]
+            conditions.push(inArray(tenderInfos.status, [10, 14, 35]));
+        } else if (activeTab === 'tender-dnb') {
+            // Tender DNB: status in [8, 34] (dnb category)
+            const dnbStatusIds = StatusCache.getIds('dnb');
+            if (dnbStatusIds.length > 0) {
+                // Filter to only [8, 34] from dnb category
+                const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
+                if (filteredDnbIds.length > 0) {
+                    conditions.push(inArray(tenderInfos.status, filteredDnbIds));
+                }
+            }
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Add search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                        ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                        ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                        ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                        ${users.name} ILIKE ${searchStr}
+                    )`
+            );
+        }
+
+        const whereClause = and(...conditions);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy;
+        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : 'desc');
         let orderByClause: any = asc(tenderInfos.dueDate); // Default
 
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
+        // Set default sort based on tab if no sortBy specified
+        if (!sortBy) {
+            if (activeTab === 'pending') {
+                orderByClause = asc(tenderInfos.dueDate);
+            } else if (activeTab === 'sent') {
+                orderByClause = desc(tenderInfos.dueDate);
+            } else if (activeTab === 'rfq-rejected' || activeTab === 'tender-dnb') {
+                orderByClause = desc(tenderInfos.updatedAt);
+            }
+        } else {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
                 case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
                 case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    orderByClause = sortFn(tenderInfos.tenderName);
                     break;
                 case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
+                    orderByClause = sortFn(users.name);
                     break;
                 case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'itemName':
-                    orderByClause = sortOrder(items.name);
-                    break;
-                case 'statusName':
-                    orderByClause = sortOrder(statuses.name);
+                case 'statusChangeDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
                 default:
-                    orderByClause = asc(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
             }
         }
 
+        // Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -139,65 +226,101 @@ export class RfqsService {
                 dueDate: tenderInfos.dueDate,
                 rfqId: rfqs.id,
                 vendorOrganizationNames: sql<string>`(
-                    SELECT string_agg(${vendorOrganizations.name}, ', ')
-                    FROM ${vendorOrganizations}
-                    WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
-                )`,
+                        SELECT string_agg(${vendorOrganizations.name}, ', ')
+                        FROM ${vendorOrganizations}
+                        WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
+                    )`,
             })
             .from(tenderInfos)
+            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(rfqs, eq(tenderInfos.id, rfqs.tenderId))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(and(...conditions))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
             .orderBy(orderByClause);
 
-        console.log("RFQ Rows: ", rows);
-        // Filter by rfqStatus (pending = rfqId is null, sent = rfqId is not null)
-        let filteredRows = rows;
-        if (filters?.rfqStatus) {
-            if (filters.rfqStatus === 'pending') {
-                filteredRows = rows.filter((row) => row.rfqId === null);
-            } else if (filters.rfqStatus === 'sent') {
-                filteredRows = rows.filter((row) => row.rfqId !== null);
-            }
-        }
+        // Enrich rows with latest status log data
+        if (rows.length > 0) {
+            const tenderIds = rows.map(r => r.tenderId);
 
-        // Apply sorting if sortBy is not a database field (e.g., vendorOrganizationNames)
-        if (filters?.sortBy && ['vendorOrganizationNames'].includes(filters.sortBy)) {
-            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
-            filteredRows.sort((a, b) => {
-                let aVal: any;
-                let bVal: any;
+            // Get latest status log for each tender
+            const allStatusLogs = await this.db
+                .select({
+                    tenderId: tenderStatusHistory.tenderId,
+                    newStatus: tenderStatusHistory.newStatus,
+                    comment: tenderStatusHistory.comment,
+                    createdAt: tenderStatusHistory.createdAt,
+                    id: tenderStatusHistory.id,
+                })
+                .from(tenderStatusHistory)
+                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
+                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
 
-                switch (filters.sortBy) {
-                    case 'vendorOrganizationNames':
-                        aVal = a.vendorOrganizationNames || '';
-                        bVal = b.vendorOrganizationNames || '';
-                        break;
-                    default:
-                        return 0;
+            // Group by tenderId and take the first (latest) entry for each
+            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
+            for (const log of allStatusLogs) {
+                if (!latestStatusLogMap.has(log.tenderId)) {
+                    latestStatusLogMap.set(log.tenderId, log);
                 }
+            }
 
-                if (aVal < bVal) return -1 * sortOrder;
-                if (aVal > bVal) return 1 * sortOrder;
-                return 0;
+            // Get status names for latest status logs
+            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
+            const latestStatuses = latestStatusIds.length > 0
+                ? await this.db
+                    .select({ id: statuses.id, name: statuses.name })
+                    .from(statuses)
+                    .where(inArray(statuses.id, latestStatusIds))
+                : [];
+
+            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
+
+            // Enrich rows with latest status log data
+            const enrichedRows = rows.map((row) => {
+                const latestLog = latestStatusLogMap.get(row.tenderId);
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: `${row.tenderName} - ${row.tenderNo}`,
+                    teamMember: row.teamMember || 0,
+                    teamMemberName: row.teamMemberName || '',
+                    status: row.status || 0,
+                    statusName: row.statusName || '',
+                    latestStatus: latestLog?.newStatus || null,
+                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
+                    statusRemark: latestLog?.comment || null,
+                    itemName: row.itemName || '',
+                    rfqTo: row.rfqTo || '',
+                    dueDate: row.dueDate,
+                    rfqId: row.rfqId,
+                    vendorOrganizationNames: row.vendorOrganizationNames,
+                };
             });
+
+            return wrapPaginatedResponse(enrichedRows, total, page, limit);
         }
 
-        // Apply pagination
-        const totalFiltered = filteredRows.length;
-        const paginatedData = filteredRows.slice(offset, offset + limit);
+        const data: RfqRow[] = rows.map((row) => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: `${row.tenderName} - ${row.tenderNo}`,
+            teamMember: row.teamMember || 0,
+            teamMemberName: row.teamMemberName || '',
+            status: row.status || 0,
+            statusName: row.statusName || '',
+            latestStatus: null,
+            latestStatusName: null,
+            statusRemark: null,
+            itemName: row.itemName || '',
+            rfqTo: row.rfqTo || '',
+            dueDate: row.dueDate,
+            rfqId: row.rfqId,
+            vendorOrganizationNames: row.vendorOrganizationNames,
+        }));
 
-        return {
-            data: paginatedData as unknown as RfqRow[],
-            meta: {
-                total: totalFiltered,
-                page,
-                limit,
-                totalPages: Math.ceil(totalFiltered / limit),
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async findById(id: number): Promise<RfqDetails | null> {
@@ -431,18 +554,15 @@ export class RfqsService {
     }
 
     /**
-     * Get RFQ Dashboard data - Updated implementation per requirements
-     * Type: 'pending' = rfqId IS NULL, 'sent' = rfqId IS NOT NULL
+     * Get counts for all RFQ dashboard tabs
      */
-    async getRfqData(
-        type?: 'pending' | 'sent',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-    ): Promise<PaginatedResult<RfqRow>> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
-        const offset = (page - 1) * limit;
-
-        // Build base conditions
+    async getDashboardCounts(): Promise<{
+        pending: number;
+        sent: number;
+        'rfq-rejected': number;
+        'tender-dnb': number;
+        total: number;
+    }> {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
@@ -452,104 +572,83 @@ export class RfqsService {
             ne(tenderInfos.rfqTo, ''),
         ];
 
-        // Add type filter
-        if (type === 'pending') {
-            baseConditions.push(isNull(rfqs.id));
-        } else if (type === 'sent') {
-            baseConditions.push(isNotNull(rfqs.id));
-        }
+        // Count pending: status = 3, rfqId IS NULL
+        const pendingConditions = [
+            ...baseConditions,
+            eq(tenderInfos.status, 3),
+            isNull(rfqs.id),
+        ];
 
-        const whereClause = and(...baseConditions);
+        // Count sent: status = 4, rfqId IS NOT NULL
+        const sentConditions = [
+            ...baseConditions,
+            eq(tenderInfos.status, 4),
+            isNotNull(rfqs.id),
+        ];
 
-        // Build orderBy clause
-        let orderByClause: any = asc(tenderInfos.dueDate); // Default
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
-                    break;
-                default:
-                    orderByClause = asc(tenderInfos.dueDate);
-            }
-        }
+        // Count rfq-rejected: status in [10, 14, 35]
+        const rfqRejectedConditions = [
+            ...baseConditions,
+            inArray(tenderInfos.status, [10, 14, 35]),
+        ];
 
-        // Get total count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(whereClause);
-        const total = Number(countResult?.count || 0);
+        // Count tender-dnb: status in [8, 34] (dnb category)
+        const dnbStatusIds = StatusCache.getIds('dnb');
+        const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
+        const tenderDnbConditions = [
+            ...baseConditions,
+            ...(filteredDnbIds.length > 0 ? [inArray(tenderInfos.status, filteredDnbIds)] : []),
+        ];
 
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                teamMember: tenderInfos.teamMember,
-                teamMemberName: users.name,
-                status: tenderInfos.status,
-                statusName: statuses.name,
-                item: tenderInfos.item,
-                itemName: items.name,
-                rfqTo: tenderInfos.rfqTo,
-                dueDate: tenderInfos.dueDate,
-                rfqId: rfqs.id,
-                vendorOrganizationNames: sql<string>`(
-                    SELECT string_agg(${vendorOrganizations.name}, ', ')
-                    FROM ${vendorOrganizations}
-                    WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
-                )`,
-            })
-            .from(tenderInfos)
-            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(whereClause)
-            .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
-
-        const data: RfqRow[] = rows.map((row) => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: `${row.tenderName} - ${row.tenderNo}`,
-            teamMember: row.teamMember || 0,
-            teamMemberName: row.teamMemberName || '',
-            status: row.status || 0,
-            statusName: row.statusName || '',
-            itemName: row.itemName || '',
-            rfqTo: row.rfqTo || '',
-            dueDate: row.dueDate,
-            rfqId: row.rfqId,
-            vendorOrganizationNames: row.vendorOrganizationNames,
-        }));
+        // Count for each tab
+        const counts = await Promise.all([
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(and(...pendingConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(and(...sentConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(and(...rfqRejectedConditions))
+                .then(([result]) => Number(result?.count || 0)),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(and(...tenderDnbConditions))
+                .then(([result]) => Number(result?.count || 0)),
+        ]);
 
         return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            pending: counts[0],
+            sent: counts[1],
+            'rfq-rejected': counts[2],
+            'tender-dnb': counts[3],
+            total: counts.reduce((sum, count) => sum + count, 0),
         };
     }
+
 
     /**
      * Helper method to send email notifications

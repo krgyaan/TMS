@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull } from 'drizzle-orm';
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -10,11 +10,14 @@ import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schem
 import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
-import type { PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -54,9 +57,7 @@ export class DocumentChecklistsService {
 
         // Build WHERE conditions
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            ...getBaseDashboardConditions(['dnb', 'lost']),
         ];
 
         // Add checklistSubmitted filter condition
@@ -159,19 +160,188 @@ export class DocumentChecklistsService {
         };
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; total: number }> {
-        const [pendingCountResult] = await this.db
+    /**
+     * Get dashboard data by tab - Refactored to use config
+     */
+    async getDashboardData(
+        tabKey?: 'pending' | 'submitted' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const activeTab = tabKey || 'pending';
+        const tabConfig = getTabConfig('document-checklist', activeTab);
+
+        if (!tabConfig) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Build base conditions
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+        ];
+
+        // Build tab-specific conditions
+        const fieldMappings = {
+            checklistId: tenderDocumentChecklists.id,
+        };
+
+        const conditions = buildTabConditions(
+            'document-checklist',
+            activeTab,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy || tabConfig.sortBy;
+        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        let orderByClause: any = asc(tenderInfos.dueDate);
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'dueDate':
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'submissionDate':
+                    orderByClause = sortFn(tenderDocumentChecklists.createdAt);
+                    break;
+                case 'statusChangeDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'statusName':
+                    orderByClause = sortFn(statuses.name);
+                    break;
+                default:
+                    orderByClause = sortFn(tenderInfos.dueDate);
+            }
+        }
+
+        // Get total count
+        const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
-            .from(tenderDocumentChecklists)
-            .where(isNull(tenderDocumentChecklists.id));
-        const pending = Number(pendingCountResult?.count || 0);
-        const [submittedCountResult] = await this.db
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+            .where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+                itemName: items.name,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                gstValues: tenderInfos.gstValues,
+                checklistId: tenderDocumentChecklists.id,
+            })
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+            .where(whereClause)
+            .limit(limit)
+            .offset(offset)
+            .orderBy(orderByClause);
+
+        const data = rows.map((row) => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamMemberName: row.teamMemberName,
+            itemName: row.itemName,
+            statusName: row.statusName,
+            dueDate: row.dueDate,
+            gstValues: row.gstValues ? Number(row.gstValues) : 0,
+            checklistSubmitted: row.checklistId !== null,
+        }));
+
+        return wrapPaginatedResponse(data, total, page, limit);
+    }
+
+    async getDashboardCounts(): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
+        const config = loadDashboardConfig();
+        const dashboardConfig = config.dashboards['document-checklist'];
+
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+        ];
+
+        const fieldMappings = {
+            checklistId: tenderDocumentChecklists.id,
+        };
+
+        const counts = await Promise.all([
+            this.countTab('document-checklist', 'pending', baseConditions, fieldMappings),
+            this.countTab('document-checklist', 'submitted', baseConditions, fieldMappings),
+            this.countTab('document-checklist', 'tender-dnb', baseConditions, fieldMappings),
+        ]);
+
+        return {
+            pending: counts[0],
+            submitted: counts[1],
+            'tender-dnb': counts[2],
+            total: counts.reduce((sum, count) => sum + count, 0),
+        };
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const [result] = await this.db
             .select({ count: sql<number>`count(*)` })
-            .from(tenderDocumentChecklists)
-            .where(isNotNull(tenderDocumentChecklists.id));
-        const submitted = Number(submittedCountResult?.count || 0);
-        const total = pending + submitted;
-        return { pending, submitted, total };
+            .from(tenderInfos)
+            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+            .where(whereClause);
+
+        return Number(result?.count || 0);
     }
 
     async findByTenderId(tenderId: number) {

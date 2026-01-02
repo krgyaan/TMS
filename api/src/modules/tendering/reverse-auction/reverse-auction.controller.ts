@@ -9,7 +9,7 @@ import {
     Query,
 } from '@nestjs/common';
 import { ReverseAuctionService, type RaDashboardFilters } from '@/modules/tendering/reverse-auction/reverse-auction.service';
-import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
+import type { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
 import type { RaDashboardType } from '@/modules/tendering/reverse-auction/reverse-auction.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -20,11 +20,13 @@ export class ReverseAuctionController {
 
     @Get('dashboard')
     getDashboard(
-        @Query('type') type?: RaDashboardType,
+        @Query('tabKey') tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
+        @Query('type') type?: RaDashboardType, // Legacy support
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
             if (!v) return undefined;
@@ -32,15 +34,18 @@ export class ReverseAuctionController {
             return Number.isNaN(num) ? undefined : num;
         };
 
-        const filters: RaDashboardFilters = {
-            type,
+        // Use tabKey if provided, otherwise fall back to type for backward compatibility
+        const activeTab = tabKey || (type as 'under-evaluation' | 'scheduled' | 'completed' | undefined);
+
+        const filters = {
             ...(parseNumber(page) && { page: parseNumber(page) }),
             ...(parseNumber(limit) && { limit: parseNumber(limit) }),
             ...(sortBy && { sortBy }),
             ...(sortOrder && { sortOrder }),
+            ...(search && { search }),
         };
 
-        return this.reverseAuctionService.getDashboardData(type, filters);
+        return this.reverseAuctionService.getDashboardData(activeTab, filters);
     }
 
     @Get('dashboard/counts')

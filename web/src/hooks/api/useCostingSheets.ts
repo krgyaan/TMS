@@ -13,7 +13,7 @@ export const costingSheetsKey = {
 };
 
 export const useCostingSheets = (
-    tab?: 'pending' | 'submitted' | 'rejected',
+    tab?: 'pending' | 'submitted',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
@@ -66,6 +66,7 @@ export const useSubmitCostingSheet = () => {
         mutationFn: costingSheetsService.submit,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
             toast.success('Costing sheet submitted successfully');
         },
         onError: (error: any) => {
@@ -82,6 +83,7 @@ export const useUpdateCostingSheet = () => {
             costingSheetsService.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
             toast.success('Costing sheet updated successfully');
         },
         onError: (error: any) => {
@@ -114,6 +116,7 @@ export const useCreateCostingSheet = () => {
         onSuccess: (data) => {
             if (data.success) {
                 queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
                 toast.success('Costing sheet created successfully');
             }
         },
@@ -133,6 +136,7 @@ export const useCreateCostingSheetWithName = () => {
         onSuccess: (data) => {
             if (data.success) {
                 queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
+                queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
                 toast.success('Costing sheet created successfully');
             }
         },
@@ -142,5 +146,3 @@ export const useCreateCostingSheetWithName = () => {
         },
     });
 };
-
-

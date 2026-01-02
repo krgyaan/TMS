@@ -10,7 +10,7 @@ import {
     Query
 } from '@nestjs/common';
 import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
-import { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
+import type { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -51,8 +51,27 @@ export class CostingApprovalsController {
         return this.costingApprovalsService.findAllForApproval((user as any).team, filters);
     }
 
-    @Get('counts')
-    async getCounts() {
+    @Get('dashboard')
+    async getDashboard(
+        @CurrentUser() user: ValidatedUser,
+        @Query('tab') tab?: 'pending' | 'approved' | 'rejected' | 'tender-dnb',
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
+    ) {
+        return this.costingApprovalsService.getDashboardData((user as any).team, tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+            search,
+        });
+    }
+
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
         return this.costingApprovalsService.getDashboardCounts();
     }
 

@@ -8,8 +8,8 @@ import {
     ParseIntPipe,
     Query
 } from '@nestjs/common';
-import { TqManagementService, type TqManagementFilters } from '@/modules/tendering/tq-management/tq-management.service';
-import {
+import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
+import type {
     CreateTqReceivedDto,
     UpdateTqRepliedDto,
     UpdateTqMissedDto,
@@ -41,7 +41,27 @@ export class TqManagementController {
         });
     }
 
-    @Get('counts')
+    @Get('dashboard')
+    getDashboard(
+        @Query('tabKey') tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
+        @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified', // Legacy support
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    ) {
+        // Use tabKey if provided, otherwise fall back to tab for backward compatibility
+        const activeTab = tabKey || tab;
+
+        return this.tqManagementService.getDashboardData(activeTab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+        });
+    }
+
+    @Get('dashboard/counts')
     getDashboardCounts() {
         return this.tqManagementService.getDashboardCounts();
     }

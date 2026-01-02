@@ -1,44 +1,23 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import { z } from 'zod';
+import {
+    optionalString,
+    optionalTextField,
+    optionalNumber,
+    decimalField,
+    requiredEnumField,
+} from '@/utils/zod-schema-generator';
 
-export class UploadResultDto {
-    @IsString()
-    @IsNotEmpty()
-    technicallyQualified: 'Yes' | 'No';
+export const UploadResultSchema = z.object({
+    technicallyQualified: requiredEnumField(['Yes', 'No']),
+    disqualificationReason: optionalString,
+    qualifiedPartiesCount: optionalTextField(50),
+    qualifiedPartiesNames: z.array(z.string()).optional(),
+    result: z.enum(['Won', 'Lost']).optional(),
+    l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
+    l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
+    ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),
+    qualifiedPartiesScreenshot: optionalString,
+    finalResultScreenshot: optionalString,
+});
 
-    @IsString()
-    @IsOptional()
-    disqualificationReason?: string;
-
-    @IsString()
-    @IsOptional()
-    qualifiedPartiesCount?: string;
-
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    qualifiedPartiesNames?: string[];
-
-    @IsString()
-    @IsOptional()
-    result?: 'Won' | 'Lost';
-
-    @IsString()
-    @IsOptional()
-    l1Price?: string;
-
-    @IsString()
-    @IsOptional()
-    l2Price?: string;
-
-    @IsString()
-    @IsOptional()
-    ourPrice?: string;
-
-    @IsString()
-    @IsOptional()
-    qualifiedPartiesScreenshot?: string;
-
-    @IsString()
-    @IsOptional()
-    finalResultScreenshot?: string;
-}
+export type UploadResultDto = z.infer<typeof UploadResultSchema>;

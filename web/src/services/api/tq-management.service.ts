@@ -23,6 +23,36 @@ class TqManagementService extends BaseApiService {
         super('/tq-management');
     }
 
+    async getDashboard(
+        tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<TqManagementDashboardRow>> {
+        const search = new URLSearchParams();
+
+        if (tabKey) {
+            search.set('tabKey', tabKey);
+        }
+        if (filters) {
+            if (filters.page) {
+                search.set('page', String(filters.page));
+            }
+            if (filters.limit) {
+                search.set('limit', String(filters.limit));
+            }
+            if (filters.sortBy) {
+                search.set('sortBy', filters.sortBy);
+            }
+            if (filters.sortOrder) {
+                search.set('sortOrder', filters.sortOrder);
+            }
+        }
+
+        const queryString = search.toString();
+        return this.get<PaginatedResult<TqManagementDashboardRow>>(
+            `/dashboard${queryString ? `?${queryString}` : ''}`
+        );
+    }
+
     async getAll(
         filters?: TqManagementFilters
     ): Promise<PaginatedResult<TqManagementDashboardRow>> {
@@ -91,7 +121,7 @@ class TqManagementService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
-        return this.get<TqManagementDashboardCounts>('/counts');
+        return this.get<TqManagementDashboardCounts>('/dashboard/counts');
     }
 }
 

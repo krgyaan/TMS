@@ -1,20 +1,24 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, isNotNull, or, inArray, isNull, like } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
-import { TenderInfosService, type PaginatedResult } from '@/modules/tendering/tenders/tenders.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { alias } from 'drizzle-orm/pg-core';
 
 export type TenderApprovalFilters = {
     tlStatus?: '0' | '1' | '2' | '3' | number;
@@ -22,16 +26,8 @@ export type TenderApprovalFilters = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
-
-const TABS_NAMES = {
-    '0': 'Pending',
-    '1': 'Approved',
-    '2': 'Rejected',
-    '3': 'Incomplete',
-} as const;
-
-type TabCategory = (typeof TABS_NAMES)[keyof typeof TABS_NAMES];
 
 type TenderRow = {
     tenderId: number;
@@ -48,6 +44,9 @@ type TenderRow = {
     itemName: string;
     statusName: string;
     tlStatus: string | number;
+    statusRemark?: string | null;
+    rejectReason?: number | null;
+    rejectRemarks?: string | null;
 };
 
 @Injectable()
@@ -62,58 +61,122 @@ export class TenderApprovalService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
+    /**
+     * Get dashboard data by tab
+     */
+    async getDashboardData(
+        tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+    ): Promise<PaginatedResult<TenderRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        console.log("Filters: ", filters);
+        const activeTab = tabKey || 'pending';
 
-        const conditions = [
-            TenderInfosService.getActiveCondition(),
-        ];
-
-        // Filter by tlStatus if provided
-        if (filters?.tlStatus !== undefined) {
-            conditions.push(eq(tenderInfos.tlStatus, filters.tlStatus as number));
+        // Validate tab key
+        if (!['pending', 'accepted', 'rejected', 'tender-dnb'].includes(activeTab)) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Build orderBy clause based on sortBy
+        // Base conditions for all tabs
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['lost']),
+        ];
+
+        // TODO: Add role-based team filtering middleware/guard
+        // - Admin: see all tenders
+        // - Non-admin: filter by user.team
+
+        // Tab-specific conditions
+        let tabConditions: any[] = [];
+        if (activeTab === 'pending') {
+            tabConditions.push(
+                or(
+                    eq(tenderInfos.tlStatus, 0),
+                    eq(tenderInfos.tlStatus, 3),
+                    isNull(tenderInfos.tlStatus)
+                )
+            );
+        } else if (activeTab === 'accepted') {
+            tabConditions.push(eq(tenderInfos.tlStatus, 1));
+        } else if (activeTab === 'rejected') {
+            tabConditions.push(eq(tenderInfos.tlStatus, 2));
+        } else if (activeTab === 'tender-dnb') {
+            tabConditions.push(
+                inArray(tenderInfos.status, [8, 34]),
+                inArray(tenderInfos.tlStatus, [1, 2, 3])
+            );
+        }
+
+        // Search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            tabConditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${tenderInfos.gstValues}::text ILIKE ${searchStr} OR
+                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${items.name} ILIKE ${searchStr} OR
+                    ${tenderInformation.teRejectionRemarks} ILIKE ${searchStr}
+                )`
+            );
+        }
+
+        const allConditions = [...baseConditions, ...tabConditions];
+        const whereClause = and(...allConditions);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy || (activeTab === 'pending' ? 'dueDate' : activeTab === 'accepted' ? 'approvalDate' : activeTab === 'rejected' ? 'rejectionDate' : 'statusChangeDate');
+        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : 'desc');
         let orderByClause: any = asc(tenderInfos.dueDate); // Default
 
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
                 case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
+                    orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
                 case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
+                    orderByClause = sortFn(tenderInfos.tenderName);
                     break;
                 case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
+                    orderByClause = sortFn(users.name);
                     break;
                 case 'dueDate':
-                    orderByClause = sortOrder(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'approvalDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
+                    break;
+                case 'rejectionDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
+                    break;
+                case 'statusChangeDate':
+                    orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
                 case 'gstValues':
-                    orderByClause = sortOrder(tenderInfos.gstValues);
+                    orderByClause = sortFn(tenderInfos.gstValues);
                     break;
                 case 'itemName':
-                    orderByClause = sortOrder(items.name);
+                    orderByClause = sortFn(items.name);
                     break;
                 case 'statusName':
-                    orderByClause = sortOrder(statuses.name);
+                    orderByClause = sortFn(statuses.name);
                     break;
                 case 'tlStatus':
-                    orderByClause = sortOrder(tenderInfos.tlStatus);
+                    orderByClause = sortFn(tenderInfos.tlStatus);
                     break;
                 default:
-                    orderByClause = asc(tenderInfos.dueDate);
+                    orderByClause = sortFn(tenderInfos.dueDate);
             }
         }
 
-        const rows = (await this.db
+        // Build query
+        const query = this.db
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -129,6 +192,8 @@ export class TenderApprovalService {
                 teamMemberName: users.name,
                 itemName: items.name,
                 statusName: statuses.name,
+                rejectReason: tenderInformation.teRejectionReason,
+                rejectRemarks: tenderInformation.teRejectionRemarks,
             })
             .from(tenderInfos)
             .innerJoin(users, eq(tenderInfos.teamMember, users.id))
@@ -138,51 +203,181 @@ export class TenderApprovalService {
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
-            .where(and(...conditions))
-            .orderBy(orderByClause)) as unknown as TenderRow[];
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+        // Execute query
+        const rows = (await query) as unknown as TenderRow[];
 
-        if (filters?.tlStatus !== undefined || filters?.page !== undefined) {
-            const totalRows = rows.length;
-            const paginatedData = rows.slice(offset, offset + limit);
+        // Enrich rows with latest status log data
+        if (rows.length > 0) {
+            const tenderIds = rows.map(r => r.tenderId);
 
-            return {
-                data: paginatedData,
-                meta: {
-                    total: totalRows,
-                    page: page,
-                    limit: limit,
-                    totalPages: Math.ceil(totalRows / limit),
-                },
-            };
+            // Get latest status log for each tender using window function approach
+            const allStatusLogs = await this.db
+                .select({
+                    tenderId: tenderStatusHistory.tenderId,
+                    newStatus: tenderStatusHistory.newStatus,
+                    comment: tenderStatusHistory.comment,
+                    createdAt: tenderStatusHistory.createdAt,
+                    id: tenderStatusHistory.id,
+                })
+                .from(tenderStatusHistory)
+                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
+                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
+
+            // Group by tenderId and take the first (latest) entry for each
+            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
+            for (const log of allStatusLogs) {
+                if (!latestStatusLogMap.has(log.tenderId)) {
+                    latestStatusLogMap.set(log.tenderId, log);
+                }
+            }
+
+            // Get status names for latest status logs
+            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
+            const latestStatuses = latestStatusIds.length > 0
+                ? await this.db
+                    .select({ id: statuses.id, name: statuses.name })
+                    .from(statuses)
+                    .where(inArray(statuses.id, latestStatusIds))
+                : [];
+
+            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
+
+            // Enrich rows with latest status log data
+            for (const row of rows) {
+                const latestLog = latestStatusLogMap.get(row.tenderId);
+                if (latestLog) {
+                    // Use latest status from log
+                    row.status = latestLog.newStatus;
+                    row.statusName = statusNameMap.get(latestLog.newStatus) || row.statusName;
+                    row.statusRemark = latestLog.comment;
+                } else {
+                    // Keep current status if no log exists
+                    row.statusRemark = null;
+                }
+            }
         }
 
-        return {
-            data: rows,
-            meta: {
-                total: rows.length,
-                page: page,
-                limit: limit,
-                totalPages: Math.ceil(rows.length / limit),
-            },
-        };
+        // Get total count
+        let countQuery: any = this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
+            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .innerJoin(items, eq(tenderInfos.item, items.id))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            );
+
+        // Add search joins to count query if search is used
+        if (filters?.search) {
+            // Joins already added above
+        }
+
+        const [countResult] = await countQuery.where(whereClause);
+
+        const total = Number(countResult?.count || 0);
+
+        this.logger.debug(`[TenderApproval] Query result: ${rows.length} rows, total: ${total}`);
+
+        return wrapPaginatedResponse(rows, total, page, limit);
+    }
+
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use getDashboardData instead
+     */
+    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
+        // Map tlStatus to tabKey for backward compatibility
+        let tabKey: 'pending' | 'accepted' | 'rejected' | 'tender-dnb' | undefined;
+        if (filters?.tlStatus !== undefined) {
+            if (filters.tlStatus === 0) tabKey = 'pending';
+            else if (filters.tlStatus === 1) tabKey = 'accepted';
+            else if (filters.tlStatus === 2) tabKey = 'rejected';
+        }
+
+        return this.getDashboardData(tabKey, {
+            page: filters?.page,
+            limit: filters?.limit,
+            sortBy: filters?.sortBy,
+            sortOrder: filters?.sortOrder,
+            search: filters?.search,
+        });
     }
 
     async getCounts() {
-        const counts = await this.db
-            .select({
-                total: sql<number>`count(*)`,
-                pending: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 0)`,
-                approved: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 1)`,
-                rejected: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 2)`,
-                incomplete: sql<number>`count(*) FILTER (WHERE ${tenderInfos.tlStatus} = 3)`,
-            })
+        // Base conditions for all tabs
+        const baseConditions = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getExcludeStatusCondition(['lost']),
+        ];
+
+        // Build conditions for each tab
+        const pendingConditions = [
+            ...baseConditions,
+            eq(tenderInfos.status, 2),
+            or(eq(tenderInfos.tlStatus, 0), isNull(tenderInfos.tlStatus))
+        ];
+
+        const acceptedConditions = [
+            ...baseConditions,
+            or(
+                and(eq(tenderInfos.status, 2), eq(tenderInfos.tlStatus, 1)),
+                eq(tenderInfos.status, 3)
+            )
+        ];
+
+        const rejectedConditions = [
+            ...baseConditions,
+            eq(tenderInfos.status, 2),
+            eq(tenderInfos.tlStatus, 2)
+        ];
+
+        const tenderDnbConditions = [
+            ...baseConditions,
+            inArray(tenderInfos.status, [8, 34]),
+            inArray(tenderInfos.tlStatus, [1, 2, 3])
+        ];
+
+        // Count for each tab
+        const [pendingCount, acceptedCount, rejectedCount, tenderDnbCount] = await Promise.all([
+            this.countTabItems(and(...pendingConditions)),
+            this.countTabItems(and(...acceptedConditions)),
+            this.countTabItems(and(...rejectedConditions)),
+            this.countTabItems(and(...tenderDnbConditions)),
+        ]);
+
+        return {
+            pending: pendingCount,
+            accepted: acceptedCount,
+            rejected: rejectedCount,
+            'tender-dnb': tenderDnbCount,
+            total: pendingCount + acceptedCount + rejectedCount + tenderDnbCount,
+        };
+    }
+
+    /**
+     * Helper method to count items with given conditions
+     */
+    private async countTabItems(whereClause: any): Promise<number> {
+        const countQuery = this.db
+            .select({ count: sql<number>`count(*)` })
             .from(tenderInfos)
+            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
+            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .innerJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
-            .where(TenderInfosService.getActiveCondition());
-        return counts[0];
+            .where(whereClause);
+
+        const [result] = await countQuery;
+        return Number(result?.count || 0);
     }
 
     async getByTenderId(tenderId: number) {

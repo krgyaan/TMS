@@ -8,25 +8,40 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TenderApprovalController {
     constructor(private readonly tenderApprovalService: TenderApprovalService) { }
 
-    @Get('counts')
-    async getCounts() {
+    @Get('dashboard/counts')
+    async getDashboardCounts() {
         return this.tenderApprovalService.getCounts();
     }
 
     @Get()
     async getAll(
-        @Query('tlStatus') tlStatus?: '0' | '1' | '2' | '3',
+        @Query('tabKey') tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+        @Query('tlStatus') tlStatus?: '0' | '1' | '2' | '3', // Legacy support
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
+        // Use tabKey if provided, otherwise fall back to tlStatus for backward compatibility
+        if (tabKey) {
+            return this.tenderApprovalService.getDashboardData(tabKey, {
+                page: page ? parseInt(page, 10) : undefined,
+                limit: limit ? parseInt(limit, 10) : undefined,
+                sortBy,
+                sortOrder,
+                search,
+            });
+        }
+
+        // Legacy support: map tlStatus to tabKey
         return this.tenderApprovalService.getAll({
             tlStatus,
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

@@ -1,41 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/axios';
 import type {
     RaDashboardResponse,
-    RaDashboardRow,
     RaDashboardCounts,
-    RaDashboardType,
-} from '@/types/api.types';
+    RaDashboardListParams,
+    ReverseAuction,
+    ScheduleRaDto,
+    UploadRaResultDto,
+} from '@/modules/tendering/ras/helpers/reverseAuction.types';
+import { reverseAuctionService } from '@/services/api/reverse-auction.service';
 
-const RA_QUERY_KEY = 'reverse-auctions';
+export const reverseAuctionsKey = {
+    all: ['reverse-auctions'] as const,
+    dashboards: () => [...reverseAuctionsKey.all, 'dashboard'] as const,
+    dashboard: (filters?: Record<string, unknown>) => [...reverseAuctionsKey.dashboards(), { filters }] as const,
+    counts: () => [...reverseAuctionsKey.all, 'counts'] as const,
+    details: () => [...reverseAuctionsKey.all, 'detail'] as const,
+    detail: (id: number) => [...reverseAuctionsKey.details(), id] as const,
+};
 
 // Fetch RA dashboard data with counts
-export const useRaDashboard = (
-    type?: RaDashboardType,
-    pagination?: { page: number; limit: number },
-    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+export const useReverseAuctionDashboard = (
+    filters?: RaDashboardListParams,
 ) => {
-    const queryKeyFilters = {
-        type,
-        ...pagination,
-        ...sort,
+    const params: RaDashboardListParams = {
+        ...filters,
     };
 
     return useQuery<RaDashboardResponse>({
-        queryKey: [RA_QUERY_KEY, 'dashboard', queryKeyFilters],
-        queryFn: async () => {
-            const params = new URLSearchParams();
-            if (type) params.append('type', type);
-            if (pagination?.page) params.append('page', String(pagination.page));
-            if (pagination?.limit) params.append('limit', String(pagination.limit));
-            if (sort?.sortBy) params.append('sortBy', sort.sortBy);
-            if (sort?.sortOrder) params.append('sortOrder', sort.sortOrder);
-
-            const queryString = params.toString();
-            const url = `/reverse-auctions/dashboard${queryString ? `?${queryString}` : ''}`;
-            const response = await apiClient.get(url);
-            return response.data;
-        },
+        queryKey: reverseAuctionsKey.dashboard(params as Record<string, unknown>),
+        queryFn: () => reverseAuctionService.getDashboard(params),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {
                 return previousData;
@@ -46,24 +39,18 @@ export const useRaDashboard = (
 };
 
 // Fetch only counts (for badges)
-export const useRaDashboardCounts = () => {
+export const useReverseAuctionDashboardCounts = () => {
     return useQuery<RaDashboardCounts>({
-        queryKey: [RA_QUERY_KEY, 'counts'],
-        queryFn: async () => {
-            const response = await apiClient.get('/reverse-auctions/dashboard/counts');
-            return response.data;
-        },
+        queryKey: reverseAuctionsKey.counts(),
+        queryFn: () => reverseAuctionService.getDashboardCounts(),
     });
 };
 
 // Fetch single RA by ID
 export const useReverseAuction = (id: number) => {
-    return useQuery<RaDashboardRow>({
-        queryKey: [RA_QUERY_KEY, id],
-        queryFn: async () => {
-            const response = await apiClient.get(`/reverse-auctions/${id}`);
-            return response.data;
-        },
+    return useQuery<ReverseAuction>({
+        queryKey: reverseAuctionsKey.detail(id),
+        queryFn: () => reverseAuctionService.getById(id),
         enabled: !!id,
     });
 };
@@ -73,12 +60,9 @@ export const useScheduleRa = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: number; data: any }) => {
-            const response = await apiClient.patch(`/reverse-auctions/${id}/schedule`, data);
-            return response.data;
-        },
+        mutationFn: ({ id, data }: { id: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [RA_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
         },
     });
 };
@@ -88,24 +72,11 @@ export const useUploadRaResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: number; data: any }) => {
-            const response = await apiClient.patch(`/reverse-auctions/${id}/upload-result`, data);
-            return response.data;
-        },
+        mutationFn: ({ id, data }: { id: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [RA_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
         },
     });
 };
 
-// Legacy hook for backward compatibility
-export const useReverseAuctions = () => {
-    const query = useRaDashboard();
-    return {
-        ...query,
-        data: query.data?.data,
-        counts: query.data?.counts,
-    };
-};
-
-export type { RaDashboardRow, RaDashboardCounts, RaDashboardResponse };
+export type { RaDashboardCounts, RaDashboardResponse };

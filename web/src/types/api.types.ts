@@ -1,6 +1,8 @@
 export type { TenderClient, TenderClientDto, TenderInfoSheet, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import type { TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import type { AuthUser, Team, UserRole, UserProfile } from './auth.types';
+import type { RaDashboardRow } from '@/modules/tendering/ras/helpers/reverseAuction.types';
+import type { ResultDashboardRow } from '@/modules/tendering/results/helpers/tenderResult.types';
 
 export interface User {
     id: number;
@@ -727,19 +729,21 @@ export interface TenderApprovalRow {
     teamMemberName: string;
     itemName: string;
     statusName: string;
-    tlStatus: string | number;
+    tlStatus: number;
 }
 
 export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3' | number;
+    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
+    tlStatus?: number;
     page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 export type TenderApprovalTabData = {
-    key: '0' | '1' | '2' | '3';
+    key: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
     name: string;
     count: number;
     data: TenderApprovalRow[];
@@ -1079,7 +1083,7 @@ export type BidSubmissionDashboardRow = {
 };
 
 export type BidSubmissionListParams = {
-    bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -1146,171 +1150,6 @@ export type TenderQueryItem = {
     updatedAt: Date;
 };
 
-export type TenderResult = {
-    id: number;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamExecutiveName: string | null;
-    tenderValue: string | null;
-    itemName: string | null;
-    status: string;
-    reverseAuctionId: number | null;
-    raApplicable: boolean;
-    technicallyQualified: string | null;
-    disqualificationReason: string | null;
-    qualifiedPartiesCount: string | null;
-    qualifiedPartiesNames: string[] | null;
-    result: string | null;
-    l1Price: string | null;
-    l2Price: string | null;
-    ourPrice: string | null;
-    qualifiedPartiesScreenshot: string | null;
-    finalResultScreenshot: string | null;
-    resultUploadedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type UploadResultDto = {
-    technicallyQualified: 'Yes' | 'No';
-    disqualificationReason?: string;
-    qualifiedPartiesCount?: string;
-    qualifiedPartiesNames?: string[];
-    result?: 'Won' | 'Lost';
-    l1Price?: string;
-    l2Price?: string;
-    ourPrice?: string;
-    qualifiedPartiesScreenshot?: string;
-    finalResultScreenshot?: string;
-};
-
-export type ReverseAuction = {
-    id: number;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    tenderValue: string | null;
-    itemName: string | null;
-    bidSubmissionDate: Date | null;
-    status: string;
-    technicallyQualified: string | null;
-    disqualificationReason: string | null;
-    qualifiedPartiesCount: string | null;
-    qualifiedPartiesNames: string[] | null;
-    raStartTime: Date | null;
-    raEndTime: Date | null;
-    scheduledAt: Date | null;
-    raResult: string | null;
-    veL1AtStart: string | null;
-    raStartPrice: string | null;
-    raClosePrice: string | null;
-    raCloseTime: Date | null;
-    screenshotQualifiedParties: string | null;
-    screenshotDecrements: string | null;
-    finalResultScreenshot: string | null;
-    resultUploadedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type ScheduleRaDto = {
-    technicallyQualified: 'Yes' | 'No';
-    disqualificationReason?: string;
-    qualifiedPartiesCount?: string;
-    qualifiedPartiesNames?: string[];
-    raStartTime?: string;
-    raEndTime?: string;
-};
-
-export type UploadRaResultDto = {
-    raResult: 'Won' | 'Lost' | 'H1 Elimination';
-    veL1AtStart: 'Yes' | 'No';
-    raStartPrice?: string;
-    raClosePrice?: string;
-    raCloseTime?: string;
-    screenshotQualifiedParties?: string;
-    screenshotDecrements?: string;
-    finalResultScreenshot?: string;
-};
-
-export type RaDashboardType = 'under-evaluation' | 'scheduled' | 'completed';
-
-export interface RaDashboardRow {
-    id: number;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    bidSubmissionDate: Date | null;
-    tenderValue: string | null;
-    itemName: string | null;
-    tenderStatus: string | null;
-    raStatus: string;
-    raStartTime: Date | null;
-    raEndTime: Date | null;
-    technicallyQualified: string | null;
-    result: string | null;
-}
-
-export interface RaDashboardCounts {
-    underEvaluation: number;
-    scheduled: number;
-    completed: number;
-    total: number;
-}
-
-export interface RaDashboardResponse {
-    data: RaDashboardRow[];
-    counts: RaDashboardCounts;
-}
-
-export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
-
-export interface EmdDetails {
-    amount: string;
-    instrumentType: string | null;
-    instrumentStatus: string | null;
-    displayText: string;
-}
-
-export interface ResultDashboardRow {
-    id: number;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamExecutiveName: string | null;
-    bidSubmissionDate: Date | null;
-    tenderValue: string | null;
-    finalPrice: string | null;
-    itemName: string | null;
-    tenderStatus: string | null;
-    resultStatus: string;
-    raApplicable: boolean;
-    reverseAuctionId: number | null;
-    emdDetails: EmdDetails | null;
-}
-
-export interface ResultDashboardCounts {
-    pending: number;
-    won: number;
-    lost: number;
-    disqualified: number;
-    total: number;
-}
-
-export interface ResultDashboardResponse {
-    data: ResultDashboardRow[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
-    counts: ResultDashboardCounts;
-}
-
 export interface PhysicalDocsDashboardRow {
     tenderId: number;
     tenderNo: string;
@@ -1319,9 +1158,14 @@ export interface PhysicalDocsDashboardRow {
     physicalDocsRequired: string;
     physicalDocsDeadline: Date;
     teamMemberName: string;
+    status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     physicalDocs: number | null;
     courierNo: number | null;
+    courierDate: Date | null;
 };
 
 export interface PhysicalDocs {
@@ -1340,6 +1184,7 @@ export interface PhysicalDocsListParams {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 }
 
 export interface CreatePhysicalDocsDto {
@@ -1438,32 +1283,33 @@ export interface EmdDashboardRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    sent: number;
-    approved: number;
+    'request-sent': number;
+    paid: number;
     rejected: number;
-    returned: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface BidSubmissionDashboardCounts {
     pending: number;
     submitted: number;
-    missed: number;
+    disqualified: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface CostingApprovalDashboardCounts {
-    submitted: number;
+    pending: number;
     approved: number;
-    rejected: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface TenderApprovalDashboardCounts {
     pending: number;
-    approved: number;
+    accepted: number;
     rejected: number;
-    incomplete: number;
+    'tender-dnb': number;
     total: number;
 }
 
@@ -1481,19 +1327,38 @@ export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'D
 export interface PhysicalDocsDashboardCounts {
     pending: number;
     sent: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface DocumentChecklistsDashboardCounts {
     pending: number;
     submitted: number;
+    'tender-dnb': number;
     total: number;
 }
 
 export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;
-    rejected: number;
+    'tender-dnb': number;
+    total: number;
+}
+
+export interface RfqDashboardCounts {
+    pending: number;
+    sent: number;
+    'rfq-rejected': number;
+    'tender-dnb': number;
+    total: number;
+}
+
+export interface TenderInfoDashboardCounts {
+    'under-preparation': number;
+    'did-not-bid': number;
+    'tenders-bid': number;
+    'tender-won': number;
+    'tender-lost': number;
     total: number;
 }
 
@@ -1554,7 +1419,11 @@ export interface RfqDashboardRow {
     itemName: string;
     rfqTo: string;
     teamMemberName: string;
+    status: number;
     statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
     dueDate: Date;
     rfqId: number | null;
     vendorOrganizationNames: string | null;
@@ -1662,10 +1531,10 @@ export interface PaymentRequestRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    sent: number;
-    approved: number;
+    'request-sent': number;
+    paid: number;
     rejected: number;
-    returned: number;
+    'tender-dnb': number;
     total: number;
 }
 

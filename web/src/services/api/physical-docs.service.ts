@@ -33,10 +33,42 @@ class PhysicalDocsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
         }
 
         const queryString = search.toString();
         return this.get<PaginatedResult<PhysicalDocsDashboardRow>>(queryString ? `?${queryString}` : '');
+    }
+
+    async getDashboard(
+        tab?: 'pending' | 'sent' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+    ): Promise<PaginatedResult<PhysicalDocsDashboardRow>> {
+        const search = new URLSearchParams();
+
+        if (tab) {
+            search.set('tab', tab);
+        }
+        if (filters?.page) {
+            search.set('page', String(filters.page));
+        }
+        if (filters?.limit) {
+            search.set('limit', String(filters.limit));
+        }
+        if (filters?.sortBy) {
+            search.set('sortBy', filters.sortBy);
+        }
+        if (filters?.sortOrder) {
+            search.set('sortOrder', filters.sortOrder);
+        }
+        if (filters?.search) {
+            search.set('search', filters.search);
+        }
+
+        const queryString = search.toString();
+        return this.get<PaginatedResult<PhysicalDocsDashboardRow>>(`/dashboard${queryString ? `?${queryString}` : ''}`);
     }
 
     async getById(id: number): Promise<PhysicalDocs | null> {
@@ -60,7 +92,7 @@ class PhysicalDocsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<PhysicalDocsDashboardCounts> {
-        return this.get<PhysicalDocsDashboardCounts>('/counts');
+        return this.get<PhysicalDocsDashboardCounts>('/dashboard/counts');
     }
 }
 

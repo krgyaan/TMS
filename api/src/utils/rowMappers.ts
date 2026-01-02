@@ -17,6 +17,11 @@ export const RowMappers = {
             physicalDocsDeadline: row.physicalDocsDeadline || null,
             physicalDocs: row.physicalDocs,
             courierNo: row.courierNo || null,
+            status: row.status || null,
+            latestStatus: row.latestStatus || null,
+            latestStatusName: row.latestStatusName || null,
+            statusRemark: row.statusRemark || null,
+            courierDate: row.courierDate || null,
         };
     },
 };

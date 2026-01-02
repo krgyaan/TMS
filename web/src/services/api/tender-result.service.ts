@@ -1,7 +1,10 @@
-import type { ResultDashboardFilters } from '@/hooks/api/useTenderResults';
+import type { ResultDashboardFilters } from '@/modules/tendering/results/helpers/tenderResult.types';
 import { BaseApiService } from './base.service';
-import type { PaginatedResult, ResultDashboardCounts, ResultDashboardRow, TenderResult, UploadResultDto } from '@/types/api.types';
-
+import type { PaginatedResult } from '@/types/api.types';
+import type { ResultDashboardRow } from '@/modules/tendering/results/helpers/tenderResult.types';
+import type { TenderResult } from '@/modules/tendering/results/helpers/tenderResult.types';
+import type { UploadResultFormPageProps } from '@/modules/tendering/results/helpers/tenderResult.types';
+import type { ResultDashboardCounts } from '@/modules/tendering/results/helpers/tenderResult.types';
 class TenderResultService extends BaseApiService {
     constructor() {
         super('/tender-results');
@@ -13,8 +16,8 @@ class TenderResultService extends BaseApiService {
         console.log('params:', params);
 
         if (params) {
-            if (params.type !== undefined) {
-                search.set('type', params.type);
+            if (params.tab) {
+                search.set('tab', params.tab);
             }
             if (params.page) {
                 search.set('page', String(params.page));
@@ -28,20 +31,16 @@ class TenderResultService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
         }
 
         const queryString = search.toString();
-        const url = queryString ? `?${queryString}` : '';
-        console.log('Request URL:', url);
-        console.log('Full URL:', `${this.basePath}${url}`);
+        const url = `/dashboard${queryString ? `?${queryString}` : ''}`;
 
         try {
             const result = await this.get<PaginatedResult<ResultDashboardRow>>(url);
-            console.log('=== tenderResultService.getAll Response ===');
-            console.log('result:', result);
-            console.log('result.data:', result?.data);
-            console.log('result.meta:', result?.meta);
-            console.log('result.data length:', result?.data?.length);
             return result;
         } catch (error) {
             console.error('=== tenderResultService.getAll Error ===');
@@ -62,24 +61,13 @@ class TenderResultService extends BaseApiService {
         return this.get<any>(`/${id}/ra-details`);
     }
 
-    async uploadResult(id: number, data: UploadResultDto): Promise<TenderResult> {
-        return this.patch<TenderResult>(`/${id}/upload-result`, data);
+    async uploadResult(id: number, data: UploadResultFormPageProps): Promise<TenderResult> {
+        return this.post<TenderResult>(`/${id}/upload-result`, data);
     }
 
     async getCounts(): Promise<ResultDashboardCounts> {
-        console.log('=== tenderResultService.getCounts ===');
-        console.log('Request URL: /counts');
-        console.log('Full URL:', `${this.basePath}/counts`);
-
         try {
-            const result = await this.get<ResultDashboardCounts>('/counts');
-            console.log('=== tenderResultService.getCounts Response ===');
-            console.log('result:', result);
-            console.log('result.pending:', result?.pending);
-            console.log('result.won:', result?.won);
-            console.log('result.lost:', result?.lost);
-            console.log('result.disqualified:', result?.disqualified);
-            console.log('result.total:', result?.total);
+            const result = await this.get<ResultDashboardCounts>('/dashboard/counts');
             return result;
         } catch (error) {
             console.error('=== tenderResultService.getCounts Error ===');

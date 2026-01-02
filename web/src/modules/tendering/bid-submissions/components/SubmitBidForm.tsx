@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -11,36 +10,13 @@ import { ArrowLeft, Save, IndianRupee } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useSubmitBid, useUpdateBidSubmission } from '@/hooks/api/useBidSubmissions';
-import type { BidSubmission } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderFileUploader } from '@/components/tender-file-upload';
+import { SubmitBidFormSchema, type SubmitBidFormValues } from '../helpers/bidSubmission.schema';
+import type { SubmitBidFormProps } from '../helpers/bidSubmission.types';
 
-const SubmitBidFormSchema = z.object({
-    tenderId: z.number(),
-    submissionDatetime: z.string().min(1, 'Bid submission date and time is required'),
-    submittedDocs: z.array(z.string()).default([]),
-    proofOfSubmission: z.array(z.string()).min(1, 'Proof of submission is required'),
-    finalPriceSs: z.array(z.string()).min(1, 'Final bidding price screenshot is required'),
-    finalBiddingPrice: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof SubmitBidFormSchema>;
-
-interface SubmitBidFormProps {
-    tenderId: number;
-    tenderDetails: {
-        tenderNo: string;
-        tenderName: string;
-        dueDate: Date | null;
-        teamMemberName: string | null;
-        emdAmount: string | null;
-        gstValues: number;
-        finalCosting: string | null;
-    };
-    mode: 'submit' | 'edit';
-    existingData?: BidSubmission;
-}
+type FormValues = SubmitBidFormValues;
 
 export default function SubmitBidForm({
     tenderId,

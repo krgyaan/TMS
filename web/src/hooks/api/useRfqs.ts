@@ -12,6 +12,7 @@ export const rfqsKey = {
     details: () => [...rfqsKey.all, "detail"] as const,
     detail: (id: number) => [...rfqsKey.details(), id] as const,
     byTender: (tenderId: number) => [...rfqsKey.all, "by-tender", tenderId] as const,
+    dashboardCounts: () => [...rfqsKey.all, "dashboard-counts"] as const,
 };
 
 export type RfqFilters = {
@@ -22,11 +23,27 @@ export type RfqFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
+export type RfqDashboardFilters = {
+    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+};
+
 export const useRfqs = (filters?: RfqFilters) => {
     return useQuery({
         queryKey: rfqsKey.list(filters),
         queryFn: () => rfqsService.getAll(filters),
     })
+};
+
+export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
+    return useQuery({
+        queryKey: [...rfqsKey.all, 'dashboard', filters],
+        queryFn: () => rfqsService.getDashboard(filters),
+    });
 };
 
 export const useRfq = (id: number | null) => {
@@ -121,5 +138,13 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
             return responses;
         },
         enabled: !!rfqToIds && rfqToIds !== "0" && rfqToIds.trim() !== "",
+    });
+};
+
+export const useRfqsDashboardCounts = () => {
+    return useQuery({
+        queryKey: rfqsKey.dashboardCounts(),
+        queryFn: () => rfqsService.getDashboardCounts(),
+        staleTime: 30000,
     });
 };

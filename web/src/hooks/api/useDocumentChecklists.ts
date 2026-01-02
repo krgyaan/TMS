@@ -59,6 +59,7 @@ export const useCreateDocumentChecklist = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.all });
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: documentChecklistKeys.dashboardCounts() });
             toast.success('Document checklist submitted successfully');
         },
         onError: (error: any) => {
@@ -75,6 +76,7 @@ export const useUpdateDocumentChecklist = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.all });
             queryClient.invalidateQueries({ queryKey: documentChecklistKeys.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: documentChecklistKeys.dashboardCounts() });
             toast.success('Document checklist updated successfully');
         },
         onError: (error: any) => {

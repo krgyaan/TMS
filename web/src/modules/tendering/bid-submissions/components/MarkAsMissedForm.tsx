@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -11,33 +10,12 @@ import { ArrowLeft, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useMarkAsMissed, useUpdateBidSubmission } from '@/hooks/api/useBidSubmissions';
-import type { BidSubmission } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { MarkAsMissedFormSchema, type MarkAsMissedFormValues } from '../helpers/bidSubmission.schema';
+import type { MarkAsMissedFormProps } from '../helpers/bidSubmission.types';
 
-const MarkAsMissedFormSchema = z.object({
-    tenderId: z.number(),
-    reasonForMissing: z.string().min(10, 'Reason must be at least 10 characters'),
-    preventionMeasures: z.string().min(10, 'Prevention measures must be at least 10 characters'),
-    tmsImprovements: z.string().min(10, 'TMS improvements must be at least 10 characters'),
-});
-
-type FormValues = z.infer<typeof MarkAsMissedFormSchema>;
-
-interface MarkAsMissedFormProps {
-    tenderId: number;
-    tenderDetails: {
-        tenderNo: string;
-        tenderName: string;
-        dueDate: Date | null;
-        teamMemberName: string | null;
-        emdAmount: string | null;
-        gstValues: number;
-        finalCosting: string | null;
-    };
-    mode: 'missed' | 'edit';
-    existingData?: BidSubmission;
-}
+type FormValues = MarkAsMissedFormValues;
 
 export default function MarkAsMissedForm({
     tenderId,

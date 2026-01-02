@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
-import { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
+import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -8,33 +8,26 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class CostingSheetsController {
     constructor(private readonly costingSheetsService: CostingSheetsService) { }
 
-    @Get()
-    findAll(
-        @Query('costingStatus') costingStatus?: 'pending' | 'submitted' | 'rejected',
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'pending' | 'submitted' | 'tender-dnb',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const filters: CostingSheetFilters = {
-            ...(costingStatus && { costingStatus }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.costingSheetsService.findAll(filters);
+        return this.costingSheetsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+            search,
+        });
     }
 
-    @Get('counts')
-    getCounts() {
+    @Get('dashboard/counts')
+    getDashboardCounts() {
         return this.costingSheetsService.getDashboardCounts();
     }
 

@@ -12,18 +12,19 @@ export const tendersKey = {
     details: () => [...tendersKey.all, 'detail'] as const,
     detail: (id: number) => [...tendersKey.details(), id] as const,
     list: (filters?: Record<string, unknown>) => [...tendersKey.lists(), { filters }] as const,
+    dashboardCounts: () => [...tendersKey.all, 'dashboard-counts'] as const,
 };
 
 export const useTenders = (
     activeTab?: string,
-    statusIds: number[] = [],
+    category?: string,
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 }
 ) => {
     const { queryParams: teamParams, teamId, userId, dataScope } = useTeamFilter();
 
     const filters: TenderListParams = {
         ...(activeTab === 'unallocated' ? { unallocated: true } : {}),
-        ...(activeTab !== 'unallocated' && statusIds.length > 0 ? { statusIds } : {}),
+        ...(activeTab !== 'unallocated' && category ? { category } : {}),
         ...teamParams,
         page: pagination.page,
         limit: pagination.limit,
@@ -32,7 +33,7 @@ export const useTenders = (
 
     const queryKeyFilters = {
         activeTab,
-        statusIds,
+        category,
         teamId,
         userId,
         dataScope,
@@ -114,5 +115,13 @@ export const useGenerateTenderName = () => {
         onError: error => {
             console.error("Error generating tender name:", error);
         },
+    });
+};
+
+export const useTendersDashboardCounts = () => {
+    return useQuery({
+        queryKey: tendersKey.dashboardCounts(),
+        queryFn: () => tenderInfosService.getDashboardCounts(),
+        staleTime: 30000,
     });
 };

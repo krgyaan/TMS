@@ -9,6 +9,15 @@ export type RfqFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
+export type RfqDashboardFilters = {
+    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+};
+
 export const rfqsService = {
     getAll: async (filters?: RfqFilters): Promise<PaginatedResult<RfqDashboardRow>> => {
         const params = new URLSearchParams();
@@ -19,6 +28,19 @@ export const rfqsService = {
         if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
         const query = params.toString();
         const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs${query ? `?${query}` : ''}`);
+        return response.data;
+    },
+
+    getDashboard: async (filters?: RfqDashboardFilters): Promise<PaginatedResult<RfqDashboardRow>> => {
+        const params = new URLSearchParams();
+        if (filters?.tab) params.append('tab', filters.tab);
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', filters.limit.toString());
+        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        if (filters?.search) params.append('search', filters.search);
+        const query = params.toString();
+        const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs/dashboard${query ? `?${query}` : ''}`);
         return response.data;
     },
 
@@ -44,5 +66,10 @@ export const rfqsService = {
 
     delete: async (id: number): Promise<void> => {
         await axiosInstance.delete(`/rfqs/${id}`);
+    },
+
+    getDashboardCounts: async (): Promise<any> => {
+        const response = await axiosInstance.get<any>('/rfqs/dashboard/counts');
+        return response.data;
     },
 };

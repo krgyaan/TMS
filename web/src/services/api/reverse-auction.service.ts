@@ -1,35 +1,67 @@
-import axiosInstance from '@/lib/axios';
-import type { RaDashboardRow, ReverseAuction, ScheduleRaDto, UploadRaResultDto } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type {
+    RaDashboardCounts,
+    RaDashboardResponse,
+    ReverseAuction,
+    ScheduleRaDto,
+    UploadRaResultDto,
+    RaDashboardListParams,
+} from '@/modules/tendering/ras/helpers/reverseAuction.types';
 
-export const reverseAuctionService = {
-    getAll: async (): Promise<RaDashboardRow[]> => {
-        const response = await axiosInstance.get<RaDashboardRow[]>('/reverse-auctions');
-        return response.data;
-    },
+class ReverseAuctionService extends BaseApiService {
+    constructor() {
+        super('/reverse-auctions');
+    }
 
-    getById: async (id: number): Promise<ReverseAuction> => {
-        const response = await axiosInstance.get<ReverseAuction>(`/reverse-auctions/${id}`);
-        return response.data;
-    },
+    async getDashboard(
+        filters?: RaDashboardListParams
+    ): Promise<RaDashboardResponse> {
+        const search = new URLSearchParams();
 
-    getByTenderId: async (tenderId: number): Promise<ReverseAuction | null> => {
-        const response = await axiosInstance.get<ReverseAuction>(`/reverse-auctions/tender/${tenderId}`);
-        return response.data;
-    },
+        if (filters) {
+            if (filters.tabKey) {
+                search.set('tabKey', filters.tabKey);
+            }
+            if (filters.page) {
+                search.set('page', String(filters.page));
+            }
+            if (filters.limit) {
+                search.set('limit', String(filters.limit));
+            }
+            if (filters.sortBy) {
+                search.set('sortBy', filters.sortBy);
+            }
+            if (filters.sortOrder) {
+                search.set('sortOrder', filters.sortOrder);
+            }
+            if (filters.search) {
+                search.set('search', filters.search);
+            }
+        }
 
-    scheduleRa: async (id: number, data: ScheduleRaDto): Promise<ReverseAuction> => {
-        const response = await axiosInstance.patch<ReverseAuction>(
-            `/reverse-auctions/${id}/schedule`,
-            data
-        );
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<RaDashboardResponse>(queryString ? `/dashboard?${queryString}` : '/dashboard');
+    }
 
-    uploadResult: async (id: number, data: UploadRaResultDto): Promise<ReverseAuction> => {
-        const response = await axiosInstance.patch<ReverseAuction>(
-            `/reverse-auctions/${id}/upload-result`,
-            data
-        );
-        return response.data;
-    },
-};
+    async getDashboardCounts(): Promise<RaDashboardCounts> {
+        return this.get<RaDashboardCounts>('/dashboard/counts');
+    }
+
+    async getById(id: number): Promise<ReverseAuction> {
+        return this.get<ReverseAuction>(`/${id}`);
+    }
+
+    async getByTenderId(tenderId: number): Promise<ReverseAuction> {
+        return this.get<ReverseAuction>(`/tender/${tenderId}`);
+    }
+
+    async scheduleRa(id: number, data: ScheduleRaDto): Promise<ReverseAuction> {
+        return this.patch<ReverseAuction>(`/${id}/schedule`, data);
+    }
+
+    async uploadResult(id: number, data: UploadRaResultDto): Promise<ReverseAuction> {
+        return this.patch<ReverseAuction>(`/${id}/upload-result`, data);
+    }
+}
+
+export const reverseAuctionService = new ReverseAuctionService();

@@ -56,14 +56,16 @@ const TqManagementListPage = () => {
         }
     };
 
-    // Fetch paginated data for active tab
-    const { data: apiResponse, isLoading: loading, error } = useTqManagement({
-        tqStatus: getTqStatusesFromTab(activeTab),
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-        sortBy: sortModel[0]?.colId,
-        sortOrder: sortModel[0]?.sort,
-    });
+    // Fetch paginated data for active tab using tabKey
+    const { data: apiResponse, isLoading: loading, error } = useTqManagement(
+        activeTab,
+        {
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
+            sortBy: sortModel[0]?.colId,
+            sortOrder: sortModel[0]?.sort,
+        }
+    );
 
     const { data: counts } = useTqManagementDashboardCounts();
 

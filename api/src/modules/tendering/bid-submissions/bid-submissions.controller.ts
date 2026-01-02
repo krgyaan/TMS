@@ -9,8 +9,7 @@ import {
     Query
 } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
-import { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
-import type { BidSubmissionFilters } from './bid-submissions.service';
+import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -18,32 +17,25 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class BidSubmissionsController {
     constructor(private readonly bidSubmissionsService: BidSubmissionsService) { }
 
-    @Get()
-    findAll(
-        @Query('bidStatus') bidStatus?: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed',
+    @Get('dashboard')
+    getDashboard(
+        @Query('tab') tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const filters: BidSubmissionFilters = {
-            ...(bidStatus && { bidStatus }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.bidSubmissionsService.findAll(filters);
+        return this.bidSubmissionsService.getDashboardData(tab, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            sortBy,
+            sortOrder,
+            search,
+        });
     }
 
-    @Get('counts')
+    @Get('dashboard/counts')
     getDashboardCounts() {
         return this.bidSubmissionsService.getDashboardCounts();
     }
@@ -64,7 +56,7 @@ export class BidSubmissionsController {
             submittedDocs: dto.submittedDocs || [],
             proofOfSubmission: dto.proofOfSubmission,
             finalPriceSs: dto.finalPriceSs,
-            finalBiddingPrice: dto.finalBiddingPrice,
+            finalBiddingPrice: dto.finalBiddingPrice !== null && dto.finalBiddingPrice !== undefined ? String(dto.finalBiddingPrice) : null,
             submittedBy: user.sub,
         });
     }
@@ -96,12 +88,12 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.update(id, {
             submissionDatetime: dto.submissionDatetime ? new Date(dto.submissionDatetime) : undefined,
             submittedDocs: dto.submittedDocs,
-            proofOfSubmission: dto.proofOfSubmission,
-            finalPriceSs: dto.finalPriceSs,
-            finalBiddingPrice: dto.finalBiddingPrice,
-            reasonForMissing: dto.reasonForMissing,
-            preventionMeasures: dto.preventionMeasures,
-            tmsImprovements: dto.tmsImprovements,
+            proofOfSubmission: dto.proofOfSubmission ?? undefined,
+            finalPriceSs: dto.finalPriceSs ?? undefined,
+            finalBiddingPrice: dto.finalBiddingPrice !== null && dto.finalBiddingPrice !== undefined ? String(dto.finalBiddingPrice) : null,
+            reasonForMissing: dto.reasonForMissing ?? undefined,
+            preventionMeasures: dto.preventionMeasures ?? undefined,
+            tmsImprovements: dto.tmsImprovements ?? undefined,
         });
     }
 }

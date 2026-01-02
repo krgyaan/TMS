@@ -1,16 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { tenderApprovalsService, type TenderApprovalFilters } from '@/services/api/tender-approvals.service';
+import { tenderApprovalsService } from '@/services/api/tender-approvals.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts } from '@/types/api.types';
-
-// export const tenderApprovalsKey = {
-//     all: ['tender-approvals'] as const,
-//     lists: () => [...tenderApprovalsKey.all, 'list'] as const,
-//     list: (filters?: TenderApprovalFilters) => [...tenderApprovalsKey.lists(), { filters }] as const,
-//     details: () => [...tenderApprovalsKey.all, 'detail'] as const,
-//     detail: (tenderId: number) => [...tenderApprovalsKey.details(), tenderId] as const,
-// };
+import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts, TenderApprovalFilters } from '@/types/api.types';
 
 export const tenderApprovalsKey = {
     all: ['tender-approvals'] as const,
@@ -23,16 +15,32 @@ export const tenderApprovalsKey = {
 }
 
 export const useTenderApprovals = (
-    tab?: '0' | '1' | '2' | '3',
-    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    tab?: '0' | '1' | '2' | '3' | 'tender-dnb' | 'pending' | 'accepted' | 'rejected',
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    // Map tab to tabKey (support both old numeric format and new string format)
+    const tabKeyMap: Record<string, 'pending' | 'accepted' | 'rejected' | 'tender-dnb'> = {
+        '0': 'pending',
+        '1': 'accepted',
+        '2': 'rejected',
+        '3': 'pending', // Incomplete maps to pending
+        'pending': 'pending',
+        'accepted': 'accepted',
+        'rejected': 'rejected',
+        'tender-dnb': 'tender-dnb',
+    };
+
+    const tabKey = tab ? tabKeyMap[tab] : undefined;
+
     const params: TenderApprovalFilters = {
-        ...(tab && { tlStatus: tab }),
+        ...(tabKey && { tabKey }),
+        ...(tab && !tabKey && { tlStatus: Number(tab) }), // Fallback to legacy tlStatus if tabKey not found
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        ...(pagination.search && { search: pagination.search }),
     };
 
     const queryKeyFilters = {
@@ -51,11 +59,6 @@ export const useTenderApprovals = (
             return undefined;
         },
     })
-
-    // return useQuery({
-    //     queryKey: tenderApprovalsKey.list(filters),
-    //     queryFn: () => tenderApprovalsService.getAll(filters),
-    // });
 };
 
 export const useTenderApproval = (tenderId: number | null) => {
@@ -74,6 +77,7 @@ export const useCreateTenderApproval = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.dashboardCounts() });
             toast.success("Tender approval submitted successfully");
         },
         onError: error => {
@@ -90,6 +94,7 @@ export const useUpdateTenderApproval = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.detail(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: tenderApprovalsKey.dashboardCounts() });
             toast.success("Tender approval updated successfully");
         },
         onError: error => {

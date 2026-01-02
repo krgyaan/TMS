@@ -20,8 +20,8 @@ class BidSubmissionsService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.bidStatus) {
-                search.set('bidStatus', params.bidStatus);
+            if (params.tab) {
+                search.set('tab', params.tab);
             }
             if (params.page) {
                 search.set('page', String(params.page));
@@ -38,7 +38,7 @@ class BidSubmissionsService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<BidSubmissionDashboardRow>>(queryString ? `?${queryString}` : '');
+        return this.get<PaginatedResult<BidSubmissionDashboardRow>>(`/dashboard${queryString ? `?${queryString}` : ''}`);
     }
 
     async getById(id: number): Promise<BidSubmission> {
@@ -62,7 +62,7 @@ class BidSubmissionsService extends BaseApiService {
     }
 
     async getDashboardCounts(): Promise<BidSubmissionDashboardCounts> {
-        return this.get<BidSubmissionDashboardCounts>('/counts');
+        return this.get<BidSubmissionDashboardCounts>('/dashboard/counts');
     }
 }
 

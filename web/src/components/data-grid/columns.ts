@@ -27,7 +27,7 @@ export function tenderNameCol<T extends { tenderNo: string; tenderName: string }
         sortable: true,
         filter: true,
         cellRenderer: TenderNameCell,
-        minWidth: 250,
+        minWidth: 150,
         ...overrides,
     } as ColDef<T>;
 }

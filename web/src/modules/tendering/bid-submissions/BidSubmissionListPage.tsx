@@ -16,7 +16,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
-type TabKey = 'pending' | 'submitted' | 'missed';
+type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
 const BidSubmissionListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -40,7 +40,7 @@ const BidSubmissionListPage = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useBidSubmissions(
-        activeTab,
+        activeTab as TabKey,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
@@ -109,7 +109,7 @@ const BidSubmissionListPage = () => {
         return [
             {
                 key: 'pending' as TabKey,
-                name: 'Pending',
+                name: 'Bid Submission Pending',
                 count: counts?.pending ?? 0,
             },
             {
@@ -118,9 +118,14 @@ const BidSubmissionListPage = () => {
                 count: counts?.submitted ?? 0,
             },
             {
-                key: 'missed' as TabKey,
-                name: 'Tender Missed',
-                count: counts?.missed ?? 0,
+                key: 'disqualified' as TabKey,
+                name: 'Disqualified',
+                count: counts?.disqualified ?? 0,
+            },
+            {
+                key: 'tender-dnb' as TabKey,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] ?? 0,
             },
         ];
     }, [counts]);
@@ -129,15 +134,13 @@ const BidSubmissionListPage = () => {
         tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
             headerName: 'Tender',
             filter: true,
-            flex: 2,
-            minWidth: 250,
+            width: 200,
         }),
         {
             field: 'teamMemberName',
             colId: 'teamMemberName',
             headerName: 'Team Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 130,
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
@@ -146,8 +149,7 @@ const BidSubmissionListPage = () => {
             field: 'dueDate',
             colId: 'dueDate',
             headerName: 'Due Date & Time',
-            flex: 1.5,
-            minWidth: 170,
+            width: 160,
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
@@ -155,8 +157,7 @@ const BidSubmissionListPage = () => {
         {
             field: 'emdAmount',
             headerName: 'EMD',
-            flex: 1,
-            minWidth: 130,
+            width: 120,
             valueGetter: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
@@ -169,8 +170,7 @@ const BidSubmissionListPage = () => {
             field: 'gstValues',
             colId: 'gstValues',
             headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
+            width: 140,
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
@@ -183,8 +183,7 @@ const BidSubmissionListPage = () => {
             field: 'finalCosting',
             colId: 'finalCosting',
             headerName: 'Final Costing',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.finalCosting;
                 if (!value) return '—';
@@ -197,22 +196,19 @@ const BidSubmissionListPage = () => {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            minWidth: 140,
-            sortable: true,
-            filter: true,
+            width: 140,
             valueGetter: (params: any) => {
                 const value = params.data?.statusName;
                 if (!value) return '—';
                 return value;
             },
+            sortable: true,
+            filter: true,
         },
         {
             field: 'bidStatus',
             headerName: 'Status',
-            flex: 1,
-            minWidth: 140,
-            sortable: true,
-            filter: true,
+            width: 140,
             cellRenderer: (params: any) => {
                 const status = params.value;
                 if (!status) return '—';
@@ -222,6 +218,8 @@ const BidSubmissionListPage = () => {
                     </Badge>
                 );
             },
+            sortable: true,
+            filter: true,
         },
         {
             headerName: 'Actions',
@@ -318,7 +316,8 @@ const BidSubmissionListPage = () => {
                                             <p className="text-sm mt-2">
                                                 {tab.key === 'pending' && 'Tenders with approved costings will appear here for bid submission'}
                                                 {tab.key === 'submitted' && 'Submitted bids will be shown here'}
-                                                {tab.key === 'missed' && 'Missed tenders will appear here'}
+                                                {tab.key === 'disqualified' && 'Disqualified bids will appear here'}
+                                                {tab.key === 'tender-dnb' && 'Tender DNB bids will appear here'}
                                             </p>
                                         </div>
                                     ) : (

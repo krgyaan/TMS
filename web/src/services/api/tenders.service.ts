@@ -9,6 +9,7 @@ import type {
 
 export type TenderListParams = {
     statusIds?: number[];
+    category?: string;
     unallocated?: boolean;
     teamId?: number | null;
     assignedTo?: number | null;
@@ -26,7 +27,10 @@ class TenderInfosService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.statusIds?.length) {
+            // Category takes precedence over statusIds
+            if (params.category) {
+                search.set('category', params.category);
+            } else if (params.statusIds?.length) {
                 search.set('statusIds', params.statusIds.join(','));
             }
             if (params.unallocated) {
@@ -71,6 +75,10 @@ class TenderInfosService extends BaseApiService {
 
     async generateName(params: { organization: number; item: number; location?: number }): Promise<{ tenderName: string }> {
         return this.post<{ tenderName: string }>('/generate-name', params);
+    }
+
+    async getDashboardCounts(): Promise<any> {
+        return this.get<any>('/dashboard/counts');
     }
 }
 

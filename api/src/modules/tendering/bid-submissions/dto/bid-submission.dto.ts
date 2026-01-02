@@ -1,80 +1,62 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional, IsDateString, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { z } from 'zod';
+import {
+    optionalString,
+    optionalNumber,
+    requiredDateField,
+    dateField,
+    decimalField,
+    bigintField,
+    textField,
+    jsonbField,
+} from '@/utils/zod-schema-generator';
 
-export class SubmitBidDto {
-    @IsNumber()
-    tenderId: number;
+/**
+ * Bid Documents Schema - Based on BidDocuments interface
+ */
+const BidDocumentsSchema = z.object({
+    submittedDocs: z.array(z.string()).min(1).max(3, 'Maximum 3 documents allowed'),
+    submissionProof: z.string().nullable(),
+    finalPriceSs: z.string().nullable(),
+});
 
-    @IsDateString()
-    @IsNotEmpty()
-    submissionDatetime: string;
+/**
+ * Submit Bid Schema - Based on bidSubmissions table (Bid Submitted status)
+ */
+export const SubmitBidSchema = z.object({
+    tenderId: bigintField().positive('Tender ID must be positive'),
+    submissionDatetime: requiredDateField,
+    submittedDocs: z.array(z.string()).min(1, 'At least one document is required').max(3, 'Maximum 3 documents allowed'),
+    proofOfSubmission: textField().min(1, 'Proof of submission is required'),
+    finalPriceSs: textField().min(1, 'Final price screenshot is required'),
+    finalBiddingPrice: optionalNumber(z.coerce.number().min(0, 'Final bidding price must be non-negative')),
+});
 
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    submittedDocs: string[];
+export type SubmitBidDto = z.infer<typeof SubmitBidSchema>;
 
-    @IsString()
-    @IsNotEmpty()
-    proofOfSubmission: string;
+/**
+ * Mark As Missed Schema - Based on bidSubmissions table (Tender Missed status)
+ */
+export const MarkAsMissedSchema = z.object({
+    tenderId: bigintField().positive('Tender ID must be positive'),
+    reasonForMissing: textField().min(1, 'Reason for missing is required'),
+    preventionMeasures: textField().min(1, 'Prevention measures are required'),
+    tmsImprovements: textField().min(1, 'TMS improvements are required'),
+});
 
-    @IsString()
-    @IsNotEmpty()
-    finalPriceSs: string;
+export type MarkAsMissedDto = z.infer<typeof MarkAsMissedSchema>;
 
-    @IsString()
-    @IsOptional()
-    finalBiddingPrice: string | null;
-}
+/**
+ * Update Bid Submission Schema - Partial update schema
+ */
+export const UpdateBidSubmissionSchema = z.object({
+    submissionDatetime: dateField,
+    submittedDocs: z.array(z.string()).min(1).max(3, 'Maximum 3 documents allowed').optional(),
+    proofOfSubmission: optionalString,
+    finalPriceSs: optionalString,
+    finalBiddingPrice: optionalNumber(z.coerce.number().min(0, 'Final bidding price must be non-negative')),
+    reasonForMissing: optionalString,
+    preventionMeasures: optionalString,
+    tmsImprovements: optionalString,
+});
 
-export class MarkAsMissedDto {
-    @IsNumber()
-    tenderId: number;
-
-    @IsString()
-    @IsNotEmpty()
-    reasonForMissing: string;
-
-    @IsString()
-    @IsNotEmpty()
-    preventionMeasures: string;
-
-    @IsString()
-    @IsNotEmpty()
-    tmsImprovements: string;
-}
-
-export class UpdateBidSubmissionDto {
-    @IsDateString()
-    @IsOptional()
-    submissionDatetime?: string;
-
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    submittedDocs?: string[];
-
-    @IsString()
-    @IsOptional()
-    proofOfSubmission?: string;
-
-    @IsString()
-    @IsOptional()
-    finalPriceSs?: string;
-
-    @IsString()
-    @IsOptional()
-    finalBiddingPrice?: string | null;
-
-    @IsString()
-    @IsOptional()
-    reasonForMissing?: string;
-
-    @IsString()
-    @IsOptional()
-    preventionMeasures?: string;
-
-    @IsString()
-    @IsOptional()
-    tmsImprovements?: string;
-}
+export type UpdateBidSubmissionDto = z.infer<typeof UpdateBidSubmissionSchema>;

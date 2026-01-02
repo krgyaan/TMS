@@ -26,7 +26,7 @@ export const ActionMenu = <T extends object>({ rowData, actions }: Props<T>) => 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="outline" size="icon" className="h-6 w-6 rounded-full">
                     <EllipsisVertical className="h-4 w-4" />
                     <span className="sr-only">Open row actions</span>
                 </Button>

@@ -33,7 +33,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-type TabKey = 'pending' | 'submitted' | 'rejected';
+type TabKey = 'pending' | 'submitted' | 'tender-dnb';
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -70,7 +70,7 @@ const CostingSheets = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
-        activeTab,
+        activeTab as 'pending' | 'submitted',
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
@@ -187,18 +187,18 @@ const CostingSheets = () => {
         return [
             {
                 key: 'pending' as TabKey,
-                name: 'Pending',
+                name: 'Costing Sheet Pending',
                 count: counts?.pending || 0,
             },
             {
                 key: 'submitted' as TabKey,
-                name: 'Submitted',
+                name: 'Costing Sheet Submitted',
                 count: counts?.submitted || 0,
             },
             {
-                key: 'rejected' as TabKey,
-                name: 'Rejected/Redo',
-                count: counts?.rejected || 0,
+                key: 'tender-dnb' as TabKey,
+                name: 'Tender DNB',
+                count: counts?.['tender-dnb'] || 0,
             },
         ];
     }, [counts]);
@@ -207,14 +207,13 @@ const CostingSheets = () => {
         tenderNameCol<CostingSheetDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            minWidth: 250,
+            width: 200,
         }),
         {
             field: 'teamMemberName',
             colId: 'teamMemberName',
             headerName: 'Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 120,
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
@@ -223,8 +222,7 @@ const CostingSheets = () => {
             field: 'dueDate',
             colId: 'dueDate',
             headerName: 'Due Date',
-            flex: 1.5,
-            minWidth: 150,
+            width: 140,
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
@@ -233,8 +231,7 @@ const CostingSheets = () => {
             field: 'emdAmount',
             colId: 'emdAmount',
             headerName: 'EMD',
-            flex: 1,
-            minWidth: 130,
+            width: 100,
             valueGetter: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
@@ -247,8 +244,7 @@ const CostingSheets = () => {
             field: 'gstValues',
             colId: 'gstValues',
             headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
+            width: 120,
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
@@ -258,25 +254,36 @@ const CostingSheets = () => {
             filter: true,
         },
         {
-            field: 'costingStatus',
-            colId: 'costingStatus',
-            headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
+            field: 'statusName',
+            colId: 'statusName',
+            headerName: 'Tender Status',
+            width: 120,
             sortable: true,
             filter: true,
             cellRenderer: (params: any) => {
-                const status = params.value;
+                const status = params.data?.statusName;
                 if (!status) return '—';
                 return status;
+            },
+        },
+        {
+            field: 'costingStatus',
+            colId: 'costingStatus',
+            headerName: 'Status',
+            width: 120,
+            sortable: true,
+            filter: true,
+            cellRenderer: (params: any) => {
+                const status = params.data?.costingStatus;
+                if (!status) return '—';
+                return <Badge variant={status === 'Submitted' ? 'success' : status === 'Rejected/Redo' ? 'destructive' : 'secondary'}>{status}</Badge>;
             },
         },
         {
             field: 'submittedFinalPrice',
             colId: 'submittedFinalPrice',
             headerName: 'Final Price',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.submittedFinalPrice;
                 if (!value) return '—';
@@ -289,8 +296,7 @@ const CostingSheets = () => {
             field: 'submittedBudgetPrice',
             colId: 'submittedBudgetPrice',
             headerName: 'Budget',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.submittedBudgetPrice;
                 if (!value) return '—';
@@ -416,7 +422,7 @@ const CostingSheets = () => {
                                             <p className="text-sm mt-2">
                                                 {tab.key === 'pending' && 'Tenders requiring costing submission will appear here'}
                                                 {tab.key === 'submitted' && 'Submitted costing sheets will be shown here'}
-                                                {tab.key === 'rejected' && 'Rejected costing sheets requiring re-submission will appear here'}
+                                                {tab.key === 'tender-dnb' && 'Tender DNB costing sheets will appear here'}
                                             </p>
                                         </div>
                                     ) : (
