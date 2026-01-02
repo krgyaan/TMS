@@ -26,6 +26,7 @@ export class ReverseAuctionController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
             if (!v) return undefined;
@@ -41,6 +42,7 @@ export class ReverseAuctionController {
             ...(parseNumber(limit) && { limit: parseNumber(limit) }),
             ...(sortBy && { sortBy }),
             ...(sortOrder && { sortOrder }),
+            ...(search && { search }),
         };
 
         return this.reverseAuctionService.getDashboardData(activeTab, filters);
