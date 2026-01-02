@@ -23,8 +23,8 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { buildTabConditions, getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { getTabConfig, getCategoryStatusIds, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions, countTabItems } from '@/modules/tendering/dashboards/dashboard-query-helper';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type ResultDashboardType = 'pending' | 'won' | 'lost' | 'disqualified';
@@ -90,294 +90,277 @@ export class TenderResultService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    async findAll(filters?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
-        console.log('=== findAll START ===');
-        console.log('filters:', JSON.stringify(filters, null, 2));
-
-        // Convert page and limit to numbers, with validation
-        const pageRaw = filters?.page;
-        const limitRaw = filters?.limit;
-        const page = pageRaw ? (isNaN(Number(pageRaw)) || Number(pageRaw) < 1 ? 1 : Math.floor(Number(pageRaw))) : 1;
-        const limit = limitRaw ? (isNaN(Number(limitRaw)) || Number(limitRaw) < 1 ? 50 : Math.floor(Number(limitRaw))) : 50;
+    /**
+     * Get dashboard data by tab - Uses dashboard-config.json
+     */
+    async getDashboardData(
+        tabKey?: 'result-awaited' | 'won' | 'lost' | 'disqualified',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<PaginatedResult<ResultDashboardRow>> {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        let orderByClause: any = desc(bidSubmissions.submissionDatetime);
+        const activeTab = tabKey || 'result-awaited';
+        const tabConfig = getTabConfig('result', activeTab);
 
-        // Build dynamic order by clause based on filters
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamExecutiveName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'bidSubmissionDate':
-                    orderByClause = sortOrder(bidSubmissions.submissionDatetime);
-                    break;
-                case 'finalPrice':
-                    orderByClause = sortOrder(tenderCostingSheets.finalPrice);
-                    break;
-                case 'itemName':
-                    orderByClause = sortOrder(items.name);
-                    break;
-                case 'tenderStatus':
-                    orderByClause = sortOrder(statuses.name);
-                    break;
-                default:
-                    orderByClause = desc(bidSubmissions.submissionDatetime);
-            }
+        if (!tabConfig) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Build type filter condition
-        let typeFilter: any = null;
-        if (filters?.type) {
-            switch (filters.type) {
-                case 'pending':
-                    // Pending: result status is null OR 'Under Evaluation' AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified
-                    const pendingStatusNames = ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'];
-                    typeFilter = and(
-                        or(
-                            isNull(tenderResults.status),
-                            inArray(statuses.name, pendingStatusNames),
-                            eq(tenderResults.status, RESULT_STATUS.UNDER_EVALUATION)
-                        ),
-                    );
-                    break;
-                case 'won':
-                    typeFilter = eq(tenderResults.status, RESULT_STATUS.WON);
-                    break;
-                case 'lost':
-                    typeFilter = inArray(tenderResults.status, [RESULT_STATUS.LOST, RESULT_STATUS.LOST_H1]);
-                    break;
-                case 'disqualified':
-                    typeFilter = eq(tenderResults.status, RESULT_STATUS.DISQUALIFIED);
-                    break;
-            }
-        }
-
-        // Build where conditions
-        const whereConditions = [
+        // Build base conditions
+        const baseConditions = [
             ...getBaseDashboardConditions(['dnb']),
-            eq(tenderInfos.status, 17), // Entry condition: Status 17
             eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1])
         ];
-        console.log('whereConditions', whereConditions);
 
-        if (typeFilter) {
-            whereConditions.push(typeFilter);
-        } else {
-            console.log('No type filter applied');
+        // Apply entry condition only if tab's statusIds include entry condition statusIds
+        const entryConditionStatusIds = [17];
+        const tabStatusIds = tabConfig.statusIds || [];
+        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
+        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
+
+        // Only apply entry condition if tab statusIds include entry condition statusIds
+        const shouldApplyEntryCondition = entryConditionStatusIds.some(id => allTabStatusIds.includes(id));
+        if (shouldApplyEntryCondition) {
+            baseConditions.push(eq(tenderInfos.status, 17));
         }
 
-        try {
-            // Check 1: Base conditions only (without type filter)
-            const baseConditionsCount = await this.db
-                .select({ count: sql<number>`count(*)` })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...whereConditions.slice(0, 4))); // Base conditions only
+        // Build tab-specific conditions using helper
+        const fieldMappings = {
+            resultId: tenderResults.id,
+            resultStatus: tenderResults.status,
+        };
 
-            const baseCount = Number(baseConditionsCount[0]?.count || 0);
+        const conditions = buildTabConditions(
+            'result',
+            activeTab,
+            baseConditions,
+            fieldMappings
+        );
 
-            // Check 3: If type filter exists, check count with type filter
-            if (typeFilter) {
-                const withTypeFilterCount = await this.db
-                    .select({ count: sql<number>`count(*)` })
-                    .from(tenderInfos)
-                    .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                    .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                    .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                    .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                    .where(and(...whereConditions));
+        const whereClause = and(...conditions);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy || tabConfig.sortBy;
+        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        let orderByClause: any = desc(bidSubmissions.submissionDatetime); // Default
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamExecutiveName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                    break;
+                case 'resultDate':
+                    orderByClause = sortFn(tenderResults.createdAt);
+                    break;
+                case 'disqualificationDate':
+                    orderByClause = sortFn(tenderResults.createdAt);
+                    break;
+                case 'finalPrice':
+                    orderByClause = sortFn(tenderCostingSheets.finalPrice);
+                    break;
+                case 'itemName':
+                    orderByClause = sortFn(items.name);
+                    break;
+                case 'tenderStatus':
+                    orderByClause = sortFn(statuses.name);
+                    break;
+                default:
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
             }
-        } catch (diagError) {
-            console.error('Diagnostic query error:', diagError);
         }
 
-        // Fetch the rows from the database with DISTINCT to avoid duplicates
+        // Build query
+        const query = this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderValue: tenderInfos.gstValues,
+                emdAmount: tenderInfos.emd,
+                teamExecutiveName: users.name,
+                itemName: items.name,
+                statusId: tenderInfos.status,
+                tenderStatus: statuses.name,
+                tenderCategory: statuses.tenderCategory,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                costingFinalPrice: tenderCostingSheets.finalPrice,
+                resultId: tenderResults.id,
+                resultStatus: tenderResults.status,
+            })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+
+        // Log SQL query
+        let dataQuerySql = '';
         try {
-            const rows = await this.db
-                .select({
-                    tenderId: tenderInfos.id,
-                    tenderNo: tenderInfos.tenderNo,
-                    tenderName: tenderInfos.tenderName,
-                    tenderValue: tenderInfos.gstValues,
-                    emdAmount: tenderInfos.emd,
-                    teamExecutiveName: users.name,
-                    itemName: items.name,
-                    statusId: tenderInfos.status,
-                    tenderStatus: statuses.name,
-                    tenderCategory: statuses.tenderCategory,
-                    bidSubmissionDate: bidSubmissions.submissionDatetime,
-                    costingFinalPrice: tenderCostingSheets.finalPrice,
-                    resultId: tenderResults.id,
-                    resultStatus: tenderResults.status,
-                })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...whereConditions))
-                .orderBy(orderByClause)
-                .limit(limit)
-                .offset(offset);
-
-            // If no rows, return empty data
-            if (!rows || rows.length === 0) {
-                return {
-                    data: [],
-                    meta: {
-                        total: 0,
-                        page,
-                        limit,
-                        totalPages: 0,
-                    },
-                };
-            }
-
-            const tenderIds = rows.map((r) => r.tenderId);
-            const emdDetailsMap = await this.getEmdDetailsForTenders(tenderIds);
-
-            // Map the rows to the desired structure
-            const data = rows.map((row) => ({
-                id: row.resultId,
-                tenderId: row.tenderId,
-                tenderNo: row.tenderNo,
-                tenderName: row.tenderName,
-                teamExecutiveName: row.teamExecutiveName,
-                bidSubmissionDate: row.bidSubmissionDate,
-                tenderValue: row.tenderValue,
-                finalPrice: row.costingFinalPrice || row.tenderValue,
-                itemName: row.itemName,
-                tenderStatus: row.tenderStatus,
-                tenderStatusId: row.statusId,
-                resultStatus: row.resultStatus || '', // Ensure the result status is not null
-                emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
-                hasResultEntry: row.resultId !== null,
-            }));
-
-            // Get the total number of matching rows
-            const totalRows = await this.db
-                .select({ count: sql<number>`count(*)` })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...whereConditions));
-
-            const total = Number(totalRows[0]?.count || 0);
-
-            return wrapPaginatedResponse(data, total, page, limit);
+            const sqlQuery = query.toSQL();
+            dataQuerySql = JSON.stringify(sqlQuery);
+            this.logger.debug(`[TenderResult] SQL Query: ${dataQuerySql}`);
         } catch (error) {
-            console.error('Error details:', error);
-            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-            console.error('Query parameters:', { filters, page, limit, offset });
-            throw error;
+            this.logger.debug(`[TenderResult] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
         }
+
+        // Execute query
+        const rows = await query;
+
+        // If no rows, return empty data
+        if (!rows || rows.length === 0) {
+            return wrapPaginatedResponse([], 0, page, limit);
+        }
+
+        const tenderIds = rows.map((r) => r.tenderId);
+        const emdDetailsMap = await this.getEmdDetailsForTenders(tenderIds);
+
+        // Map the rows to the desired structure
+        const data = rows.map((row) => ({
+            id: row.resultId,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamExecutiveName: row.teamExecutiveName,
+            bidSubmissionDate: row.bidSubmissionDate,
+            tenderValue: row.tenderValue,
+            finalPrice: row.costingFinalPrice || row.tenderValue,
+            itemName: row.itemName,
+            tenderStatus: row.tenderStatus,
+            tenderStatusId: row.statusId,
+            resultStatus: row.resultStatus || '',
+            emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
+            hasResultEntry: row.resultId !== null,
+        }));
+
+        // Get the total number of matching rows
+        const countQuery = this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const [totalResult] = await countQuery;
+
+        const total = Number(totalResult?.count || 0);
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async getCounts(): Promise<ResultDashboardCounts> {
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
-            eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1]),
-        ];
+        const config = loadDashboardConfig();
+        const resultConfig = config.dashboards['result'];
 
-        // Count pending (result status is null OR 'Under Evaluation' AND tender status is one of: Bid Submitted, TQ Qualified, No TQ, Qualified)
-        const pendingStatusNames = ['Bid Submitted', 'TQ Qualified', 'No TQ', 'Qualified'];
+        const fieldMappings = {
+            resultId: tenderResults.id,
+            resultStatus: tenderResults.status,
+        };
 
-        const pendingCount = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(
-                and(
-                    ...baseConditions,
-                    or(
-                        isNull(tenderResults.status),
-                        eq(tenderResults.status, RESULT_STATUS.UNDER_EVALUATION),
-                        inArray(statuses.name, pendingStatusNames)
-                    ),
-                )
-            );
-
-        // Count won
-        const wonCount = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(
-                and(
-                    ...baseConditions,
-                    eq(tenderResults.status, RESULT_STATUS.WON)
-                )
-            );
-
-        // Count lost (Lost or Lost - H1 Elimination)
-        const lostCount = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(
-                and(
-                    ...baseConditions,
-                    inArray(tenderResults.status, [RESULT_STATUS.LOST, RESULT_STATUS.LOST_H1])
-                )
-            );
-
-        // Count disqualified
-        const disqualifiedCount = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(
-                and(
-                    ...baseConditions,
-                    eq(tenderResults.status, RESULT_STATUS.DISQUALIFIED)
-                )
-            );
-
-        const pending = Number(pendingCount[0]?.count || 0);
-        const won = Number(wonCount[0]?.count || 0);
-        const lost = Number(lostCount[0]?.count || 0);
-        const disqualified = Number(disqualifiedCount[0]?.count || 0);
+        // Count for each tab using config - build baseConditions per tab to conditionally apply entry conditions
+        const [resultAwaitedCount, wonCount, lostCount, disqualifiedCount] = await Promise.all([
+            this.countTab('result', 'result-awaited', this.buildBaseConditionsForTab('result', 'result-awaited'), fieldMappings),
+            this.countTab('result', 'won', this.buildBaseConditionsForTab('result', 'won'), fieldMappings),
+            this.countTab('result', 'lost', this.buildBaseConditionsForTab('result', 'lost'), fieldMappings),
+            this.countTab('result', 'disqualified', this.buildBaseConditionsForTab('result', 'disqualified'), fieldMappings),
+        ]);
 
         return {
-            pending,
-            won,
-            lost,
-            disqualified,
-            total: pending + won + lost + disqualified,
+            pending: resultAwaitedCount,
+            won: wonCount,
+            lost: lostCount,
+            disqualified: disqualifiedCount,
+            total: resultAwaitedCount + wonCount + lostCount + disqualifiedCount,
         };
     }
 
+    /**
+     * Build base conditions for a specific tab, conditionally applying entry conditions
+     */
+    private buildBaseConditionsForTab(dashboardName: string, tabKey: string): any[] {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return [...getBaseDashboardConditions(['dnb']), eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1])];
+        }
+
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb']),
+            eq(bidSubmissions.status, bidSubmissionStatusEnum.enumValues[1])
+        ];
+
+        // Apply entry condition only if tab's statusIds include entry condition statusIds
+        const entryConditionStatusIds = [17];
+        const tabStatusIds = tabConfig.statusIds || [];
+        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
+        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
+
+        if (entryConditionStatusIds.some(id => allTabStatusIds.includes(id))) {
+            baseConditions.push(eq(tenderInfos.status, 17));
+        }
+
+        return baseConditions;
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const countQuery = this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const [result] = await countQuery;
+
+        const count = Number(result?.count || 0);
+
+        return count;
+    }
 
     private async getEmdDetailsForTenders(
         tenderIds: number[]

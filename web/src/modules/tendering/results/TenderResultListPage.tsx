@@ -35,37 +35,37 @@ type TabConfig = {
     filterFn: (item: ResultDashboardRow) => boolean;
 };
 
-const TABS_CONFIG: TabConfig[] = [
+// Map ResultDashboardType to config tabKey
+type ResultTabKey = 'result-awaited' | 'won' | 'lost' | 'disqualified';
+
+const TABS_CONFIG: Array<{ key: ResultTabKey; name: string; icon: React.ReactNode; description: string; legacyKey: ResultDashboardType }> = [
     {
-        key: 'pending',
+        key: 'result-awaited',
+        legacyKey: 'pending',
         name: 'Result Awaited',
         icon: <Clock className="h-4 w-4" />,
         description: 'Tenders awaiting result declaration',
-        filterFn: (item) => item.resultStatus === RESULT_STATUS.RESULT_AWAITED,
     },
     {
         key: 'won',
+        legacyKey: 'won',
         name: 'Won',
         icon: <Trophy className="h-4 w-4" />,
         description: 'Tenders that we have won',
-        filterFn: (item) => item.resultStatus === RESULT_STATUS.WON,
     },
     {
         key: 'lost',
+        legacyKey: 'lost',
         name: 'Lost',
         icon: <XCircle className="h-4 w-4" />,
         description: 'Tenders that were lost or disqualified',
-        filterFn: (item) =>
-            [RESULT_STATUS.LOST, RESULT_STATUS.LOST_H1].includes(
-                item.resultStatus as any
-            ),
     },
     {
         key: 'disqualified',
+        legacyKey: 'disqualified',
         name: 'Disqualified',
         icon: <XCircle className="h-4 w-4" />,
         description: 'Tenders that were disqualified',
-        filterFn: (item) => item.resultStatus === RESULT_STATUS.DISQUALIFIED || item.tenderStatus === RESULT_STATUS.DISQUALIFIED,
     }
 ];
 

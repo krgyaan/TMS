@@ -12,7 +12,7 @@ class TenderResultService extends BaseApiService {
         console.log('=== tenderResultService.getAll ===');
         console.log('params:', params);
 
-        // Map type to tab for dashboard endpoint
+        // Map type to tabKey for dashboard endpoint
         const tabMap: Record<string, string> = {
             'pending': 'result-awaited',
             'won': 'won',
@@ -21,7 +21,10 @@ class TenderResultService extends BaseApiService {
         };
 
         if (params) {
-            if (params.type !== undefined) {
+            // Use tabKey if provided, otherwise fall back to type for backward compatibility
+            if (params.tabKey) {
+                search.set('tabKey', params.tabKey);
+            } else if (params.type !== undefined) {
                 search.set('tab', tabMap[params.type] || params.type);
             }
             if (params.page) {

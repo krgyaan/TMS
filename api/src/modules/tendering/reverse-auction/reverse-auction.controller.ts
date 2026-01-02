@@ -20,7 +20,8 @@ export class ReverseAuctionController {
 
     @Get('dashboard')
     getDashboard(
-        @Query('type') type?: RaDashboardType,
+        @Query('tabKey') tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
+        @Query('type') type?: RaDashboardType, // Legacy support
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -32,15 +33,17 @@ export class ReverseAuctionController {
             return Number.isNaN(num) ? undefined : num;
         };
 
-        const filters: RaDashboardFilters = {
-            type,
+        // Use tabKey if provided, otherwise fall back to type for backward compatibility
+        const activeTab = tabKey || (type as 'under-evaluation' | 'scheduled' | 'completed' | undefined);
+
+        const filters = {
             ...(parseNumber(page) && { page: parseNumber(page) }),
             ...(parseNumber(limit) && { limit: parseNumber(limit) }),
             ...(sortBy && { sortBy }),
             ...(sortOrder && { sortOrder }),
         };
 
-        return this.reverseAuctionService.getDashboardData(type, filters);
+        return this.reverseAuctionService.getDashboardData(activeTab, filters);
     }
 
     @Get('dashboard/counts')

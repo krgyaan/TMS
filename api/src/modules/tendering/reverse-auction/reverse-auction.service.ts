@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { and, eq, lte, asc, desc, sql, inArray, isNull, isNotNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -18,8 +18,8 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { getTabConfig, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { getBaseDashboardConditions } from '@/modules/tendering/dashboards/dashboard-query-helper';
+import { getTabConfig, getCategoryStatusIds, loadDashboardConfig } from '@/config/dashboard-config.loader';
+import { buildTabConditions, getBaseDashboardConditions, countTabItems } from '@/modules/tendering/dashboards/dashboard-query-helper';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export type RaDashboardFilters = {
@@ -98,128 +98,312 @@ export class ReverseAuctionService {
     ) { }
 
     /**
-     * Get RA Dashboard data with counts for all tabs
+     * Get RA Dashboard data with counts for all tabs - Uses dashboard-config.json
      */
-    async getDashboardData(type?: RaDashboardType, filters?: RaDashboardFilters): Promise<RaDashboardResponse> {
-        const allData = await this.findAllFromTenders();
-        const counts = this.calculateCounts(allData);
+    async getDashboardData(
+        tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    ): Promise<RaDashboardResponse> {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'reverse-auction.service.ts:103', message: 'getDashboardData entry', data: { tabKey, filters }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+        // #endregion
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
 
-        let filteredData: RaDashboardRow[];
+        const activeTab = tabKey || 'under-evaluation';
+        const tabConfig = getTabConfig('reverse-auction', activeTab);
 
-        switch (type) {
-            case 'under-evaluation':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.underEvaluation.includes(r.raStatus as any)
-                );
-                break;
-            case 'scheduled':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.scheduled.includes(r.raStatus as any)
-                );
-                break;
-            case 'completed':
-                filteredData = allData.filter((r) =>
-                    STATUS_GROUPS.completed.includes(r.raStatus as any)
-                );
-                break;
-            default:
-                filteredData = allData;
+        if (!tabConfig) {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Apply sorting
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
-            filteredData.sort((a, b) => {
-                let aVal: any;
-                let bVal: any;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'reverse-auction.service.ts:112', message: 'tabConfig loaded', data: { activeTab, tabConfig: JSON.stringify(tabConfig) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
+        // #endregion
 
-                switch (filters.sortBy) {
-                    case 'tenderNo':
-                        aVal = a.tenderNo || '';
-                        bVal = b.tenderNo || '';
-                        break;
-                    case 'tenderName':
-                        aVal = a.tenderName || '';
-                        bVal = b.tenderName || '';
-                        break;
-                    case 'teamMemberName':
-                        aVal = a.teamMemberName || '';
-                        bVal = b.teamMemberName || '';
-                        break;
-                    case 'bidSubmissionDate':
-                        aVal = a.bidSubmissionDate ? new Date(a.bidSubmissionDate).getTime() : 0;
-                        bVal = b.bidSubmissionDate ? new Date(b.bidSubmissionDate).getTime() : 0;
-                        break;
-                    case 'tenderValue':
-                        aVal = parseFloat(a.tenderValue || '0');
-                        bVal = parseFloat(b.tenderValue || '0');
-                        break;
-                    case 'raStatus':
-                        aVal = a.raStatus || '';
-                        bVal = b.raStatus || '';
-                        break;
-                    case 'raStartTime':
-                        aVal = a.raStartTime ? new Date(a.raStartTime).getTime() : 0;
-                        bVal = b.raStartTime ? new Date(b.raStartTime).getTime() : 0;
-                        break;
-                    default:
-                        return 0;
-                }
+        // Log tab config
+        this.logger.debug(`[ReverseAuction] Tab: ${activeTab}, Config: ${JSON.stringify(tabConfig)}`);
 
-                if (aVal < bVal) return -1 * sortOrder;
-                if (aVal > bVal) return 1 * sortOrder;
-                return 0;
-            });
+        // Build base conditions
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+            eq(tenderInformation.reverseAuctionApplicable, 'Yes'), // Entry condition: RA applicable (always applies)
+        ];
+
+        // Apply status entry condition only if tab's statusIds include entry condition statusIds
+        const entryConditionStatusIds = [17];
+        const tabStatusIds = tabConfig.statusIds || [];
+        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
+        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
+
+        // Only apply entry condition if tab statusIds include entry condition statusIds
+        const shouldApplyEntryCondition = entryConditionStatusIds.some(id => allTabStatusIds.includes(id));
+        if (shouldApplyEntryCondition) {
+            baseConditions.push(eq(tenderInfos.status, 17));
         }
 
-        // Apply pagination
-        const total = filteredData.length;
-        let paginatedData = filteredData;
-        if (filters?.page && filters?.limit) {
-            const page = filters.page;
-            const limit = filters.limit;
-            const offset = (page - 1) * limit;
-            paginatedData = filteredData.slice(offset, offset + limit);
-        }
-
-        const response: RaDashboardResponse = {
-            data: paginatedData,
-            counts,
+        // Build tab-specific conditions using helper
+        const fieldMappings = {
+            raId: reverseAuctions.id,
+            reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
         };
 
-        if (filters?.page && filters?.limit) {
-            const wrapped = wrapPaginatedResponse(paginatedData, total, filters.page, filters.limit);
-            response.data = wrapped.data;
-            response.meta = wrapped.meta;
+        const conditions = buildTabConditions(
+            'reverse-auction',
+            activeTab,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        // Log WHERE conditions
+        this.logger.debug(`[ReverseAuction] WHERE conditions: statusIds=${tabConfig.statusIds}, fieldConditions=${JSON.stringify(tabConfig.fieldConditions)}`);
+
+        // Build orderBy clause
+        const sortBy = filters?.sortBy || tabConfig.sortBy;
+        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
+        let orderByClause: any = asc(bidSubmissions.submissionDatetime); // Default
+
+        if (sortBy) {
+            const sortFn = sortOrder === 'desc' ? desc : asc;
+            switch (sortBy) {
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'bidSubmissionDate':
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                    break;
+                case 'completionDate':
+                    orderByClause = sortFn(reverseAuctions.raEndTime);
+                    break;
+                case 'tenderValue':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'raStatus':
+                    orderByClause = sortFn(reverseAuctions.status);
+                    break;
+                case 'raStartTime':
+                    orderByClause = sortFn(reverseAuctions.raStartTime);
+                    break;
+                default:
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+            }
         }
+
+        // Log ORDER BY
+        this.logger.debug(`[ReverseAuction] ORDER BY: ${sortBy} ${sortOrder}`);
+
+        // Build query
+        const query = this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderValue: tenderInfos.gstValues,
+                teamMemberName: users.name,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                bidSubmissionId: bidSubmissions.id,
+                raId: reverseAuctions.id,
+                raStatus: reverseAuctions.status,
+                raStartTime: reverseAuctions.raStartTime,
+                raEndTime: reverseAuctions.raEndTime,
+                technicallyQualified: reverseAuctions.technicallyQualified,
+                raResult: reverseAuctions.raResult,
+            })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+
+        // Log query parameters
+        this.logger.debug(`[ReverseAuction] Query params: page=${page}, limit=${limit}, offset=${offset}`);
+
+        // Log SQL query
+        try {
+            const sqlQuery = query.toSQL();
+            this.logger.debug(`[ReverseAuction] SQL Query: ${JSON.stringify(sqlQuery)}`);
+        } catch (error) {
+            this.logger.debug(`[ReverseAuction] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        // Execute query
+        const rows = await query;
+
+        // Map rows and calculate RA status for display
+        const data: RaDashboardRow[] = rows.map((row) => ({
+            id: row.raId,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamMemberName: row.teamMemberName,
+            bidSubmissionDate: row.bidSubmissionDate,
+            tenderValue: row.tenderValue,
+            itemName: row.itemName,
+            tenderStatus: row.tenderStatus,
+            raStatus: this.calculateRaStatus(row),
+            raStartTime: row.raStartTime,
+            raEndTime: row.raEndTime,
+            technicallyQualified: row.technicallyQualified,
+            result: row.raResult,
+            hasRaEntry: row.raId !== null,
+        }));
+
+        // Get total count
+        const [totalResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const total = Number(totalResult?.count || 0);
+
+        this.logger.debug(`[ReverseAuction] Query result: ${rows.length} rows, total: ${total}`);
+
+        // Get counts for all tabs
+        const counts = await this.getDashboardCounts();
+
+        const response: RaDashboardResponse = {
+            data,
+            counts,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
 
         return response;
     }
 
     async getDashboardCounts(): Promise<RaDashboardCounts> {
-        const allData = await this.findAllFromTenders();
-        return this.calculateCounts(allData);
-    }
+        const config = loadDashboardConfig();
+        const raConfig = config.dashboards['reverse-auction'];
 
-    private calculateCounts(data: RaDashboardRow[]): RaDashboardCounts {
-        const counts: RaDashboardCounts = {
-            underEvaluation: 0,
-            scheduled: 0,
-            completed: 0,
-            total: data.length,
+        const fieldMappings = {
+            raId: reverseAuctions.id,
+            reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
         };
 
-        for (const row of data) {
-            if (STATUS_GROUPS.underEvaluation.includes(row.raStatus as any)) {
-                counts.underEvaluation++;
-            } else if (STATUS_GROUPS.scheduled.includes(row.raStatus as any)) {
-                counts.scheduled++;
-            } else if (STATUS_GROUPS.completed.includes(row.raStatus as any)) {
-                counts.completed++;
-            }
+        // Count for each tab using config - build baseConditions per tab to conditionally apply entry conditions
+        const [underEvaluationCount, scheduledCount, completedCount] = await Promise.all([
+            this.countTab('reverse-auction', 'under-evaluation', this.buildBaseConditionsForTab('reverse-auction', 'under-evaluation'), fieldMappings),
+            this.countTab('reverse-auction', 'scheduled', this.buildBaseConditionsForTab('reverse-auction', 'scheduled'), fieldMappings),
+            this.countTab('reverse-auction', 'completed', this.buildBaseConditionsForTab('reverse-auction', 'completed'), fieldMappings),
+        ]);
+
+        this.logger.debug(`[ReverseAuction] Counts: under-evaluation=${underEvaluationCount}, scheduled=${scheduledCount}, completed=${completedCount}`);
+
+        return {
+            underEvaluation: underEvaluationCount,
+            scheduled: scheduledCount,
+            completed: completedCount,
+            total: underEvaluationCount + scheduledCount + completedCount,
+        };
+    }
+
+    /**
+     * Build base conditions for a specific tab, conditionally applying entry conditions
+     */
+    private buildBaseConditionsForTab(dashboardName: string, tabKey: string): any[] {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return [
+                ...getBaseDashboardConditions(['dnb', 'lost']),
+                eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
+            ];
         }
 
-        return counts;
+        const baseConditions = [
+            ...getBaseDashboardConditions(['dnb', 'lost']),
+            eq(tenderInformation.reverseAuctionApplicable, 'Yes'), // Entry condition: RA applicable (always applies)
+        ];
+
+        // Apply status entry condition only if tab's statusIds include entry condition statusIds
+        const entryConditionStatusIds = [17];
+        const tabStatusIds = tabConfig.statusIds || [];
+        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
+        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
+
+        if (entryConditionStatusIds.some(id => allTabStatusIds.includes(id))) {
+            baseConditions.push(eq(tenderInfos.status, 17));
+        }
+
+        return baseConditions;
+    }
+
+    /**
+     * Helper method to count items for a specific tab
+     */
+    private async countTab(
+        dashboardName: string,
+        tabKey: string,
+        baseConditions: any[],
+        fieldMappings: Record<string, any>
+    ): Promise<number> {
+        const tabConfig = getTabConfig(dashboardName, tabKey);
+        if (!tabConfig) {
+            return 0;
+        }
+
+        const conditions = buildTabConditions(
+            dashboardName,
+            tabKey,
+            baseConditions,
+            fieldMappings
+        );
+
+        const whereClause = and(...conditions);
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(
+                tenderInformation,
+                eq(tenderInformation.tenderId, tenderInfos.id)
+            )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const countValue = Number(result?.count || 0);
+
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'reverse-auction.service.ts:407', message: 'countTab result', data: { tabKey, count: countValue, conditionsCount: conditions.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+        // #endregion
+
+        return countValue;
     }
 
     async findAllFromTenders(): Promise<RaDashboardRow[]> {

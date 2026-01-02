@@ -17,30 +17,19 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TenderResultController {
     constructor(private readonly tenderResultService: TenderResultService) { }
 
-    @Get()
-    findAll(@Query() filters?: ResultDashboardFilters) {
-        console.log('filters', filters);
-        return this.tenderResultService.findAll(filters);
-    }
-
     @Get('dashboard')
     getDashboard(
-        @Query('tab') tab?: 'result-awaited' | 'won' | 'lost' | 'disqualified',
+        @Query('tabKey') tabKey?: 'result-awaited' | 'won' | 'lost' | 'disqualified',
+        @Query('tab') tab?: 'result-awaited' | 'won' | 'lost' | 'disqualified', // Legacy support
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     ) {
-        // Map tab to type for backward compatibility
-        const typeMap: Record<string, ResultDashboardType> = {
-            'result-awaited': 'pending',
-            'won': 'won',
-            'lost': 'lost',
-            'disqualified': 'disqualified',
-        };
+        // Use tabKey if provided, otherwise fall back to tab for backward compatibility
+        const activeTab = tabKey || tab;
 
-        return this.tenderResultService.findAll({
-            type: tab ? typeMap[tab] : undefined,
+        return this.tenderResultService.getDashboardData(activeTab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,

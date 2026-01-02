@@ -11,12 +11,12 @@ const RA_QUERY_KEY = 'reverse-auctions';
 
 // Fetch RA dashboard data with counts
 export const useRaDashboard = (
-    type?: RaDashboardType,
+    tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
     pagination?: { page: number; limit: number },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const queryKeyFilters = {
-        type,
+        tabKey,
         ...pagination,
         ...sort,
     };
@@ -25,7 +25,10 @@ export const useRaDashboard = (
         queryKey: [RA_QUERY_KEY, 'dashboard', queryKeyFilters],
         queryFn: async () => {
             const params = new URLSearchParams();
-            if (type) params.append('type', type);
+            // Use tabKey if provided, otherwise fall back to type for backward compatibility
+            if (tabKey) {
+                params.append('tabKey', tabKey);
+            }
             if (pagination?.page) params.append('page', String(pagination.page));
             if (pagination?.limit) params.append('limit', String(pagination.limit));
             if (sort?.sortBy) params.append('sortBy', sort.sortBy);

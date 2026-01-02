@@ -24,7 +24,8 @@ export const tenderResultKey = {
 };
 
 export type ResultDashboardFilters = {
-    type?: ResultDashboardType;
+    tabKey?: 'result-awaited' | 'won' | 'lost' | 'disqualified';
+    type?: ResultDashboardType; // Legacy support
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -42,8 +43,16 @@ export const useResultDashboard = (
     console.log('pagination:', pagination);
     console.log('sort:', sort);
 
+    // Map tab to tabKey
+    const tabKeyMap: Record<ResultDashboardType, 'result-awaited' | 'won' | 'lost' | 'disqualified'> = {
+        'pending': 'result-awaited',
+        'won': 'won',
+        'lost': 'lost',
+        'disqualified': 'disqualified',
+    };
+
     const params: ResultDashboardFilters = {
-        ...(tab && { type: tab }),
+        ...(tab && { tabKey: tabKeyMap[tab], type: tab }), // Include both for backward compatibility
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
