@@ -106,3 +106,48 @@ export type TenderForApproval = {
     statusName: string | null;
     tlStatus: number;
 };
+
+// TENDER RESULT TYPES
+
+export type ResultDashboardType = 'result-awaited' | 'won' | 'lost' | 'disqualified';
+
+export type ResultDashboardFilters = {
+    tab?: ResultDashboardType;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+};
+
+export type ResultDashboardRow = {
+    id: number | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamExecutiveName: string | null;
+    bidSubmissionDate: Date | null;
+    tenderValue: string | null;
+    finalPrice: string | null;
+    itemName: string | null;
+    tenderStatus: string | null;
+    tenderStatusId: number | null;
+    resultStatus: string | null;
+    emdDetails: EmdDetails | null;
+    hasResultEntry: boolean;
+};
+
+export type EmdDetails = {
+    amount: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    displayText: string;
+};
+
+export type ResultDashboardCounts = {
+    pending: number;
+    won: number;
+    lost: number;
+    disqualified: number;
+    total: number;
+};

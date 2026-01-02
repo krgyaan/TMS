@@ -7,9 +7,6 @@ import {
     requiredEnumField,
 } from '@/utils/zod-schema-generator';
 
-/**
- * Upload Result Schema - Based on tenderResults table
- */
 export const UploadResultSchema = z.object({
     technicallyQualified: requiredEnumField(['Yes', 'No']),
     disqualificationReason: optionalString,

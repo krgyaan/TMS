@@ -7,13 +7,14 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2 } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useResultDashboard, useResultDashboardCounts } from '@/hooks/api/useTenderResults';
-import type { ResultDashboardRow, ResultDashboardType } from '@/types/api.types';
+import type { ResultDashboardRow, ResultDashboardType } from '@/modules/tendering/results/helpers/tenderResult.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
@@ -27,42 +28,28 @@ const RESULT_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
 } as const;
 
-type TabConfig = {
-    key: ResultDashboardType;
-    name: string;
-    icon: React.ReactNode;
-    description: string;
-    filterFn: (item: ResultDashboardRow) => boolean;
-};
 
-// Map ResultDashboardType to config tabKey
-type ResultTabKey = 'result-awaited' | 'won' | 'lost' | 'disqualified';
-
-const TABS_CONFIG: Array<{ key: ResultTabKey; name: string; icon: React.ReactNode; description: string; legacyKey: ResultDashboardType }> = [
+const TABS_CONFIG: Array<{ key: ResultDashboardType; name: string; icon: React.ReactNode; description: string; }> = [
     {
         key: 'result-awaited',
-        legacyKey: 'pending',
         name: 'Result Awaited',
         icon: <Clock className="h-4 w-4" />,
         description: 'Tenders awaiting result declaration',
     },
     {
         key: 'won',
-        legacyKey: 'won',
         name: 'Won',
         icon: <Trophy className="h-4 w-4" />,
         description: 'Tenders that we have won',
     },
     {
         key: 'lost',
-        legacyKey: 'lost',
         name: 'Lost',
         icon: <XCircle className="h-4 w-4" />,
         description: 'Tenders that were lost or disqualified',
     },
     {
         key: 'disqualified',
-        legacyKey: 'disqualified',
         name: 'Disqualified',
         icon: <XCircle className="h-4 w-4" />,
         description: 'Tenders that were disqualified',
@@ -86,13 +73,14 @@ const getStatusVariant = (status: string): string => {
 
 const TenderResultListPage = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<ResultDashboardType>('pending');
+    const [activeTab, setActiveTab] = useState<ResultDashboardType>('result-awaited');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, search]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -105,12 +93,14 @@ const TenderResultListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const { data: apiResponse, isLoading, error } = useResultDashboard(
-        activeTab,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
-
-    );
+    const { data: apiResponse, isLoading, error } = useResultDashboard({
+        tab: activeTab,
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
+        search: search || undefined,
+    });
 
     const { data: counts } = useResultDashboardCounts();
 
@@ -157,7 +147,7 @@ const TenderResultListPage = () => {
             tenderNameCol<ResultDashboardRow>('tenderNo', {
                 headerName: 'Tender',
                 filter: true,
-                width: 250,
+                width: 200,
                 colId: 'tenderNo',
                 sortable: true,
             }),
@@ -196,35 +186,21 @@ const TenderResultListPage = () => {
                 filter: true,
             },
             {
-                field: 'itemName',
-                headerName: 'Item',
-                flex: 1,
-                width: 100,
-                colId: 'itemName',
-                valueGetter: (params) => params.data?.itemName || '—',
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
                 width: 150,
                 colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
-                cellRenderer: (params: any) => {
-                    const status = params.data?.tenderStatus;
-                    if (!status) return '—';
-                    return <Badge variant='outline'>{status}</Badge>;
-                },
                 sortable: true,
                 filter: true,
             },
             {
                 field: 'emdDetails',
-                headerName: 'EMD',
-                width: 100,
-                sortable: false,
-                filter: false,
+                headerName: 'EMD Details',
+                width: 140,
+                colId: 'emdDetails',
+                sortable: true,
+                filter: true,
                 cellRenderer: (params: any) => {
                     const emd = params.data?.emdDetails;
                     if (!emd) return '—';
@@ -280,12 +256,12 @@ const TenderResultListPage = () => {
                 },
             },
             {
-                headerName: 'Actions',
+                headerName: '',
                 filter: false,
                 cellRenderer: createActionColumnRenderer(resultActions),
                 sortable: false,
                 pinned: 'right',
-                width: 80,
+                width: 57,
             },
         ],
         [resultActions]
@@ -296,7 +272,7 @@ const TenderResultListPage = () => {
             let count = 0;
             if (counts) {
                 switch (tab.key) {
-                    case 'pending':
+                    case 'result-awaited':
                         count = counts.pending ?? 0;
                         break;
                     case 'won':
@@ -376,6 +352,18 @@ const TenderResultListPage = () => {
                                 Track and manage tender results after bid submission.
                             </CardDescription>
                         </div>
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -410,7 +398,7 @@ const TenderResultListPage = () => {
                                                 <FileX2 className="h-12 w-12 mb-4" />
                                                 <p className="text-lg font-medium">No {tab.name.toLowerCase()} tender</p>
                                                 <p className="text-sm mt-2">
-                                                    {tab.key === 'pending'
+                                                    {tab.key === 'result-awaited'
                                                         ? 'Tenders requiring result declaration will appear here'
                                                         : 'Tender results will be shown here'}
                                                 </p>

@@ -1,14 +1,6 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    Query,
-} from '@nestjs/common';
-import { TenderResultService, type ResultDashboardFilters, type ResultDashboardType } from '@/modules/tendering/tender-result/tender-result.service';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
+import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
 import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -19,21 +11,19 @@ export class TenderResultController {
 
     @Get('dashboard')
     getDashboard(
-        @Query('tabKey') tabKey?: 'result-awaited' | 'won' | 'lost' | 'disqualified',
-        @Query('tab') tab?: 'result-awaited' | 'won' | 'lost' | 'disqualified', // Legacy support
+        @Query('tab') tab?: ResultDashboardType,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
-        // Use tabKey if provided, otherwise fall back to tab for backward compatibility
-        const activeTab = tabKey || tab;
-
-        return this.tenderResultService.getDashboardData(activeTab, {
+        return this.tenderResultService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 
@@ -68,7 +58,6 @@ export class TenderResultController {
         @Body() dto: UploadResultDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        // Fetch result to get tenderId
         const result = await this.tenderResultService.findById(id);
         return this.tenderResultService.uploadResult(id, result.tenderId, dto, user.sub);
     }
