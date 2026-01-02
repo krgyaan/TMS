@@ -96,9 +96,9 @@ export class BidSubmissionsService {
         if (activeTab === 'pending') {
             conditions.push(isNull(bidSubmissions.id));
         } else if (activeTab === 'submitted') {
-            conditions.push(isNotNull(bidSubmissions.id));
+            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
         } else if (activeTab === 'disqualified') {
-            conditions.push(isNotNull(bidSubmissions.id));
+            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Tender Missed'));
         } else if (activeTab === 'tender-dnb') {
             conditions.push(inArray(tenderInfos.status, [8, 34]));
         } else {
@@ -239,24 +239,22 @@ export class BidSubmissionsService {
             eq(tenderCostingSheets.status, 'Approved'),
         ];
 
-        // Count pending: bidSubmission doesn't exist
         const pendingConditions = [
             ...baseConditions,
             isNull(bidSubmissions.id),
         ];
 
-        // Count submitted: bidSubmission exists
         const submittedConditions = [
             ...baseConditions,
-            isNotNull(bidSubmissions.id),
+            isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
         const disqualifiedConditions = [
             ...baseConditions,
             isNotNull(bidSubmissions.id),
+            eq(bidSubmissions.status, 'Tender Missed'),
         ];
 
-        // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
         const tenderDnbBaseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),

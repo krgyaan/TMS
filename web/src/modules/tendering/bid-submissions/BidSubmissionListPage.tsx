@@ -134,15 +134,13 @@ const BidSubmissionListPage = () => {
         tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
             headerName: 'Tender',
             filter: true,
-            flex: 2,
-            minWidth: 250,
+            width: 200,
         }),
         {
             field: 'teamMemberName',
             colId: 'teamMemberName',
             headerName: 'Team Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 130,
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
             filter: true,
@@ -151,8 +149,7 @@ const BidSubmissionListPage = () => {
             field: 'dueDate',
             colId: 'dueDate',
             headerName: 'Due Date & Time',
-            flex: 1.5,
-            minWidth: 170,
+            width: 160,
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
@@ -160,8 +157,7 @@ const BidSubmissionListPage = () => {
         {
             field: 'emdAmount',
             headerName: 'EMD',
-            flex: 1,
-            minWidth: 130,
+            width: 120,
             valueGetter: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
@@ -174,8 +170,7 @@ const BidSubmissionListPage = () => {
             field: 'gstValues',
             colId: 'gstValues',
             headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
+            width: 140,
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
@@ -188,8 +183,7 @@ const BidSubmissionListPage = () => {
             field: 'finalCosting',
             colId: 'finalCosting',
             headerName: 'Final Costing',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.finalCosting;
                 if (!value) return '—';
@@ -202,22 +196,19 @@ const BidSubmissionListPage = () => {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            minWidth: 140,
-            sortable: true,
-            filter: true,
+            width: 140,
             valueGetter: (params: any) => {
                 const value = params.data?.statusName;
                 if (!value) return '—';
                 return value;
             },
+            sortable: true,
+            filter: true,
         },
         {
             field: 'bidStatus',
             headerName: 'Status',
-            flex: 1,
-            minWidth: 140,
-            sortable: true,
-            filter: true,
+            width: 140,
             cellRenderer: (params: any) => {
                 const status = params.value;
                 if (!status) return '—';
@@ -227,6 +218,8 @@ const BidSubmissionListPage = () => {
                     </Badge>
                 );
             },
+            sortable: true,
+            filter: true,
         },
         {
             headerName: 'Actions',
