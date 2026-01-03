@@ -1225,13 +1225,6 @@ export interface DocumentChecklistsDashboardCounts {
     total: number;
 }
 
-export interface CostingSheetDashboardCounts {
-    pending: number;
-    submitted: number;
-    'tender-dnb': number;
-    total: number;
-}
-
 export interface RfqDashboardCounts {
     pending: number;
     sent: number;
@@ -1248,22 +1241,6 @@ export interface TenderInfoDashboardCounts {
     'tender-lost': number;
     total: number;
 }
-
-export type CreateSheetResponse = {
-    success: boolean;
-    sheetUrl?: string;
-    sheetId?: string;
-    message?: string;
-    isDuplicate?: boolean;
-    existingSheetUrl?: string;
-    suggestedName?: string;
-};
-
-export type DriveScopesResponse = {
-    hasScopes: boolean;
-    missingScopes: string[];
-    grantedScopes: string[];
-};
 
 export type CreatePaymentRequestDto = {
     emdMode?: string;

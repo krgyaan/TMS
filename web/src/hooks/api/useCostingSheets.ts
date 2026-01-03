@@ -1,16 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { costingSheetsService, type CostingSheetListParams } from '@/services/api/costing-sheets.service';
-import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
+import { costingSheetsService } from '@/services/api/costing-sheets.service';
+import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
-
-type TabKey = 'pending' | 'submitted' | 'tender-dnb';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 
 export const costingSheetsKey = {
     all: ['costing-sheets'] as const,
     lists: () => [...costingSheetsKey.all, 'list'] as const,
     detail: (id: number) => [...costingSheetsKey.all, 'detail', id] as const,
     byTender: (tenderId: number) => [...costingSheetsKey.all, 'byTender', tenderId] as const,
-    list: (filters?: Record<string, unknown>) => [...costingSheetsKey.lists(), { filters }] as const,
+    list: (params?: CostingSheetListParams) => [...costingSheetsKey.lists(), { params }] as const,
     dashboardCounts: () => [...costingSheetsKey.all, 'dashboardCounts'] as const,
 };
 
@@ -27,14 +26,8 @@ export const useCostingSheets = (
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
 
-    const queryKeyFilters = {
-        tab,
-        ...pagination,
-        ...sort,
-    };
-
     return useQuery<PaginatedResult<CostingSheetDashboardRow>>({
-        queryKey: costingSheetsKey.list(queryKeyFilters),
+        queryKey: costingSheetsKey.list(params),
         queryFn: () => costingSheetsService.getAll(params),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {

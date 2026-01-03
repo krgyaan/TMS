@@ -13,27 +13,12 @@ import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { CostingSheetDashboardRow } from "@/types/api.types";
+import type { CostingSheetDashboardRow, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import { tenderNameCol } from "@/components/data-grid/columns";
-import {
-    useCostingSheets,
-    useCostingSheetsCounts,
-    useCheckDriveScopes,
-    useCreateCostingSheet,
-    useCreateCostingSheetWithName,
-} from "@/hooks/api/useCostingSheets";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-
-type TabKey = 'pending' | 'submitted' | 'tender-dnb';
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('pending');
@@ -50,7 +35,7 @@ const CostingSheets = () => {
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
 
-    const { data: driveScopes, refetch: refetchScopes } = useCheckDriveScopes();
+    const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
     const createSheetWithNameMutation = useCreateCostingSheetWithName();
 

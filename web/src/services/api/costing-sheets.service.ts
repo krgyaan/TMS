@@ -1,24 +1,6 @@
 import { BaseApiService } from './base.service';
-import type {
-    TenderCostingSheet,
-    CostingSheetDashboardRow,
-    SubmitCostingSheetDto,
-    UpdateCostingSheetDto,
-    PaginatedResult,
-    CostingSheetDashboardCounts,
-    CreateSheetResponse,
-    DriveScopesResponse,
-} from '@/types/api.types';
-
-type TabKey = 'pending' | 'submitted' | 'tender-dnb';
-
-export type CostingSheetListParams = {
-    tab?: TabKey;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
+import type { PaginatedResult } from '@/types/api.types';
+import type { CostingSheetListParams, TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, CostingSheetDashboardCounts, CreateSheetResponse, DriveScopesResponse } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 
 class CostingSheetsService extends BaseApiService {
     constructor() {
