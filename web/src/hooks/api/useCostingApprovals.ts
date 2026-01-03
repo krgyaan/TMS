@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingApprovalsService } from '@/services/api/costing-approvals.service';
-import type { ApproveCostingDto, RejectCostingDto, CostingApprovalListParams } from '@/types/api.types';
+import type { CostingApprovalListParams, CostingApprovalDashboardRow, CostingApprovalDashboardCounts, TabKey, ApproveCostingDto, RejectCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { toast } from 'sonner';
-import type { PaginatedResult, CostingApprovalDashboardCounts, CostingApprovalDashboardRow } from '@/types/api.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 export const costingApprovalsKey = {
     all: ['costing-approvals'] as const,
@@ -13,17 +13,12 @@ export const costingApprovalsKey = {
 };
 
 export const useCostingApprovals = (
-    tab?: 'pending' | 'approved',
+    tab?: TabKey,
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    const costingStatusMap: Record<string, 'Submitted' | 'Approved' | 'Rejected/Redo'> = {
-        pending: 'Submitted', // Backend 'pending' tab corresponds to 'Submitted' status
-        approved: 'Approved',
-    };
-
     const params: CostingApprovalListParams = {
-        ...(tab && costingStatusMap[tab] && { costingStatus: costingStatusMap[tab] }),
+        ...(tab && { tab }),
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
