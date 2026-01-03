@@ -10,8 +10,10 @@ import type {
     DriveScopesResponse,
 } from '@/types/api.types';
 
+type TabKey = 'pending' | 'submitted' | 'tender-dnb';
+
 export type CostingSheetListParams = {
-    costingStatus?: 'pending' | 'submitted' | 'rejected';
+    tab?: TabKey;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -27,8 +29,8 @@ class CostingSheetsService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.costingStatus) {
-                search.set('costingStatus', params.costingStatus);
+            if (params.tab) {
+                search.set('tab', params.tab);
             }
             if (params.page) {
                 search.set('page', String(params.page));

@@ -3,6 +3,8 @@ import { costingSheetsService, type CostingSheetListParams } from '@/services/ap
 import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 
+type TabKey = 'pending' | 'submitted' | 'tender-dnb';
+
 export const costingSheetsKey = {
     all: ['costing-sheets'] as const,
     lists: () => [...costingSheetsKey.all, 'list'] as const,
@@ -13,12 +15,12 @@ export const costingSheetsKey = {
 };
 
 export const useCostingSheets = (
-    tab?: 'pending' | 'submitted',
+    tab?: TabKey,
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params: CostingSheetListParams = {
-        ...(tab && { costingStatus: tab }),
+        ...(tab && { tab }),
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
