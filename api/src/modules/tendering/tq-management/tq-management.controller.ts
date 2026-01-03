@@ -24,31 +24,15 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TqManagementController {
     constructor(private readonly tqManagementService: TqManagementService) { }
 
-    @Get()
-    findAll(
-        @Query('tqStatus') tqStatus?: 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received',
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        return this.tqManagementService.findAll({
-            tqStatus,
-            page: page ? parseInt(page, 10) : undefined,
-            limit: limit ? parseInt(limit, 10) : undefined,
-            sortBy,
-            sortOrder,
-        });
-    }
-
     @Get('dashboard')
     getDashboard(
         @Query('tabKey') tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-        @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified', // Legacy support
+        @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         // Use tabKey if provided, otherwise fall back to tab for backward compatibility
         const activeTab = tabKey || tab;
@@ -58,6 +42,7 @@ export class TqManagementController {
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

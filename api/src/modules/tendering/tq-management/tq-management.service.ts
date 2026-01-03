@@ -16,8 +16,6 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { getTabConfig, getCategoryStatusIds, loadDashboardConfig } from '@/config/dashboard-config.loader';
-import { buildTabConditions, getBaseDashboardConditions, countTabItems } from '@/modules/tendering/dashboards/dashboard-query-helper';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 export interface TqManagementDashboardCounts {
@@ -65,88 +63,48 @@ export class TqManagementService {
     ) { }
 
     /**
-     * Get dashboard data by tab - Uses dashboard-config.json
+     * Get dashboard data by tab
      */
     async getDashboardData(
         tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<TqManagementDashboardRow>> {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:70', message: 'getDashboardData entry', data: { tabKey, filters }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
         const activeTab = tabKey || 'awaited';
-        const tabConfig = getTabConfig('tq-management', activeTab);
-
-        if (!tabConfig) {
-            throw new BadRequestException(`Invalid tab: ${activeTab}`);
-        }
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:79', message: 'tabConfig loaded', data: { activeTab, tabConfig: JSON.stringify(tabConfig) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
-        // #endregion
-
-        // Log tab config
-        this.logger.debug(`[TqManagement] Tab: ${activeTab}, Config: ${JSON.stringify(tabConfig)}`);
 
         // Build base conditions
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb']),
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // TenderInfosService.getExcludeStatusCondition(['dnb']),
+            eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
-        // Apply entry condition only if tab's statusIds include entry condition statusIds
-        const entryConditionStatusIds = [17];
-        const tabStatusIds = tabConfig.statusIds || [];
-        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
-        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
+        const conditions = [...baseConditions];
 
-        // Only apply entry condition if tab statusIds include entry condition statusIds
-        const shouldApplyEntryCondition = entryConditionStatusIds.some(id => allTabStatusIds.includes(id));
-        if (shouldApplyEntryCondition) {
-            baseConditions.push(eq(tenderInfos.status, 17));
+        // Add search conditions
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr} OR
+                    ${users.name} ILIKE ${searchStr} OR
+                    ${statuses.name} ILIKE ${searchStr}
+                )`
+            );
         }
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:89', message: 'baseConditions built', data: { baseConditionsCount: baseConditions.length, entryConditionApplied: shouldApplyEntryCondition, entryConditionStatusIds, allTabStatusIds }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-        // #endregion
-
-        // Build tab-specific conditions using helper
-        const fieldMappings = {
-            tqId: tenderQueries.id,
-        };
-
-        const conditions = buildTabConditions(
-            'tq-management',
-            activeTab,
-            baseConditions,
-            fieldMappings
-        );
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:99', message: 'conditions after buildTabConditions', data: { conditionsCount: conditions.length, statusIds: tabConfig.statusIds, fieldConditions: tabConfig.fieldConditions }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
-        // #endregion
-
-        // Add bid submission condition
-        conditions.push(
-            eq(bidSubmissions.status, 'Bid Submitted')
-        );
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:107', message: 'conditions after bidSubmission filter', data: { conditionsCount: conditions.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
-        // #endregion
 
         const whereClause = and(...conditions);
 
-        // Log WHERE conditions
-        this.logger.debug(`[TqManagement] WHERE conditions: statusIds=${tabConfig.statusIds}, fieldConditions=${JSON.stringify(tabConfig.fieldConditions)}`);
-
         // Build orderBy clause
-        const sortBy = filters?.sortBy || tabConfig.sortBy;
-        const sortOrder = filters?.sortOrder || tabConfig.sortOrder || 'asc';
-        let orderByClause: any = asc(bidSubmissions.submissionDatetime); // Default
+        const sortBy = filters?.sortBy;
+        const sortOrder = filters?.sortOrder || 'asc';
+        let orderByClause: any = asc(bidSubmissions.submissionDatetime);
 
         if (sortBy) {
             const sortFn = sortOrder === 'desc' ? desc : asc;
@@ -173,9 +131,6 @@ export class TqManagementService {
                     orderByClause = sortFn(bidSubmissions.submissionDatetime);
             }
         }
-
-        // Log ORDER BY
-        this.logger.debug(`[TqManagement] ORDER BY: ${sortBy} ${sortOrder}`);
 
         // Build query - get base tender data
         const rows = await this.db
@@ -206,10 +161,7 @@ export class TqManagementService {
             .limit(limit)
             .offset(offset);
 
-        // Log query parameters
-        this.logger.debug(`[TqManagement] Query params: page=${page}, limit=${limit}, offset=${offset}`);
-
-        // Get TQ details for each tender
+        // Get TQ details for each tender and filter by tab
         const result: TqManagementDashboardRow[] = [];
 
         for (const tenderRow of rows) {
@@ -232,26 +184,46 @@ export class TqManagementService {
                 .where(eq(tenderQueries.tenderId, tenderRow.tenderId));
 
             const tqCount = tqCountResult[0]?.count || 0;
+            const tqStatus = (latestTq[0]?.status as TenderQueryStatus) || 'TQ awaited';
 
-            result.push({
-                tenderId: tenderRow.tenderId,
-                tenderNo: tenderRow.tenderNo,
-                tenderName: tenderRow.tenderName,
-                teamMemberName: tenderRow.teamMemberName,
-                itemName: tenderRow.itemName,
-                statusName: tenderRow.statusName,
-                bidSubmissionDate: tenderRow.bidSubmissionDate,
-                tqSubmissionDeadline: latestTq[0]?.tqSubmissionDeadline || null,
-                tqStatus: (latestTq[0]?.status as any) || 'TQ awaited',
-                tqId: latestTq[0]?.id || null,
-                tqCount: tqCount,
-                bidSubmissionId: tenderRow.bidSubmissionId,
-            });
+            // Filter by tab
+            let shouldInclude = false;
+            if (activeTab === 'awaited') {
+                shouldInclude = tqStatus === 'TQ awaited';
+            } else if (activeTab === 'received') {
+                shouldInclude = tqStatus === 'TQ received';
+            } else if (activeTab === 'replied') {
+                shouldInclude = tqStatus === 'TQ replied';
+            } else if (activeTab === 'qualified') {
+                shouldInclude = tqStatus === 'Qualified, No TQ received' || tqStatus === 'TQ replied, Qualified';
+            } else if (activeTab === 'disqualified') {
+                shouldInclude = tqStatus === 'Disqualified, No TQ received' || tqStatus === 'Disqualified, TQ missed';
+            }
+
+            if (shouldInclude) {
+                result.push({
+                    tenderId: tenderRow.tenderId,
+                    tenderNo: tenderRow.tenderNo,
+                    tenderName: tenderRow.tenderName,
+                    teamMemberName: tenderRow.teamMemberName,
+                    itemName: tenderRow.itemName,
+                    statusName: tenderRow.statusName,
+                    bidSubmissionDate: tenderRow.bidSubmissionDate,
+                    tqSubmissionDeadline: latestTq[0]?.tqSubmissionDeadline || null,
+                    tqStatus: tqStatus,
+                    tqId: latestTq[0]?.id || null,
+                    tqCount: tqCount,
+                    bidSubmissionId: tenderRow.bidSubmissionId,
+                });
+            }
         }
 
-        // Get total count
-        const [totalResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+        // Get total count (need to count after filtering by TQ status)
+        // This is less efficient but necessary due to the tab filtering logic
+        const allRows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+            })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -266,13 +238,36 @@ export class TqManagementService {
             .leftJoin(tenderQueries, eq(tenderQueries.tenderId, tenderInfos.id))
             .where(whereClause);
 
-        const total = Number(totalResult?.count || 0);
+        let total = 0;
+        for (const row of allRows) {
+            const latestTq = await this.db
+                .select({
+                    status: tenderQueries.status,
+                })
+                .from(tenderQueries)
+                .where(eq(tenderQueries.tenderId, row.tenderId))
+                .orderBy(desc(tenderQueries.createdAt))
+                .limit(1);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3343d3fd-3e35-4c9a-99f4-c4cbdbe8a9a3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'tq-management.service.ts:260', message: 'data query executed', data: { tabKey: activeTab, rowsCount: result.length, sampleRow: result[0] ? { tenderId: result[0].tenderId, tenderNo: result[0].tenderNo } : null, total, mismatch: total !== result.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
+            const tqStatus = (latestTq[0]?.status as TenderQueryStatus) || 'TQ awaited';
 
-        this.logger.debug(`[TqManagement] Query result: ${result.length} rows, total: ${total}`);
+            let shouldInclude = false;
+            if (activeTab === 'awaited') {
+                shouldInclude = tqStatus === 'TQ awaited';
+            } else if (activeTab === 'received') {
+                shouldInclude = tqStatus === 'TQ received';
+            } else if (activeTab === 'replied') {
+                shouldInclude = tqStatus === 'TQ replied';
+            } else if (activeTab === 'qualified') {
+                shouldInclude = tqStatus === 'Qualified, No TQ received' || tqStatus === 'TQ replied, Qualified';
+            } else if (activeTab === 'disqualified') {
+                shouldInclude = tqStatus === 'Disqualified, No TQ received' || tqStatus === 'Disqualified, TQ missed';
+            }
+
+            if (shouldInclude) {
+                total++;
+            }
+        }
 
         return wrapPaginatedResponse(result, total, page, limit);
     }
@@ -320,7 +315,9 @@ export class TqManagementService {
             .from(tenderInfos)
             .where(
                 and(
-                    ...getBaseDashboardConditions(['dnb']),
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    TenderInfosService.getExcludeStatusCondition(['dnb']),
                     eq(tenderInfos.status, 17), // Entry condition: Status 17
                     inArray(tenderInfos.id, allTenderIds)
                 )
@@ -562,7 +559,9 @@ export class TqManagementService {
 
     private tqManagementBaseWhere() {
         return and(
-            ...getBaseDashboardConditions(['dnb']),
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
             eq(tenderInfos.status, 17) // Entry condition: Status 17
         );
     }
@@ -585,95 +584,19 @@ export class TqManagementService {
     }
 
     async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
-        const config = loadDashboardConfig();
-        const tqConfig = config.dashboards['tq-management'];
-
-        const fieldMappings = {
-            tqId: tenderQueries.id,
-        };
-
-        // Count for each tab using config - build baseConditions per tab to conditionally apply entry conditions
-        const [awaitedCount, receivedCount, repliedCount, qualifiedCount, disqualifiedCount] = await Promise.all([
-            this.countTab('tq-management', 'awaited', this.buildBaseConditionsForTab('tq-management', 'awaited'), fieldMappings),
-            this.countTab('tq-management', 'received', this.buildBaseConditionsForTab('tq-management', 'received'), fieldMappings),
-            this.countTab('tq-management', 'replied', this.buildBaseConditionsForTab('tq-management', 'replied'), fieldMappings),
-            this.countTab('tq-management', 'qualified', this.buildBaseConditionsForTab('tq-management', 'qualified'), fieldMappings),
-            this.countTab('tq-management', 'disqualified', this.buildBaseConditionsForTab('tq-management', 'disqualified'), fieldMappings),
-        ]);
-
-        this.logger.debug(`[TqManagement] Counts: awaited=${awaitedCount}, received=${receivedCount}, replied=${repliedCount}, qualified=${qualifiedCount}, disqualified=${disqualifiedCount}`);
-
-        return {
-            awaited: awaitedCount,
-            received: receivedCount,
-            replied: repliedCount,
-            qualified: qualifiedCount,
-            disqualified: disqualifiedCount,
-            total: awaitedCount + receivedCount + repliedCount + qualifiedCount + disqualifiedCount,
-        };
-    }
-
-    /**
-     * Build base conditions for a specific tab, conditionally applying entry conditions
-     */
-    private buildBaseConditionsForTab(dashboardName: string, tabKey: string): any[] {
-        const tabConfig = getTabConfig(dashboardName, tabKey);
-        if (!tabConfig) {
-            return [...getBaseDashboardConditions(['dnb'])];
-        }
-
         const baseConditions = [
-            ...getBaseDashboardConditions(['dnb']),
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
+            eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
-        // Apply entry condition only if tab's statusIds include entry condition statusIds
-        const entryConditionStatusIds = [17];
-        const tabStatusIds = tabConfig.statusIds || [];
-        const categoryStatusIds = tabConfig.category ? getCategoryStatusIds(tabConfig.category) : [];
-        const allTabStatusIds = [...new Set([...tabStatusIds, ...categoryStatusIds])];
-
-        const shouldApplyEntryCondition = entryConditionStatusIds.some(id => allTabStatusIds.includes(id));
-        if (shouldApplyEntryCondition) {
-            baseConditions.push(eq(tenderInfos.status, 17));
-        }
-
-        return baseConditions;
-    }
-
-    /**
-     * Helper method to count items for a specific tab
-     */
-    private async countTab(
-        dashboardName: string,
-        tabKey: string,
-        baseConditions: any[],
-        fieldMappings: Record<string, any>
-    ): Promise<number> {
-        const tabConfig = getTabConfig(dashboardName, tabKey);
-        if (!tabConfig) {
-            return 0;
-        }
-
-        const conditions = buildTabConditions(
-            dashboardName,
-            tabKey,
-            baseConditions,
-            fieldMappings
-        );
-
-        // Add bid submission condition
-        conditions.push(
-            eq(bidSubmissions.status, 'Bid Submitted')
-        );
-
-        const whereClause = and(...conditions);
-
-        const [result] = await this.db
-            .select({ count: sql<number>`count(*)` })
+        // Get all tenders matching base conditions
+        const allTenders = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+            })
             .from(tenderInfos)
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(
                 bidSubmissions,
                 and(
@@ -681,10 +604,70 @@ export class TqManagementService {
                     eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
-            .leftJoin(tenderQueries, eq(tenderQueries.tenderId, tenderInfos.id))
-            .where(whereClause);
+            .where(and(...baseConditions));
 
-        return Number(result?.count || 0);
+        const tenderIds = allTenders.map(t => t.tenderId);
+
+        if (tenderIds.length === 0) {
+            return {
+                awaited: 0,
+                received: 0,
+                replied: 0,
+                qualified: 0,
+                disqualified: 0,
+                total: 0,
+            };
+        }
+
+        // Get all TQ records for these tenders, ordered by createdAt DESC
+        const allTqs = await this.db
+            .select({
+                tenderId: tenderQueries.tenderId,
+                status: tenderQueries.status,
+                createdAt: tenderQueries.createdAt,
+            })
+            .from(tenderQueries)
+            .where(inArray(tenderQueries.tenderId, tenderIds))
+            .orderBy(desc(tenderQueries.createdAt));
+
+        // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
+        const statusMap = new Map<number, TenderQueryStatus>();
+        for (const tq of allTqs) {
+            if (!statusMap.has(tq.tenderId)) {
+                statusMap.set(tq.tenderId, tq.status as TenderQueryStatus);
+            }
+        }
+
+        // Count by status
+        let awaited = 0;
+        let received = 0;
+        let replied = 0;
+        let qualified = 0;
+        let disqualified = 0;
+
+        for (const tenderId of tenderIds) {
+            const status = statusMap.get(tenderId) || 'TQ awaited';
+            if (status === 'TQ awaited') {
+                awaited++;
+            } else if (status === 'TQ received') {
+                received++;
+            } else if (status === 'TQ replied') {
+                replied++;
+            } else if (status === 'Qualified, No TQ received' || status === 'TQ replied, Qualified') {
+                qualified++;
+            } else if (status === 'Disqualified, No TQ received' || status === 'Disqualified, TQ missed') {
+                disqualified++;
+            }
+        }
+
+        return {
+            awaited,
+            received,
+            replied,
+            qualified,
+            disqualified,
+            total: awaited + received + replied + qualified + disqualified,
+        };
     }
 
     /**

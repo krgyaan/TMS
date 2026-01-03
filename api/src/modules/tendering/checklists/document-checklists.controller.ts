@@ -7,37 +7,6 @@ import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/m
 export class DocumentChecklistsController {
     constructor(private readonly documentChecklistsService: DocumentChecklistsService) { }
 
-    @Get()
-    findAll(
-        @Query('checklistSubmitted') checklistSubmitted?: string,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const parseBoolean = (v?: string): boolean | undefined => {
-            if (v === 'true') return true;
-            if (v === 'false') return false;
-            return undefined;
-        };
-
-        const filters: DocumentChecklistFilters = {
-            ...(parseBoolean(checklistSubmitted) !== undefined && { checklistSubmitted: parseBoolean(checklistSubmitted) }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.documentChecklistsService.findAll(filters);
-    }
-
     @Get('dashboard')
     getDashboard(
         @Query('tab') tab?: 'pending' | 'submitted' | 'tender-dnb',
@@ -45,12 +14,14 @@ export class DocumentChecklistsController {
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+        @Query('search') search?: string,
     ) {
         return this.documentChecklistsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
+            search,
         });
     }
 

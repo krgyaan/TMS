@@ -48,40 +48,7 @@ class TqManagementService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<TqManagementDashboardRow>>(
-            `/dashboard${queryString ? `?${queryString}` : ''}`
-        );
-    }
-
-    async getAll(
-        filters?: TqManagementFilters
-    ): Promise<PaginatedResult<TqManagementDashboardRow>> {
-        const search = new URLSearchParams();
-
-        if (filters) {
-            if (filters.tqStatus) {
-                // Only handle single status in service - arrays are handled in hook
-                const status = Array.isArray(filters.tqStatus) ? filters.tqStatus[0] : filters.tqStatus;
-                search.set('tqStatus', status);
-            }
-            if (filters.page) {
-                search.set('page', String(filters.page));
-            }
-            if (filters.limit) {
-                search.set('limit', String(filters.limit));
-            }
-            if (filters.sortBy) {
-                search.set('sortBy', filters.sortBy);
-            }
-            if (filters.sortOrder) {
-                search.set('sortOrder', filters.sortOrder);
-            }
-        }
-
-        const queryString = search.toString();
-        return this.get<PaginatedResult<TqManagementDashboardRow>>(
-            queryString ? `?${queryString}` : ''
-        );
+        return this.get<PaginatedResult<TqManagementDashboardRow>>(`/dashboard${queryString ? `?${queryString}` : ''}`);
     }
 
     async getById(id: number): Promise<TenderQuery> {

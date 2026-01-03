@@ -22,71 +22,18 @@ export type TqManagementFilters = {
 
 export const useTqManagement = (
     tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-    filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' },
+    filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
     legacyFilters?: TqManagementFilters // Legacy support
 ) => {
     return useQuery({
         queryKey: [...tqManagementKey.lists(), { tabKey, ...filters, ...legacyFilters }],
         queryFn: async () => {
-            // Use new getDashboard method if tabKey is provided
-            if (tabKey) {
-                return tqManagementService.getDashboard(tabKey, filters);
-            }
-
-            // Legacy support: Handle multiple statuses for the "noTq" tab
-            if (legacyFilters && Array.isArray(legacyFilters.tqStatus)) {
-                const statuses = legacyFilters.tqStatus;
-                const page = legacyFilters.page || 1;
-                const limit = legacyFilters.limit || 50;
-                const sortBy = legacyFilters.sortBy;
-                const sortOrder = legacyFilters.sortOrder;
-
-                // Fetch all statuses in parallel
-                const promises = statuses.map(status =>
-                    tqManagementService.getAll({
-                        tqStatus: status,
-                        page: 1, // Fetch all pages for each status
-                        limit: 1000, // Large limit to get all records
-                        sortBy,
-                        sortOrder,
-                    })
-                );
-
-                const results = await Promise.all(promises);
-
-                // Combine all results
-                const combinedData = results.flatMap(result => result.data);
-                const total = combinedData.length;
-
-                // Apply client-side pagination
-                const startIndex = (page - 1) * limit;
-                const endIndex = startIndex + limit;
-                const paginatedData = combinedData.slice(startIndex, endIndex);
-
-                // Apply sorting if needed
-                let sortedData = paginatedData;
-                if (sortBy) {
-                    sortedData = [...paginatedData].sort((a, b) => {
-                        const aValue = (a as any)[sortBy];
-                        const bValue = (b as any)[sortBy];
-                        const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-                        return sortOrder === 'desc' ? -comparison : comparison;
-                    });
-                }
-
-                return {
-                    data: sortedData,
-                    meta: {
-                        total,
-                        page,
-                        limit,
-                        totalPages: Math.ceil(total / limit),
-                    },
-                };
-            }
-
-            // Single status - use normal API call
-            return tqManagementService.getAll(legacyFilters);
+            return tqManagementService.getDashboard(tabKey, {
+                page: filters?.page,
+                limit: filters?.limit,
+                sortBy: filters?.sortBy,
+                sortOrder: filters?.sortOrder,
+            });
         },
     });
 };

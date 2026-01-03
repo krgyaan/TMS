@@ -9,7 +9,7 @@ import type {
 } from '@/types/api.types';
 
 export type DocumentChecklistListParams = {
-    checklistSubmitted?: boolean;
+    tab?: 'pending' | 'submitted' | 'tender-dnb';
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -25,8 +25,8 @@ class DocumentChecklistService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.checklistSubmitted !== undefined) {
-                search.set('checklistSubmitted', String(params.checklistSubmitted));
+            if (params.tab) {
+                search.set('tab', String(params.tab));
             }
             if (params.page) {
                 search.set('page', String(params.page));
@@ -43,9 +43,7 @@ class DocumentChecklistService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(
-            queryString ? `?${queryString}` : ''
-        );
+        return this.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
     async getDashboardCounts(): Promise<DocumentChecklistsDashboardCounts> {
