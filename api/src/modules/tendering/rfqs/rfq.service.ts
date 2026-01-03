@@ -96,7 +96,7 @@ export class RfqsService {
  * Get RFQ Dashboard data - Refactored to use dashboard config
  */
     async getRfqData(
-        tabKey?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
+        tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<RfqRow>> {
         const page = filters?.page || 1;
@@ -104,13 +104,12 @@ export class RfqsService {
         const offset = (page - 1) * limit;
 
         // Use default tab if not provided
-        const activeTab = tabKey || 'pending';
+        const activeTab = tab || 'pending';
 
         // Build base conditions
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNotNull(tenderInfos.rfqTo),   // NOT NULL
             ne(tenderInfos.rfqTo, ''),      // NOT empty string
             ne(tenderInfos.rfqTo, '0'),     // NOT '0'
@@ -125,21 +124,16 @@ export class RfqsService {
         const conditions = [...baseConditions];
 
         if (activeTab === 'pending') {
-            // conditions.push(eq(tenderInfos.status, 3));
             conditions.push(isNull(rfqs.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'sent') {
-            // conditions.push(eq(tenderInfos.status, 4));
             conditions.push(isNotNull(rfqs.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'rfq-rejected') {
-            // RFQ Rejected: status in [10, 14, 35]
             conditions.push(inArray(tenderInfos.status, [10, 14, 35]));
         } else if (activeTab === 'tender-dnb') {
-            // Tender DNB: status in [8, 34] (dnb category)
             const dnbStatusIds = StatusCache.getIds('dnb');
             if (dnbStatusIds.length > 0) {
-                // Filter to only [8, 34] from dnb category
                 const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
                 if (filteredDnbIds.length > 0) {
                     conditions.push(inArray(tenderInfos.status, filteredDnbIds));

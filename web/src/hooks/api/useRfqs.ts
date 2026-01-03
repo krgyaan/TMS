@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CreateRfqDto, UpdateRfqDto, VendorOrganizationWithRelations } from "@/types/api.types";
+import type { VendorOrganizationWithRelations } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
 import { vendorOrganizationsService } from "@/services/api";
+import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
 
 export const rfqsKey = {
     all: ["rfqs"] as const,
@@ -13,30 +14,6 @@ export const rfqsKey = {
     detail: (id: number) => [...rfqsKey.details(), id] as const,
     byTender: (tenderId: number) => [...rfqsKey.all, "by-tender", tenderId] as const,
     dashboardCounts: () => [...rfqsKey.all, "dashboard-counts"] as const,
-};
-
-export type RfqFilters = {
-    rfqStatus?: 'pending' | 'sent';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
-
-export type RfqDashboardFilters = {
-    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-    search?: string;
-};
-
-export const useRfqs = (filters?: RfqFilters) => {
-    return useQuery({
-        queryKey: rfqsKey.list(filters),
-        queryFn: () => rfqsService.getAll(filters),
-    })
 };
 
 export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
@@ -107,7 +84,7 @@ export const useDeleteRfq = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: number) => rfqsService.delete(id),
+        mutationFn: (id: number) => rfqsService.remove(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: rfqsKey.lists() });
             toast.success("Rfq deleted successfully");

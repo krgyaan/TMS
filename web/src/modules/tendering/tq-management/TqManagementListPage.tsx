@@ -13,7 +13,7 @@ import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck }
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
-import type { TenderQueryStatus, TqManagementDashboardRow } from '@/types/api.types';
+import type { TqManagementDashboardRow } from '@/types/api.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import QualificationDialog from './components/QualificationDialog';
 
@@ -43,18 +43,6 @@ const TqManagementListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
-
-    // Map tab key to tqStatus(es)
-    const getTqStatusesFromTab = (tab: TabKey): TenderQueryStatus[] | TenderQueryStatus | undefined => {
-        switch (tab) {
-            case 'awaited': return 'TQ awaited';
-            case 'received': return 'TQ received';
-            case 'replied': return 'TQ replied';
-            case 'qualified': return ['Qualified, No TQ received', 'TQ replied, Qualified'];
-            case 'disqualified': return ['Disqualified, No TQ received', 'Disqualified, TQ missed'];
-            default: return undefined;
-        }
-    };
 
     // Fetch paginated data for active tab using tabKey
     const { data: apiResponse, isLoading: loading, error } = useTqManagement(
