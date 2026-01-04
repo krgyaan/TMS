@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, desc, isNotNull, sql, inArray, asc, isNull } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, sql, inArray, asc, isNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -63,52 +63,94 @@ export class TqManagementService {
     ) { }
 
     /**
-     * Check if TQ status matches the active tab
-     */
-    private matchesTab(tqStatus: TenderQueryStatus, tab: string): boolean {
-        switch (tab) {
-            case 'awaited':
-                return tqStatus === 'TQ awaited';
-            case 'received':
-                return tqStatus === 'TQ received';
-            case 'replied':
-                return tqStatus === 'TQ replied';
-            case 'qualified':
-                return tqStatus === 'Qualified, No TQ received' || tqStatus === 'TQ replied, Qualified';
-            case 'disqualified':
-                return tqStatus === 'Disqualified, No TQ received' || tqStatus === 'Disqualified, TQ missed';
-            default:
-                return false;
-        }
-    }
-
-    /**
      * Get dashboard data by tab
      */
     async getDashboardData(
         tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: {
+            page?: number;
+            limit?: number;
+            sortBy?: string;
+            sortOrder?: 'asc' | 'desc';
+            search?: string;
+        }
     ): Promise<PaginatedResult<TqManagementDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
-        const activeTab = tabKey || 'awaited';
+        const activeTab = tabKey ?? 'awaited';
 
-        // Build base conditions
+        // Base conditions
         const conditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
-        // Add search conditions
+        // Latest TQ per tender (using subquery to get latest per tender)
+        const latestTq = this.db.$with('latest_tq').as(
+            this.db
+                .select({
+                    tenderId: tenderQueries.tenderId,
+                    id: tenderQueries.id,
+                    status: tenderQueries.status,
+                    tqSubmissionDeadline: tenderQueries.tqSubmissionDeadline,
+                    createdAt: tenderQueries.createdAt,
+                })
+                .from(tenderQueries)
+                .where(
+                    sql`${tenderQueries.id} = (
+                        SELECT tq2.id
+                        FROM ${tenderQueries} tq2
+                        WHERE tq2.tender_id = ${tenderQueries.tenderId}
+                        ORDER BY tq2.created_at DESC, tq2.id DESC
+                        LIMIT 1
+                    )`
+                )
+        );
+
+        // Tab-specific conditions (simple & readable)
+        if (activeTab === 'awaited') {
+            conditions.push(
+                or(
+                    isNull(latestTq.id as any),
+                    eq(latestTq.status, 'TQ awaited') as any
+                ) as any
+            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else if (activeTab === 'received') {
+            conditions.push(eq(latestTq.status, 'TQ received') as any);
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else if (activeTab === 'replied') {
+            conditions.push(eq(latestTq.status, 'TQ replied') as any);
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else if (activeTab === 'qualified') {
+            conditions.push(
+                inArray(latestTq.status, [
+                    'Qualified, No TQ received',
+                    'TQ replied, Qualified',
+                ]) as any
+            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else if (activeTab === 'disqualified') {
+            conditions.push(
+                inArray(latestTq.status, [
+                    'Disqualified, No TQ received',
+                    'Disqualified, TQ missed',
+                ]) as any
+            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        // Search
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
             conditions.push(
                 sql`(
                     ${tenderInfos.tenderName} ILIKE ${searchStr} OR
                     ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr} OR
                     ${users.name} ILIKE ${searchStr} OR
                     ${statuses.name} ILIKE ${searchStr}
                 )`
@@ -117,37 +159,66 @@ export class TqManagementService {
 
         const whereClause = and(...conditions);
 
-        // Build orderBy clause
-        const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || 'asc';
+        // Sorting
+        const sortOrder = filters?.sortOrder || 'desc';
         const sortFn = sortOrder === 'desc' ? desc : asc;
-        let orderByClause: any = asc(bidSubmissions.submissionDatetime);
 
-        if (sortBy) {
-            switch (sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortFn(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortFn(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortFn(users.name);
-                    break;
-                case 'bidSubmissionDate':
-                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
-                    break;
-                case 'submissionDate':
-                    orderByClause = sortFn(tenderQueries.createdAt);
-                    break;
-                case 'statusChangeDate':
-                    orderByClause = sortFn(tenderInfos.updatedAt);
-                    break;
-            }
+        let orderByClause: any = desc(bidSubmissions.submissionDatetime);
+
+        switch (filters?.sortBy) {
+            case 'tenderNo':
+                orderByClause = sortFn(tenderInfos.tenderNo);
+                break;
+            case 'tenderName':
+                orderByClause = sortFn(tenderInfos.tenderName);
+                break;
+            case 'teamMemberName':
+                orderByClause = sortFn(users.name);
+                break;
+            case 'bidSubmissionDate':
+                orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                break;
+            case 'tqSubmissionDate':
+                orderByClause = sortFn(latestTq.createdAt);
+                break;
+            case 'statusChangeDate':
+                orderByClause = sortFn(tenderInfos.updatedAt);
+                break;
         }
 
-        // Get all matching tenders (without limit for filtering)
-        const allTenders = await this.db
+        // Count
+        const [countResult] = await this.db
+            .with(latestTq)
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .innerJoin(
+                bidSubmissions,
+                and(
+                    eq(bidSubmissions.tenderId, tenderInfos.id),
+                    eq(bidSubmissions.status, 'Bid Submitted')
+                )
+            )
+            .where(whereClause);
+
+        const total = Number(countResult?.count || 0);
+
+        const tqCount = this.db.$with('tq_count').as(
+            this.db
+                .select({
+                    tenderId: tenderQueries.tenderId,
+                    count: sql<number>`count(*)::int`.as('count'),
+                })
+                .from(tenderQueries)
+                .groupBy(tenderQueries.tenderId)
+        );
+
+        // Data
+        const rows = await this.db
+            .with(latestTq, tqCount)
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -157,12 +228,18 @@ export class TqManagementService {
                 statusName: statuses.name,
                 bidSubmissionDate: bidSubmissions.submissionDatetime,
                 bidSubmissionId: bidSubmissions.id,
+                tqId: latestTq.id,
+                tqStatus: latestTq.status,
+                tqSubmissionDeadline: latestTq.tqSubmissionDeadline,
+                tqCount: tqCount.count,
             })
             .from(tenderInfos)
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
+            .leftJoin(tqCount, eq(tqCount.tenderId, tenderInfos.id))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(
+            .innerJoin(
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
@@ -170,152 +247,35 @@ export class TqManagementService {
                 )
             )
             .where(whereClause)
+            .limit(limit)
+            .offset(offset)
             .orderBy(orderByClause);
 
-        if (allTenders.length === 0) {
-            return wrapPaginatedResponse([], 0, page, limit);
-        }
+        // Final mapping (fixed: include required tqCount field)
+        const result: TqManagementDashboardRow[] = rows.map(row => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            teamMemberName: row.teamMemberName,
+            itemName: row.itemName,
+            statusName: row.statusName,
+            bidSubmissionDate: row.bidSubmissionDate,
+            tqId: row.tqId ?? null,
+            tqStatus: (row.tqStatus ?? 'TQ awaited') as TenderQueryStatus,
+            tqSubmissionDeadline: row.tqSubmissionDeadline ?? null,
+            bidSubmissionId: row.bidSubmissionId,
+            tqCount: row.tqCount ?? 0,
+        }));
 
-        // Batch fetch TQ data for all tenders
-        const tenderIds = allTenders.map(t => t.tenderId);
-        const allTqs = await this.db
-            .select({
-                tenderId: tenderQueries.tenderId,
-                id: tenderQueries.id,
-                status: tenderQueries.status,
-                tqSubmissionDeadline: tenderQueries.tqSubmissionDeadline,
-                createdAt: tenderQueries.createdAt,
-            })
-            .from(tenderQueries)
-            .where(inArray(tenderQueries.tenderId, tenderIds))
-            .orderBy(desc(tenderQueries.createdAt), desc(tenderQueries.id));
 
-        // Get TQ counts for all tenders
-        const tqCounts = await this.db
-            .select({
-                tenderId: tenderQueries.tenderId,
-                count: sql<number>`count(*)::int`,
-            })
-            .from(tenderQueries)
-            .where(inArray(tenderQueries.tenderId, tenderIds))
-            .groupBy(tenderQueries.tenderId);
-
-        // Create maps for quick lookup
-        const latestTqMap = new Map<number, { id: number; status: TenderQueryStatus; tqSubmissionDeadline: Date | null }>();
-        const tqCountMap = new Map<number, number>();
-
-        // Get latest TQ for each tender (first occurrence is latest due to DESC order)
-        for (const tq of allTqs) {
-            if (!latestTqMap.has(tq.tenderId)) {
-                latestTqMap.set(tq.tenderId, {
-                    id: tq.id,
-                    status: tq.status as TenderQueryStatus,
-                    tqSubmissionDeadline: tq.tqSubmissionDeadline,
-                });
-            }
-        }
-
-        // Map TQ counts
-        for (const count of tqCounts) {
-            tqCountMap.set(count.tenderId, count.count);
-        }
-
-        // Filter and build result
-        const filteredTenders = allTenders.filter(tender => {
-            const tqStatus = latestTqMap.get(tender.tenderId)?.status || 'TQ awaited';
-            return this.matchesTab(tqStatus, activeTab);
-        });
-
-        // Apply pagination
-        const paginatedTenders = filteredTenders.slice(offset, offset + limit);
-
-        // Build result rows
-        const result: TqManagementDashboardRow[] = paginatedTenders.map(tender => {
-            const latestTq = latestTqMap.get(tender.tenderId);
-            const tqStatus = latestTq?.status || 'TQ awaited';
-
-            return {
-                tenderId: tender.tenderId,
-                tenderNo: tender.tenderNo,
-                tenderName: tender.tenderName,
-                teamMemberName: tender.teamMemberName,
-                itemName: tender.itemName,
-                statusName: tender.statusName,
-                bidSubmissionDate: tender.bidSubmissionDate,
-                tqSubmissionDeadline: latestTq?.tqSubmissionDeadline || null,
-                tqStatus: tqStatus,
-                tqId: latestTq?.id || null,
-                tqCount: tqCountMap.get(tender.tenderId) || 0,
-                bidSubmissionId: tender.bidSubmissionId,
-            };
-        });
-
-        return wrapPaginatedResponse(result, filteredTenders.length, page, limit);
-    }
-
-    async findById(id: number) {
-        const result = await this.db
-            .select()
-            .from(tenderQueries)
-            .where(eq(tenderQueries.id, id))
-            .limit(1);
-
-        if (!result[0]) {
-            throw new NotFoundException('TQ record not found');
-        }
-
-        return result[0];
-    }
-
-    async findByTenderId(tenderId: number) {
-        const result = await this.db
-            .select()
-            .from(tenderQueries)
-            .where(eq(tenderQueries.tenderId, tenderId))
-            .orderBy(desc(tenderQueries.createdAt));
-
-        return result;
-    }
-
-    async getTqItems(tqId: number) {
-        return await this.db
-            .select()
-            .from(tenderQueryItems)
-            .where(eq(tenderQueryItems.tenderQueryId, tqId))
-            .orderBy(tenderQueryItems.srNo);
-    }
-
-    private tqManagementBaseWhere() {
-        return and(
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
-            eq(tenderInfos.status, 17) // Entry condition: Status 17
-        );
-    }
-
-    private tqManagementBaseQuery(select: any): any {
-        return this.db
-            .select(select)
-            .from(tenderInfos)
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(
-                bidSubmissions,
-                and(
-                    eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
-                )
-            )
-            .leftJoin(tenderQueries, eq(tenderQueries.tenderId, tenderInfos.id));
+        return wrapPaginatedResponse(result, total, page, limit);
     }
 
     async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
@@ -398,100 +358,36 @@ export class TqManagementService {
         };
     }
 
-    /**
-     * Legacy getDashboardCounts - kept for reference
-     * @deprecated Use the config-based version above
-     */
-    private async getDashboardCountsLegacy(): Promise<TqManagementDashboardCounts> {
-        try {
-            const baseWhere = this.tqManagementBaseWhere();
+    async findById(id: number) {
+        const result = await this.db
+            .select()
+            .from(tenderQueries)
+            .where(eq(tenderQueries.id, id))
+            .limit(1);
 
-            // Get all tenders that match base conditions and have bid submissions
-            const tendersWithBids = await this.db
-                .select({
-                    tenderId: tenderInfos.id,
-                })
-                .from(tenderInfos)
-                .leftJoin(
-                    bidSubmissions,
-                    and(
-                        eq(bidSubmissions.tenderId, tenderInfos.id),
-                        eq(bidSubmissions.status, 'Bid Submitted')
-                    )
-                )
-                .where(
-                    and(
-                        baseWhere,
-                        isNotNull(bidSubmissions.id)
-                    )
-                );
-
-            const tenderIds = tendersWithBids.map(t => t.tenderId);
-
-            if (tenderIds.length === 0) {
-                return {
-                    awaited: 0,
-                    received: 0,
-                    replied: 0,
-                    qualified: 0,
-                    disqualified: 0,
-                    total: 0,
-                };
-            }
-
-            // Get all TQ records for these tenders, ordered by createdAt DESC
-            const allTqs = await this.db
-                .select({
-                    tenderId: tenderQueries.tenderId,
-                    status: tenderQueries.status,
-                    createdAt: tenderQueries.createdAt,
-                })
-                .from(tenderQueries)
-                .where(inArray(tenderQueries.tenderId, tenderIds))
-                .orderBy(desc(tenderQueries.createdAt));
-
-            // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
-            const statusMap = new Map<number, string>();
-            for (const tq of allTqs) {
-                if (!statusMap.has(tq.tenderId)) {
-                    statusMap.set(tq.tenderId, tq.status);
-                }
-            }
-
-            // Count by status
-            let awaited = 0;
-            let received = 0;
-            let replied = 0;
-            let qualified = 0;
-            let disqualified = 0;
-
-            for (const tenderId of tenderIds) {
-                const status = statusMap.get(tenderId);
-                if (!status) {
-                    awaited++;
-                } else if (status === 'TQ received') {
-                    received++;
-                } else if (status === 'TQ replied') {
-                    replied++;
-                } else if (status === 'Qualified, No TQ received' || status === 'TQ replied, Qualified') {
-                    qualified++;
-                } else if (status === 'Disqualified, No TQ received' || status === 'Disqualified, TQ missed') {
-                    disqualified++;
-                }
-            }
-
-            return {
-                awaited,
-                received,
-                replied,
-                qualified,
-                disqualified,
-                total: awaited + received + replied + qualified + disqualified,
-            };
-        } catch (error) {
-            console.error('Error in getDashboardCounts:', error);
-            throw error;
+        if (!result[0]) {
+            throw new NotFoundException('TQ record not found');
         }
+
+        return result[0];
+    }
+
+    async findByTenderId(tenderId: number) {
+        const result = await this.db
+            .select()
+            .from(tenderQueries)
+            .where(eq(tenderQueries.tenderId, tenderId))
+            .orderBy(desc(tenderQueries.createdAt));
+
+        return result;
+    }
+
+    async getTqItems(tqId: number) {
+        return await this.db
+            .select()
+            .from(tenderQueryItems)
+            .where(eq(tenderQueryItems.tenderQueryId, tqId))
+            .orderBy(tenderQueryItems.srNo);
     }
 
     async createTqReceived(data: {
