@@ -1011,38 +1011,7 @@ export type UpdateBidSubmissionDto = {
     tmsImprovements?: string;
 };
 
-export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
 
-export type TenderQuery = {
-    id: number;
-    tenderId: number;
-    tqSubmissionDeadline: Date | null;
-    tqDocumentReceived: string | null;
-    receivedBy: number | null;
-    receivedAt: Date | null;
-    repliedDatetime: Date | null;
-    repliedDocument: string | null;
-    proofOfSubmission: string | null;
-    repliedBy: number | null;
-    repliedAt: Date | null;
-    missedReason: string | null;
-    preventionMeasures: string | null;
-    tmsImprovements: string | null;
-    status: TqStatus;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type TenderQueryItem = {
-    id: number;
-    tenderQueryId: number;
-    srNo: number;
-    tqTypeId: number;
-    queryDescription: string;
-    response: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
 
 export interface PhysicalDocsDashboardRow {
     tenderId: number;
@@ -1110,43 +1079,6 @@ export interface PhysicalDocWithPersons {
     persons: PhysicalDocPerson[];
 };
 
-export type TqManagementDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    bidSubmissionDate: Date | null;
-    tqSubmissionDeadline: Date | null;
-    tqStatus: TenderQueryStatus;
-    tqId: number | null;
-    tqCount: number;
-    bidSubmissionId: number | null;
-};
-
-export type CreateTqReceivedDto = {
-    tenderId: number;
-    tqSubmissionDeadline: string;
-    tqDocumentReceived: string | null;
-    tqItems: Array<{
-        tqTypeId: number;
-        queryDescription: string;
-    }>;
-};
-
-export type UpdateTqRepliedDto = {
-    repliedDatetime: string;
-    repliedDocument: string | null;
-    proofOfSubmission: string;
-};
-
-export type UpdateTqMissedDto = {
-    missedReason: string;
-    preventionMeasures: string;
-    tmsImprovements: string;
-};
-
 export type EmdDashboardFilters = {
     tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
     userId?: number;
@@ -1200,16 +1132,6 @@ export interface TenderApprovalDashboardCounts {
     total: number;
 }
 
-export interface TqManagementDashboardCounts {
-    awaited: number;
-    received: number;
-    replied: number;
-    qualified: number;
-    disqualified: number;
-    total: number;
-}
-
-export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
 
 export interface PhysicalDocsDashboardCounts {
     pending: number;

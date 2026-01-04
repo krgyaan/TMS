@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tqManagementService } from '@/services/api/tq-management.service';
 import { toast } from 'sonner';
-import type { TenderQueryStatus, TqManagementDashboardCounts } from '@/types/api.types';
+import type { TabKey, TqManagementDashboardCounts, TqManagementFilters } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
 
 export const tqManagementKey = {
     all: ['tq-management'] as const,
@@ -12,21 +12,12 @@ export const tqManagementKey = {
     dashboardCounts: () => [...tqManagementKey.all, 'dashboard-counts'] as const,
 };
 
-export type TqManagementFilters = {
-    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
-
 export const useTqManagement = (
-    tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-    filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
-    legacyFilters?: TqManagementFilters // Legacy support
+    tabKey?: TabKey,
+    filters?: TqManagementFilters,
 ) => {
     return useQuery({
-        queryKey: [...tqManagementKey.lists(), { tabKey, ...filters, ...legacyFilters }],
+        queryKey: [...tqManagementKey.lists(), { tabKey, ...filters }],
         queryFn: async () => {
             return tqManagementService.getDashboard(tabKey, {
                 page: filters?.page,
