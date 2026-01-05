@@ -1,28 +1,21 @@
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useWebsites } from '@/hooks/api/useWebsites';
-import type { Website } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus, ExternalLink } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { WebsiteDrawer } from './components/WebsiteDrawer';
-import { WebsiteViewModal } from './components/WebsiteViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useWebsites } from "@/hooks/api/useWebsites";
+import type { Website } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { WebsiteModal } from "./components/WebsiteModal";
+import { WebsiteViewModal } from "./components/WebsiteViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -35,29 +28,29 @@ const WebsitesPage = () => {
     // Website actions
     const websiteActions: ActionItem<Website>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedWebsite(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedWebsite(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteWebsite.mutateAsync(row.id);
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -66,23 +59,23 @@ const WebsitesPage = () => {
 
     const [colDefs] = useState<ColDef<Website>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Website Name',
+            field: "name",
+            headerName: "Website Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'url',
-            headerName: 'URL',
+            field: "url",
+            headerName: "URL",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
             cellRenderer: (params: any) => {
                 if (!params.value) {
                     return <span className="text-gray-400">—</span>;
@@ -93,7 +86,7 @@ const WebsitesPage = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
                     >
                         {params.value}
                         <ExternalLink className="h-3 w-3" />
@@ -102,22 +95,18 @@ const WebsitesPage = () => {
             },
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(websiteActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -150,12 +139,7 @@ const WebsitesPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading websites: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -198,7 +182,7 @@ const WebsitesPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={websites || []}
                         columnDefs={colDefs}
@@ -217,12 +201,12 @@ const WebsitesPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <WebsiteDrawer
+            <WebsiteModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 website={selectedWebsite}
@@ -230,11 +214,7 @@ const WebsitesPage = () => {
                     refetch();
                 }}
             />
-            <WebsiteViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                website={selectedWebsite}
-            />
+            <WebsiteViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} website={selectedWebsite} />
         </>
     );
 };
