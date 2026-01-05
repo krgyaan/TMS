@@ -146,7 +146,7 @@ const navMain: NavGroup[] = [
             { title: "Document Submitted", url: paths.master.documentSubmitted, permission: "master.documents-submitted" },
             { title: "Imprest Categories", url: paths.master.imprestCategories, permission: "master.imprest-categories" },
             { title: "Followup Categories", url: paths.master.followupCategories, permission: "master.followup-categories" },
-            { title: "Financial Year", url: paths.master.financialYears, permission: "master.financial-years" },
+            // { title: "Financial Year", url: paths.master.financialYears, permission: "master.financial-years" },
             { title: "EMDs Responsibilities", url: paths.master.emdsResponsibilities, permission: "master.emds-responsibilities" },
             { title: "Lead Types", url: paths.master.leadTypes, permission: "master.lead-types" },
             { title: "TQ Types", url: paths.master.tqTypes, permission: "master.tq-types" },
