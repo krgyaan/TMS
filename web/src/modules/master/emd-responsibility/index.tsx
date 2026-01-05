@@ -1,21 +1,21 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useEmdResponsibilities } from '@/hooks/api/useEmdResponsibility';
-import type { EmdResponsibility } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { EmdResponsibilityDrawer } from './components/EmdResponsibilityDrawer';
-import { EmdResponsibilityViewModal } from './components/EmdResponsibilityViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useEmdResponsibilities } from "@/hooks/api/useEmdResponsibility";
+import type { EmdResponsibility } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { EmdResponsibilityModal } from "./components/EmdResponsibilityModal";
+import { EmdResponsibilityViewModal } from "./components/EmdResponsibilityViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -27,28 +27,28 @@ const EmdResponsibilityPage = () => {
 
     const emdResponsibilityActions: ActionItem<EmdResponsibility>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedEmdResponsibility(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedEmdResponsibility(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -57,35 +57,31 @@ const EmdResponsibilityPage = () => {
 
     const [colDefs] = useState<ColDef<EmdResponsibility>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'EMD Responsibility Name',
+            field: "name",
+            headerName: "EMD Responsibility Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(emdResponsibilityActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -159,7 +155,7 @@ const EmdResponsibilityPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={emdResponsibilities || []}
                         columnDefs={colDefs}
@@ -178,12 +174,12 @@ const EmdResponsibilityPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <EmdResponsibilityDrawer
+            <EmdResponsibilityModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 emdResponsibility={selectedEmdResponsibility}
@@ -191,11 +187,7 @@ const EmdResponsibilityPage = () => {
                     refetch();
                 }}
             />
-            <EmdResponsibilityViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                emdResponsibility={selectedEmdResponsibility}
-            />
+            <EmdResponsibilityViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} emdResponsibility={selectedEmdResponsibility} />
         </>
     );
 };
