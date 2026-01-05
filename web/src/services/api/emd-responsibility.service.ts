@@ -1,13 +1,14 @@
-import { BaseApiService } from './base.service';
-import type { EmdResponsibility, CreateEmdResponsibilityDto, UpdateEmdResponsibilityDto } from '@/types/api.types';
+import { BaseApiService } from "./base.service";
+import type { EmdResponsibility, CreateEmdResponsibilityDto, UpdateEmdResponsibilityDto } from "@/types/api.types";
 
 class EmdResponsibilityService extends BaseApiService {
     constructor() {
-        super('/emds-responsibilities');
+        super("/emd-responsibilities");
     }
 
     async getAll(): Promise<EmdResponsibility[]> {
-        return this.get<EmdResponsibility[]>('');
+        console.log("Fetching all EMD Responsibilities from Service", this.get<EmdResponsibility[]>(""));
+        return this.get<EmdResponsibility[]>("");
     }
 
     async getById(id: number): Promise<EmdResponsibility> {
@@ -15,7 +16,7 @@ class EmdResponsibilityService extends BaseApiService {
     }
 
     async create(data: CreateEmdResponsibilityDto): Promise<EmdResponsibility> {
-        return this.post<EmdResponsibility>('', data);
+        return this.post<EmdResponsibility>("", data);
     }
 
     async update(id: number, data: UpdateEmdResponsibilityDto): Promise<EmdResponsibility> {
