@@ -18,9 +18,11 @@ import { cn } from "@/lib/utils";
 import { useCreateEmdResponsibility, useUpdateEmdResponsibility } from "@/hooks/api/useEmdResponsibility";
 
 import type { EmdResponsibility } from "@/types/api.types";
+import { Textarea } from "@/components/ui/textarea";
 
 const EmdResponsibilityFormSchema = z.object({
     name: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).optional(),
     status: z.boolean().default(true),
 });
 
@@ -43,6 +45,7 @@ export const EmdResponsibilityModal = ({ open, onOpenChange, emdResponsibility, 
         resolver: zodResolver(EmdResponsibilityFormSchema),
         defaultValues: {
             name: "",
+            description: "",
             status: true,
         },
     });
@@ -132,6 +135,21 @@ export const EmdResponsibilityModal = ({ open, onOpenChange, emdResponsibility, 
                                         </FormLabel>
                                         <FormControl>
                                             <Input placeholder="Enter EMD responsibility name" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {/* Description */}
+                            <FormField
+                                control={form.control}
+                                name="description"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Description</FormLabel>
+                                        <FormControl>
+                                            <Textarea rows={3} placeholder="Enter description (optional)" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

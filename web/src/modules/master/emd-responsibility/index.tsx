@@ -70,6 +70,15 @@ const EmdResponsibilityPage = () => {
             filter: "agTextColumnFilter",
         },
         {
+            field: "description",
+            headerName: "Description",
+            flex: 2,
+            filter: "agTextColumnFilter",
+            cellRenderer: (params: any) => {
+                return params.value || <span className="text-gray-400">—</span>;
+            },
+        },
+        {
             field: "status",
             headerName: "Status",
             width: 120,
