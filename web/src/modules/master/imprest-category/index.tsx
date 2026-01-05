@@ -1,40 +1,26 @@
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import {
-    useImprestCategories,
-} from '@/hooks/api/useImprestCategories';
-import type { ImprestCategory } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { ImprestCategoryDrawer } from './components/ImprestCategoryDrawer';
-import { ImprestCategoryViewModal } from './components/ImprestCategoryViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useImprestCategories } from "@/hooks/api/useImprestCategories";
+import type { ImprestCategory } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ImprestCategoryModal } from "./components/ImprestCategoryModal";
+import { ImprestCategoryViewModal } from "./components/ImprestCategoryViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
 const ImprestCategoryPage = () => {
-    const {
-        data: categories,
-        isLoading,
-        error,
-        refetch,
-    } = useImprestCategories();
+    const { data: categories, isLoading, error, refetch } = useImprestCategories();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<ImprestCategory | null>(null);
@@ -42,29 +28,29 @@ const ImprestCategoryPage = () => {
     // Category actions
     const categoryActions: ActionItem<ImprestCategory>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedCategory(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedCategory(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteCategory.mutateAsync(row.id);
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -73,44 +59,40 @@ const ImprestCategoryPage = () => {
 
     const [colDefs] = useState<ColDef<ImprestCategory>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Category Name',
+            field: "name",
+            headerName: "Category Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'heading',
-            headerName: 'Heading',
+            field: "heading",
+            headerName: "Heading",
             flex: 1.5,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
             cellRenderer: (params: any) => {
                 return params.value || <span className="text-gray-400">—</span>;
             },
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(categoryActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -143,12 +125,7 @@ const ImprestCategoryPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading imprest categories: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -177,9 +154,7 @@ const ImprestCategoryPage = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>Imprest Categories</CardTitle>
-                    <CardDescription>
-                        Manage imprest categories for expense tracking
-                    </CardDescription>
+                    <CardDescription>Manage imprest categories for expense tracking</CardDescription>
                     <CardAction>
                         <Button
                             variant="default"
@@ -193,7 +168,7 @@ const ImprestCategoryPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={categories || []}
                         columnDefs={colDefs}
@@ -212,12 +187,12 @@ const ImprestCategoryPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <ImprestCategoryDrawer
+            <ImprestCategoryModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 imprestCategory={selectedCategory}
@@ -225,11 +200,7 @@ const ImprestCategoryPage = () => {
                     refetch();
                 }}
             />
-            <ImprestCategoryViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                imprestCategory={selectedCategory}
-            />
+            <ImprestCategoryViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} imprestCategory={selectedCategory} />
         </>
     );
 };

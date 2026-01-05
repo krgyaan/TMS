@@ -1,28 +1,21 @@
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useTqTypes } from '@/hooks/api/useTqTypes';
-import type { TqType } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { TqTypeDrawer } from './components/TqTypeDrawer';
-import { TqTypeViewModal } from './components/TqTypeViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useTqTypes } from "@/hooks/api/useTqTypes";
+import type { TqType } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TqTypeModal } from "./components/TqTypeModal";
+import { TqTypeViewModal } from "./components/TqTypeViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -35,29 +28,29 @@ const TqTypesPage = () => {
     // TQ Type actions
     const tqTypeActions: ActionItem<TqType>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedTqType(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedTqType(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteTqType.mutateAsync(row.id);
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -66,43 +59,38 @@ const TqTypesPage = () => {
 
     const [colDefs] = useState<ColDef<TqType>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'TQ Type Name',
+            field: "name",
+            headerName: "TQ Type Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            field: 'createdAt',
-            headerName: 'Created At',
+            field: "createdAt",
+            headerName: "Created At",
             width: 150,
-            filter: 'agDateColumnFilter',
-            valueFormatter: (params) =>
-                params.value ? new Date(params.value).toLocaleDateString() : '',
+            filter: "agDateColumnFilter",
+            valueFormatter: params => (params.value ? new Date(params.value).toLocaleDateString() : ""),
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(tqTypeActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -135,12 +123,7 @@ const TqTypesPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading TQ types: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -183,7 +166,7 @@ const TqTypesPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={tqTypes || []}
                         columnDefs={colDefs}
@@ -202,12 +185,12 @@ const TqTypesPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <TqTypeDrawer
+            <TqTypeModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 tqType={selectedTqType}
@@ -215,11 +198,7 @@ const TqTypesPage = () => {
                     refetch();
                 }}
             />
-            <TqTypeViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                tqType={selectedTqType}
-            />
+            <TqTypeViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} tqType={selectedTqType} />
         </>
     );
 };

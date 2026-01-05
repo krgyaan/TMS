@@ -1,143 +1,124 @@
-﻿import { useState, type ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card'
-import DataTable from '@/components/ui/data-table'
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community'
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer'
-import type { ActionItem } from '@/components/ui/ActionMenu'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
-import { useUsers, useDeleteUser } from '@/hooks/api/useUsers'
-import { useRoles } from '@/hooks/api/useRoles'
-import { useDesignations } from '@/hooks/api/useDesignations'
-import { useTeams } from '@/hooks/api/useTeams'
-import { usePermissions } from '@/hooks/api/usePermissions'
-import type { User } from '@/types/api.types'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Mail, Phone, UserRound, Shield, Briefcase, Users, KeyRound, ArrowRight } from 'lucide-react'
-import { RolesDrawer } from '@/modules/master/role/components/RolesDrawer'
-import { DesignationsDrawer } from '@/modules/master/designation/components/DesignationsDrawer'
-import { TeamsDrawer } from '@/modules/master/team/components/TeamsDrawer'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
+﻿import { useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { NavLink, useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { useUsers, useDeleteUser } from "@/hooks/api/useUsers";
+import { useRoles } from "@/hooks/api/useRoles";
+import { useDesignations } from "@/hooks/api/useDesignations";
+import { useTeams } from "@/hooks/api/useTeams";
+import { usePermissions } from "@/hooks/api/usePermissions";
+import type { User } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Mail, Phone, UserRound, Shield, Briefcase, Users, KeyRound, ArrowRight } from "lucide-react";
+import { RolesDrawer } from "@/modules/master/role/components/RolesDrawer";
+import { DesignationsDrawer } from "@/modules/master/designation/components/DesignationsDrawer";
+import { TeamsDrawer } from "@/modules/master/team/components/TeamsDrawer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
-}
+};
 
 const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
     <div className="space-y-1">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{value ?? '—'}</p>
+        <p className="text-sm font-semibold text-foreground/90">{value ?? "—"}</p>
     </div>
-)
+);
 
 const UserPage = () => {
-    const navigate = useNavigate()
-    const { data: users, isLoading, error, refetch } = useUsers()
-    const { data: roles = [] } = useRoles()
-    const { data: designations = [] } = useDesignations()
-    const { data: teams = [] } = useTeams()
-    const { data: permissions = [] } = usePermissions()
-    const deleteUser = useDeleteUser()
-    const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null })
-    const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false)
-    const [designationsDrawerOpen, setDesignationsDrawerOpen] = useState(false)
-    const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false)
+    const navigate = useNavigate();
+    const { data: users, isLoading, error, refetch } = useUsers();
+    const { data: roles = [] } = useRoles();
+    const { data: designations = [] } = useDesignations();
+    const { data: teams = [] } = useTeams();
+    const { data: permissions = [] } = usePermissions();
+    const deleteUser = useDeleteUser();
+    const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null });
+    const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false);
+    const [designationsDrawerOpen, setDesignationsDrawerOpen] = useState(false);
+    const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false);
 
     const employeeActions: ActionItem<User>[] = [
         {
-            label: 'View',
-            onClick: (row) => setViewState({ open: true, data: row }),
+            label: "View",
+            onClick: row => setViewState({ open: true, data: row }),
         },
         {
-            label: 'Edit',
-            onClick: (row) => navigate(paths.master.users_edit(row.id)),
+            label: "Edit",
+            onClick: row => navigate(paths.master.users_edit(row.id)),
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (!confirm(`Are you sure you want to delete ${row.name}?`)) {
-                    return
+                    return;
                 }
                 try {
-                    await deleteUser.mutateAsync(row.id)
+                    await deleteUser.mutateAsync(row.id);
                 } catch (err) {
-                    console.error('Delete failed:', err)
+                    console.error("Delete failed:", err);
                 }
             },
         },
-    ]
+    ];
 
     const colDefs: ColDef<User>[] = [
         {
-            field: 'name',
-            headerName: 'Name',
+            field: "name",
+            headerName: "Name",
             flex: 1.2,
             cellRenderer: ({ data }: { data: User }): ReactNode => (
                 <div>
                     <div className="font-semibold">{data.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                        @{data.username ?? (data.email ? data.email.split('@')[0] : '')}
-                    </div>
+                    <div className="text-xs text-muted-foreground">@{data.username ?? (data.email ? data.email.split("@")[0] : "")}</div>
                 </div>
             ),
         },
-        { field: 'email', headerName: 'Email', flex: 1 },
-        { field: 'mobile', headerName: 'Mobile', flex: 0.8 },
+        { field: "email", headerName: "Email", flex: 1 },
+        { field: "mobile", headerName: "Mobile", flex: 0.8 },
         {
-            headerName: 'Team',
-            field: 'team',
+            headerName: "Team",
+            field: "team",
             flex: 0.8,
-            valueGetter: (params) => params.data?.team?.name || '—',
+            valueGetter: params => params.data?.team?.name || "—",
         },
         {
-            headerName: 'Designation',
-            field: 'designation',
+            headerName: "Designation",
+            field: "designation",
             flex: 0.9,
-            valueGetter: (params) => params.data?.designation?.name || '—',
+            valueGetter: params => params.data?.designation?.name || "—",
         },
         {
-            headerName: 'Employee Code',
-            field: 'profile.employeeCode',
+            headerName: "Employee Code",
+            field: "profile.employeeCode",
             flex: 0.8,
-            valueGetter: (params) => params.data?.profile?.employeeCode || '—',
+            valueGetter: params => params.data?.profile?.employeeCode || "—",
         },
         {
-            field: 'isActive',
-            headerName: 'Status',
+            field: "isActive",
+            headerName: "Status",
             width: 120,
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             cellRenderer: createActionColumnRenderer(employeeActions),
             sortable: false,
-            pinned: 'right',
+            pinned: "right",
             width: 120,
         },
-    ]
+    ];
 
     if (isLoading) {
         return (
@@ -150,7 +131,7 @@ const UserPage = () => {
                     <Skeleton className="h-96 w-full" />
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     if (error) {
@@ -172,7 +153,7 @@ const UserPage = () => {
                     </Alert>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     return (
@@ -186,16 +167,11 @@ const UserPage = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{users?.length ?? 0}</div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                            Total users (Active and Inactive)
-                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">Total users (Active and Inactive)</p>
                     </CardContent>
                 </Card>
 
-                <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow group"
-                    onClick={() => setRolesDrawerOpen(true)}
-                >
+                <Card className="cursor-pointer hover:shadow-md transition-shadow group" onClick={() => setRolesDrawerOpen(true)}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-lg font-medium">Roles</CardTitle>
                         <Shield className="h-4 w-4 text-muted-foreground" />
@@ -209,10 +185,7 @@ const UserPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow group"
-                    onClick={() => setDesignationsDrawerOpen(true)}
-                >
+                <Card className="cursor-pointer hover:shadow-md transition-shadow group" onClick={() => setDesignationsDrawerOpen(true)}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-lg font-medium">Designations</CardTitle>
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
@@ -226,10 +199,7 @@ const UserPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow group"
-                    onClick={() => setTeamsDrawerOpen(true)}
-                >
+                <Card className="cursor-pointer hover:shadow-md transition-shadow group" onClick={() => setTeamsDrawerOpen(true)}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-lg font-medium">Teams</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
@@ -243,10 +213,7 @@ const UserPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card
-                    className="cursor-pointer hover:shadow-md transition-shadow group"
-                    onClick={() => navigate(paths.master.permissions)}
-                >
+                <Card className="cursor-pointer hover:shadow-md transition-shadow group" onClick={() => navigate(paths.master.permissions)}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-lg font-medium">Permissions</CardTitle>
                         <KeyRound className="h-4 w-4 text-muted-foreground" />
@@ -271,7 +238,7 @@ const UserPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={users || []}
                         columnDefs={colDefs}
@@ -285,10 +252,7 @@ const UserPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog
-                open={viewState.open}
-                onOpenChange={(open) => setViewState((prev) => ({ open, data: open ? prev.data : null }))}
-            >
+            <Dialog open={viewState.open} onOpenChange={open => setViewState(prev => ({ open, data: open ? prev.data : null }))}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -299,10 +263,10 @@ const UserPage = () => {
                     </DialogHeader>
                     {viewState.data ? (
                         <div className="grid gap-6 md:grid-cols-2">
-                            <DetailItem label="Username" value={`@${viewState.data.username ?? '—'}`} />
-                            <DetailItem label="Employee Code" value={viewState.data.profile?.employeeCode || '—'} />
-                            <DetailItem label="Team" value={viewState.data.team?.name || '—'} />
-                            <DetailItem label="Designation" value={viewState.data.designation?.name || '—'} />
+                            <DetailItem label="Username" value={`@${viewState.data.username ?? "—"}`} />
+                            <DetailItem label="Employee Code" value={viewState.data.profile?.employeeCode || "—"} />
+                            <DetailItem label="Team" value={viewState.data.team?.name || "—"} />
+                            <DetailItem label="Designation" value={viewState.data.designation?.name || "—"} />
                             <DetailItem
                                 label="Email"
                                 value={
@@ -321,7 +285,7 @@ const UserPage = () => {
                                             {viewState.data.profile.altEmail}
                                         </span>
                                     ) : (
-                                        '—'
+                                        "—"
                                     )
                                 }
                             />
@@ -334,24 +298,20 @@ const UserPage = () => {
                                             {viewState.data.mobile}
                                         </span>
                                     ) : (
-                                        '—'
+                                        "—"
                                     )
                                 }
                             />
                             <DetailItem
                                 label="Status"
-                                value={
-                                    <Badge variant={viewState.data.isActive ? 'default' : 'secondary'}>
-                                        {viewState.data.isActive ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                }
+                                value={<Badge variant={viewState.data.isActive ? "default" : "secondary"}>{viewState.data.isActive ? "Active" : "Inactive"}</Badge>}
                             />
-                            <DetailItem label="Emergency Contact" value={viewState.data.profile?.emergencyContactName || '—'} />
-                            <DetailItem label="Contact Phone" value={viewState.data.profile?.emergencyContactPhone || '—'} />
-                            <DetailItem label="Timezone" value={viewState.data.profile?.timezone || '—'} />
-                            <DetailItem label="Locale" value={viewState.data.profile?.locale || '—'} />
-                            <DetailItem label="Created" value={viewState.data.createdAt ? new Date(viewState.data.createdAt).toLocaleString() : '—'} />
-                            <DetailItem label="Updated" value={viewState.data.updatedAt ? new Date(viewState.data.updatedAt).toLocaleString() : '—'} />
+                            <DetailItem label="Emergency Contact" value={viewState.data.profile?.emergencyContactName || "—"} />
+                            <DetailItem label="Contact Phone" value={viewState.data.profile?.emergencyContactPhone || "—"} />
+                            <DetailItem label="Timezone" value={viewState.data.profile?.timezone || "—"} />
+                            <DetailItem label="Locale" value={viewState.data.profile?.locale || "—"} />
+                            <DetailItem label="Created" value={viewState.data.createdAt ? new Date(viewState.data.createdAt).toLocaleString() : "—"} />
+                            <DetailItem label="Updated" value={viewState.data.updatedAt ? new Date(viewState.data.updatedAt).toLocaleString() : "—"} />
                         </div>
                     ) : null}
                 </DialogContent>
@@ -361,7 +321,7 @@ const UserPage = () => {
             <DesignationsDrawer open={designationsDrawerOpen} onOpenChange={setDesignationsDrawerOpen} />
             <TeamsDrawer open={teamsDrawerOpen} onOpenChange={setTeamsDrawerOpen} />
         </>
-    )
-}
+    );
+};
 
-export default UserPage
+export default UserPage;

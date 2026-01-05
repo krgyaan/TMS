@@ -1,20 +1,20 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useRoles, useDeleteRole } from '@/hooks/api/useRoles';
-import type { Role } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { RoleModal } from './components/RoleModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useRoles, useDeleteRole } from "@/hooks/api/useRoles";
+import type { Role } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { RoleModal } from "./components/RoleModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -26,21 +26,21 @@ const RolesPage = () => {
 
     const roleActions: ActionItem<Role>[] = [
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedRole(row);
                 setModalOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         await deleteRole.mutateAsync(row.id);
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -49,44 +49,40 @@ const RolesPage = () => {
 
     const [colDefs] = useState<ColDef<Role>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Role Name',
+            field: "name",
+            headerName: "Role Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'description',
-            headerName: 'Description',
+            field: "description",
+            headerName: "Description",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
             cellRenderer: (params: any) => {
                 return params.value || <span className="text-gray-400">—</span>;
             },
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(roleActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -145,7 +141,7 @@ const RolesPage = () => {
                     </Button>
                 </CardAction>
             </CardHeader>
-            <CardContent className="h-screen px-0">
+            <CardContent className="px-3">
                 <DataTable
                     data={roles || []}
                     columnDefs={colDefs}
@@ -165,13 +161,13 @@ const RolesPage = () => {
                     enablePagination={true}
                     enableRowSelection={true}
                     selectionType="multiple"
-                    onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                    onSelectionChanged={rows => console.log("Selected rows:", rows)}
                     height="100%"
                 />
             </CardContent>
             <RoleModal
                 open={modalOpen}
-                onOpenChange={(open) => {
+                onOpenChange={open => {
                     setModalOpen(open);
                     if (!open) {
                         setSelectedRole(null);

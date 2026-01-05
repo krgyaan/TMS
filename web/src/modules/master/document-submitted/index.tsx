@@ -1,40 +1,26 @@
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import {
-    useDocumentsSubmitted,
-} from '@/hooks/api/useDocumentsSubmitted';
-import type { DocumentSubmitted } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { DocumentSubmittedDrawer } from './components/DocumentSubmittedDrawer';
-import { DocumentSubmittedViewModal } from './components/DocumentSubmittedViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useDocumentsSubmitted } from "@/hooks/api/useDocumentsSubmitted";
+import type { DocumentSubmitted } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { DocumentSubmittedModal } from "./components/DocumentSubmittedModal";
+import { DocumentSubmittedViewModal } from "./components/DocumentSubmittedViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
 const DocumentsSubmittedPage = () => {
-    const {
-        data: documents,
-        isLoading,
-        error,
-        refetch,
-    } = useDocumentsSubmitted();
+    const { data: documents, isLoading, error, refetch } = useDocumentsSubmitted();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState<DocumentSubmitted | null>(null);
@@ -42,29 +28,29 @@ const DocumentsSubmittedPage = () => {
     // Document actions
     const documentActions: ActionItem<DocumentSubmitted>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedDocument(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedDocument(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteDocument.mutateAsync(row.id);
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -73,35 +59,31 @@ const DocumentsSubmittedPage = () => {
 
     const [colDefs] = useState<ColDef<DocumentSubmitted>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Document Type',
+            field: "name",
+            headerName: "Document Type",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(documentActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -134,12 +116,7 @@ const DocumentsSubmittedPage = () => {
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                             Error loading documents: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -168,9 +145,7 @@ const DocumentsSubmittedPage = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>Documents Submitted</CardTitle>
-                    <CardDescription>
-                        Manage document types required for submissions
-                    </CardDescription>
+                    <CardDescription>Manage document types required for submissions</CardDescription>
                     <CardAction>
                         <Button
                             variant="default"
@@ -184,7 +159,7 @@ const DocumentsSubmittedPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={documents || []}
                         columnDefs={colDefs}
@@ -203,12 +178,12 @@ const DocumentsSubmittedPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <DocumentSubmittedDrawer
+            <DocumentSubmittedModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 documentSubmitted={selectedDocument}
@@ -216,11 +191,7 @@ const DocumentsSubmittedPage = () => {
                     refetch();
                 }}
             />
-            <DocumentSubmittedViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                documentSubmitted={selectedDocument}
-            />
+            <DocumentSubmittedViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} documentSubmitted={selectedDocument} />
         </>
     );
 };
