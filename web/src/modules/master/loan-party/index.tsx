@@ -41,20 +41,20 @@ const LoanPartyPage = () => {
                 setDrawerOpen(true);
             },
         },
-        {
-            label: "Delete",
-            className: "text-red-600",
-            onClick: async row => {
-                if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
-                    try {
-                        // await deleteLoanParty.mutateAsync(row.id);
-                        console.log("Delete functionality to be implemented");
-                    } catch (error) {
-                        console.error("Delete failed:", error);
-                    }
-                }
-            },
-        },
+        // {
+        //     label: "Delete",
+        //     className: "text-red-600",
+        //     onClick: async row => {
+        //         if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
+        //             try {
+        //                 // await deleteLoanParty.mutateAsync(row.id);
+        //                 console.log("Delete functionality to be implemented");
+        //             } catch (error) {
+        //                 console.error("Delete failed:", error);
+        //             }
+        //         }
+        //     },
+        // },
     ];
 
     const [colDefs] = useState<ColDef<LoanParty>[]>([
@@ -165,15 +165,12 @@ const LoanPartyPage = () => {
                                 sortable: true,
                                 resizable: true,
                             },
-                            rowSelection,
+
                             pagination: true,
                             paginationPageSize: 20,
                             paginationPageSizeSelector: [10, 20, 50, 100],
                         }}
                         enablePagination={true}
-                        enableRowSelection={true}
-                        selectionType="multiple"
-                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
