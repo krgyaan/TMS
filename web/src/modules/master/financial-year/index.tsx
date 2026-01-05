@@ -1,21 +1,21 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useFinancialYears } from '@/hooks/api/useFinancialYear';
-import type { FinancialYear } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { FinancialYearDrawer } from './components/FinancialYearDrawer';
-import { FinancialYearViewModal } from './components/FinancialYearViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useFinancialYears } from "@/hooks/api/useFinancialYear";
+import type { FinancialYear } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FinancialYearModal } from "./components/FinancialYearModal";
+import { FinancialYearViewModal } from "./components/FinancialYearViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -27,28 +27,28 @@ const FinancialYearPage = () => {
 
     const financialYearActions: ActionItem<FinancialYear>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedFinancialYear(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedFinancialYear(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -57,35 +57,31 @@ const FinancialYearPage = () => {
 
     const [colDefs] = useState<ColDef<FinancialYear>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Financial Year',
+            field: "name",
+            headerName: "Financial Year",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(financialYearActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -159,7 +155,7 @@ const FinancialYearPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={financialYears || []}
                         columnDefs={colDefs}
@@ -178,12 +174,12 @@ const FinancialYearPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <FinancialYearDrawer
+            <FinancialYearModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 financialYear={selectedFinancialYear}
@@ -191,11 +187,7 @@ const FinancialYearPage = () => {
                     refetch();
                 }}
             />
-            <FinancialYearViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                financialYear={selectedFinancialYear}
-            />
+            <FinancialYearViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} financialYear={selectedFinancialYear} />
         </>
     );
 };
