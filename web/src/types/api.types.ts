@@ -1,8 +1,8 @@
-export type { TenderClient, TenderClientDto, TenderInfoSheet, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
-import type { TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
-import type { AuthUser, Team, UserRole, UserProfile } from './auth.types';
-import type { RaDashboardRow } from '@/modules/tendering/ras/helpers/reverseAuction.types';
-import type { ResultDashboardRow } from '@/modules/tendering/results/helpers/tenderResult.types';
+export type { TenderClient, TenderClientDto, TenderInfoSheet, TenderInfoSheetResponse } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types";
+import type { TenderInfoSheetResponse } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types";
+import type { AuthUser, Team, UserRole, UserProfile } from "./auth.types";
+import type { RaDashboardRow } from "@/modules/tendering/ras/helpers/reverseAuction.types";
+import type { ResultDashboardRow } from "@/modules/tendering/results/helpers/tenderResult.types";
 
 export interface User {
     id: number;
@@ -29,10 +29,10 @@ export interface MeResponse {
 }
 
 export interface PaginatedResponse<T> {
-    data: T[]
-    total: number
-    page: number
-    limit: number
+    data: T[];
+    total: number;
+    page: number;
+    limit: number;
 }
 
 export interface PaginatedResult<T> {
@@ -46,41 +46,39 @@ export interface PaginatedResult<T> {
 }
 
 export interface ApiError {
-    message: string
-    statusCode: number
-    error?: string
+    message: string;
+    statusCode: number;
+    error?: string;
 }
 
-export interface Company {
-
-}
+export interface Company {}
 
 export interface NamedEntity {
-    id: number | null
-    name: string | null
+    id: number | null;
+    name: string | null;
 }
 
 export interface CreateUserDto {
-    name: string
-    email: string
-    username?: string | null
-    mobile?: string | null
-    password: string
-    isActive?: boolean
-    roleId: number
+    name: string;
+    email: string;
+    username?: string | null;
+    mobile?: string | null;
+    password: string;
+    isActive?: boolean;
+    roleId: number;
 }
 
-export interface UpdateUserDto extends Partial<CreateUserDto> { }
+export interface UpdateUserDto extends Partial<CreateUserDto> {}
 
 export interface Location {
-    id: number
-    name: string
-    acronym: string
-    state: string | null
-    region: string | null
-    status?: boolean
-    createdAt?: string
-    updatedAt?: string
+    id: number;
+    name: string;
+    acronym: string;
+    state: string | null;
+    region: string | null;
+    status?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface ItemHeading {
@@ -112,12 +110,12 @@ export interface Item {
 }
 
 export interface Status {
-    id: number
-    name: string
-    tenderCategory: string | null
-    status?: boolean
-    createdAt?: string
-    updatedAt?: string
+    id: number;
+    name: string;
+    tenderCategory: string | null;
+    status?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface Industry {
@@ -145,27 +143,27 @@ export interface Organization {
 }
 
 export interface ApiResponse<T = any> {
-    data?: T
-    user?: T
-    message?: string
-    status?: number
+    data?: T;
+    user?: T;
+    message?: string;
+    status?: number;
 }
 
 export interface ApiError {
-    message: string
-    statusCode: number
-    error?: string
+    message: string;
+    statusCode: number;
+    error?: string;
 }
 
 export interface Company {
-    id: string
-    name: string
-    industryId: string
-    locationId: string
-    isActive: boolean
-    logo?: string
-    createdAt: string
-    updatedAt: string
+    id: string;
+    name: string;
+    industryId: string;
+    locationId: string;
+    isActive: boolean;
+    logo?: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface VendorOrganization {
@@ -290,14 +288,14 @@ export interface CreateVendorOrganizationWithRelationsDto {
         address?: string;
         status?: boolean;
     };
-    gsts?: Omit<CreateVendorGstDto, 'org'>[];
-    accounts?: Omit<CreateVendorAccountDto, 'org'>[];
+    gsts?: Omit<CreateVendorGstDto, "org">[];
+    accounts?: Omit<CreateVendorAccountDto, "org">[];
     persons?: Array<{
         name: string;
         email?: string;
         address?: string;
         status?: boolean;
-        files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+        files?: Omit<CreateVendorFileDto, "vendorId">[];
     }>;
 }
 
@@ -308,12 +306,12 @@ export interface UpdateVendorOrganizationWithRelationsDto {
         status?: boolean;
     };
     gsts?: {
-        create?: Omit<CreateVendorGstDto, 'org'>[];
+        create?: Omit<CreateVendorGstDto, "org">[];
         update?: Array<{ id: number; data: UpdateVendorGstDto }>;
         delete?: number[];
     };
     accounts?: {
-        create?: Omit<CreateVendorAccountDto, 'org'>[];
+        create?: Omit<CreateVendorAccountDto, "org">[];
         update?: Array<{ id: number; data: UpdateVendorAccountDto }>;
         delete?: number[];
     };
@@ -323,7 +321,7 @@ export interface UpdateVendorOrganizationWithRelationsDto {
             email?: string;
             address?: string;
             status?: boolean;
-            files?: Omit<CreateVendorFileDto, 'vendorId'>[];
+            files?: Omit<CreateVendorFileDto, "vendorId">[];
         }>;
         update?: Array<{ id: number; data: Partial<CreateVendorDto> }>;
         delete?: number[];
@@ -378,7 +376,7 @@ export interface CreateFollowupCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }
+export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> {}
 
 export interface Designation {
     id: number;
@@ -393,7 +391,7 @@ export interface CreateDesignationDto {
     status?: boolean;
 }
 
-export interface UpdateDesignationDto extends Partial<CreateDesignationDto> { }
+export interface UpdateDesignationDto extends Partial<CreateDesignationDto> {}
 
 export interface DocumentSubmitted {
     id: number;
@@ -408,9 +406,7 @@ export interface CreateDocumentSubmittedDto {
     status?: boolean;
 }
 
-export interface UpdateDocumentSubmittedDto
-    extends Partial<CreateDocumentSubmittedDto> { }
-
+export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmittedDto> {}
 
 export interface CreateVendorDto {
     organizationId?: number;
@@ -420,7 +416,7 @@ export interface CreateVendorDto {
     status?: boolean;
 }
 
-export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
+export interface UpdateVendorDto extends Partial<CreateVendorDto> {}
 
 export interface CreateVendorOrganizationDto {
     organizationId?: number;
@@ -429,7 +425,7 @@ export interface CreateVendorOrganizationDto {
     status?: boolean;
 }
 
-export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
+export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> {}
 
 export interface CreateOrganizationDto {
     name: string;
@@ -438,7 +434,7 @@ export interface CreateOrganizationDto {
     status?: boolean;
 }
 
-export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }
+export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
 
 export interface CreateWebsiteDto {
     name: string;
@@ -446,7 +442,7 @@ export interface CreateWebsiteDto {
     status?: boolean;
 }
 
-export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }
+export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> {}
 
 export interface CreateImprestCategoryDto {
     name: string;
@@ -454,8 +450,7 @@ export interface CreateImprestCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
-
+export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> {}
 
 // ========== INDUSTRIES ==========
 export interface Industry {
@@ -473,7 +468,7 @@ export interface CreateIndustryDto {
     status?: boolean;
 }
 
-export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
+export interface UpdateIndustryDto extends Partial<CreateIndustryDto> {}
 
 // ========== TEAMS ==========
 
@@ -483,7 +478,7 @@ export interface CreateTeamDto {
     status?: boolean;
 }
 
-export interface UpdateTeamDto extends Partial<CreateTeamDto> { }
+export interface UpdateTeamDto extends Partial<CreateTeamDto> {}
 
 // ========== ROLES ==========
 export interface Role {
@@ -501,7 +496,7 @@ export interface CreateRoleDto {
     status?: boolean;
 }
 
-export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
+export interface UpdateRoleDto extends Partial<CreateRoleDto> {}
 
 // ========== PERMISSIONS ==========
 export interface Permission {
@@ -551,7 +546,7 @@ export interface CreateStateDto {
     status?: boolean;
 }
 
-export interface UpdateStateDto extends Partial<CreateStateDto> { }
+export interface UpdateStateDto extends Partial<CreateStateDto> {}
 
 // ========== TQ TYPES ==========
 export interface TqType {
@@ -567,12 +562,13 @@ export interface CreateTqTypeDto {
     status?: boolean;
 }
 
-export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
+export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> {}
 
 // ========== EMD RESPONSIBILITY ==========
 export interface EmdResponsibility {
     id: number;
     name: string;
+    description?: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -583,7 +579,7 @@ export interface CreateEmdResponsibilityDto {
     status?: boolean;
 }
 
-export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> { }
+export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> {}
 
 // ========== FINANCIAL YEAR ==========
 export interface FinancialYear {
@@ -599,7 +595,7 @@ export interface CreateFinancialYearDto {
     status?: boolean;
 }
 
-export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
+export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> {}
 
 // ========== LEAD TYPES ==========
 export interface LeadType {
@@ -617,7 +613,7 @@ export interface CreateLeadTypeDto {
     status?: boolean;
 }
 
-export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> { }
+export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> {}
 
 // ========== LOAN PARTY ==========
 export interface LoanParty {
@@ -635,7 +631,7 @@ export interface CreateLoanPartyDto {
     status?: boolean;
 }
 
-export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
+export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> {}
 // Tender Info Sheet Types - Re-exported from consolidated types file
 
 // Base Tender Info (matches tenderInfos table)
@@ -663,8 +659,8 @@ export interface TenderInfo {
     tlRemarks: string | null;
     rfqTo: string | null;
     tlStatus: number;
-    tenderFeeMode: string | null;  // ✅ Added
-    emdMode: string | null;        // ✅ Added
+    tenderFeeMode: string | null; // ✅ Added
+    emdMode: string | null; // ✅ Added
     approvePqrSelection: string | null;
     approveFinanceDocSelection: string | null;
     tenderApprovalStatus: string | null;
@@ -679,16 +675,16 @@ export interface IncompleteField {
     id?: number;
     fieldName: string;
     comment: string;
-    status?: 'pending' | 'resolved';
+    status?: "pending" | "resolved";
 }
 
 export interface SaveTenderApprovalDto {
-    tlStatus: '0' | '1' | '2' | '3' | number;
+    tlStatus: "0" | "1" | "2" | "3" | number;
     rfqTo?: number[]; // vendor org IDs
     tenderFeeMode?: string;
     emdMode?: string;
-    approvePqrSelection?: '1' | '2';
-    approveFinanceDocSelection?: '1' | '2';
+    approvePqrSelection?: "1" | "2";
+    approveFinanceDocSelection?: "1" | "2";
     tenderStatus?: number; // status ID
     oemNotAllowed?: string; // vendor org ID
     tlRejectionRemarks?: string;
@@ -698,13 +694,13 @@ export interface SaveTenderApprovalDto {
 export interface TenderApproval {
     id?: number;
     tenderId?: number;
-    tlStatus?: '0' | '1' | '2' | '3' | number;
-    tlDecision?: '0' | '1' | '2' | '3' | number; // Alias for tlStatus for backward compatibility
+    tlStatus?: "0" | "1" | "2" | "3" | number;
+    tlDecision?: "0" | "1" | "2" | "3" | number; // Alias for tlStatus for backward compatibility
     rfqTo: number[] | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
-    approvePqrSelection: '1' | '2' | null;
-    approveFinanceDocSelection: '1' | '2' | null;
+    approvePqrSelection: "1" | "2" | null;
+    approveFinanceDocSelection: "1" | "2" | null;
     alternativeTechnicalDocs?: string[] | null;
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
@@ -733,17 +729,17 @@ export interface TenderApprovalRow {
 }
 
 export type TenderApprovalFilters = {
-    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
+    tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb";
     tlStatus?: number;
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     search?: string;
 };
 
 export type TenderApprovalTabData = {
-    key: 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
+    key: "pending" | "accepted" | "rejected" | "tender-dnb";
     name: string;
     count: number;
     data: TenderApprovalRow[];
@@ -835,13 +831,7 @@ export interface UpdateTenderRequest {
 
 export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee";
 
-export type InstrumentType =
-    | "DD"
-    | "FDR"
-    | "BG"
-    | "Cheque"
-    | "Bank Transfer"
-    | "Portal Payment";
+export type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment";
 
 export type DashboardRowType = "request" | "missing";
 
@@ -935,7 +925,7 @@ export type TenderDocumentChecklistDashboardRow = {
     checklistSubmitted: boolean;
 };
 
-export type CostingSheetStatus = 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+export type CostingSheetStatus = "Pending" | "Created" | "Submitted" | "Approved" | "Rejected/Redo";
 
 export type TenderCostingSheet = {
     id: number;
@@ -979,7 +969,7 @@ export type CostingSheetDashboardRow = {
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
-    costingStatus: 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo';
+    costingStatus: "Pending" | "Created" | "Submitted" | "Approved" | "Rejected/Redo";
     submittedFinalPrice: string | null;
     submittedBudgetPrice: string | null;
     googleSheetUrl: string | null;
@@ -1014,7 +1004,7 @@ export type CostingApprovalDashboardRow = {
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
-    costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    costingStatus: "Submitted" | "Approved" | "Rejected/Redo";
     submittedFinalPrice: string | null;
     submittedBudgetPrice: string | null;
     googleSheetUrl: string | null;
@@ -1035,14 +1025,14 @@ export type RejectCostingDto = {
 };
 
 export type CostingApprovalListParams = {
-    costingStatus?: 'Submitted' | 'Approved' | 'Rejected/Redo';
+    costingStatus?: "Submitted" | "Approved" | "Rejected/Redo";
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
 };
 
-export type BidSubmissionStatus = 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+export type BidSubmissionStatus = "Submission Pending" | "Bid Submitted" | "Tender Missed";
 
 export type BidDocuments = {
     submittedDocs: string[];
@@ -1065,7 +1055,6 @@ export type BidSubmission = {
     updatedAt: Date;
 };
 
-
 export type BidSubmissionDashboardRow = {
     tenderId: number;
     tenderNo: string;
@@ -1077,17 +1066,17 @@ export type BidSubmissionDashboardRow = {
     emdAmount: string | null;
     gstValues: number;
     finalCosting: string | null;
-    bidStatus: 'Submission Pending' | 'Bid Submitted' | 'Tender Missed';
+    bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     bidSubmissionId: number | null;
     costingSheetId: number | null;
 };
 
 export type BidSubmissionListParams = {
-    tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
+    tab?: "pending" | "submitted" | "disqualified" | "tender-dnb";
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
 };
 
 export type SubmitBidDto = {
@@ -1117,7 +1106,7 @@ export type UpdateBidSubmissionDto = {
     tmsImprovements?: string;
 };
 
-export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+export type TqStatus = "TQ awaited" | "TQ received" | "TQ replied" | "TQ missed" | "No TQ";
 
 export type TenderQuery = {
     id: number;
@@ -1166,7 +1155,7 @@ export interface PhysicalDocsDashboardRow {
     physicalDocs: number | null;
     courierNo: number | null;
     courierDate: Date | null;
-};
+}
 
 export interface PhysicalDocs {
     id: number;
@@ -1183,7 +1172,7 @@ export interface PhysicalDocsListParams {
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     search?: string;
 }
 
@@ -1191,14 +1180,14 @@ export interface CreatePhysicalDocsDto {
     tenderId: number;
     courierNo: number;
     submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+    physicalDocsPersons?: Omit<PhysicalDocPerson, "id">[];
 }
 
 export interface UpdatePhysicalDocsDto {
     id: number;
     courierNo?: number;
     submittedDocs?: string;
-    physicalDocsPersons?: Omit<PhysicalDocPerson, 'id'>[];
+    physicalDocsPersons?: Omit<PhysicalDocPerson, "id">[];
 }
 
 export interface PhysicalDocPerson {
@@ -1206,7 +1195,7 @@ export interface PhysicalDocPerson {
     name: string;
     email: string;
     phone: string;
-};
+}
 
 export interface PhysicalDocWithPersons {
     id: number;
@@ -1214,7 +1203,7 @@ export interface PhysicalDocWithPersons {
     courierNo: number;
     submittedDocs: string | null;
     persons: PhysicalDocPerson[];
-};
+}
 
 export type TqManagementDashboardRow = {
     tenderId: number;
@@ -1254,18 +1243,18 @@ export type UpdateTqMissedDto = {
 };
 
 export type EmdDashboardFilters = {
-    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'all';
+    tab?: "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
     userId?: number;
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
 };
 
 export interface EmdDashboardRow {
     id: number | null;
-    type: 'request' | 'missing';
-    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    type: "request" | "missing";
+    purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string;
     status: string;
     instrumentType: string | null;
@@ -1283,10 +1272,10 @@ export interface EmdDashboardRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    'request-sent': number;
+    "request-sent": number;
     paid: number;
     rejected: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
@@ -1294,14 +1283,14 @@ export interface BidSubmissionDashboardCounts {
     pending: number;
     submitted: number;
     disqualified: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
 export interface CostingApprovalDashboardCounts {
     pending: number;
     approved: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
@@ -1309,7 +1298,7 @@ export interface TenderApprovalDashboardCounts {
     pending: number;
     accepted: number;
     rejected: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
@@ -1322,43 +1311,50 @@ export interface TqManagementDashboardCounts {
     total: number;
 }
 
-export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
+export type TenderQueryStatus =
+    | "TQ awaited"
+    | "TQ received"
+    | "TQ replied"
+    | "Disqualified, TQ missed"
+    | "Disqualified, No TQ received"
+    | "TQ replied, Qualified"
+    | "Qualified, No TQ received";
 
 export interface PhysicalDocsDashboardCounts {
     pending: number;
     sent: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
 export interface DocumentChecklistsDashboardCounts {
     pending: number;
     submitted: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
 export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
 export interface RfqDashboardCounts {
     pending: number;
     sent: number;
-    'rfq-rejected': number;
-    'tender-dnb': number;
+    "rfq-rejected": number;
+    "tender-dnb": number;
     total: number;
 }
 
 export interface TenderInfoDashboardCounts {
-    'under-preparation': number;
-    'did-not-bid': number;
-    'tenders-bid': number;
-    'tender-won': number;
-    'tender-lost': number;
+    "under-preparation": number;
+    "did-not-bid": number;
+    "tenders-bid": number;
+    "tender-won": number;
+    "tender-lost": number;
     total: number;
 }
 
@@ -1517,7 +1513,7 @@ export interface PaymentRequestRow {
     tenderId: number;
     tenderNo: string;
     tenderName: string;
-    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string;
     dueDate: string | null;
     teamMemberId: number | null;
@@ -1531,10 +1527,10 @@ export interface PaymentRequestRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    'request-sent': number;
+    "request-sent": number;
     paid: number;
     rejected: number;
-    'tender-dnb': number;
+    "tender-dnb": number;
     total: number;
 }
 
