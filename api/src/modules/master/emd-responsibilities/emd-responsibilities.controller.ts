@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from "@nestjs/common";
 import { z } from "zod";
-import { EmdResponsibilityService } from "@/modules/master/emd-responsibilties/emd-responsibilties.service";
+import { EmdResponsibilityService } from "@/modules/master/emd-responsibilities/emd-responsibilities.service";
 
 const CreateEmdResponsibilitySchema = z.object({
     name: z.string().min(1, "Name is required").max(100),
