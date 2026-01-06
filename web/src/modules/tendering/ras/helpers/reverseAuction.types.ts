@@ -101,7 +101,13 @@ export interface RaDashboardCounts {
 
 export interface RaDashboardResponse {
     data: RaDashboardRow[];
-    counts: RaDashboardCounts;
+    counts?: RaDashboardCounts; // Optional - counts are fetched separately via getDashboardCounts
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }
 
 

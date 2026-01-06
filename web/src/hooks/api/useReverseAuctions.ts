@@ -21,9 +21,13 @@ export const reverseAuctionsKey = {
 // Fetch RA dashboard data with counts
 export const useReverseAuctionDashboard = (
     filters?: RaDashboardListParams,
+    pagination?: { page: number; limit: number },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params: RaDashboardListParams = {
         ...filters,
+        ...pagination,
+        ...sort,
     };
 
     return useQuery<RaDashboardResponse>({
@@ -43,6 +47,8 @@ export const useReverseAuctionDashboardCounts = () => {
     return useQuery<RaDashboardCounts>({
         queryKey: reverseAuctionsKey.counts(),
         queryFn: () => reverseAuctionService.getDashboardCounts(),
+        staleTime: 30000, // 30 seconds - counts don't need to be as fresh as data
+        retry: 2,
     });
 };
 
@@ -63,6 +69,8 @@ export const useScheduleRa = () => {
         mutationFn: ({ id, data }: { id: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
         },
     });
 };
@@ -75,6 +83,8 @@ export const useUploadRaResult = () => {
         mutationFn: ({ id, data }: { id: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
+            // Explicitly invalidate dashboard counts to ensure they refresh
+            queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
         },
     });
 };

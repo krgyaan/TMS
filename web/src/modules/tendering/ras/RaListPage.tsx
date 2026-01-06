@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { useReverseAuctionDashboard } from '@/hooks/api/useReverseAuctions';
+import { useReverseAuctionDashboard, useReverseAuctionDashboardCounts } from '@/hooks/api/useReverseAuctions';
 import type { RaDashboardRow, RaDashboardTab } from '@/modules/tendering/ras/helpers/reverseAuction.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
@@ -138,9 +138,10 @@ const ReverseAuctionListPage = () => {
         search: search || undefined,
     });
 
+    const { data: counts } = useReverseAuctionDashboardCounts();
+
     const raData = response?.data || [];
-    const counts = response?.counts || null;
-    const totalRows = counts?.total || raData.length;
+    const totalRows = response?.meta?.total || raData.length;
 
     const handleViewDetails = useCallback((row: RaDashboardRow) => {
         if (row.id) navigate(paths.tendering.rasShow(row.id));
