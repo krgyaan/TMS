@@ -63,7 +63,7 @@ import { PermissionsModule } from "@/modules/master/permissions/permissions.modu
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
-import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilties/emd-responsibilties.module";
+import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
 
 @Module({
     imports: [
