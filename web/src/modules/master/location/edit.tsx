@@ -1,27 +1,27 @@
-import { useParams } from 'react-router-dom'
-import { useLocation as useLocationQuery } from '@/hooks/api/useLocations'
-import { LocationDrawer } from './components/LocationDrawer'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
+import { useParams } from "react-router-dom";
+import { useLocation as useLocationQuery } from "@/hooks/api/useLocations";
+import { LocationModal } from "./components/LocationModal";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 const EditLocationPage = () => {
-    const { id } = useParams<{ id: string }>()
-    const navigate = useNavigate()
-    const locationId = Number(id)
-    const { data, isLoading, error, refetch } = useLocationQuery(locationId)
-    const [open, setOpen] = useState(true)
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const locationId = Number(id);
+    const { data, isLoading, error, refetch } = useLocationQuery(locationId);
+    const [open, setOpen] = useState(true);
 
     useEffect(() => {
         if (!open) {
-            navigate(paths.master.locations)
+            navigate(paths.master.locations);
         }
-    }, [open, navigate])
+    }, [open, navigate]);
 
     if (!locationId) {
         return (
@@ -31,7 +31,7 @@ const EditLocationPage = () => {
                     <CardDescription>Invalid location identifier</CardDescription>
                 </CardHeader>
             </Card>
-        )
+        );
     }
 
     if (isLoading) {
@@ -45,7 +45,7 @@ const EditLocationPage = () => {
                     <Skeleton className="h-96 w-full" />
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     if (error || !data) {
@@ -67,17 +67,10 @@ const EditLocationPage = () => {
                     </Alert>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
-    return (
-        <LocationDrawer
-            open={open}
-            onOpenChange={setOpen}
-            location={data}
-            onSuccess={() => navigate(paths.master.locations)}
-        />
-    )
-}
+    return <LocationDrawer open={open} onOpenChange={setOpen} location={data} onSuccess={() => navigate(paths.master.locations)} />;
+};
 
-export default EditLocationPage
+export default EditLocationPage;

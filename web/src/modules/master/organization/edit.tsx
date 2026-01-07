@@ -1,27 +1,27 @@
-import { useParams } from 'react-router-dom'
-import { useOrganization } from '@/hooks/api/useOrganizations'
-import { OrganizationDrawer } from './components/OrganizationDrawer'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
+import { useParams } from "react-router-dom";
+import { useOrganization } from "@/hooks/api/useOrganizations";
+import { OrganizationModal } from "./components/OrganizationModal";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 const EditOrganizationPage = () => {
-    const { id } = useParams<{ id: string }>()
-    const navigate = useNavigate()
-    const orgId = Number(id)
-    const { data, isLoading, error, refetch } = useOrganization(orgId)
-    const [open, setOpen] = useState(true)
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const orgId = Number(id);
+    const { data, isLoading, error, refetch } = useOrganization(orgId);
+    const [open, setOpen] = useState(true);
 
     useEffect(() => {
         if (!open) {
-            navigate(paths.master.organizations)
+            navigate(paths.master.organizations);
         }
-    }, [open, navigate])
+    }, [open, navigate]);
 
     if (!orgId) {
         return (
@@ -31,7 +31,7 @@ const EditOrganizationPage = () => {
                     <CardDescription>Invalid organization identifier</CardDescription>
                 </CardHeader>
             </Card>
-        )
+        );
     }
 
     if (isLoading) {
@@ -45,7 +45,7 @@ const EditOrganizationPage = () => {
                     <Skeleton className="h-96 w-full" />
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     if (error || !data) {
@@ -67,17 +67,10 @@ const EditOrganizationPage = () => {
                     </Alert>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
-    return (
-        <OrganizationDrawer
-            open={open}
-            onOpenChange={setOpen}
-            organization={data}
-            onSuccess={() => navigate(paths.master.organizations)}
-        />
-    )
-}
+    return <OrganizationDrawer open={open} onOpenChange={setOpen} organization={data} onSuccess={() => navigate(paths.master.organizations)} />;
+};
 
-export default EditOrganizationPage
+export default EditOrganizationPage;

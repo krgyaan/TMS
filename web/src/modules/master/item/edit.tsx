@@ -1,27 +1,27 @@
-import { useParams } from 'react-router-dom'
-import { useItem } from '@/hooks/api/useItems'
-import { ItemDrawer } from './components/ItemDrawer'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { paths } from '@/app/routes/paths'
+import { useParams } from "react-router-dom";
+import { useItem } from "@/hooks/api/useItems";
+import { ItemModal } from "./components/ItemModal";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 const EditItemPage = () => {
-    const { id } = useParams<{ id: string }>()
-    const navigate = useNavigate()
-    const itemId = Number(id)
-    const { data, isLoading, error, refetch } = useItem(itemId)
-    const [open, setOpen] = useState(true)
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const itemId = Number(id);
+    const { data, isLoading, error, refetch } = useItem(itemId);
+    const [open, setOpen] = useState(true);
 
     useEffect(() => {
         if (!open) {
-            navigate(paths.master.items)
+            navigate(paths.master.items);
         }
-    }, [open, navigate])
+    }, [open, navigate]);
 
     if (!itemId) {
         return (
@@ -31,7 +31,7 @@ const EditItemPage = () => {
                     <CardDescription>Invalid item identifier</CardDescription>
                 </CardHeader>
             </Card>
-        )
+        );
     }
 
     if (isLoading) {
@@ -45,7 +45,7 @@ const EditItemPage = () => {
                     <Skeleton className="h-96 w-full" />
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     if (error || !data) {
@@ -67,17 +67,10 @@ const EditItemPage = () => {
                     </Alert>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
-    return (
-        <ItemDrawer
-            open={open}
-            onOpenChange={setOpen}
-            item={data}
-            onSuccess={() => navigate(paths.master.items)}
-        />
-    )
-}
+    return <ItemDrawer open={open} onOpenChange={setOpen} item={data} onSuccess={() => navigate(paths.master.items)} />;
+};
 
-export default EditItemPage
+export default EditItemPage;

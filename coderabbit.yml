@@ -1,0 +1,72 @@
+reviews:
+    auto_review:
+        enabled: true
+        drafts: false
+
+    review_status: true
+
+    rules:
+        - name: Correctness
+        - name: Security
+        - name: Performance
+        - name: Maintainability
+        - name: Readability
+        - name: Best Practices
+
+comments:
+    tone: professional
+    inline: true
+    summarize: true
+
+language:
+    typescript:
+        enabled: true
+    javascript:
+        enabled: true
+    python:
+        enabled: false # disable unless you want ML reviewed
+
+path_filters:
+    include:
+        # Backend (NestJS)
+        - "api/src/**"
+        - "api/scripts/**"
+        - "api/test/**"
+
+        # Frontend (React)
+        - "web/src/**"
+        - "web/components/**"
+
+    exclude:
+        # Generated / noisy
+        - "**/node_modules/**"
+        - "**/dist/**"
+        - "**/build/**"
+
+        # Drizzle artifacts
+        - "api/drizzle/**"
+        - "**/*.sql"
+        - "**/*.json"
+
+        # Tooling & configs
+        - "**/*.lock"
+        - "**/pnpm-lock.yaml"
+        - "**/.env*"
+        - "**/.prettierrc"
+        - "**/eslint.config.*"
+        - "**/tsconfig*.json"
+        - "**/vite.config.ts"
+        - "**/nest-cli.json"
+
+        # Assets
+        - "**/*.png"
+        - "**/*.svg"
+        - "**/*.css"
+
+        # ML folder (enable later if needed)
+        - "ml-ocr/**"
+
+severity:
+    fail_on:
+        - Security
+        - Correctness

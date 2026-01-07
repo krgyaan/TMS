@@ -1,28 +1,21 @@
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef, RowSelectionOptions } from 'ag-grid-community';
-import { useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useLeadTypes } from '@/hooks/api/useLeadTypes';
-import type { LeadType } from '@/types/api.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { LeadTypeDrawer } from './components/LeadTypeDrawer';
-import { LeadTypeViewModal } from './components/LeadTypeViewModal';
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { useState } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useLeadTypes } from "@/hooks/api/useLeadTypes";
+import type { LeadType } from "@/types/api.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { LeadTypeModal } from "./components/LeadTypeModal";
+import { LeadTypeViewModal } from "./components/LeadTypeViewModal";
 
 const rowSelection: RowSelectionOptions = {
-    mode: 'multiRow',
+    mode: "multiRow",
     headerCheckbox: false,
 };
 
@@ -35,29 +28,29 @@ const LeadTypesPage = () => {
     // Lead Type actions
     const leadTypeActions: ActionItem<LeadType>[] = [
         {
-            label: 'View',
-            onClick: (row) => {
+            label: "View",
+            onClick: row => {
                 setSelectedLeadType(row);
                 setViewModalOpen(true);
             },
         },
         {
-            label: 'Edit',
-            onClick: (row) => {
+            label: "Edit",
+            onClick: row => {
                 setSelectedLeadType(row);
                 setDrawerOpen(true);
             },
         },
         {
-            label: 'Delete',
-            className: 'text-red-600',
-            onClick: async (row) => {
+            label: "Delete",
+            className: "text-red-600",
+            onClick: async row => {
                 if (confirm(`Are you sure you want to delete "${row.name}"?`)) {
                     try {
                         // await deleteLeadType.mutateAsync(row.id);
-                        console.log('Delete functionality to be implemented');
+                        console.log("Delete functionality to be implemented");
                     } catch (error) {
-                        console.error('Delete failed:', error);
+                        console.error("Delete failed:", error);
                     }
                 }
             },
@@ -66,44 +59,40 @@ const LeadTypesPage = () => {
 
     const [colDefs] = useState<ColDef<LeadType>[]>([
         {
-            headerName: 'S.No.',
-            valueGetter: 'node.rowIndex + 1',
+            headerName: "S.No.",
+            valueGetter: "node.rowIndex + 1",
             width: 80,
             filter: false,
             sortable: false,
         },
         {
-            field: 'name',
-            headerName: 'Lead Type Name',
+            field: "name",
+            headerName: "Lead Type Name",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
         },
         {
-            field: 'description',
-            headerName: 'Description',
+            field: "description",
+            headerName: "Description",
             flex: 2,
-            filter: 'agTextColumnFilter',
+            filter: "agTextColumnFilter",
             cellRenderer: (params: any) => {
                 return params.value || <span className="text-gray-400">—</span>;
             },
         },
         {
-            field: 'status',
-            headerName: 'Status',
+            field: "status",
+            headerName: "Status",
             width: 120,
-            filter: 'agSetColumnFilter',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value ? 'Active' : 'Inactive'}
-                </Badge>
-            ),
+            filter: "agSetColumnFilter",
+            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
         },
         {
-            headerName: 'Actions',
+            headerName: "Actions",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(leadTypeActions),
-            pinned: 'right',
+            pinned: "right",
             width: 100,
         },
     ]);
@@ -133,15 +122,10 @@ const LeadTypesPage = () => {
                 </CardHeader>
                 <CardContent>
                     <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
+                        <AlertCircle className="px-3" />
                         <AlertDescription>
                             Error loading lead types: {error.message}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                className="ml-4"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
                                 Retry
                             </Button>
                         </AlertDescription>
@@ -184,7 +168,7 @@ const LeadTypesPage = () => {
                         </Button>
                     </CardAction>
                 </CardHeader>
-                <CardContent className="h-screen px-0">
+                <CardContent className="px-3">
                     <DataTable
                         data={leadTypes || []}
                         columnDefs={colDefs}
@@ -203,12 +187,12 @@ const LeadTypesPage = () => {
                         enablePagination={true}
                         enableRowSelection={true}
                         selectionType="multiple"
-                        onSelectionChanged={(rows) => console.log('Selected rows:', rows)}
+                        onSelectionChanged={rows => console.log("Selected rows:", rows)}
                         height="100%"
                     />
                 </CardContent>
             </Card>
-            <LeadTypeDrawer
+            <LeadTypeModal
                 open={drawerOpen}
                 onOpenChange={handleDrawerClose}
                 leadType={selectedLeadType}
@@ -216,11 +200,7 @@ const LeadTypesPage = () => {
                     refetch();
                 }}
             />
-            <LeadTypeViewModal
-                open={viewModalOpen}
-                onOpenChange={handleViewModalClose}
-                leadType={selectedLeadType}
-            />
+            <LeadTypeViewModal open={viewModalOpen} onOpenChange={handleViewModalClose} leadType={selectedLeadType} />
         </>
     );
 };
