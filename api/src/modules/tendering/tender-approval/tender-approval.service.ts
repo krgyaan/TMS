@@ -3,7 +3,7 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc, sql, isNotNull, or, inArray, isNull, like } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, or, inArray, isNull } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -18,7 +18,6 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { alias } from 'drizzle-orm/pg-core';
 
 export type TenderApprovalFilters = {
     tlStatus?: '0' | '1' | '2' | '3' | number;
@@ -279,61 +278,36 @@ export class TenderApprovalService {
         }
 
         const [countResult] = await countQuery.where(whereClause);
-
         const total = Number(countResult?.count || 0);
-
         this.logger.debug(`[TenderApproval] Query result: ${rows.length} rows, total: ${total}`);
 
         return wrapPaginatedResponse(rows, total, page, limit);
-    }
-
-    /**
-     * Legacy method - kept for backward compatibility
-     * @deprecated Use getDashboardData instead
-     */
-    async getAll(filters?: TenderApprovalFilters): Promise<PaginatedResult<TenderRow>> {
-        // Map tlStatus to tabKey for backward compatibility
-        let tabKey: 'pending' | 'accepted' | 'rejected' | 'tender-dnb' | undefined;
-        if (filters?.tlStatus !== undefined) {
-            if (filters.tlStatus === 0) tabKey = 'pending';
-            else if (filters.tlStatus === 1) tabKey = 'accepted';
-            else if (filters.tlStatus === 2) tabKey = 'rejected';
-        }
-
-        return this.getDashboardData(tabKey, {
-            page: filters?.page,
-            limit: filters?.limit,
-            sortBy: filters?.sortBy,
-            sortOrder: filters?.sortOrder,
-            search: filters?.search,
-        });
     }
 
     async getCounts() {
         // Base conditions for all tabs
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
-            TenderInfosService.getExcludeStatusCondition(['lost']),
+            // TenderInfosService.getExcludeStatusCondition(['lost']),
         ];
 
         // Build conditions for each tab
         const pendingConditions = [
             ...baseConditions,
-            eq(tenderInfos.status, 2),
-            or(eq(tenderInfos.tlStatus, 0), isNull(tenderInfos.tlStatus))
+            or(
+                eq(tenderInfos.tlStatus, 0),
+                eq(tenderInfos.tlStatus, 3),
+                isNull(tenderInfos.tlStatus)
+            )
         ];
 
         const acceptedConditions = [
             ...baseConditions,
-            or(
-                and(eq(tenderInfos.status, 2), eq(tenderInfos.tlStatus, 1)),
-                eq(tenderInfos.status, 3)
-            )
+            eq(tenderInfos.tlStatus, 1)
         ];
 
         const rejectedConditions = [
             ...baseConditions,
-            eq(tenderInfos.status, 2),
             eq(tenderInfos.tlStatus, 2)
         ];
 
@@ -360,9 +334,6 @@ export class TenderApprovalService {
         };
     }
 
-    /**
-     * Helper method to count items with given conditions
-     */
     private async countTabItems(whereClause: any): Promise<number> {
         const countQuery = this.db
             .select({ count: sql<number>`count(*)` })

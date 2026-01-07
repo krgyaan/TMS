@@ -97,25 +97,14 @@ const Checklists = () => {
         tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            minWidth: 250,
+            width: 250,
         }),
         {
             field: 'teamMemberName',
             colId: 'teamMemberName',
             headerName: 'Member',
-            flex: 1.5,
-            minWidth: 150,
+            width: 150,
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'itemName',
-            colId: 'itemName',
-            headerName: 'Item',
-            flex: 1,
-            minWidth: 120,
-            valueGetter: (params: any) => params.data?.itemName || '—',
             sortable: true,
             filter: true,
         },
@@ -123,8 +112,7 @@ const Checklists = () => {
             field: 'dueDate',
             colId: 'dueDate',
             headerName: 'Due Date',
-            flex: 1.5,
-            minWidth: 150,
+            width: 150,
             valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
@@ -133,8 +121,7 @@ const Checklists = () => {
             field: 'gstValues',
             colId: 'gstValues',
             headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
+            width: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
@@ -146,9 +133,8 @@ const Checklists = () => {
         {
             field: 'statusName',
             colId: 'statusName',
-            headerName: 'Status',
-            flex: 1,
-            minWidth: 120,
+            headerName: 'Tender Status',
+            width: 150,
             valueGetter: (params: any) => params.data?.statusName || '—',
             sortable: true,
             filter: true,
@@ -163,12 +149,12 @@ const Checklists = () => {
             },
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(checklistActions),
             sortable: false,
             pinned: 'right',
-            width: 120,
+            width: 57,
         },
     ], [checklistActions]);
 

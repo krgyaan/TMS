@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -20,7 +20,9 @@ import { Input } from '@/components/ui/input';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
 type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
-const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = { 'pending': 'Pending', 'accepted': 'Accepted', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB' };
+const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = {
+    'pending': 'Pending', 'accepted': 'Accepted', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB'
+};
 
 const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Tender DNB' };
 
@@ -122,7 +124,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'teamMemberName',
             headerName: 'Member',
-            width: 130,
+            width: 150,
             colId: 'teamMemberName',
             valueGetter: (params: any) => params.data?.teamMemberName || '—',
             sortable: true,
@@ -174,7 +176,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'statusName',
             headerName: 'Status',
-            width: 165,
+            width: 250,
             colId: 'statusName',
             cellRenderer: (params: any) => {
                 const status = params.data?.statusName;
@@ -217,12 +219,12 @@ const TenderApprovalListPage = () => {
             filter: true,
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(approvalActions),
             sortable: false,
             pinned: 'right',
-            width: 80,
+            width: 57,
         },
     ], [approvalActions]);
 
@@ -275,6 +277,17 @@ const TenderApprovalListPage = () => {
                             Review and approve tender decisions.
                         </CardDescription>
                     </div>
+                    <CardAction>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by tender name, number, value, due date, member, item..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                    </CardAction>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
@@ -296,15 +309,6 @@ const TenderApprovalListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by tender name, number, value, due date, member, item..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
                     </div>
 
                     {tabsConfig.map((tab) => (

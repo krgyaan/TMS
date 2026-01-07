@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { RfqDashboardRow } from '@/types/api.types';
+import type { RfqDashboardRow } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
@@ -141,30 +141,30 @@ const Rfqs = () => {
             filter: true,
         },
         {
-            field: 'itemName',
-            headerName: 'Item',
-            width: 150,
-            colId: 'itemName',
-            valueGetter: (params: any) => params.data?.itemName ? params.data.itemName : '—',
-            sortable: true,
-            filter: true,
-        },
-        {
             field: 'statusName',
-            headerName: 'Status',
-            width: 100,
+            headerName: 'Tender Status',
+            width: 200,
             colId: 'statusName',
             valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            cellRenderer: (params: any) => {
+                const status = params.value;
+                if (!status) return '—';
+                return (
+                    <Badge variant="default">
+                        {status}
+                    </Badge>
+                );
+            },
             sortable: true,
             filter: true,
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(rfqsActions),
             sortable: false,
             pinned: 'right',
-            width: 80,
+            width: 57,
         },
     ], [rfqsActions]);
 
@@ -264,10 +264,10 @@ const Rfqs = () => {
                                                 {tab.key === 'pending'
                                                     ? 'Tenders requiring RFQs will appear here'
                                                     : tab.key === 'sent'
-                                                    ? 'Sent RFQs will be shown here'
-                                                    : tab.key === 'rfq-rejected'
-                                                    ? 'Rejected RFQs will be shown here'
-                                                    : 'Tender DNB RFQs will be shown here'}
+                                                        ? 'Sent RFQs will be shown here'
+                                                        : tab.key === 'rfq-rejected'
+                                                            ? 'Rejected RFQs will be shown here'
+                                                            : 'Tender DNB RFQs will be shown here'}
                                             </p>
                                         </div>
                                     ) : (

@@ -1,22 +1,6 @@
 import { BaseApiService } from './base.service';
-import type {
-    TenderCostingSheet,
-    CostingSheetDashboardRow,
-    SubmitCostingSheetDto,
-    UpdateCostingSheetDto,
-    PaginatedResult,
-    CostingSheetDashboardCounts,
-    CreateSheetResponse,
-    DriveScopesResponse,
-} from '@/types/api.types';
-
-export type CostingSheetListParams = {
-    costingStatus?: 'pending' | 'submitted' | 'rejected';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
+import type { PaginatedResult } from '@/types/api.types';
+import type { CostingSheetListParams, TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, CostingSheetDashboardCounts, CreateSheetResponse, DriveScopesResponse } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 
 class CostingSheetsService extends BaseApiService {
     constructor() {
@@ -27,8 +11,8 @@ class CostingSheetsService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.costingStatus) {
-                search.set('costingStatus', params.costingStatus);
+            if (params.tab) {
+                search.set('tab', params.tab);
             }
             if (params.page) {
                 search.set('page', String(params.page));

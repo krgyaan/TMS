@@ -12,7 +12,7 @@ import {
     NotFoundException,
     Query,
 } from '@nestjs/common';
-import { RfqsService, type RfqFilters } from '@/modules/tendering/rfqs/rfq.service';
+import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
 import type { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';

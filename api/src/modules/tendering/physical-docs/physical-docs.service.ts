@@ -103,7 +103,7 @@ export class PhysicalDocsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, 'YES'),
+            inArray(tenderInformation.physicalDocsRequired, ['Yes', 'YES']),
         ];
 
         // TODO: Add role-based team filtering middleware/guard
@@ -115,11 +115,11 @@ export class PhysicalDocsService {
         const conditions = [...baseConditions];
 
         if (activeTab === 'pending') {
-            // conditions.push(eq(tenderInfos.status, 3));
             conditions.push(isNull(physicalDocs.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'sent') {
-            // conditions.push(eq(tenderInfos.status, 30));
             conditions.push(isNotNull(physicalDocs.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'tender-dnb') {
             const dnbStatusIds = StatusCache.getIds('dnb');
             const excludeStatusIds = [30];
@@ -322,20 +322,20 @@ export class PhysicalDocsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, 'YES'),
+            eq(tenderInformation.physicalDocsRequired, 'Yes'),
         ];
 
         // Count pending: status = 3, physicalDocsId IS NULL
         const pendingConditions = [
             ...baseConditions,
-            // eq(tenderInfos.status, 3),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNull(physicalDocs.id),
         ];
 
         // Count sent: status = 30, physicalDocsId IS NOT NULL
         const sentConditions = [
             ...baseConditions,
-            eq(tenderInfos.status, 30),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNotNull(physicalDocs.id),
         ];
 

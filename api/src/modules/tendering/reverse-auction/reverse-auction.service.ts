@@ -113,8 +113,8 @@ export class ReverseAuctionService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.reverseAuctionApplicable, 'YES'),
+            eq(bidSubmissions.status, 'Bid Submitted'),
+            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
         ];
 
         // TODO: Add role-based team filtering middleware/guard
@@ -123,22 +123,40 @@ export class ReverseAuctionService {
         // - Others: filter by team_member = user.id
 
         const conditions = [...baseConditions];
-        if (activeTab === 'under-evaluation' || activeTab === 'scheduled') {
-            conditions.push(eq(bidSubmissions.status, 'Bid Submitted'));
-        }
 
+        // Tab-specific filtering based on raResult field (matching Laravel logic)
         if (activeTab === 'under-evaluation') {
-            // conditions.push();
+            // Under-evaluation: No RA OR (RA exists but no result AND no schedule times)
+            // Exclude records that have schedule times (they belong in scheduled tab)
+            conditions.push(
+                or(
+                    isNull(reverseAuctions.id),
+                    and(
+                        isNull(reverseAuctions.raResult),
+                        isNull(reverseAuctions.raStartTime),
+                        isNull(reverseAuctions.raEndTime)
+                    )!
+                )!
+            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'scheduled') {
+            // Scheduled: RA exists, result is null, and has start/end times
             conditions.push(
                 isNotNull(reverseAuctions.id),
-                inArray(reverseAuctions.status, ['RA Scheduled', 'RA Started', 'RA Ended'])
+                isNull(reverseAuctions.raResult),
+                or(
+                    isNotNull(reverseAuctions.raStartTime),
+                    isNotNull(reverseAuctions.raEndTime)
+                )!
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'completed') {
+            // Laravel: RA exists AND result IS NOT NULL
             conditions.push(
                 isNotNull(reverseAuctions.id),
-                inArray(reverseAuctions.status, ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified'])
+                isNotNull(reverseAuctions.raResult)
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -194,7 +212,9 @@ export class ReverseAuctionService {
             }
         }
 
-        const query = this.db
+        // Build query with conditional bid submission join
+        // For completed tab, bid submissions are not required (matching Laravel)
+        const baseQuery = this.db
             .select({
                 tenderId: tenderInfos.id,
                 tenderNo: tenderInfos.tenderNo,
@@ -218,23 +238,29 @@ export class ReverseAuctionService {
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+
+        // Add bid submission join conditionally based on tab
+        const query = activeTab === 'completed'
+            ? baseQuery.leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            : baseQuery.innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id));
+
+        const finalQuery = query
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
             .offset(offset);
 
         try {
-            const sqlQuery = query.toSQL();
+            const sqlQuery = finalQuery.toSQL();
             this.logger.debug(`[ReverseAuction] SQL Query: ${JSON.stringify(sqlQuery)}`);
         } catch (error) {
             this.logger.debug(`[ReverseAuction] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
         }
 
-        const rows = await query;
+        const rows = await finalQuery;
 
         const data: RaDashboardRow[] = rows.map((row) => ({
             id: row.raId,
@@ -254,7 +280,8 @@ export class ReverseAuctionService {
             hasRaEntry: row.raId !== null,
         }));
 
-        const [totalResult] = await this.db
+        // Build count query with conditional bid submission join
+        const baseCountQuery = this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -262,11 +289,15 @@ export class ReverseAuctionService {
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
-            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .where(whereClause);
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+
+        const countQuery = activeTab === 'completed'
+            ? baseCountQuery.leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            : baseCountQuery.innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id));
+
+        const [totalResult] = await countQuery.where(whereClause);
 
         const total = Number(totalResult?.count || 0);
 
@@ -290,33 +321,48 @@ export class ReverseAuctionService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.reverseAuctionApplicable, 'YES'),
+            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
         ];
 
-        // Count under-evaluation: status = 17 AND (RA doesn't exist OR technicallyQualified IS NULL)
+        // Under-evaluation: No RA OR (RA exists but no result AND no schedule times)
+        // Exclude records that have schedule times (they belong in scheduled tab)
         const underEvaluationConditions = [
             ...baseConditions,
             eq(bidSubmissions.status, 'Bid Submitted'),
-            isNull(reverseAuctions.id),
+            or(
+                isNull(reverseAuctions.id),
+                and(
+                    isNull(reverseAuctions.raResult),
+                    isNull(reverseAuctions.raStartTime),
+                    isNull(reverseAuctions.raEndTime)
+                )!
+            )!,
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
-        // Count scheduled: status = 17 AND RA exists with status in ['RA Scheduled', 'RA Started', 'RA Ended']
+        // Scheduled: RA exists, result is null, and has start/end times (matching getDashboardData logic)
         const scheduledConditions = [
             ...baseConditions,
             eq(bidSubmissions.status, 'Bid Submitted'),
             isNotNull(reverseAuctions.id),
-            inArray(reverseAuctions.status, ['RA Scheduled', 'RA Started', 'RA Ended']),
+            isNull(reverseAuctions.raResult),
+            or(
+                isNotNull(reverseAuctions.raStartTime),
+                isNotNull(reverseAuctions.raEndTime)
+            )!,
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
-        // Count completed: RA exists with status in ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified']
+        // Completed: RA exists AND result IS NOT NULL (matching Laravel)
         const completedConditions = [
             ...baseConditions,
             isNotNull(reverseAuctions.id),
-            inArray(reverseAuctions.status, ['Won', 'Lost', 'Lost - H1 Elimination', 'Disqualified']),
+            isNotNull(reverseAuctions.raResult),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         const counts = await Promise.all([
+            // Under-evaluation count
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
@@ -328,6 +374,7 @@ export class ReverseAuctionService {
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...underEvaluationConditions))
                 .then(([result]) => Number(result?.count || 0)),
+            // Scheduled count
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
@@ -339,12 +386,13 @@ export class ReverseAuctionService {
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...scheduledConditions))
                 .then(([result]) => Number(result?.count || 0)),
+            // Completed count (no bid submission requirement per Laravel)
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -433,14 +481,12 @@ export class ReverseAuctionService {
         raEndTime: Date | null;
         raResult: string | null;
     }): string {
+        // No RA entry → Under Evaluation
         if (!row.raId) {
             return RA_STATUS.UNDER_EVALUATION;
         }
 
-        if (!row.raStatus) {
-            return RA_STATUS.UNDER_EVALUATION;
-        }
-
+        // Has result → Completed status (Won/Lost/Lost H1)
         if (row.raResult) {
             switch (row.raResult) {
                 case 'Won':
@@ -452,10 +498,12 @@ export class ReverseAuctionService {
             }
         }
 
+        // Disqualified → Disqualified
         if (row.technicallyQualified === 'No') {
             return RA_STATUS.DISQUALIFIED;
         }
 
+        // Has schedule times → Check current time to determine RA_STARTED/RA_ENDED/RA_SCHEDULED
         if (row.raStartTime || row.raEndTime) {
             const now = new Date();
 
@@ -466,10 +514,14 @@ export class ReverseAuctionService {
             if (row.raStartTime && now >= new Date(row.raStartTime)) {
                 return RA_STATUS.RA_STARTED;
             }
+
+            // Has schedule times but not started yet → RA_SCHEDULED
+            return RA_STATUS.RA_SCHEDULED;
         }
 
-        if (row.technicallyQualified === 'Yes') {
-            return RA_STATUS.RA_SCHEDULED;
+        // No schedule times, no result → Under Evaluation (matches filtering logic)
+        if (!row.raStartTime && !row.raEndTime && !row.raResult) {
+            return RA_STATUS.UNDER_EVALUATION;
         }
 
         // Default to stored status or Under Evaluation

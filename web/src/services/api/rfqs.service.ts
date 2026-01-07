@@ -1,75 +1,63 @@
-import axiosInstance from '@/lib/axios';
-import type { RfqDashboardRow, CreateRfqDto, UpdateRfqDto, Rfq, PaginatedResult } from '@/types/api.types';
+import { BaseApiService } from './base.service';
+import type { RfqDashboardFilters, RfqDashboardRow, Rfq, CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { PaginatedResult } from '@/types/api.types';
 
-export type RfqFilters = {
-    rfqStatus?: 'pending' | 'sent';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
+class RfqsService extends BaseApiService {
+    constructor() {
+        super('/rfqs');
+    }
 
-export type RfqDashboardFilters = {
-    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-    search?: string;
-};
+    async getDashboard(filters?: RfqDashboardFilters): Promise<PaginatedResult<RfqDashboardRow>> {
+        const search = new URLSearchParams();
 
-export const rfqsService = {
-    getAll: async (filters?: RfqFilters): Promise<PaginatedResult<RfqDashboardRow>> => {
-        const params = new URLSearchParams();
-        if (filters?.rfqStatus) params.append('rfqStatus', filters.rfqStatus);
-        if (filters?.page) params.append('page', filters.page.toString());
-        if (filters?.limit) params.append('limit', filters.limit.toString());
-        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
-        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
-        const query = params.toString();
-        const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs${query ? `?${query}` : ''}`);
-        return response.data;
-    },
+        if (filters) {
+            if (filters.tab) {
+                search.set('tab', filters.tab);
+            }
+            if (filters.page) {
+                search.set('page', String(filters.page));
+            }
+            if (filters.limit) {
+                search.set('limit', String(filters.limit));
+            }
+            if (filters.sortBy) {
+                search.set('sortBy', filters.sortBy);
+            }
+            if (filters.sortOrder) {
+                search.set('sortOrder', filters.sortOrder);
+            }
+            if (filters.search) {
+                search.set('search', filters.search);
+            }
+        }
 
-    getDashboard: async (filters?: RfqDashboardFilters): Promise<PaginatedResult<RfqDashboardRow>> => {
-        const params = new URLSearchParams();
-        if (filters?.tab) params.append('tab', filters.tab);
-        if (filters?.page) params.append('page', filters.page.toString());
-        if (filters?.limit) params.append('limit', filters.limit.toString());
-        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
-        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
-        if (filters?.search) params.append('search', filters.search);
-        const query = params.toString();
-        const response = await axiosInstance.get<PaginatedResult<RfqDashboardRow>>(`/rfqs/dashboard${query ? `?${query}` : ''}`);
-        return response.data;
-    },
+        const queryString = search.toString();
+        return this.get<PaginatedResult<RfqDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
+    }
 
-    getById: async (id: number): Promise<Rfq> => {
-        const response = await axiosInstance.get<Rfq>(`/rfqs/${id}`);
-        return response.data;
-    },
+    async getById(id: number): Promise<Rfq> {
+        return this.get<Rfq>(`/${id}`);
+    }
 
-    getByTenderId: async (tenderId: number): Promise<Rfq> => {
-        const response = await axiosInstance.get<Rfq>(`/rfqs/by-tender/${tenderId}`);
-        return response.data;
-    },
+    async getByTenderId(tenderId: number): Promise<Rfq> {
+        return this.get<Rfq>(`/by-tender/${tenderId}`);
+    }
 
-    create: async (data: CreateRfqDto): Promise<Rfq> => {
-        const response = await axiosInstance.post<Rfq>(`/rfqs`, data);
-        return response.data;
-    },
+    async create(data: CreateRfqDto): Promise<Rfq> {
+        return this.post<Rfq>('', data);
+    }
 
-    update: async (id: number, data: UpdateRfqDto): Promise<Rfq> => {
-        const response = await axiosInstance.patch<Rfq>(`/rfqs/${id}`, data);
-        return response.data;
-    },
+    async update(id: number, data: UpdateRfqDto): Promise<Rfq> {
+        return this.patch<Rfq>(`/${id}`, data);
+    }
 
-    delete: async (id: number): Promise<void> => {
-        await axiosInstance.delete(`/rfqs/${id}`);
-    },
+    async remove(id: number): Promise<void> {
+        return this.delete<void>(`/${id}`);
+    }
 
-    getDashboardCounts: async (): Promise<any> => {
-        const response = await axiosInstance.get<any>('/rfqs/dashboard/counts');
-        return response.data;
-    },
-};
+    async getDashboardCounts(): Promise<any> {
+        return this.get<any>('/dashboard/counts');
+    }
+}
+
+export const rfqsService = new RfqsService();

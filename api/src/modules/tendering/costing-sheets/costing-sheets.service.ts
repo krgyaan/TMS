@@ -90,7 +90,7 @@ export class CostingSheetsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         // TODO: Add role-based team filtering middleware/guard
@@ -102,19 +102,14 @@ export class CostingSheetsService {
         const conditions = [...baseConditions];
 
         if (activeTab === 'pending') {
-            // Pending: sheet doesn't exist OR sheet exists but final_price is null
-            conditions.push(
-                or(
-                    isNull(tenderCostingSheets.id),
-                    isNull(tenderCostingSheets.submittedFinalPrice)
-                )!
-            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(isNull(tenderCostingSheets.id));
+            conditions.push(isNull(tenderCostingSheets.submittedFinalPrice));
         } else if (activeTab === 'submitted') {
-            // Submitted: sheet exists and final_price is not null
-            conditions.push(
-                isNotNull(tenderCostingSheets.submittedFinalPrice)
-            );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(isNotNull(tenderCostingSheets.submittedFinalPrice));
         } else if (activeTab === 'tender-dnb') {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             conditions.push(inArray(tenderInfos.status, [8, 34]));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -313,13 +308,13 @@ export class CostingSheetsService {
         // Count pending: sheet doesn't exist OR sheet exists but final_price is null
         const pendingConditions = [
             ...baseConditions,
-            or(
-                isNull(tenderCostingSheets.id),
-                isNull(tenderCostingSheets.submittedFinalPrice)
-            )!,
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            isNull(tenderCostingSheets.id),
+            isNull(tenderCostingSheets.submittedFinalPrice),
         ];
         const submittedConditions = [
             ...baseConditions,
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
 

@@ -15,27 +15,12 @@ export const tenderApprovalsKey = {
 }
 
 export const useTenderApprovals = (
-    tab?: '0' | '1' | '2' | '3' | 'tender-dnb' | 'pending' | 'accepted' | 'rejected',
+    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    // Map tab to tabKey (support both old numeric format and new string format)
-    const tabKeyMap: Record<string, 'pending' | 'accepted' | 'rejected' | 'tender-dnb'> = {
-        '0': 'pending',
-        '1': 'accepted',
-        '2': 'rejected',
-        '3': 'pending', // Incomplete maps to pending
-        'pending': 'pending',
-        'accepted': 'accepted',
-        'rejected': 'rejected',
-        'tender-dnb': 'tender-dnb',
-    };
-
-    const tabKey = tab ? tabKeyMap[tab] : undefined;
-
     const params: TenderApprovalFilters = {
         ...(tabKey && { tabKey }),
-        ...(tab && !tabKey && { tlStatus: Number(tab) }), // Fallback to legacy tlStatus if tabKey not found
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
@@ -44,7 +29,7 @@ export const useTenderApprovals = (
     };
 
     const queryKeyFilters = {
-        tab,
+        tabKey,
         ...pagination,
         ...sort,
     };

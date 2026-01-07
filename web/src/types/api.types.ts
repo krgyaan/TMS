@@ -925,113 +925,6 @@ export type TenderDocumentChecklistDashboardRow = {
     checklistSubmitted: boolean;
 };
 
-export type CostingSheetStatus = "Pending" | "Created" | "Submitted" | "Approved" | "Rejected/Redo";
-
-export type TenderCostingSheet = {
-    id: number;
-    tenderId: number;
-    submittedBy: number | null;
-    approvedBy: number | null;
-    googleSheetUrl: string | null;
-    sheetTitle: string | null;
-
-    // Submitted values (TE)
-    submittedFinalPrice: string | null;
-    submittedReceiptPrice: string | null;
-    submittedBudgetPrice: string | null;
-    submittedGrossMargin: string | null;
-    teRemarks: string | null;
-
-    // Approved values (TL)
-    finalPrice: string | null;
-    receiptPrice: string | null;
-    budgetPrice: string | null;
-    grossMargin: string | null;
-    oemVendorIds: number[] | null;
-    tlRemarks: string | null;
-
-    status: CostingSheetStatus;
-    rejectionReason: string | null;
-
-    submittedAt: Date | null;
-    approvedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type CostingSheetDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    dueDate: Date | null;
-    emdAmount: string | null;
-    gstValues: number;
-    costingStatus: "Pending" | "Created" | "Submitted" | "Approved" | "Rejected/Redo";
-    submittedFinalPrice: string | null;
-    submittedBudgetPrice: string | null;
-    googleSheetUrl: string | null;
-    costingSheetId: number | null;
-};
-
-export type SubmitCostingSheetDto = {
-    tenderId: number;
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
-};
-
-export type UpdateCostingSheetDto = {
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
-};
-
-export type CostingApprovalDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMember: number | null;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    dueDate: Date | null;
-    emdAmount: string | null;
-    gstValues: number;
-    costingStatus: "Submitted" | "Approved" | "Rejected/Redo";
-    submittedFinalPrice: string | null;
-    submittedBudgetPrice: string | null;
-    googleSheetUrl: string | null;
-    costingSheetId: number | null;
-};
-
-export type ApproveCostingDto = {
-    finalPrice: string;
-    receiptPrice: string;
-    budgetPrice: string;
-    grossMargin: string;
-    oemVendorIds: number[];
-    tlRemarks: string;
-};
-
-export type RejectCostingDto = {
-    rejectionReason: string;
-};
-
-export type CostingApprovalListParams = {
-    costingStatus?: "Submitted" | "Approved" | "Rejected/Redo";
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-};
-
 export type BidSubmissionStatus = "Submission Pending" | "Bid Submitted" | "Tender Missed";
 
 export type BidDocuments = {
@@ -1106,39 +999,6 @@ export type UpdateBidSubmissionDto = {
     tmsImprovements?: string;
 };
 
-export type TqStatus = "TQ awaited" | "TQ received" | "TQ replied" | "TQ missed" | "No TQ";
-
-export type TenderQuery = {
-    id: number;
-    tenderId: number;
-    tqSubmissionDeadline: Date | null;
-    tqDocumentReceived: string | null;
-    receivedBy: number | null;
-    receivedAt: Date | null;
-    repliedDatetime: Date | null;
-    repliedDocument: string | null;
-    proofOfSubmission: string | null;
-    repliedBy: number | null;
-    repliedAt: Date | null;
-    missedReason: string | null;
-    preventionMeasures: string | null;
-    tmsImprovements: string | null;
-    status: TqStatus;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type TenderQueryItem = {
-    id: number;
-    tenderQueryId: number;
-    srNo: number;
-    tqTypeId: number;
-    queryDescription: string;
-    response: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
 export interface PhysicalDocsDashboardRow {
     tenderId: number;
     tenderNo: string;
@@ -1205,43 +1065,6 @@ export interface PhysicalDocWithPersons {
     persons: PhysicalDocPerson[];
 }
 
-export type TqManagementDashboardRow = {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    teamMemberName: string | null;
-    itemName: string | null;
-    statusName: string | null;
-    bidSubmissionDate: Date | null;
-    tqSubmissionDeadline: Date | null;
-    tqStatus: TenderQueryStatus;
-    tqId: number | null;
-    tqCount: number;
-    bidSubmissionId: number | null;
-};
-
-export type CreateTqReceivedDto = {
-    tenderId: number;
-    tqSubmissionDeadline: string;
-    tqDocumentReceived: string | null;
-    tqItems: Array<{
-        tqTypeId: number;
-        queryDescription: string;
-    }>;
-};
-
-export type UpdateTqRepliedDto = {
-    repliedDatetime: string;
-    repliedDocument: string | null;
-    proofOfSubmission: string;
-};
-
-export type UpdateTqMissedDto = {
-    missedReason: string;
-    preventionMeasures: string;
-    tmsImprovements: string;
-};
-
 export type EmdDashboardFilters = {
     tab?: "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
     userId?: number;
@@ -1287,13 +1110,6 @@ export interface BidSubmissionDashboardCounts {
     total: number;
 }
 
-export interface CostingApprovalDashboardCounts {
-    pending: number;
-    approved: number;
-    "tender-dnb": number;
-    total: number;
-}
-
 export interface TenderApprovalDashboardCounts {
     pending: number;
     accepted: number;
@@ -1302,23 +1118,6 @@ export interface TenderApprovalDashboardCounts {
     total: number;
 }
 
-export interface TqManagementDashboardCounts {
-    awaited: number;
-    received: number;
-    replied: number;
-    qualified: number;
-    disqualified: number;
-    total: number;
-}
-
-export type TenderQueryStatus =
-    | "TQ awaited"
-    | "TQ received"
-    | "TQ replied"
-    | "Disqualified, TQ missed"
-    | "Disqualified, No TQ received"
-    | "TQ replied, Qualified"
-    | "Qualified, No TQ received";
 
 export interface PhysicalDocsDashboardCounts {
     pending: number;
@@ -1328,13 +1127,6 @@ export interface PhysicalDocsDashboardCounts {
 }
 
 export interface DocumentChecklistsDashboardCounts {
-    pending: number;
-    submitted: number;
-    "tender-dnb": number;
-    total: number;
-}
-
-export interface CostingSheetDashboardCounts {
     pending: number;
     submitted: number;
     "tender-dnb": number;
@@ -1357,22 +1149,6 @@ export interface TenderInfoDashboardCounts {
     "tender-lost": number;
     total: number;
 }
-
-export type CreateSheetResponse = {
-    success: boolean;
-    sheetUrl?: string;
-    sheetId?: string;
-    message?: string;
-    isDuplicate?: boolean;
-    existingSheetUrl?: string;
-    suggestedName?: string;
-};
-
-export type DriveScopesResponse = {
-    hasScopes: boolean;
-    missingScopes: string[];
-    grantedScopes: string[];
-};
 
 export type CreatePaymentRequestDto = {
     emdMode?: string;
@@ -1406,86 +1182,6 @@ export interface TenderListParams {
     page?: number;
     limit?: number;
     search?: string;
-}
-
-export interface RfqDashboardRow {
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    itemName: string;
-    rfqTo: string;
-    teamMemberName: string;
-    status: number;
-    statusName: string;
-    latestStatus: number | null;
-    latestStatusName: string | null;
-    statusRemark: string | null;
-    dueDate: Date;
-    rfqId: number | null;
-    vendorOrganizationNames: string | null;
-}
-
-export interface Rfq {
-    id: number;
-    tenderId: number;
-    tenderNo: string;
-    tenderName: string;
-    itemName: string;
-    rfqTo: string;
-    teamMemberName: string;
-    statusName: string;
-    dueDate: Date;
-    rfqId: number | null;
-    requestedVendor: string | null;
-    items: RfqItem[];
-    documents: RfqDocument[];
-    docList: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-export interface RfqItem {
-    id: number;
-    rfqId: number;
-    requirement: string;
-    unit: string | null;
-    qty: string | null;
-}
-
-export interface RfqDocument {
-    id: number;
-    rfqId: number;
-    docType: string;
-    path: string;
-    metadata: any;
-}
-
-export interface CreateRfqDto {
-    tenderId: number;
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
-    documents?: Array<{
-        docType: string;
-        path: string;
-        metadata?: any;
-    }>;
-}
-
-export interface UpdateRfqDto {
-    dueDate?: string;
-    docList?: string;
-    requestedVendor?: string;
-    items?: Array<{
-        requirement: string;
-        unit?: string;
-        qty?: number;
-    }>;
 }
 
 // Add to existing types file

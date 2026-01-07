@@ -1,4 +1,3 @@
-import type { TenderQuery } from '@/types/api.types';
 import type { TqReceivedFormValues, TqRepliedFormValues, TqMissedFormValues } from './tqManagement.schema';
 
 /**
@@ -41,3 +40,104 @@ export interface TqMissedFormProps {
 
 // Re-export form value types
 export type { TqReceivedFormValues, TqRepliedFormValues, TqMissedFormValues };
+
+export type TabKey = 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified';
+
+export type TqManagementFilters = {
+    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+};
+
+export interface TqManagementDashboardCounts {
+    awaited: number;
+    received: number;
+    replied: number;
+    qualified: number;
+    disqualified: number;
+    total: number;
+}
+
+export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
+
+export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
+
+export type TenderQuery = {
+    id: number;
+    tenderId: number;
+    tqSubmissionDeadline: Date | null;
+    tqDocumentReceived: string | null;
+    receivedBy: number | null;
+    receivedAt: Date | null;
+    repliedDatetime: Date | null;
+    repliedDocument: string | null;
+    proofOfSubmission: string | null;
+    repliedBy: number | null;
+    repliedAt: Date | null;
+    missedReason: string | null;
+    preventionMeasures: string | null;
+    tmsImprovements: string | null;
+    status: TqStatus;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TenderQueryItem = {
+    id: number;
+    tenderQueryId: number;
+    srNo: number;
+    tqTypeId: number;
+    queryDescription: string;
+    response: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type TqManagementDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    bidSubmissionDate: Date | null;
+    tqSubmissionDeadline: Date | null;
+    tqStatus: TenderQueryStatus;
+    tqId: number | null;
+    tqCount: number;
+    bidSubmissionId: number | null;
+};
+
+export type CreateTqReceivedDto = {
+    tenderId: number;
+    tqSubmissionDeadline: string;
+    tqDocumentReceived: string | null;
+    tqItems: Array<{
+        tqTypeId: number;
+        queryDescription: string;
+    }>;
+};
+
+export type UpdateTqRepliedDto = {
+    repliedDatetime: string;
+    repliedDocument: string | null;
+    proofOfSubmission: string;
+};
+
+export type UpdateTqMissedDto = {
+    missedReason: string;
+    preventionMeasures: string;
+    tmsImprovements: string;
+};
+
+
+export interface TqManagementDashboardCounts {
+    awaited: number;
+    received: number;
+    replied: number;
+    qualified: number;
+    disqualified: number;
+    total: number;
+}

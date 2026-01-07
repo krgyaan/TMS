@@ -1,13 +1,13 @@
 import { BaseApiService } from './base.service';
 import type {
     TenderCostingSheet,
-    PaginatedResult,
     CostingApprovalDashboardCounts,
     CostingApprovalListParams,
     CostingApprovalDashboardRow,
     ApproveCostingDto,
     RejectCostingDto,
-} from '@/types/api.types';
+} from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 
 class CostingApprovalsService extends BaseApiService {
@@ -21,8 +21,8 @@ class CostingApprovalsService extends BaseApiService {
         const search = new URLSearchParams();
 
         if (params) {
-            if (params.costingStatus) {
-                search.set('costingStatus', params.costingStatus);
+            if (params.tab) {
+                search.set('tab', params.tab);
             }
             if (params.page) {
                 search.set('page', String(params.page));
@@ -39,9 +39,7 @@ class CostingApprovalsService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<CostingApprovalDashboardRow>>(
-            queryString ? `?${queryString}` : ''
-        );
+        return this.get<PaginatedResult<CostingApprovalDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
     async getById(id: number): Promise<TenderCostingSheet> {

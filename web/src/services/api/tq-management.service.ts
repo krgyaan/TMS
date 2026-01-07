@@ -1,22 +1,7 @@
 import { BaseApiService } from './base.service';
-import type {
-    TenderQuery,
-    TqManagementDashboardRow,
-    CreateTqReceivedDto,
-    UpdateTqRepliedDto,
-    UpdateTqMissedDto,
-    PaginatedResult,
-    TqManagementDashboardCounts,
-    TenderQueryStatus,
-} from '@/types/api.types';
-
-export type TqManagementFilters = {
-    tqStatus?: TenderQueryStatus | TenderQueryStatus[];
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-};
+import type { TqManagementDashboardRow, CreateTqReceivedDto, UpdateTqRepliedDto, UpdateTqMissedDto, TqManagementDashboardCounts, } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
+import type { TabKey, TqManagementFilters, TenderQuery } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 class TqManagementService extends BaseApiService {
     constructor() {
@@ -24,8 +9,8 @@ class TqManagementService extends BaseApiService {
     }
 
     async getDashboard(
-        tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        tabKey?: TabKey,
+        filters?: TqManagementFilters,
     ): Promise<PaginatedResult<TqManagementDashboardRow>> {
         const search = new URLSearchParams();
 
@@ -48,40 +33,7 @@ class TqManagementService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<TqManagementDashboardRow>>(
-            `/dashboard${queryString ? `?${queryString}` : ''}`
-        );
-    }
-
-    async getAll(
-        filters?: TqManagementFilters
-    ): Promise<PaginatedResult<TqManagementDashboardRow>> {
-        const search = new URLSearchParams();
-
-        if (filters) {
-            if (filters.tqStatus) {
-                // Only handle single status in service - arrays are handled in hook
-                const status = Array.isArray(filters.tqStatus) ? filters.tqStatus[0] : filters.tqStatus;
-                search.set('tqStatus', status);
-            }
-            if (filters.page) {
-                search.set('page', String(filters.page));
-            }
-            if (filters.limit) {
-                search.set('limit', String(filters.limit));
-            }
-            if (filters.sortBy) {
-                search.set('sortBy', filters.sortBy);
-            }
-            if (filters.sortOrder) {
-                search.set('sortOrder', filters.sortOrder);
-            }
-        }
-
-        const queryString = search.toString();
-        return this.get<PaginatedResult<TqManagementDashboardRow>>(
-            queryString ? `?${queryString}` : ''
-        );
+        return this.get<PaginatedResult<TqManagementDashboardRow>>(`/dashboard${queryString ? `?${queryString}` : ''}`);
     }
 
     async getById(id: number): Promise<TenderQuery> {

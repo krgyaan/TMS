@@ -18,11 +18,8 @@ class TenderApprovalsService extends BaseApiService {
     ): Promise<PaginatedResult<TenderApprovalRow>> {
         const search = new URLSearchParams();
         if (params) {
-            // Use tabKey if provided, otherwise fall back to tlStatus for backward compatibility
             if (params.tabKey) {
                 search.set('tabKey', params.tabKey);
-            } else if (params.tlStatus) {
-                search.set('tlStatus', String(params.tlStatus));
             }
             if (params.page) search.set('page', params.page.toString());
             if (params.limit) search.set('limit', params.limit.toString());
@@ -32,7 +29,7 @@ class TenderApprovalsService extends BaseApiService {
         }
 
         const queryString = search.toString();
-        return this.get<PaginatedResult<TenderApprovalRow>>(queryString ? `?${queryString}` : '');
+        return this.get<PaginatedResult<TenderApprovalRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
     async getByTenderId(tenderId: number): Promise<TenderApproval | null> {

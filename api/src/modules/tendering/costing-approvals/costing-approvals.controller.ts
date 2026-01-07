@@ -18,43 +18,10 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class CostingApprovalsController {
     constructor(private readonly costingApprovalsService: CostingApprovalsService) { }
 
-    // private validateTeamLeader(user: any) {
-    //     if (user.role !== 'Team Leader' || user.role !== 'Admin' || user.role !== 'Super Admin' || user.role !== 'Coordinator') {
-    //         throw new ForbiddenException('Only team leaders can access this resource, but you are ' + user.role);
-    //     }
-    // }
-
-    @Get()
-    async findAll(
-        @CurrentUser() user: ValidatedUser,
-        @Query('costingStatus') costingStatus?: 'Submitted' | 'Approved' | 'Rejected/Redo',
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('sortBy') sortBy?: string,
-        @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    ) {
-        // this.validateTeamLeader(user);
-        const parseNumber = (v?: string): number | undefined => {
-            if (!v) return undefined;
-            const num = parseInt(v, 10);
-            return Number.isNaN(num) ? undefined : num;
-        };
-
-        const filters: CostingApprovalFilters = {
-            ...(costingStatus && { costingStatus }),
-            ...(parseNumber(page) && { page: parseNumber(page) }),
-            ...(parseNumber(limit) && { limit: parseNumber(limit) }),
-            ...(sortBy && { sortBy }),
-            ...(sortOrder && { sortOrder }),
-        };
-
-        return this.costingApprovalsService.findAllForApproval((user as any).team, filters);
-    }
-
     @Get('dashboard')
     async getDashboard(
         @CurrentUser() user: ValidatedUser,
-        @Query('tab') tab?: 'pending' | 'approved' | 'rejected' | 'tender-dnb',
+        @Query('tab') tab?: 'pending' | 'approved' | 'tender-dnb',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,

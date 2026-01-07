@@ -13,12 +13,12 @@ export const documentChecklistKeys = {
 };
 
 export const useDocumentChecklists = (
-    tab?: 'pending' | 'submitted',
+    tab?: 'pending' | 'submitted' | 'tender-dnb',
     pagination: { page: number; limit: number } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params = {
-        ...(tab && { checklistSubmitted: tab === 'submitted' }),
+        ...(tab && { tab }),
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),

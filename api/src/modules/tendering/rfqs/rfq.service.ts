@@ -96,7 +96,7 @@ export class RfqsService {
  * Get RFQ Dashboard data - Refactored to use dashboard config
  */
     async getRfqData(
-        tabKey?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
+        tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<RfqRow>> {
         const page = filters?.page || 1;
@@ -104,13 +104,12 @@ export class RfqsService {
         const offset = (page - 1) * limit;
 
         // Use default tab if not provided
-        const activeTab = tabKey || 'pending';
+        const activeTab = tab || 'pending';
 
         // Build base conditions
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNotNull(tenderInfos.rfqTo),   // NOT NULL
             ne(tenderInfos.rfqTo, ''),      // NOT empty string
             ne(tenderInfos.rfqTo, '0'),     // NOT '0'
@@ -125,19 +124,16 @@ export class RfqsService {
         const conditions = [...baseConditions];
 
         if (activeTab === 'pending') {
-            // conditions.push(eq(tenderInfos.status, 3));
             conditions.push(isNull(rfqs.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'sent') {
-            // conditions.push(eq(tenderInfos.status, 4));
             conditions.push(isNotNull(rfqs.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'rfq-rejected') {
-            // RFQ Rejected: status in [10, 14, 35]
             conditions.push(inArray(tenderInfos.status, [10, 14, 35]));
         } else if (activeTab === 'tender-dnb') {
-            // Tender DNB: status in [8, 34] (dnb category)
             const dnbStatusIds = StatusCache.getIds('dnb');
             if (dnbStatusIds.length > 0) {
-                // Filter to only [8, 34] from dnb category
                 const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
                 if (filteredDnbIds.length > 0) {
                     conditions.push(inArray(tenderInfos.status, filteredDnbIds));
@@ -283,7 +279,7 @@ export class RfqsService {
                 return {
                     tenderId: row.tenderId,
                     tenderNo: row.tenderNo,
-                    tenderName: `${row.tenderName} - ${row.tenderNo}`,
+                    tenderName: row.tenderName,
                     teamMember: row.teamMember || 0,
                     teamMemberName: row.teamMemberName || '',
                     status: row.status || 0,
@@ -305,7 +301,7 @@ export class RfqsService {
         const data: RfqRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
-            tenderName: `${row.tenderName} - ${row.tenderNo}`,
+            tenderName: row.tenderName,
             teamMember: row.teamMember || 0,
             teamMemberName: row.teamMemberName || '',
             status: row.status || 0,
@@ -324,24 +320,19 @@ export class RfqsService {
     }
 
     async findById(id: number): Promise<RfqDetails | null> {
-        const rfqData = await this.db
-            .select()
-            .from(rfqs)
-            .where(eq(rfqs.id, id))
-            .limit(1);
+        const rfqData = await this.db.select().from(rfqs)
+            .where(eq(rfqs.id, id)).limit(1);
 
         if (!rfqData[0]) {
             return null;
         }
 
         const rfqItemsData = await this.db
-            .select()
-            .from(rfqItems)
+            .select().from(rfqItems)
             .where(eq(rfqItems.rfqId, id));
 
         const rfqDocumentsData = await this.db
-            .select()
-            .from(rfqDocuments)
+            .select().from(rfqDocuments)
             .where(eq(rfqDocuments.rfqId, id));
 
         return {
@@ -353,8 +344,7 @@ export class RfqsService {
 
     async findByTenderId(tenderId: number): Promise<RfqDetails | null> {
         const rfqData = await this.db
-            .select()
-            .from(rfqs)
+            .select().from(rfqs)
             .where(eq(rfqs.tenderId, tenderId))
             .limit(1);
 
@@ -363,13 +353,11 @@ export class RfqsService {
         }
 
         const rfqItemsData = await this.db
-            .select()
-            .from(rfqItems)
+            .select().from(rfqItems)
             .where(eq(rfqItems.rfqId, rfqData[0].id));
 
         const rfqDocumentsData = await this.db
-            .select()
-            .from(rfqDocuments)
+            .select().from(rfqDocuments)
             .where(eq(rfqDocuments.rfqId, rfqData[0].id));
 
         return {
@@ -566,7 +554,7 @@ export class RfqsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             isNotNull(tenderInfos.rfqTo),
             ne(tenderInfos.rfqTo, '0'),
             ne(tenderInfos.rfqTo, ''),
@@ -575,15 +563,15 @@ export class RfqsService {
         // Count pending: status = 3, rfqId IS NULL
         const pendingConditions = [
             ...baseConditions,
-            eq(tenderInfos.status, 3),
             isNull(rfqs.id),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         // Count sent: status = 4, rfqId IS NOT NULL
         const sentConditions = [
             ...baseConditions,
-            eq(tenderInfos.status, 4),
             isNotNull(rfqs.id),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
         // Count rfq-rejected: status in [10, 14, 35]

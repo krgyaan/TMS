@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
-import type { CostingApprovalDashboardRow } from '@/types/api.types';
+import type { CostingApprovalDashboardRow } from '@/modules/tendering/costing-approvals/helpers/costing-approval.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 
 type TabKey = 'pending' | 'approved' | 'tender-dnb';
@@ -41,7 +41,7 @@ const CostingApprovalListPage = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingApprovals(
-        activeTab,
+        activeTab as TabKey,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
