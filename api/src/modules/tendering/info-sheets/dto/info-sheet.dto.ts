@@ -36,11 +36,13 @@ const ClientSchema = z.object({
 });
 
 export const TenderInfoSheetPayloadSchema = z.object({
+    // OEM Experience
+    tenderValue: z.boolean().optional().nullable(),
+    oemExperience: z.enum(['YES', 'NO']).optional().nullable(),
     // TE Recommendation
     teRecommendation: z.enum(['YES', 'NO']),
     teRejectionReason: optionalNumber(z.coerce.number().int().min(1)),
     teRejectionRemarks: optionalString,
-
     // Processing Fee
     processingFeeRequired: z.enum(['YES', 'NO']).optional().nullable(),
     processingFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
@@ -126,7 +128,6 @@ export const TenderInfoSheetPayloadSchema = z.object({
     commercialDocuments: optionalStringArray,
 
     // Client & Address
-    clientOrganization: optionalString,
     clients: z.array(ClientSchema).min(1, 'At least one client is required'),
     courierAddress: optionalString,
 

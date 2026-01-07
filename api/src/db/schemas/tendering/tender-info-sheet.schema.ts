@@ -7,7 +7,8 @@ import {
 export const tenderInformation = pgTable("tender_information", {
     id: serial("id").primaryKey(),
     tenderId: bigint("tender_id", { mode: "number" }).notNull().unique(),
-
+    oemExperience: varchar("oem_experience", { length: 5 }),
+    tenderValue: numeric("tender_value", { precision: 15, scale: 2 }),
     teRecommendation: varchar("te_recommendation", { length: 5 }).notNull(),
     teRejectionReason: integer("te_rejection_reason"),
     teRejectionRemarks: text("te_rejection_remarks"),
@@ -21,7 +22,6 @@ export const tenderInformation = pgTable("tender_information", {
     emdRequired: varchar("emd_required", { length: 10 }),
     emdAmount: numeric("emd_amount", { precision: 12, scale: 2 }),
     emdMode: text("emd_mode").array(),
-    tenderValueGstInclusive: numeric("tender_value_gst_inclusive", { precision: 15, scale: 2 }),
 
     reverseAuctionApplicable: varchar("reverse_auction_applicable", { length: 5 }),
     paymentTermsSupply: integer("payment_terms_supply"),

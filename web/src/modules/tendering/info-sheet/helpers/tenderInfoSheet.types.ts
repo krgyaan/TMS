@@ -39,7 +39,7 @@ export interface SaveTenderInfoSheetDto {
     emdModes: string[] | null;
     emdAmount: number | null;
 
-    tenderValueGstInclusive: number | null;
+    tenderValue: number | null;
 
     bidValidityDays: number | null;
     commercialEvaluation: string | null;
@@ -107,18 +107,18 @@ export interface TenderInfoSheetResponse {
     teRejectionRemarks: string | null;
 
     processingFeeRequired: 'YES' | 'NO' | null;
-    processingFeeMode: string[] | null; // Backend response uses singular, but we map to plural in DTO
+    processingFeeMode: string[] | null;
     processingFeeAmount: string | number | null;
 
     tenderFeeRequired: 'YES' | 'NO' | null;
-    tenderFeeMode: string[] | null; // Backend response uses singular, but we map to plural in DTO
+    tenderFeeMode: string[] | null;
     tenderFeeAmount: string | number | null;
 
     emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
-    emdMode: string[] | null; // Backend response uses singular, but we map to plural in DTO
+    emdMode: string[] | null;
     emdAmount: string | number | null;
 
-    tenderValueGstInclusive: string | number | null;
+    tenderValue: string | number | null;
 
     bidValidityDays: number | null;
     commercialEvaluation: string | null;

@@ -108,6 +108,7 @@ export class TenderInfoSheetsService {
             { name: 'ldRequired', value: payload.ldRequired },
             { name: 'physicalDocsRequired', value: payload.physicalDocsRequired },
             { name: 'reverseAuctionApplicable', value: payload.reverseAuctionApplicable },
+            { name: 'oemExperience', value: payload.oemExperience },
         ];
 
         const invalidFields: string[] = [];
@@ -143,15 +144,6 @@ export class TenderInfoSheetsService {
             // Validate enum values
             if (strValue !== 'YES_GENERAL' && strValue !== 'YES_PROJECT_SPECIFIC' && strValue !== 'NO') {
                 invalidFields.push(`mafRequired="${strValue}" (must be YES_GENERAL, YES_PROJECT_SPECIFIC, or NO)`);
-            }
-        }
-
-        // Validate other VARCHAR fields that might have length constraints
-        // clientOrganization - Database column is VARCHAR(255) as per schema
-        if (payload.clientOrganization !== null && payload.clientOrganization !== undefined) {
-            const strValue = String(payload.clientOrganization).trim();
-            if (strValue.length > 255) {
-                invalidFields.push(`clientOrganization="${strValue}" (length: ${strValue.length}) exceeds database VARCHAR(255) constraint.`);
             }
         }
 
@@ -213,14 +205,12 @@ export class TenderInfoSheetsService {
                 const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
                 const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
 
-                // Log all VARCHAR(5) field values before insertion
-                this.logger.log(`Inserting values - mafRequired: "${mafRequiredValue}" (length: ${mafRequiredValue?.length || 0}), processingFeeRequired: "${processingFeeRequiredValue}" (length: ${processingFeeRequiredValue?.length || 0}), tenderFeeRequired: "${tenderFeeRequiredValue}" (length: ${tenderFeeRequiredValue?.length || 0}), emdRequired: "${emdRequiredValue}" (length: ${emdRequiredValue?.length || 0}), reverseAuctionApplicable: "${reverseAuctionApplicableValue}" (length: ${reverseAuctionApplicableValue?.length || 0}), pbgRequired: "${pbgRequiredValue}" (length: ${pbgRequiredValue?.length || 0}), sdRequired: "${sdRequiredValue}" (length: ${sdRequiredValue?.length || 0}), ldRequired: "${ldRequiredValue}" (length: ${ldRequiredValue?.length || 0}), physicalDocsRequired: "${physicalDocsRequiredValue}" (length: ${physicalDocsRequiredValue?.length || 0})`);
-
                 // Insert main info sheet
                 const [infoSheet] = await tx
                     .insert(tenderInformation)
                     .values({
                         tenderId,
+                        tenderValue: payload.tenderValue?.toString() ?? null,
                         teRecommendation: payload.teRecommendation,
                         teRejectionReason: payload.teRejectionReason ?? null,
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
@@ -274,6 +264,7 @@ export class TenderInfoSheetsService {
                         netWorthValue: payload.netWorthValue?.toString() ?? null,
                         courierAddress: payload.courierAddress ?? null,
                         teFinalRemark: payload.teFinalRemark ?? null,
+                        oemExperience: payload.oemExperience ?? null,
                     })
                     .returning();
 
@@ -425,7 +416,8 @@ export class TenderInfoSheetsService {
 
         // Get tender to check approval status
         const tender = await this.tenderInfosService.findById(tenderId);
-        const isApproved = tender.tlStatus === 1 || tender.tlStatus === 2; // 1 = approved, 2 = rejected (both mean approval process completed)
+        const isApproved = tender?.tlStatus === 1 || tender?.tlStatus === 2;
+        // 1 = approved, 2 = rejected (both mean approval process completed)
 
         // Update main info sheet
         try {
@@ -433,69 +425,71 @@ export class TenderInfoSheetsService {
                 await tx
                     .update(tenderInformation)
                     .set({
-                    teRecommendation: payload.teRecommendation,
-                    teRejectionReason: payload.teRejectionReason ?? null,
-                    teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                    processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
-                    processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                    processingFeeMode: payload.processingFeeModes ?? null,
-                    tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
-                    tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                    tenderFeeMode: payload.tenderFeeModes ?? null,
-                    emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
-                    emdAmount: payload.emdAmount?.toString() ?? null,
-                    emdMode: payload.emdModes ?? null,
-                    reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
-                    paymentTermsSupply: payload.paymentTermsSupply ?? null,
-                    paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-                    bidValidityDays: payload.bidValidityDays ?? null,
-                    commercialEvaluation: payload.commercialEvaluation ?? null,
-                    mafRequired: payload.mafRequired ?? null,
-                    deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                    deliveryTimeInstallationInclusive:
-                        payload.deliveryTimeInstallationInclusive ?? false,
-                    deliveryTimeInstallationDays:
-                        payload.deliveryTimeInstallationDays ?? null,
-                    pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
-                    pbgMode: payload.pbgMode ?? null,
-                    pbgPercentage: payload.pbgPercentage?.toString() ?? null,
-                    pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                    sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
-                    sdMode: payload.sdMode ?? null,
-                    sdPercentage: payload.sdPercentage?.toString() ?? null,
-                    sdDurationMonths: payload.sdDurationMonths ?? null,
-                    ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
-                    ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
-                    maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                    physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
-                    physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
-                    techEligibilityAge: payload.techEligibilityAge ?? null,
-                    workValueType: payload.workValueType ?? null,
-                    orderValue1: payload.orderValue1?.toString() ?? null,
-                    orderValue2: payload.orderValue2?.toString() ?? null,
-                    orderValue3: payload.orderValue3?.toString() ?? null,
-                    avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                    avgAnnualTurnoverValue:
-                        payload.avgAnnualTurnoverValue?.toString() ?? null,
-                    workingCapitalType: payload.workingCapitalType ?? null,
-                    workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
-                    solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                    solvencyCertificateValue:
-                        payload.solvencyCertificateValue?.toString() ?? null,
-                    netWorthType: payload.netWorthType ?? null,
-                    netWorthValue: payload.netWorthValue?.toString() ?? null,
-                    courierAddress: payload.courierAddress ?? null,
-                    teFinalRemark: payload.teFinalRemark ?? null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(tenderInformation.tenderId, tenderId));
+                        tenderValue: payload.tenderValue?.toString() ?? null,
+                        teRecommendation: payload.teRecommendation,
+                        teRejectionReason: payload.teRejectionReason ?? null,
+                        teRejectionRemarks: payload.teRejectionRemarks ?? null,
+                        processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
+                        processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
+                        processingFeeMode: payload.processingFeeModes ?? null,
+                        tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
+                        tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
+                        tenderFeeMode: payload.tenderFeeModes ?? null,
+                        emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
+                        emdAmount: payload.emdAmount?.toString() ?? null,
+                        emdMode: payload.emdModes ?? null,
+                        reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
+                        paymentTermsSupply: payload.paymentTermsSupply ?? null,
+                        paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
+                        bidValidityDays: payload.bidValidityDays ?? null,
+                        commercialEvaluation: payload.commercialEvaluation ?? null,
+                        mafRequired: payload.mafRequired ?? null,
+                        deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
+                        deliveryTimeInstallationInclusive:
+                            payload.deliveryTimeInstallationInclusive ?? false,
+                        deliveryTimeInstallationDays:
+                            payload.deliveryTimeInstallationDays ?? null,
+                        pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
+                        pbgMode: payload.pbgMode ?? null,
+                        pbgPercentage: payload.pbgPercentage?.toString() ?? null,
+                        pbgDurationMonths: payload.pbgDurationMonths ?? null,
+                        sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
+                        sdMode: payload.sdMode ?? null,
+                        sdPercentage: payload.sdPercentage?.toString() ?? null,
+                        sdDurationMonths: payload.sdDurationMonths ?? null,
+                        ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
+                        ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
+                        maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
+                        physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
+                        physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
+                        techEligibilityAge: payload.techEligibilityAge ?? null,
+                        workValueType: payload.workValueType ?? null,
+                        orderValue1: payload.orderValue1?.toString() ?? null,
+                        orderValue2: payload.orderValue2?.toString() ?? null,
+                        orderValue3: payload.orderValue3?.toString() ?? null,
+                        avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
+                        avgAnnualTurnoverValue:
+                            payload.avgAnnualTurnoverValue?.toString() ?? null,
+                        workingCapitalType: payload.workingCapitalType ?? null,
+                        workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
+                        solvencyCertificateType: payload.solvencyCertificateType ?? null,
+                        solvencyCertificateValue:
+                            payload.solvencyCertificateValue?.toString() ?? null,
+                        netWorthType: payload.netWorthType ?? null,
+                        netWorthValue: payload.netWorthValue?.toString() ?? null,
+                        courierAddress: payload.courierAddress ?? null,
+                        teFinalRemark: payload.teFinalRemark ?? null,
+                        oemExperience: payload.oemExperience ?? null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(tenderInformation.tenderId, tenderId));
 
                 // Update tenderInfo table's gstValues if tender is approved
-                if (isApproved && payload.tenderValueGstInclusive) {
+                if (isApproved && payload.tenderValue) {
                     await tx
                         .update(tenderInfos)
                         .set({
-                            gstValues: payload.tenderValueGstInclusive.toString(),
+                            gstValues: payload.tenderValue.toString(),
                             updatedAt: new Date(),
                         })
                         .where(eq(tenderInfos.id, tenderId));
