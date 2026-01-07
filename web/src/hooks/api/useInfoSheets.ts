@@ -29,7 +29,19 @@ export const useCreateInfoSheet = () => {
             toast.success("Tender info sheet created successfully");
         },
         onError: error => {
-            toast.error(handleQueryError(error));
+            const errorMessage = handleQueryError(error);
+            // Provide more specific error messages
+            if (errorMessage.includes('Invalid field values') || errorMessage.includes('validation')) {
+                toast.error(`Validation Error: ${errorMessage}. Please check all required fields.`, {
+                    duration: 6000,
+                });
+            } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+                toast.error("Network Error: Unable to connect to server. Please check your connection and try again.", {
+                    duration: 5000,
+                });
+            } else {
+                toast.error(errorMessage || "Failed to create tender info sheet. Please try again.");
+            }
         },
     });
 };
@@ -45,7 +57,23 @@ export const useUpdateInfoSheet = () => {
             toast.success("Tender info sheet updated successfully");
         },
         onError: error => {
-            toast.error(handleQueryError(error));
+            const errorMessage = handleQueryError(error);
+            // Provide more specific error messages
+            if (errorMessage.includes('Invalid field values') || errorMessage.includes('validation')) {
+                toast.error(`Validation Error: ${errorMessage}. Please check all required fields.`, {
+                    duration: 6000,
+                });
+            } else if (errorMessage.includes('not found')) {
+                toast.error("Error: Info sheet not found. Please refresh the page and try again.", {
+                    duration: 5000,
+                });
+            } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+                toast.error("Network Error: Unable to connect to server. Please check your connection and try again.", {
+                    duration: 5000,
+                });
+            } else {
+                toast.error(errorMessage || "Failed to update tender info sheet. Please try again.");
+            }
         },
     });
 };

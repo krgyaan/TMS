@@ -245,11 +245,11 @@ export class TenderInfoSheetsService {
                         deliveryTimeInstallationDays:
                             payload.deliveryTimeInstallationDays ?? null,
                         pbgRequired: pbgRequiredValue,
-                        pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
+                        pbgMode: payload.pbgMode ?? null,
                         pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                         pbgDurationMonths: payload.pbgDurationMonths ?? null,
                         sdRequired: sdRequiredValue,
-                        sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
+                        sdMode: payload.sdMode ?? null,
                         sdPercentage: payload.sdPercentage?.toString() ?? null,
                         sdDurationMonths: payload.sdDurationMonths ?? null,
                         ldRequired: ldRequiredValue,
@@ -423,11 +423,16 @@ export class TenderInfoSheetsService {
             );
         }
 
+        // Get tender to check approval status
+        const tender = await this.tenderInfosService.findById(tenderId);
+        const isApproved = tender.tlStatus === 1 || tender.tlStatus === 2; // 1 = approved, 2 = rejected (both mean approval process completed)
+
         // Update main info sheet
         try {
-            await this.db
-                .update(tenderInformation)
-                .set({
+            await this.db.transaction(async (tx) => {
+                await tx
+                    .update(tenderInformation)
+                    .set({
                     teRecommendation: payload.teRecommendation,
                     teRejectionReason: payload.teRejectionReason ?? null,
                     teRejectionRemarks: payload.teRejectionRemarks ?? null,
@@ -452,11 +457,11 @@ export class TenderInfoSheetsService {
                     deliveryTimeInstallationDays:
                         payload.deliveryTimeInstallationDays ?? null,
                     pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
-                    pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
+                    pbgMode: payload.pbgMode ?? null,
                     pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                     pbgDurationMonths: payload.pbgDurationMonths ?? null,
                     sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
-                    sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
+                    sdMode: payload.sdMode ?? null,
                     sdPercentage: payload.sdPercentage?.toString() ?? null,
                     sdDurationMonths: payload.sdDurationMonths ?? null,
                     ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
@@ -485,52 +490,64 @@ export class TenderInfoSheetsService {
                 })
                 .where(eq(tenderInformation.tenderId, tenderId));
 
-            // Delete existing related records
-            await Promise.all([
-                this.db
-                    .delete(tenderClients)
-                    .where(eq(tenderClients.tenderId, tenderId)),
-                this.db
-                    .delete(tenderTechnicalDocuments)
-                    .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
-                this.db
-                    .delete(tenderFinancialDocuments)
-                    .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
-            ]);
+                // Update tenderInfo table's gstValues if tender is approved
+                if (isApproved && payload.tenderValueGstInclusive) {
+                    await tx
+                        .update(tenderInfos)
+                        .set({
+                            gstValues: payload.tenderValueGstInclusive.toString(),
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(tenderInfos.id, tenderId));
+                }
 
-            // Insert updated related records
-            const clients = payload.clients ?? [];
-            if (clients.length > 0) {
-                await this.db.insert(tenderClients).values(
-                    clients.map((client) => ({
-                        tenderId,
-                        clientName: client.clientName,
-                        clientDesignation: client.clientDesignation ?? null,
-                        clientMobile: client.clientMobile ?? null,
-                        clientEmail: client.clientEmail ?? null,
-                    }))
-                );
-            }
+                // Delete existing related records
+                await Promise.all([
+                    tx
+                        .delete(tenderClients)
+                        .where(eq(tenderClients.tenderId, tenderId)),
+                    tx
+                        .delete(tenderTechnicalDocuments)
+                        .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
+                    tx
+                        .delete(tenderFinancialDocuments)
+                        .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
+                ]);
 
-            const technicalDocs = payload.technicalWorkOrders ?? [];
-            if (technicalDocs.length > 0) {
-                await this.db.insert(tenderTechnicalDocuments).values(
-                    technicalDocs.map((docName) => ({
-                        tenderId,
-                        documentName: docName,
-                    }))
-                );
-            }
+                // Insert updated related records
+                const clients = payload.clients ?? [];
+                if (clients.length > 0) {
+                    await tx.insert(tenderClients).values(
+                        clients.map((client) => ({
+                            tenderId,
+                            clientName: client.clientName,
+                            clientDesignation: client.clientDesignation ?? null,
+                            clientMobile: client.clientMobile ?? null,
+                            clientEmail: client.clientEmail ?? null,
+                        }))
+                    );
+                }
 
-            const financialDocs = payload.commercialDocuments ?? [];
-            if (financialDocs.length > 0) {
-                await this.db.insert(tenderFinancialDocuments).values(
-                    financialDocs.map((docName) => ({
-                        tenderId,
-                        documentName: docName,
-                    }))
-                );
-            }
+                const technicalDocs = payload.technicalWorkOrders ?? [];
+                if (technicalDocs.length > 0) {
+                    await tx.insert(tenderTechnicalDocuments).values(
+                        technicalDocs.map((docName) => ({
+                            tenderId,
+                            documentName: docName,
+                        }))
+                    );
+                }
+
+                const financialDocs = payload.commercialDocuments ?? [];
+                if (financialDocs.length > 0) {
+                    await tx.insert(tenderFinancialDocuments).values(
+                        financialDocs.map((docName) => ({
+                            tenderId,
+                            documentName: docName,
+                        }))
+                    );
+                }
+            });
 
             const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
 

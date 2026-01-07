@@ -149,12 +149,12 @@ export const mapResponseToForm = (
         deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : undefined,
 
         pbgRequired: data.pbgRequired ?? undefined,
-        pbgForm: data.pbgMode as TenderInfoSheetFormValues['pbgForm'],
+        pbgForm: Array.isArray(data.pbgMode) ? data.pbgMode : (data.pbgMode ? [data.pbgMode] : []),
         pbgPercentage: toNumber(data.pbgPercentage),
         pbgDurationMonths: toNumber(data.pbgDurationMonths),
 
         sdRequired: data.sdRequired ?? undefined,
-        sdForm: data.sdMode as TenderInfoSheetFormValues['sdForm'],
+        sdForm: Array.isArray(data.sdMode) ? data.sdMode : (data.sdMode ? [data.sdMode] : []),
         securityDepositPercentage: toNumber(data.sdPercentage),
         sdDurationMonths: toNumber(data.sdDurationMonths),
 
@@ -315,12 +315,16 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             : null,
 
         pbgRequired: safeYesNoValue(values.pbgRequired),
-        pbgMode: values.pbgRequired === 'YES' ? (values.pbgForm ?? null) : null,
+        pbgMode: values.pbgRequired === 'YES' && values.pbgForm?.length
+            ? toStringArray(values.pbgForm)
+            : null,
         pbgPercentage: values.pbgRequired === 'YES' ? safeNumber(values.pbgPercentage) : null,
         pbgDurationMonths: values.pbgRequired === 'YES' ? safeNumber(values.pbgDurationMonths) : null,
 
         sdRequired: safeYesNoValue(values.sdRequired),
-        sdMode: values.sdRequired === 'YES' ? (values.sdForm ?? null) : null,
+        sdMode: values.sdRequired === 'YES' && values.sdForm?.length
+            ? toStringArray(values.sdForm)
+            : null,
         sdPercentage: values.sdRequired === 'YES' ? safeNumber(values.securityDepositPercentage) : null,
         sdDurationMonths: values.sdRequired === 'YES' ? safeNumber(values.sdDurationMonths) : null,
 

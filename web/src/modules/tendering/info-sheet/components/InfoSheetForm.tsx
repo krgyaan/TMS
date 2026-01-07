@@ -30,17 +30,19 @@ import type { TenderInfoWithNames } from '@/types/api.types';
 import {
     yesNoOptions,
     emdRequiredOptions,
+    processingFeeOptions,
+    tenderFeeOptions,
     paymentModeOptions,
-    paymentTermsOptions,
     bidValidityOptions,
     commercialEvaluationOptions,
     mafRequiredOptions,
     pbgFormOptions,
     sdFormOptions,
     pbgDurationOptions,
-    ldPerWeekOptions,
-    maxLdOptions,
-    financialCriteriaOptions,
+    aatOptions,
+    scOptions,
+    wcOptions,
+    nwOptions,
     rejectionReasonOptions,
     dummyTechnicalDocuments,
     dummyFinancialDocuments,
@@ -153,6 +155,7 @@ export function TenderInformationForm({
                 'ldRequired',
                 'physicalDocsRequired',
                 'reverseAuctionApplicable',
+                'oemExperience'
             ];
 
             const invalidFields: string[] = [];
@@ -321,10 +324,6 @@ export function TenderInformationForm({
                                         </FieldWrapper>
                                     </>
                                 )}
-                            </div>
-
-                            {/* Processing Fee */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="processingFeeRequired"
@@ -338,7 +337,7 @@ export function TenderInformationForm({
                                             control={form.control}
                                             name="processingFeeModes"
                                             label="Processing Fees Mode"
-                                            options={paymentModeOptions.map(option => ({
+                                            options={processingFeeOptions.map(option => ({
                                                 value: String(option.value),
                                                 label: option.label
                                             }))}
@@ -360,10 +359,6 @@ export function TenderInformationForm({
                                         </FieldWrapper>
                                     </>
                                 )}
-                            </div>
-
-                            {/* Tender Fee */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="tenderFeeRequired"
@@ -377,7 +372,7 @@ export function TenderInformationForm({
                                             control={form.control}
                                             name="tenderFeeModes"
                                             label="Tender Fees Mode"
-                                            options={paymentModeOptions.map(option => ({
+                                            options={tenderFeeOptions.map(option => ({
                                                 value: String(option.value),
                                                 label: option.label
                                             }))}
@@ -399,10 +394,6 @@ export function TenderInformationForm({
                                         </FieldWrapper>
                                     </>
                                 )}
-                            </div>
-
-                            {/* EMD */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="emdRequired"
@@ -438,10 +429,6 @@ export function TenderInformationForm({
                                         </FieldWrapper>
                                     </>
                                 )}
-                            </div>
-
-                            {/* Tender Value & Bid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FieldWrapper
                                     control={form.control}
                                     name="tenderValueGstInclusive"
@@ -453,7 +440,6 @@ export function TenderInformationForm({
                                             placeholder="0.00"
                                             value={typeof field.value === "number" ? field.value : null}
                                             onChange={field.onChange}
-                                            disabled
                                         />
                                     )}
                                 </FieldWrapper>
@@ -477,10 +463,6 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select option"
                                 />
-                            </div>
-
-                            {/* PBG */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="pbgRequired"
@@ -490,7 +472,7 @@ export function TenderInformationForm({
                                 />
                                 {pbgRequired === 'YES' && (
                                     <>
-                                        <SelectField
+                                        <MultiSelectField
                                             control={form.control}
                                             name="pbgForm"
                                             label="PBG (in form of)"
@@ -498,7 +480,7 @@ export function TenderInformationForm({
                                                 value: String(option.value),
                                                 label: option.label
                                             }))}
-                                            placeholder="Select form"
+                                            placeholder="Select forms"
                                         />
                                         <FieldWrapper
                                             control={form.control}
@@ -508,7 +490,9 @@ export function TenderInformationForm({
                                             {(field) => (
                                                 <NumberInput
                                                     step={0.01}
-                                                    placeholder="0.00"
+                                                    min={0}
+                                                    max={100}
+                                                    placeholder="Enter percentage (0-100)"
                                                     value={typeof field.value === "number" ? field.value : null}
                                                     onChange={field.onChange}
                                                 />
@@ -526,10 +510,6 @@ export function TenderInformationForm({
                                         />
                                     </>
                                 )}
-                            </div>
-
-                            {/* SD */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="sdRequired"
@@ -539,7 +519,7 @@ export function TenderInformationForm({
                                 />
                                 {sdRequired === 'YES' && (
                                     <>
-                                        <SelectField
+                                        <MultiSelectField
                                             control={form.control}
                                             name="sdForm"
                                             label="SD (in form of)"
@@ -547,7 +527,7 @@ export function TenderInformationForm({
                                                 value: String(option.value),
                                                 label: option.label
                                             }))}
-                                            placeholder="Select form"
+                                            placeholder="Select forms"
                                         />
                                         <FieldWrapper
                                             control={form.control}
@@ -557,7 +537,9 @@ export function TenderInformationForm({
                                             {(field) => (
                                                 <NumberInput
                                                     step={0.01}
-                                                    placeholder="0.00"
+                                                    min={0}
+                                                    max={100}
+                                                    placeholder="Enter percentage (0-100)"
                                                     value={typeof field.value === "number" ? field.value : null}
                                                     onChange={field.onChange}
                                                 />
@@ -582,10 +564,6 @@ export function TenderInformationForm({
                                         </FieldWrapper>
                                     </>
                                 )}
-                            </div>
-
-                            {/* Commercial & Auction */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="commercialEvaluation"
@@ -603,34 +581,38 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
-                            </div>
-
-                            {/* Payment Terms */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <SelectField
+                                <FieldWrapper
                                     control={form.control}
                                     name="paymentTermsSupply"
                                     label="Payment Terms on Supply (%)"
-                                    options={paymentTermsOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select percentage"
-                                />
-                                <SelectField
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={0.01}
+                                            min={0}
+                                            max={100}
+                                            placeholder="Enter percentage (0-100)"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <FieldWrapper
                                     control={form.control}
                                     name="paymentTermsInstallation"
                                     label="Payment Terms on Installation (%)"
-                                    options={paymentTermsOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select percentage"
-                                />
-                            </div>
-
-                            {/* Delivery Time */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={0.01}
+                                            min={0}
+                                            max={100}
+                                            placeholder="Enter percentage (0-100)"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
                                 <FieldWrapper
                                     control={form.control}
                                     name="deliveryTimeSupply"
@@ -688,41 +670,45 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
-
-                            {/* LD */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="ldRequired"
-                                    label="LD Required"
+                                    label="LD Applicable"
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
-                                <SelectField
+                                <FieldWrapper
                                     control={form.control}
                                     name="ldPercentagePerWeek"
                                     label="LD/PRS Percentage (per week)"
-                                    options={ldPerWeekOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select percentage"
-                                />
-                                <SelectField
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={0.01}
+                                            min={0}
+                                            max={5}
+                                            placeholder="Enter percentage (0-5)"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <FieldWrapper
                                     control={form.control}
                                     name="maxLdPercentage"
                                     label="Maximum LD Percentage"
-                                    options={maxLdOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select percentage"
-                                />
-                            </div>
-
-                            {/* Physical Docs */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                >
+                                    {(field) => (
+                                        <NumberInput
+                                            step={0.01}
+                                            min={0}
+                                            max={100}
+                                            placeholder="Enter percentage (0-100)"
+                                            value={typeof field.value === "number" ? field.value : null}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                </FieldWrapper>
                                 <SelectField
                                     control={form.control}
                                     name="physicalDocsRequired"
@@ -745,10 +731,7 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
 
-                            {/* Technical Eligibility */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FieldWrapper
                                     control={form.control}
                                     name="techEligibilityAgeYears"
@@ -765,6 +748,16 @@ export function TenderInformationForm({
                                 </FieldWrapper>
                                 <SelectField
                                     control={form.control}
+                                    name="oemExperience"
+                                    label="OEM Experience"
+                                    options={yesNoOptions.map(option => ({
+                                        value: option.value,
+                                        label: option.label
+                                    }))}
+                                    placeholder="Select type"
+                                />
+                                <SelectField
+                                    control={form.control}
                                     name="workValueType"
                                     label="Work Value Type"
                                     options={workValueTypeOptions.map(option => ({
@@ -773,66 +766,63 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select type"
                                 />
-                            </div>
 
-                            {/* Work Values */}
-                            {workValueType === 'WORKS_VALUES' && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <FieldWrapper control={form.control} name="orderValue1" label="1 Work Value">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                            )}
+                                {/* Work Values */}
+                                {workValueType === 'WORKS_VALUES' && (
+                                    <>
+                                        <FieldWrapper control={form.control} name="orderValue1" label="1 Work Value">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
 
-                            {/* Custom Eligibility */}
-                            {workValueType === 'CUSTOM' && (
-                                <div className="grid grid-cols-1 gap-6">
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="customEligibilityCriteria"
-                                        label="Custom Eligibility Criteria"
-                                    >
-                                        {(field) => (
-                                            <textarea
-                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                placeholder="Enter custom eligibility criteria..."
-                                                maxLength={1000}
-                                                {...field}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                            )}
+                                {/* Custom Eligibility */}
+                                {workValueType === 'CUSTOM' && (
+                                    <>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="customEligibilityCriteria"
+                                            label="Custom Eligibility Criteria"
+                                        >
+                                            {(field) => (
+                                                <textarea
+                                                    className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                    placeholder="Enter custom eligibility criteria..."
+                                                    maxLength={1000}
+                                                    {...field}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
 
-                            {/* Documents */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <MultiSelectField
                                     control={form.control}
                                     name="technicalWorkOrders"
@@ -843,19 +833,15 @@ export function TenderInformationForm({
                                 <MultiSelectField
                                     control={form.control}
                                     name="commercialDocuments"
-                                    label="PQC Documents"
+                                    label="Financial PQC Documents"
                                     options={dummyFinancialDocuments}
                                     placeholder="Select documents"
                                 />
-                            </div>
-
-                            {/* Financial - Average Annual Turnover */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="avgAnnualTurnoverCriteria"
                                     label="Average Annual Turnover"
-                                    options={financialCriteriaOptions}
+                                    options={aatOptions}
                                     placeholder="Select criteria"
                                 />
                                 {avgAnnualTurnoverCriteria === 'AMOUNT' && (
@@ -870,15 +856,12 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
 
-                            {/* Financial - Working Capital */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="workingCapitalCriteria"
                                     label="Working Capital"
-                                    options={financialCriteriaOptions}
+                                    options={wcOptions}
                                     placeholder="Select criteria"
                                 />
                                 {workingCapitalCriteria === 'AMOUNT' && (
@@ -893,15 +876,11 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
-
-                            {/* Financial - Solvency */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="solvencyCertificateCriteria"
                                     label="Solvency Certificate"
-                                    options={financialCriteriaOptions}
+                                    options={scOptions}
                                     placeholder="Select criteria"
                                 />
                                 {solvencyCertificateCriteria === 'AMOUNT' && (
@@ -916,15 +895,11 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
-
-                            {/* Financial - Net Worth */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="netWorthCriteria"
                                     label="Net Worth"
-                                    options={financialCriteriaOptions}
+                                    options={nwOptions}
                                     placeholder="Select criteria"
                                 />
                                 {netWorthCriteria === 'AMOUNT' && (
@@ -939,13 +914,6 @@ export function TenderInformationForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-                            </div>
-
-                            {/* Client Organization */}
-                            <div className="grid grid-cols-1 gap-6">
-                                <FieldWrapper control={form.control} name="clientOrganization" label="Client Organisation">
-                                    {(field) => <Input placeholder="Enter client organisation" {...field} />}
-                                </FieldWrapper>
                             </div>
 
                             {/* Client Details */}

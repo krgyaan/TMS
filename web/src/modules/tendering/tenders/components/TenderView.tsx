@@ -7,7 +7,6 @@ import { Pencil, ArrowLeft, FileText } from 'lucide-react';
 import type { TenderInfoWithNames } from '@/types/api.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { Link } from 'react-router-dom';
 
 interface TenderViewProps {
     tender: TenderInfoWithNames;
@@ -175,7 +174,23 @@ export function TenderView({
                                 Website
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                <Link to={'/' + (tender.websiteLink ?? '#')} target='_blank' className='hover:text-primary'>{tender.websiteName || '—'}</Link>
+                                {tender.websiteLink ? (() => {
+                                    const url = tender.websiteLink.startsWith('http://') || tender.websiteLink.startsWith('https://')
+                                        ? tender.websiteLink
+                                        : `https://${tender.websiteLink}`;
+                                    return (
+                                        <a
+                                            href={url}
+                                            target='_blank'
+                                            rel='noopener noreferrer'
+                                            className='hover:text-primary underline'
+                                        >
+                                            {tender.websiteName || tender.websiteLink.replace(/^https?:\/\//i, "")}
+                                        </a>
+                                    );
+                                })() : (
+                                    '—'
+                                )}
                             </TableCell>
                         </TableRow>
 

@@ -54,12 +54,12 @@ export interface SaveTenderInfoSheetDto {
     deliveryTimeInstallationDays: number | null;
 
     pbgRequired: 'YES' | 'NO' | null;
-    pbgMode: string | null;
+    pbgMode: string[] | null;
     pbgPercentage: number | null;
     pbgDurationMonths: number | null;
 
     sdRequired: 'YES' | 'NO' | null;
-    sdMode: string | null;
+    sdMode: string[] | null;
     sdPercentage: number | null;
     sdDurationMonths: number | null;
 
@@ -71,7 +71,7 @@ export interface SaveTenderInfoSheetDto {
     physicalDocsDeadline: string | null;
 
     techEligibilityAge: number | null;
-
+    oemExperience: 'YES' | 'NO' | null;
     workValueType: 'WORKS_VALUES' | 'CUSTOM' | null;
     orderValue1: number | null;
     orderValue2: number | null;
@@ -133,12 +133,12 @@ export interface TenderInfoSheetResponse {
     deliveryTimeInstallationDays: number | null;
 
     pbgRequired: 'YES' | 'NO' | null;
-    pbgMode: string | null;
+    pbgMode: string[] | null;
     pbgPercentage: string | number | null;
     pbgDurationMonths: number | null;
 
     sdRequired: 'YES' | 'NO' | null;
-    sdMode: string | null;
+    sdMode: string[] | null;
     sdPercentage: string | number | null;
     sdDurationMonths: number | null;
 
@@ -150,7 +150,7 @@ export interface TenderInfoSheetResponse {
     physicalDocsDeadline: string | Date | null;
 
     techEligibilityAge: number | null;
-
+    oemExperience: 'YES' | 'NO' | null;
     workValueType: 'WORKS_VALUES' | 'CUSTOM' | null;
     orderValue1: string | number | null;
     orderValue2: string | number | null;
@@ -206,14 +206,25 @@ export const emdRequiredOptions = [
     { value: 'EXEMPT', label: 'Exempt' },
 ];
 
+export const processingFeeOptions = [
+    { vlaue: "DD", label: "Demand Draft" },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
+];
+
+export const tenderFeeOptions = [
+    { vlaue: "DD", label: "Demand Draft" },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
+];
+
 export const paymentModeOptions = [
-    { value: 'DD', label: 'DD (Demand Draft)' },
-    { value: 'POP', label: 'POP' },
-    { value: 'BT', label: 'BT (Bank Transfer)' },
-    { value: 'FDR', label: 'FDR' },
-    { value: 'PBG', label: 'PBG' },
-    { value: 'SB', label: 'SB' },
-    { value: 'ONLINE', label: 'Online' },
+    { value: 'DD', label: 'Demand Draft' },
+    { value: 'POP', label: 'Pay on Portal' },
+    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'FDR', label: 'Fixed Deposit Receipt' },
+    { value: 'BG', label: 'Bank Guarantee' },
+    { value: 'SB', label: 'Surety Bond' },
 ];
 
 export const paymentTermsOptions = Array.from({ length: 21 }, (_, i) => ({
@@ -240,19 +251,17 @@ export const mafRequiredOptions = [
 ];
 
 export const pbgFormOptions = [
-    { value: 'DD_DEDUCTION', label: 'DD/Deduction' },
-    { value: 'FDR', label: 'FDR' },
-    { value: 'PBG', label: 'PBG' },
-    { value: 'SB', label: 'SB' },
-    { value: 'NA', label: 'NA' },
+    { value: 'DD', label: 'DD/Deduction' },
+    { value: 'FDR', label: 'Fixed Deposit Receipt' },
+    { value: 'PBG', label: 'Performance Bank Guarantee' },
+    { value: 'SB', label: 'Surety Bond' },
 ];
 
 export const sdFormOptions = [
-    { value: 'DD_DEDUCTION', label: 'DD/Deduction' },
-    { value: 'FDR', label: 'FDR' },
-    { value: 'PBG', label: 'PBG' },
-    { value: 'SB', label: 'SB' },
-    { value: 'NA', label: 'NA' },
+    { value: 'DD', label: 'DD/Deduction' },
+    { value: 'FDR', label: 'Fixed Deposit Receipt' },
+    { value: 'PBG', label: 'Performance Bank Guarantee' },
+    { value: 'SB', label: 'Surety Bond' },
 ];
 
 export const pbgDurationOptions = Array.from({ length: 121 }, (_, i) => ({
@@ -270,7 +279,23 @@ export const maxLdOptions = Array.from({ length: 21 }, (_, i) => ({
     label: `${i}%`,
 }));
 
-export const financialCriteriaOptions = [
+export const aatOptions = [
+    { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
+    { value: 'AMOUNT', label: 'Amount' },
+];
+
+export const scOptions = [
+    { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
+    { value: 'AMOUNT', label: 'Amount' },
+];
+
+export const wcOptions = [
+    { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
+    { value: 'POSITIVE', label: 'Positive' },
+    { value: 'AMOUNT', label: 'Amount' },
+];
+
+export const nwOptions = [
     { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
     { value: 'POSITIVE', label: 'Positive' },
     { value: 'AMOUNT', label: 'Amount' },

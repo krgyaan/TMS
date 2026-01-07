@@ -22,7 +22,10 @@ export const TenderInformationFormSchema = z.object({
     emdAmount: z.coerce.number().nonnegative().optional(),
 
     // Tender Value
-    tenderValueGstInclusive: z.coerce.number().nonnegative().optional(),
+    tenderValueGstInclusive: z.coerce.number().nonnegative().optional().refine(
+        (val) => val === undefined || val === null || val > 0,
+        { message: 'Tender value must be greater than 0' }
+    ),
 
     // Bid & Commercial
     bidValidityDays: z.coerce.number().int().min(0).max(366).optional(),
@@ -71,13 +74,13 @@ export const TenderInformationFormSchema = z.object({
 
     // PBG
     pbgRequired: z.enum(['YES', 'NO']).optional(),
-    pbgForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).nullable().optional(),
+    pbgForm: z.array(z.string()).optional(),
     pbgPercentage: z.coerce.number().min(0).max(100).optional(),
     pbgDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
     // Security Deposit
     sdRequired: z.enum(['YES', 'NO']).optional(),
-    sdForm: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).nullable().optional(),
+    sdForm: z.array(z.string()).optional(),
     securityDepositPercentage: z.coerce.number().min(0).max(100).optional(),
     sdDurationMonths: z.coerce.number().int().min(0).max(120).optional(),
 
