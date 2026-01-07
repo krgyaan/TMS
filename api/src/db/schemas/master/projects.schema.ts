@@ -7,12 +7,9 @@ import {
     date,
     integer,
     timestamp,
-  } from 'drizzle-orm/pg-core';
-import { organizations } from '@db/schemas/master/organizations.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { locations } from '@db/schemas/master/locations.schema';
+} from 'drizzle-orm/pg-core';
 
-  export const projects = pgTable('projects', {
+export const projects = pgTable('projects', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     teamName: varchar('team_name', { length: 255 }).notNull(),
     tenderId: integer('tender_id'),
@@ -29,7 +26,7 @@ import { locations } from '@db/schemas/master/locations.schema';
     status: boolean('status').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  });
+});
 
-  export type Project = typeof projects.$inferSelect;
-  export type NewProject = typeof projects.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
