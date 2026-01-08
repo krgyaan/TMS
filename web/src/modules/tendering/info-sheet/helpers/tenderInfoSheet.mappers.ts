@@ -15,21 +15,23 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
 
 const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
-    return val.map(item => {
-        if (typeof item === 'string') return item;
-        if (typeof item === 'object' && item !== null) {
-            // Try to extract id, value, or first string/number property
-            if ('id' in item && item.id != null) return String(item.id);
-            if ('value' in item && item.value != null) return String(item.value);
-            // Fallback: try to find first string/number property
-            for (const [, value] of Object.entries(item)) {
-                if (typeof value === 'string' || typeof value === 'number') {
-                    return String(value);
+    return val
+        .map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                // Try to extract id, value, or first string/number property
+                if ('id' in item && item.id != null) return String(item.id);
+                if ('value' in item && item.value != null) return String(item.value);
+                // Fallback: try to find first string/number property
+                for (const [, value] of Object.entries(item)) {
+                    if (typeof value === 'string' || typeof value === 'number') {
+                        return String(value);
+                    }
                 }
             }
-        }
-        return String(item);
-    });
+            return item != null ? String(item) : null;
+        })
+        .filter((item): item is string => item !== null && item !== undefined && item !== 'undefined' && String(item).trim().length > 0);
 };
 
 // Default form values
@@ -294,17 +296,21 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
 
         processingFeeRequired: safeYesNoValue(values.processingFeeRequired),
-        processingFeeModes: values.processingFeeRequired === 'YES' && values.processingFeeModes?.length
-            ? values.processingFeeModes
-            : null,
+        processingFeeModes: (() => {
+            if (values.processingFeeRequired !== 'YES' || !values.processingFeeModes?.length) return null;
+            const filtered = values.processingFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            return filtered.length > 0 ? filtered : null;
+        })(),
         processingFeeAmount: values.processingFeeRequired === 'YES'
             ? (values.processingFeeAmount ?? null)
             : null,
 
         tenderFeeRequired: safeYesNoValue(values.tenderFeeRequired),
-        tenderFeeModes: values.tenderFeeRequired === 'YES' && values.tenderFeeModes?.length
-            ? values.tenderFeeModes
-            : null,
+        tenderFeeModes: (() => {
+            if (values.tenderFeeRequired !== 'YES' || !values.tenderFeeModes?.length) return null;
+            const filtered = values.tenderFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            return filtered.length > 0 ? filtered : null;
+        })(),
         tenderFeeAmount: values.tenderFeeRequired === 'YES'
             ? (values.tenderFeeAmount ?? null)
             : null,
@@ -312,9 +318,11 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         emdRequired: values.emdRequired === 'YES' || values.emdRequired === 'NO' || values.emdRequired === 'EXEMPT'
             ? values.emdRequired
             : null,
-        emdModes: values.emdRequired === 'YES' && values.emdModes?.length
-            ? values.emdModes
-            : null,
+        emdModes: (() => {
+            if (values.emdRequired !== 'YES' || !values.emdModes?.length) return null;
+            const filtered = values.emdModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            return filtered.length > 0 ? filtered : null;
+        })(),
         emdAmount: values.emdRequired === 'YES'
             ? (values.emdAmount ?? null)
             : null,

@@ -14,6 +14,7 @@ export interface IncompleteField {
 export interface SaveTenderApprovalDto {
     tlDecision: string;
     rfqTo: string[] | null;
+    processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
     approvePqrSelection: string | null;
@@ -32,6 +33,7 @@ export interface TenderApproval {
     tenderId: number;
     tlDecision: string;
     rfqTo: string[] | null;
+    processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
     approvePqrSelection: string | null;

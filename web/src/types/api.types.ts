@@ -51,7 +51,7 @@ export interface ApiError {
     error?: string;
 }
 
-export interface Company {}
+export interface Company { }
 
 export interface NamedEntity {
     id: number | null;
@@ -68,7 +68,7 @@ export interface CreateUserDto {
     roleId: number;
 }
 
-export interface UpdateUserDto extends Partial<CreateUserDto> {}
+export interface UpdateUserDto extends Partial<CreateUserDto> { }
 
 export interface Location {
     id: number;
@@ -376,7 +376,7 @@ export interface CreateFollowupCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> {}
+export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }
 
 export interface Designation {
     id: number;
@@ -391,7 +391,7 @@ export interface CreateDesignationDto {
     status?: boolean;
 }
 
-export interface UpdateDesignationDto extends Partial<CreateDesignationDto> {}
+export interface UpdateDesignationDto extends Partial<CreateDesignationDto> { }
 
 export interface DocumentSubmitted {
     id: number;
@@ -406,7 +406,7 @@ export interface CreateDocumentSubmittedDto {
     status?: boolean;
 }
 
-export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmittedDto> {}
+export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmittedDto> { }
 
 export interface CreateVendorDto {
     organizationId?: number;
@@ -416,7 +416,7 @@ export interface CreateVendorDto {
     status?: boolean;
 }
 
-export interface UpdateVendorDto extends Partial<CreateVendorDto> {}
+export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
 
 export interface CreateVendorOrganizationDto {
     organizationId?: number;
@@ -425,7 +425,7 @@ export interface CreateVendorOrganizationDto {
     status?: boolean;
 }
 
-export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> {}
+export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
 
 export interface CreateOrganizationDto {
     name: string;
@@ -434,7 +434,7 @@ export interface CreateOrganizationDto {
     status?: boolean;
 }
 
-export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
+export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }
 
 export interface CreateWebsiteDto {
     name: string;
@@ -442,7 +442,7 @@ export interface CreateWebsiteDto {
     status?: boolean;
 }
 
-export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> {}
+export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }
 
 export interface CreateImprestCategoryDto {
     name: string;
@@ -450,7 +450,7 @@ export interface CreateImprestCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> {}
+export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
 
 // ========== INDUSTRIES ==========
 export interface Industry {
@@ -468,7 +468,7 @@ export interface CreateIndustryDto {
     status?: boolean;
 }
 
-export interface UpdateIndustryDto extends Partial<CreateIndustryDto> {}
+export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
 
 // ========== TEAMS ==========
 
@@ -478,7 +478,7 @@ export interface CreateTeamDto {
     status?: boolean;
 }
 
-export interface UpdateTeamDto extends Partial<CreateTeamDto> {}
+export interface UpdateTeamDto extends Partial<CreateTeamDto> { }
 
 // ========== ROLES ==========
 export interface Role {
@@ -496,7 +496,7 @@ export interface CreateRoleDto {
     status?: boolean;
 }
 
-export interface UpdateRoleDto extends Partial<CreateRoleDto> {}
+export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
 
 // ========== PERMISSIONS ==========
 export interface Permission {
@@ -546,7 +546,7 @@ export interface CreateStateDto {
     status?: boolean;
 }
 
-export interface UpdateStateDto extends Partial<CreateStateDto> {}
+export interface UpdateStateDto extends Partial<CreateStateDto> { }
 
 // ========== TQ TYPES ==========
 export interface TqType {
@@ -562,7 +562,7 @@ export interface CreateTqTypeDto {
     status?: boolean;
 }
 
-export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> {}
+export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
 
 // ========== EMD RESPONSIBILITY ==========
 export interface EmdResponsibility {
@@ -579,7 +579,7 @@ export interface CreateEmdResponsibilityDto {
     status?: boolean;
 }
 
-export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> {}
+export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> { }
 
 // ========== FINANCIAL YEAR ==========
 export interface FinancialYear {
@@ -595,7 +595,7 @@ export interface CreateFinancialYearDto {
     status?: boolean;
 }
 
-export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> {}
+export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
 
 // ========== LEAD TYPES ==========
 export interface LeadType {
@@ -613,7 +613,7 @@ export interface CreateLeadTypeDto {
     status?: boolean;
 }
 
-export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> {}
+export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> { }
 
 // ========== LOAN PARTY ==========
 export interface LoanParty {
@@ -631,7 +631,7 @@ export interface CreateLoanPartyDto {
     status?: boolean;
 }
 
-export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> {}
+export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
 // Tender Info Sheet Types - Re-exported from consolidated types file
 
 // Base Tender Info (matches tenderInfos table)
@@ -681,6 +681,7 @@ export interface IncompleteField {
 export interface SaveTenderApprovalDto {
     tlStatus: "0" | "1" | "2" | "3" | number;
     rfqTo?: number[]; // vendor org IDs
+    processingFeeMode?: string;
     tenderFeeMode?: string;
     emdMode?: string;
     approvePqrSelection?: "1" | "2";
@@ -697,6 +698,7 @@ export interface TenderApproval {
     tlStatus?: "0" | "1" | "2" | "3" | number;
     tlDecision?: "0" | "1" | "2" | "3" | number; // Alias for tlStatus for backward compatibility
     rfqTo: number[] | null;
+    processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
     approvePqrSelection: "1" | "2" | null;

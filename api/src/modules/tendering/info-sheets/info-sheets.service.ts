@@ -204,13 +204,32 @@ export class TenderInfoSheetsService {
                 const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
                 const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
 
-                // Convert pbgMode and sdMode arrays to JSON strings for storage (varchar(20) column)
+                // Helper function to filter invalid values from arrays
+                const filterArray = (arr: string[] | null | undefined): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
+                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                    return filtered.length > 0 ? filtered : null;
+                };
+
+                // Convert pbgMode and sdMode arrays to JSON strings for storage
+                // Filter out invalid values (undefined, null, empty strings) before stringifying
                 const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
-                    ? JSON.stringify(payload.pbgMode)
+                    ? (() => {
+                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
                     : null;
                 const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
-                    ? JSON.stringify(payload.sdMode)
+                    ? (() => {
+                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
                     : null;
+
+                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
+                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = filterArray(payload.emdModes);
 
                 // Insert main info sheet
                 const [infoSheet] = await tx
@@ -223,13 +242,13 @@ export class TenderInfoSheetsService {
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
                         processingFeeRequired: processingFeeRequiredValue,
                         processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                        processingFeeMode: payload.processingFeeModes ?? null,
+                        processingFeeMode: processingFeeModesFiltered,
                         tenderFeeRequired: tenderFeeRequiredValue,
                         tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                        tenderFeeMode: payload.tenderFeeModes ?? null,
+                        tenderFeeMode: tenderFeeModesFiltered,
                         emdRequired: emdRequiredValue,
                         emdAmount: payload.emdAmount?.toString() ?? null,
-                        emdMode: payload.emdModes ?? null,
+                        emdMode: emdModesFiltered,
                         reverseAuctionApplicable: reverseAuctionApplicableValue,
                         paymentTermsSupply: payload.paymentTermsSupply ?? null,
                         paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
@@ -431,13 +450,32 @@ export class TenderInfoSheetsService {
         // Update main info sheet
         try {
             await this.db.transaction(async (tx) => {
-                // Convert pbgMode and sdMode arrays to JSON strings for storage (varchar(20) column)
+                // Helper function to filter invalid values from arrays
+                const filterArray = (arr: string[] | null | undefined): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
+                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                    return filtered.length > 0 ? filtered : null;
+                };
+
+                // Convert pbgMode and sdMode arrays to JSON strings for storage
+                // Filter out invalid values (undefined, null, empty strings) before stringifying
                 const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
-                    ? JSON.stringify(payload.pbgMode)
+                    ? (() => {
+                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
                     : null;
                 const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
-                    ? JSON.stringify(payload.sdMode)
+                    ? (() => {
+                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
                     : null;
+
+                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
+                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = filterArray(payload.emdModes);
 
                 await tx
                     .update(tenderInformation)
@@ -448,13 +486,13 @@ export class TenderInfoSheetsService {
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
                         processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
                         processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                        processingFeeMode: payload.processingFeeModes ?? null,
+                        processingFeeMode: processingFeeModesFiltered,
                         tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
                         tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                        tenderFeeMode: payload.tenderFeeModes ?? null,
+                        tenderFeeMode: tenderFeeModesFiltered,
                         emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
                         emdAmount: payload.emdAmount?.toString() ?? null,
-                        emdMode: payload.emdModes ?? null,
+                        emdMode: emdModesFiltered,
                         reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
                         paymentTermsSupply: payload.paymentTermsSupply ?? null,
                         paymentTermsInstallation: payload.paymentTermsInstallation ?? null,

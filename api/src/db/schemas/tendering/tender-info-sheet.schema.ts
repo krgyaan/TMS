@@ -35,12 +35,12 @@ export const tenderInformation = pgTable("tender_information", {
     deliveryTimeInstallationDays: integer("delivery_time_installation_days"),
 
     pbgRequired: varchar("pbg_required", { length: 5 }),
-    pbgMode: varchar("pbg_mode", { length: 255 }),
+    pbgMode: text("pbg_mode"),
     pbgPercentage: numeric("pbg_percentage", { precision: 5, scale: 2 }),
     pbgDurationMonths: integer("pbg_duration"),
 
     sdRequired: varchar("sd_required", { length: 5 }),
-    sdMode: varchar("sd_mode", { length: 255 }),
+    sdMode: text("sd_mode"),
     sdPercentage: numeric("sd_percentage", { precision: 5, scale: 2 }),
     sdDurationMonths: integer("sd_duration"),
 
