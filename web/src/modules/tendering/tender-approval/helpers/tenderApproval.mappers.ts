@@ -20,12 +20,17 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         };
     }
 
+    // Helper to convert null/empty string to undefined for optional fields
+    const toOptionalString = (value: string | null | undefined): string | undefined => {
+        return value && value.trim() ? value : undefined;
+    };
+
     return {
         tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
-        processingFeeMode: approval.processingFeeMode ?? undefined,
-        tenderFeeMode: approval.tenderFeeMode ?? undefined,
-        emdMode: approval.emdMode ?? undefined,
+        processingFeeMode: toOptionalString(approval.processingFeeMode),
+        tenderFeeMode: toOptionalString(approval.tenderFeeMode),
+        emdMode: toOptionalString(approval.emdMode),
         approvePqrSelection: approval.approvePqrSelection as '1' | '2' | undefined,
         approveFinanceDocSelection: approval.approveFinanceDocSelection as '1' | '2' | undefined,
         alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],

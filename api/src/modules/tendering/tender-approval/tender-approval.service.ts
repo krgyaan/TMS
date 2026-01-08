@@ -443,12 +443,12 @@ export class TenderApprovalService {
             const rfqToString = payload.rfqTo?.join(',') || '';
 
             updateData.rfqTo = rfqToString;
-            updateData.processingFeeMode = payload.processingFeeMode;
-            updateData.tenderFeeMode = payload.tenderFeeMode;
-            updateData.emdMode = payload.emdMode;
-            updateData.approvePqrSelection = payload.approvePqrSelection;
+            updateData.processingFeeMode = payload.processingFeeMode ?? null;
+            updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
+            updateData.emdMode = payload.emdMode ?? null;
+            updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
             updateData.approveFinanceDocSelection =
-                payload.approveFinanceDocSelection;
+                payload.approveFinanceDocSelection ?? null;
 
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;

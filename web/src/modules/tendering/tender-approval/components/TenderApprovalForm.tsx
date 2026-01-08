@@ -111,7 +111,16 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     });
 
     useEffect(() => {
-        if (approval) form.reset(getInitialValues(approval));
+        const initialValues = getInitialValues(approval);
+        form.reset(initialValues, {
+            keepDefaultValues: false,
+            keepValues: false
+        });
+
+        // Also explicitly set processingFeeMode to ensure it updates
+        if (initialValues.processingFeeMode) {
+            form.setValue('processingFeeMode', initialValues.processingFeeMode, { shouldDirty: false });
+        }
     }, [approval, form]);
 
     // Add this after line 153 (after form declaration) for debugging
@@ -208,8 +217,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     }, [statuses, tenderStatus]);
 
     const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
-        console.log('🚀 Submit called with values:', values);
-
         // Trigger validation
         const isValid = await form.trigger();
         if (!isValid) {
@@ -227,7 +234,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
         try {
             const payload = mapFormToPayload(values);
-            console.log('📦 Mapped payload:', payload);
             const mutation = mode === 'create' ? createApproval : updateApproval;
             await mutation.mutateAsync({ tenderId, data: payload });
             toast.success(mode === 'create' ? 'Approval submitted successfully' : 'Approval updated successfully');
@@ -325,6 +331,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
                                             <SelectField
+                                                key={`processing-fee-mode-${approval?.processingFeeMode || 'new'}`}
                                                 control={form.control}
                                                 name="processingFeeMode"
                                                 label="Processing Fee Mode"
