@@ -36,11 +36,13 @@ const ClientSchema = z.object({
 });
 
 export const TenderInfoSheetPayloadSchema = z.object({
+    // OEM Experience
+    tenderValue: optionalNumber(z.coerce.number().nonnegative()),
+    oemExperience: z.enum(['YES', 'NO']).optional().nullable(),
     // TE Recommendation
     teRecommendation: z.enum(['YES', 'NO']),
     teRejectionReason: optionalNumber(z.coerce.number().int().min(1)),
     teRejectionRemarks: optionalString,
-
     // Processing Fee
     processingFeeRequired: z.enum(['YES', 'NO']).optional().nullable(),
     processingFeeAmount: optionalNumber(z.coerce.number().nonnegative()),
@@ -74,13 +76,13 @@ export const TenderInfoSheetPayloadSchema = z.object({
 
     // PBG
     pbgRequired: z.enum(['YES', 'NO']).optional().nullable(),
-    pbgMode: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional().nullable(),
+    pbgMode: optionalStringArray,
     pbgPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     pbgDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120)),
 
     // Security Deposit
     sdRequired: z.enum(['YES', 'NO']).optional().nullable(),
-    sdMode: z.enum(['DD_DEDUCTION', 'FDR', 'PBG', 'SB', 'NA']).optional().nullable(),
+    sdMode: optionalStringArray,
     sdPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     sdDurationMonths: optionalNumber(z.coerce.number().int().min(0).max(120)),
 
@@ -110,6 +112,7 @@ export const TenderInfoSheetPayloadSchema = z.object({
     orderValue1: optionalNumber(z.coerce.number().nonnegative()),
     orderValue2: optionalNumber(z.coerce.number().nonnegative()),
     orderValue3: optionalNumber(z.coerce.number().nonnegative()),
+    customEligibilityCriteria: optionalString,
 
     // Financial Requirements
     avgAnnualTurnoverType: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional().nullable(),
@@ -126,7 +129,6 @@ export const TenderInfoSheetPayloadSchema = z.object({
     commercialDocuments: optionalStringArray,
 
     // Client & Address
-    clientOrganization: optionalString,
     clients: z.array(ClientSchema).min(1, 'At least one client is required'),
     courierAddress: optionalString,
 

@@ -5,6 +5,7 @@ export const TenderApprovalFormSchema = z.object({
 
     // Bidding Details (when approved)
     rfqTo: z.array(z.string()).optional(),
+    processingFeeMode: z.string().optional(),
     tenderFeeMode: z.string().optional(),
     emdMode: z.string().optional(),
 

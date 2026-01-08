@@ -20,7 +20,6 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
@@ -108,6 +107,7 @@ export class TenderInfoSheetsService {
             { name: 'ldRequired', value: payload.ldRequired },
             { name: 'physicalDocsRequired', value: payload.physicalDocsRequired },
             { name: 'reverseAuctionApplicable', value: payload.reverseAuctionApplicable },
+            { name: 'oemExperience', value: payload.oemExperience },
         ];
 
         const invalidFields: string[] = [];
@@ -143,15 +143,6 @@ export class TenderInfoSheetsService {
             // Validate enum values
             if (strValue !== 'YES_GENERAL' && strValue !== 'YES_PROJECT_SPECIFIC' && strValue !== 'NO') {
                 invalidFields.push(`mafRequired="${strValue}" (must be YES_GENERAL, YES_PROJECT_SPECIFIC, or NO)`);
-            }
-        }
-
-        // Validate other VARCHAR fields that might have length constraints
-        // clientOrganization - Database column is VARCHAR(255) as per schema
-        if (payload.clientOrganization !== null && payload.clientOrganization !== undefined) {
-            const strValue = String(payload.clientOrganization).trim();
-            if (strValue.length > 255) {
-                invalidFields.push(`clientOrganization="${strValue}" (length: ${strValue.length}) exceeds database VARCHAR(255) constraint.`);
             }
         }
 
@@ -213,26 +204,51 @@ export class TenderInfoSheetsService {
                 const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
                 const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
 
-                // Log all VARCHAR(5) field values before insertion
-                this.logger.log(`Inserting values - mafRequired: "${mafRequiredValue}" (length: ${mafRequiredValue?.length || 0}), processingFeeRequired: "${processingFeeRequiredValue}" (length: ${processingFeeRequiredValue?.length || 0}), tenderFeeRequired: "${tenderFeeRequiredValue}" (length: ${tenderFeeRequiredValue?.length || 0}), emdRequired: "${emdRequiredValue}" (length: ${emdRequiredValue?.length || 0}), reverseAuctionApplicable: "${reverseAuctionApplicableValue}" (length: ${reverseAuctionApplicableValue?.length || 0}), pbgRequired: "${pbgRequiredValue}" (length: ${pbgRequiredValue?.length || 0}), sdRequired: "${sdRequiredValue}" (length: ${sdRequiredValue?.length || 0}), ldRequired: "${ldRequiredValue}" (length: ${ldRequiredValue?.length || 0}), physicalDocsRequired: "${physicalDocsRequiredValue}" (length: ${physicalDocsRequiredValue?.length || 0})`);
+                // Helper function to filter invalid values from arrays
+                const filterArray = (arr: string[] | null | undefined): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
+                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                    return filtered.length > 0 ? filtered : null;
+                };
+
+                // Convert pbgMode and sdMode arrays to JSON strings for storage
+                // Filter out invalid values (undefined, null, empty strings) before stringifying
+                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
+                    ? (() => {
+                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
+                    : null;
+                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
+                    ? (() => {
+                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
+                    : null;
+
+                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
+                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = filterArray(payload.emdModes);
 
                 // Insert main info sheet
                 const [infoSheet] = await tx
                     .insert(tenderInformation)
                     .values({
                         tenderId,
+                        tenderValue: payload.tenderValue?.toString() ?? null,
                         teRecommendation: payload.teRecommendation,
                         teRejectionReason: payload.teRejectionReason ?? null,
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
                         processingFeeRequired: processingFeeRequiredValue,
                         processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                        processingFeeMode: payload.processingFeeModes ?? null,
+                        processingFeeMode: processingFeeModesFiltered,
                         tenderFeeRequired: tenderFeeRequiredValue,
                         tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                        tenderFeeMode: payload.tenderFeeModes ?? null,
+                        tenderFeeMode: tenderFeeModesFiltered,
                         emdRequired: emdRequiredValue,
                         emdAmount: payload.emdAmount?.toString() ?? null,
-                        emdMode: payload.emdModes ?? null,
+                        emdMode: emdModesFiltered,
                         reverseAuctionApplicable: reverseAuctionApplicableValue,
                         paymentTermsSupply: payload.paymentTermsSupply ?? null,
                         paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
@@ -245,11 +261,11 @@ export class TenderInfoSheetsService {
                         deliveryTimeInstallationDays:
                             payload.deliveryTimeInstallationDays ?? null,
                         pbgRequired: pbgRequiredValue,
-                        pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
+                        pbgMode: pbgModeValue,
                         pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                         pbgDurationMonths: payload.pbgDurationMonths ?? null,
                         sdRequired: sdRequiredValue,
-                        sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
+                        sdMode: sdModeValue,
                         sdPercentage: payload.sdPercentage?.toString() ?? null,
                         sdDurationMonths: payload.sdDurationMonths ?? null,
                         ldRequired: ldRequiredValue,
@@ -262,6 +278,7 @@ export class TenderInfoSheetsService {
                         orderValue1: payload.orderValue1?.toString() ?? null,
                         orderValue2: payload.orderValue2?.toString() ?? null,
                         orderValue3: payload.orderValue3?.toString() ?? null,
+                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
                         avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
                         avgAnnualTurnoverValue:
                             payload.avgAnnualTurnoverValue?.toString() ?? null,
@@ -274,6 +291,7 @@ export class TenderInfoSheetsService {
                         netWorthValue: payload.netWorthValue?.toString() ?? null,
                         courierAddress: payload.courierAddress ?? null,
                         teFinalRemark: payload.teFinalRemark ?? null,
+                        oemExperience: payload.oemExperience ?? null,
                     })
                     .returning();
 
@@ -356,6 +374,7 @@ export class TenderInfoSheetsService {
                     ldRequired: payload.ldRequired,
                     physicalDocsRequired: payload.physicalDocsRequired,
                     reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                    oemExperience: payload.oemExperience,
                 };
 
                 // Check each field for invalid values
@@ -423,114 +442,162 @@ export class TenderInfoSheetsService {
             );
         }
 
+        // Get tender to check approval status
+        const tender = await this.tenderInfosService.findById(tenderId);
+        const isApproved = tender?.tlStatus === 1 || tender?.tlStatus === 2;
+        // 1 = approved, 2 = rejected (both mean approval process completed)
+
         // Update main info sheet
         try {
-            await this.db
-                .update(tenderInformation)
-                .set({
-                    teRecommendation: payload.teRecommendation,
-                    teRejectionReason: payload.teRejectionReason ?? null,
-                    teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                    processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
-                    processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
-                    processingFeeMode: payload.processingFeeModes ?? null,
-                    tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
-                    tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
-                    tenderFeeMode: payload.tenderFeeModes ?? null,
-                    emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
-                    emdAmount: payload.emdAmount?.toString() ?? null,
-                    emdMode: payload.emdModes ?? null,
-                    reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
-                    paymentTermsSupply: payload.paymentTermsSupply ?? null,
-                    paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-                    bidValidityDays: payload.bidValidityDays ?? null,
-                    commercialEvaluation: payload.commercialEvaluation ?? null,
-                    mafRequired: payload.mafRequired ?? null,
-                    deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                    deliveryTimeInstallationInclusive:
-                        payload.deliveryTimeInstallationInclusive ?? false,
-                    deliveryTimeInstallationDays:
-                        payload.deliveryTimeInstallationDays ?? null,
-                    pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
-                    pbgMode: payload.pbgMode ? String(payload.pbgMode).trim() : null,
-                    pbgPercentage: payload.pbgPercentage?.toString() ?? null,
-                    pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                    sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
-                    sdMode: payload.sdMode ? String(payload.sdMode).trim() : null,
-                    sdPercentage: payload.sdPercentage?.toString() ?? null,
-                    sdDurationMonths: payload.sdDurationMonths ?? null,
-                    ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
-                    ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
-                    maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                    physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
-                    physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
-                    techEligibilityAge: payload.techEligibilityAge ?? null,
-                    workValueType: payload.workValueType ?? null,
-                    orderValue1: payload.orderValue1?.toString() ?? null,
-                    orderValue2: payload.orderValue2?.toString() ?? null,
-                    orderValue3: payload.orderValue3?.toString() ?? null,
-                    avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                    avgAnnualTurnoverValue:
-                        payload.avgAnnualTurnoverValue?.toString() ?? null,
-                    workingCapitalType: payload.workingCapitalType ?? null,
-                    workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
-                    solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                    solvencyCertificateValue:
-                        payload.solvencyCertificateValue?.toString() ?? null,
-                    netWorthType: payload.netWorthType ?? null,
-                    netWorthValue: payload.netWorthValue?.toString() ?? null,
-                    courierAddress: payload.courierAddress ?? null,
-                    teFinalRemark: payload.teFinalRemark ?? null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(tenderInformation.tenderId, tenderId));
+            await this.db.transaction(async (tx) => {
+                // Helper function to filter invalid values from arrays
+                const filterArray = (arr: string[] | null | undefined): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
+                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                    return filtered.length > 0 ? filtered : null;
+                };
 
-            // Delete existing related records
-            await Promise.all([
-                this.db
-                    .delete(tenderClients)
-                    .where(eq(tenderClients.tenderId, tenderId)),
-                this.db
-                    .delete(tenderTechnicalDocuments)
-                    .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
-                this.db
-                    .delete(tenderFinancialDocuments)
-                    .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
-            ]);
+                // Convert pbgMode and sdMode arrays to JSON strings for storage
+                // Filter out invalid values (undefined, null, empty strings) before stringifying
+                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
+                    ? (() => {
+                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
+                    : null;
+                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
+                    ? (() => {
+                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
+                    })()
+                    : null;
 
-            // Insert updated related records
-            const clients = payload.clients ?? [];
-            if (clients.length > 0) {
-                await this.db.insert(tenderClients).values(
-                    clients.map((client) => ({
-                        tenderId,
-                        clientName: client.clientName,
-                        clientDesignation: client.clientDesignation ?? null,
-                        clientMobile: client.clientMobile ?? null,
-                        clientEmail: client.clientEmail ?? null,
-                    }))
-                );
-            }
+                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
+                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = filterArray(payload.emdModes);
 
-            const technicalDocs = payload.technicalWorkOrders ?? [];
-            if (technicalDocs.length > 0) {
-                await this.db.insert(tenderTechnicalDocuments).values(
-                    technicalDocs.map((docName) => ({
-                        tenderId,
-                        documentName: docName,
-                    }))
-                );
-            }
+                await tx
+                    .update(tenderInformation)
+                    .set({
+                        tenderValue: payload.tenderValue?.toString() ?? null,
+                        teRecommendation: payload.teRecommendation,
+                        teRejectionReason: payload.teRejectionReason ?? null,
+                        teRejectionRemarks: payload.teRejectionRemarks ?? null,
+                        processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
+                        processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
+                        processingFeeMode: processingFeeModesFiltered,
+                        tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
+                        tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
+                        tenderFeeMode: tenderFeeModesFiltered,
+                        emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
+                        emdAmount: payload.emdAmount?.toString() ?? null,
+                        emdMode: emdModesFiltered,
+                        reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
+                        paymentTermsSupply: payload.paymentTermsSupply ?? null,
+                        paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
+                        bidValidityDays: payload.bidValidityDays ?? null,
+                        commercialEvaluation: payload.commercialEvaluation ?? null,
+                        mafRequired: payload.mafRequired ?? null,
+                        deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
+                        deliveryTimeInstallationInclusive:
+                            payload.deliveryTimeInstallationInclusive ?? false,
+                        deliveryTimeInstallationDays:
+                            payload.deliveryTimeInstallationDays ?? null,
+                        pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
+                        pbgMode: pbgModeValue,
+                        pbgPercentage: payload.pbgPercentage?.toString() ?? null,
+                        pbgDurationMonths: payload.pbgDurationMonths ?? null,
+                        sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
+                        sdMode: sdModeValue,
+                        sdPercentage: payload.sdPercentage?.toString() ?? null,
+                        sdDurationMonths: payload.sdDurationMonths ?? null,
+                        ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
+                        ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
+                        maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
+                        physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
+                        physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
+                        techEligibilityAge: payload.techEligibilityAge ?? null,
+                        workValueType: payload.workValueType ?? null,
+                        orderValue1: payload.orderValue1?.toString() ?? null,
+                        orderValue2: payload.orderValue2?.toString() ?? null,
+                        orderValue3: payload.orderValue3?.toString() ?? null,
+                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
+                        avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
+                        avgAnnualTurnoverValue:
+                            payload.avgAnnualTurnoverValue?.toString() ?? null,
+                        workingCapitalType: payload.workingCapitalType ?? null,
+                        workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
+                        solvencyCertificateType: payload.solvencyCertificateType ?? null,
+                        solvencyCertificateValue:
+                            payload.solvencyCertificateValue?.toString() ?? null,
+                        netWorthType: payload.netWorthType ?? null,
+                        netWorthValue: payload.netWorthValue?.toString() ?? null,
+                        courierAddress: payload.courierAddress ?? null,
+                        teFinalRemark: payload.teFinalRemark ?? null,
+                        oemExperience: payload.oemExperience ?? null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(tenderInformation.tenderId, tenderId));
 
-            const financialDocs = payload.commercialDocuments ?? [];
-            if (financialDocs.length > 0) {
-                await this.db.insert(tenderFinancialDocuments).values(
-                    financialDocs.map((docName) => ({
-                        tenderId,
-                        documentName: docName,
-                    }))
-                );
-            }
+                // Update tenderInfo table's gstValues if tender is approved
+                if (isApproved && payload.tenderValue) {
+                    await tx
+                        .update(tenderInfos)
+                        .set({
+                            gstValues: payload.tenderValue.toString(),
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(tenderInfos.id, tenderId));
+                }
+
+                // Delete existing related records
+                await Promise.all([
+                    tx
+                        .delete(tenderClients)
+                        .where(eq(tenderClients.tenderId, tenderId)),
+                    tx
+                        .delete(tenderTechnicalDocuments)
+                        .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
+                    tx
+                        .delete(tenderFinancialDocuments)
+                        .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
+                ]);
+
+                // Insert updated related records
+                const clients = payload.clients ?? [];
+                if (clients.length > 0) {
+                    await tx.insert(tenderClients).values(
+                        clients.map((client) => ({
+                            tenderId,
+                            clientName: client.clientName,
+                            clientDesignation: client.clientDesignation ?? null,
+                            clientMobile: client.clientMobile ?? null,
+                            clientEmail: client.clientEmail ?? null,
+                        }))
+                    );
+                }
+
+                const technicalDocs = payload.technicalWorkOrders ?? [];
+                if (technicalDocs.length > 0) {
+                    await tx.insert(tenderTechnicalDocuments).values(
+                        technicalDocs.map((docName) => ({
+                            tenderId,
+                            documentName: docName,
+                        }))
+                    );
+                }
+
+                const financialDocs = payload.commercialDocuments ?? [];
+                if (financialDocs.length > 0) {
+                    await tx.insert(tenderFinancialDocuments).values(
+                        financialDocs.map((docName) => ({
+                            tenderId,
+                            documentName: docName,
+                        }))
+                    );
+                }
+            });
 
             const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
 
@@ -557,6 +624,7 @@ export class TenderInfoSheetsService {
                     ldRequired: payload.ldRequired,
                     physicalDocsRequired: payload.physicalDocsRequired,
                     reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                    oemExperience: payload.oemExperience,
                 };
 
                 // Check each field for invalid values
@@ -646,13 +714,9 @@ export class TenderInfoSheetsService {
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
 
-        // Get organization and website names
-        const [orgData, websiteData] = await Promise.all([
-            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
+        const [websiteData] = await Promise.all([
             tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
         ]);
-
-        const orgName = orgData[0]?.name || 'Not specified';
         const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
 
         // Format due date
@@ -684,7 +748,6 @@ export class TenderInfoSheetsService {
 
         // Build email data matching template
         const emailData: Record<string, any> = {
-            organization: orgName,
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,

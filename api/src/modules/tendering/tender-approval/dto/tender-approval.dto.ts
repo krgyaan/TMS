@@ -25,6 +25,7 @@ export const TenderApprovalPayloadSchema = z.object({
         invalid_type_error: 'TL status must be one of: 0, 1, 2, 3',
     }),
     rfqTo: z.array(bigintField().positive()).optional(),
+    processingFeeMode: optionalTextField(100),
     tenderFeeMode: optionalTextField(100),
     emdMode: optionalTextField(100),
     approvePqrSelection: z.enum(['1', '2']).optional(),

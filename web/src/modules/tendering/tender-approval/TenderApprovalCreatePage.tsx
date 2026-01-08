@@ -8,7 +8,7 @@ import type { TenderWithRelations } from '@/types/api.types';
 export default function TenderApprovalCreatePage() {
     const { tenderId } = useParams<{ tenderId: string }>();
     const id = Number(tenderId);
-    
+
     const { data: tender, isLoading: isTenderLoading } = useTender(id);
     const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(id);
     const { data: approval, isLoading: isApprovalLoading } = useTenderApproval(id);

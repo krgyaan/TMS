@@ -359,6 +359,7 @@ export class TenderApprovalService {
             .select({
                 tlStatus: tenderInfos.tlStatus,
                 rfqTo: tenderInfos.rfqTo,
+                processingFeeMode: tenderInfos.processingFeeMode,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
                 emdMode: tenderInfos.emdMode,
                 approvePqrSelection: tenderInfos.approvePqrSelection,
@@ -442,11 +443,12 @@ export class TenderApprovalService {
             const rfqToString = payload.rfqTo?.join(',') || '';
 
             updateData.rfqTo = rfqToString;
-            updateData.tenderFeeMode = payload.tenderFeeMode;
-            updateData.emdMode = payload.emdMode;
-            updateData.approvePqrSelection = payload.approvePqrSelection;
+            updateData.processingFeeMode = payload.processingFeeMode ?? null;
+            updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
+            updateData.emdMode = payload.emdMode ?? null;
+            updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
             updateData.approveFinanceDocSelection =
-                payload.approveFinanceDocSelection;
+                payload.approveFinanceDocSelection ?? null;
 
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;
@@ -465,6 +467,7 @@ export class TenderApprovalService {
             }
 
             updateData.rfqTo = null;
+            updateData.processingFeeMode = null;
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
@@ -473,6 +476,7 @@ export class TenderApprovalService {
             // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
             updateData.rfqTo = null;
+            updateData.processingFeeMode = null;
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
@@ -620,6 +624,7 @@ export class TenderApprovalService {
             emdLink,
             tenderFeesLink,
             rfqLink,
+            processingFeeMode: payload.processingFeeMode || 'Not specified',
             tenderFeesMode: payload.tenderFeeMode || 'Not specified',
             emdMode: payload.emdMode || 'Not specified',
             vendor,

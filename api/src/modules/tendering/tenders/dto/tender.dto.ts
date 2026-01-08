@@ -94,23 +94,6 @@ export const UpdateTenderSchema = z.object({
 export type UpdateTenderDto = z.infer<typeof UpdateTenderSchema>;
 
 /**
- * Save Tender Approval Schema - Move from controller
- */
-export const SaveTenderApprovalSchema = z.object({
-    tlStatus: z.coerce.number().int().min(0, 'Invalid TL status').default(0),
-    rfqTo: optionalTextField(15),
-    tenderFeeMode: optionalTextField(50),
-    emdMode: optionalTextField(50),
-    approvePqrSelection: optionalTextField(50),
-    approveFinanceDocSelection: optionalTextField(50),
-    tenderApprovalStatus: optionalTextField(50),
-    oemNotAllowed: optionalString,
-    tlRejectionRemarks: optionalString,
-});
-
-export type SaveTenderApprovalDto = z.infer<typeof SaveTenderApprovalSchema>;
-
-/**
  * Update Status Schema - Move from controller
  */
 export const UpdateStatusSchema = z.object({

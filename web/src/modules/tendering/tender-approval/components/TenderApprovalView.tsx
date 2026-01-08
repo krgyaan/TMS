@@ -155,23 +155,23 @@ export function TenderApprovalView({
                                 </Badge>
                             </TableCell>
                         </TableRow>
-                        {approval.tenderApprovalStatus && (
+                        {approval.tlStatus && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Approval Status
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {approval.tenderApprovalStatus}
+                                    {approval.tlStatus}
                                 </TableCell>
                             </TableRow>
                         )}
-                        {approval.tlRemarks && (
+                        {approval.tlDecision && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     TL Remarks
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {approval.tlRemarks}
+                                    {approval.tlDecision}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -204,29 +204,26 @@ export function TenderApprovalView({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Processing Fee Mode
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {approval.processingFeeMode || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
                                         Tender Fee Mode
                                     </TableCell>
                                     <TableCell className="text-sm">
                                         {approval.tenderFeeMode || '—'}
                                     </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         EMD Mode
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm" colSpan={3}>
                                         {approval.emdMode || '—'}
                                     </TableCell>
                                 </TableRow>
-                                {approval.courierAddress && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Courier Address
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {approval.courierAddress}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Document Approvals

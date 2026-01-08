@@ -26,11 +26,13 @@ interface EmdSectionProps {
     allowedModes: string[];
     amount: number;
     defaultPurpose?: string;
+    courierAddress?: string;
 }
 
-export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD' }: EmdSectionProps) {
+export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', courierAddress }: EmdSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch('emd.mode');
+    const currentDdCourierAddress = watch('emd.details.ddCourierAddress');
 
     // Pre-fill purpose when mode changes
     useEffect(() => {
@@ -51,6 +53,13 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD' }: Emd
             }
         }
     }, [selectedMode, setValue, defaultPurpose]);
+
+    // Pre-fill DD courier address from info sheet when DD mode is selected
+    useEffect(() => {
+        if (selectedMode === 'DD' && courierAddress && !currentDdCourierAddress) {
+            setValue('emd.details.ddCourierAddress', courierAddress);
+        }
+    }, [selectedMode, courierAddress, currentDdCourierAddress, setValue]);
 
     // Filter allowed modes to only show valid EMD modes
     const availableModes = EMD_MODES.filter(mode =>

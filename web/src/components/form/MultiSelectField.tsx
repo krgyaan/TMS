@@ -60,7 +60,7 @@ export function MultiSelectField<
                                         type="button"
                                         variant="outline"
                                         role="combobox"
-                                        className="w-full justify-between min-h-[40px] flex items-center"
+                                        className="w-full justify-between min-h-[40px] h-auto flex items-center"
                                     >
                                         {selectedOptions.length > 0 ? (
                                             <div className="flex flex-wrap gap-1 max-w-[85%]">

@@ -30,7 +30,8 @@
     {{#if data.isBidApproved}}
         <p>Please do the necessary next steps:</p>
         <ul>
-            <li>Request EMD and Tender fees from - <a href="{{data.emdLink}}">EMD Link</a> and <a href="{{data.tenderFeesLink}}">Tender Fees Link</a>.</li>
+            <li>Request Processing Fee, EMD and Tender fees from - <a href="{{data.emdLink}}">EMD Link</a> and <a href="{{data.tenderFeesLink}}">Tender Fees Link</a>.</li>
+            <li>The selected mode of Processing Fee: {{data.processingFeeMode}}</li>
             <li>The selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
             <li>The selected mode of EMD: {{data.emdMode}}</li>
             <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>

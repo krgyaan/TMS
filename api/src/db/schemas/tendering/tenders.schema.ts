@@ -27,11 +27,12 @@ export const tenderInfos = pgTable("tender_infos", {
     website: bigint("website", { mode: "number" }),
     courierAddress: text("courier_address"),
     deleteStatus: integer("delete_status").default(0).notNull(),
-    documents: text("documents"), 
+    documents: text("documents"),
     // Tender approval fields
     tlRemarks: varchar("tl_remarks", { length: 200 }),
     rfqTo: varchar("rfq_to", { length: 15 }),
     tlStatus: integer("tl_status").default(0).notNull(),
+    processingFeeMode: varchar("processing_fee_mode", { length: 100 }),
     tenderFeeMode: varchar("tender_fee_mode", { length: 100 }),
     emdMode: varchar("emd_mode", { length: 100 }),
     approvePqrSelection: varchar("approve_pqr_selection", { length: 50 }),

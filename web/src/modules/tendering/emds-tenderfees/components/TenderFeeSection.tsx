@@ -22,6 +22,7 @@ interface TenderFeeSectionProps {
     allowedModes: string[];
     amount: number;
     defaultPurpose?: string;
+    courierAddress?: string;
 }
 
 export function TenderFeeSection({
@@ -30,9 +31,11 @@ export function TenderFeeSection({
     allowedModes,
     amount,
     defaultPurpose = 'TENDER_FEES',
+    courierAddress,
 }: TenderFeeSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch(`${prefix}.mode`);
+    const currentDdCourierAddress = watch(`${prefix}.details.ddCourierAddress`);
 
     // Pre-fill purpose when mode changes
     useEffect(() => {
@@ -46,6 +49,13 @@ export function TenderFeeSection({
             }
         }
     }, [selectedMode, setValue, prefix, defaultPurpose]);
+
+    // Pre-fill DD courier address from info sheet when DD mode is selected
+    useEffect(() => {
+        if (selectedMode === 'DD' && courierAddress && !currentDdCourierAddress) {
+            setValue(`${prefix}.details.ddCourierAddress`, courierAddress);
+        }
+    }, [selectedMode, courierAddress, currentDdCourierAddress, setValue, prefix]);
 
     // Filter allowed modes
     const availableModes = TENDER_FEE_MODES.filter(mode =>

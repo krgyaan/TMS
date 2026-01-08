@@ -6,6 +6,7 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         return {
             tlDecision: '0',
             rfqTo: [],
+            processingFeeMode: undefined,
             tenderFeeMode: undefined,
             emdMode: undefined,
             approvePqrSelection: undefined,
@@ -19,11 +20,17 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         };
     }
 
+    // Helper to convert null/empty string to undefined for optional fields
+    const toOptionalString = (value: string | null | undefined): string | undefined => {
+        return value && value.trim() ? value : undefined;
+    };
+
     return {
         tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
-        tenderFeeMode: approval.tenderFeeMode ?? undefined,
-        emdMode: approval.emdMode ?? undefined,
+        processingFeeMode: toOptionalString(approval.processingFeeMode),
+        tenderFeeMode: toOptionalString(approval.tenderFeeMode),
+        emdMode: toOptionalString(approval.emdMode),
         approvePqrSelection: approval.approvePqrSelection as '1' | '2' | undefined,
         approveFinanceDocSelection: approval.approveFinanceDocSelection as '1' | '2' | undefined,
         alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],
@@ -47,6 +54,9 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         };
         if (values.rfqTo && values.rfqTo.length > 0) {
             payload.rfqTo = values.rfqTo.map(id => Number(id));
+        }
+        if (values.processingFeeMode) {
+            payload.processingFeeMode = values.processingFeeMode;
         }
         if (values.tenderFeeMode) {
             payload.tenderFeeMode = values.tenderFeeMode;

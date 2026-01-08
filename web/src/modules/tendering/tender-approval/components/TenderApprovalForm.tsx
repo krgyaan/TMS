@@ -111,7 +111,16 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     });
 
     useEffect(() => {
-        if (approval) form.reset(getInitialValues(approval));
+        const initialValues = getInitialValues(approval);
+        form.reset(initialValues, {
+            keepDefaultValues: false,
+            keepValues: false
+        });
+
+        // Also explicitly set processingFeeMode to ensure it updates
+        if (initialValues.processingFeeMode) {
+            form.setValue('processingFeeMode', initialValues.processingFeeMode, { shouldDirty: false });
+        }
     }, [approval, form]);
 
     // Add this after line 153 (after form declaration) for debugging
@@ -138,6 +147,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
             form.setValue('rfqTo', []);
+            form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
             form.setValue('emdMode', undefined);
             form.setValue('approvePqrSelection', undefined);
@@ -148,6 +158,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
             form.setValue('rfqTo', []);
+            form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
             form.setValue('emdMode', undefined);
             form.setValue('approvePqrSelection', undefined);
@@ -160,6 +171,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '0') {
             // Clear all conditional fields
             form.setValue('rfqTo', []);
+            form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
             form.setValue('emdMode', undefined);
             form.setValue('approvePqrSelection', undefined);
@@ -183,6 +195,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         [statuses]
     );
 
+    const processingFeeModeOptions = useMemo(() =>
+        infoSheet?.processingFeeMode?.map(mode => ({ value: mode, label: mode })) ?? [],
+        [infoSheet]
+    );
+
     const tenderFeeModeOptions = useMemo(() =>
         infoSheet?.tenderFeeMode?.map(mode => ({ value: mode, label: mode })) ?? [],
         [infoSheet]
@@ -200,8 +217,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     }, [statuses, tenderStatus]);
 
     const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
-        console.log('🚀 Submit called with values:', values);
-
         // Trigger validation
         const isValid = await form.trigger();
         if (!isValid) {
@@ -219,7 +234,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
         try {
             const payload = mapFormToPayload(values);
-            console.log('📦 Mapped payload:', payload);
             const mutation = mode === 'create' ? createApproval : updateApproval;
             await mutation.mutateAsync({ tenderId, data: payload });
             toast.success(mode === 'create' ? 'Approval submitted successfully' : 'Approval updated successfully');
@@ -314,21 +328,92 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         options={vendorOrgOptions}
                                         placeholder="Select vendors"
                                     />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <SelectField
-                                            control={form.control}
-                                            name="tenderFeeMode"
-                                            label="Tender Fee Mode"
-                                            options={tenderFeeModeOptions}
-                                            placeholder="Select tender fee mode"
-                                        />
-                                        <SelectField
-                                            control={form.control}
-                                            name="emdMode"
-                                            label="EMD Mode"
-                                            options={emdModeOptions}
-                                            placeholder="Select EMD mode"
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <SelectField
+                                                key={`processing-fee-mode-${approval?.processingFeeMode || 'new'}`}
+                                                control={form.control}
+                                                name="processingFeeMode"
+                                                label="Processing Fee Mode"
+                                                options={processingFeeModeOptions}
+                                                placeholder="Select processing fee mode"
+                                            />
+                                            {infoSheet && (infoSheet.processingFeeAmount || (infoSheet.processingFeeMode && infoSheet.processingFeeMode.length > 0)) && (
+                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
+                                                    {infoSheet.processingFeeAmount && (
+                                                        <div>
+                                                            <strong>Amount:</strong> ₹{(() => {
+                                                                const amount = typeof infoSheet.processingFeeAmount === 'number'
+                                                                    ? infoSheet.processingFeeAmount
+                                                                    : parseFloat(String(infoSheet.processingFeeAmount));
+                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                    {infoSheet.processingFeeMode && infoSheet.processingFeeMode.length > 0 && (
+                                                        <div>
+                                                            <strong>Available Modes:</strong> {infoSheet.processingFeeMode.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <SelectField
+                                                control={form.control}
+                                                name="tenderFeeMode"
+                                                label="Tender Fee Mode"
+                                                options={tenderFeeModeOptions}
+                                                placeholder="Select tender fee mode"
+                                            />
+                                            {infoSheet && (infoSheet.tenderFeeAmount || (infoSheet.tenderFeeMode && infoSheet.tenderFeeMode.length > 0)) && (
+                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
+                                                    {infoSheet.tenderFeeAmount && (
+                                                        <div>
+                                                            <strong>Amount:</strong> ₹{(() => {
+                                                                const amount = typeof infoSheet.tenderFeeAmount === 'number'
+                                                                    ? infoSheet.tenderFeeAmount
+                                                                    : parseFloat(String(infoSheet.tenderFeeAmount));
+                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                    {infoSheet.tenderFeeMode && infoSheet.tenderFeeMode.length > 0 && (
+                                                        <div>
+                                                            <strong>Available Modes:</strong> {infoSheet.tenderFeeMode.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <SelectField
+                                                control={form.control}
+                                                name="emdMode"
+                                                label="EMD Mode"
+                                                options={emdModeOptions}
+                                                placeholder="Select EMD mode"
+                                            />
+                                            {infoSheet && (infoSheet.emdAmount || (infoSheet.emdMode && infoSheet.emdMode.length > 0)) && (
+                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
+                                                    {infoSheet.emdAmount && (
+                                                        <div>
+                                                            <strong>Amount:</strong> ₹{(() => {
+                                                                const amount = typeof infoSheet.emdAmount === 'number'
+                                                                    ? infoSheet.emdAmount
+                                                                    : parseFloat(String(infoSheet.emdAmount));
+                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                    {infoSheet.emdMode && infoSheet.emdMode.length > 0 && (
+                                                        <div>
+                                                            <strong>Available Modes:</strong> {infoSheet.emdMode.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
