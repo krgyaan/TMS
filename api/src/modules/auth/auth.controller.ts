@@ -25,7 +25,7 @@ export class AuthController {
     constructor(
         private readonly authService: AuthService,
         private readonly configService: ConfigService
-    ) {}
+    ) { }
 
     @Public()
     @Post("login")
@@ -169,9 +169,10 @@ export class AuthController {
     }
 
     private setAuthCookie(res: Response, token: string) {
+        const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
         res.cookie("access_token", token, {
             ...AUTH_COOKIE_OPTIONS,
-            maxAge: 15 * 60 * 1000, // recommended
+            maxAge: authCfg?.cookie.maxAge ?? 7 * 24 * 60 * 60 * 1000, // Use config value, default to 7 days
         });
     }
 }
