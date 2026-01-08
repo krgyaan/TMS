@@ -780,6 +780,7 @@ export interface TenderInfoWithNames extends TenderInfo {
     locationState?: string | null;
     websiteName?: string | null;
     websiteLink?: string | null;
+    oemExperience?: string | null;
 }
 
 // Create/Update DTOs

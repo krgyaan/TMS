@@ -53,7 +53,6 @@ import { infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpe
 import { TenderInformationFormSchema } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.schema';
 import { workValueTypeOptions } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { buildDefaultValues, mapResponseToForm, mapFormToPayload } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
-import { toast } from 'sonner';
 
 interface TenderInformationFormProps {
     tenderId: number;
@@ -142,35 +141,6 @@ export function TenderInformationForm({
     const handleSubmit: SubmitHandler<TenderInfoSheetFormValues> = async (values) => {
         try {
             const payload = mapFormToPayload(values);
-
-            // Debug: Log payload to identify problematic fields
-            console.log('Payload being sent:', JSON.stringify(payload, null, 2));
-
-            // Validate YES/NO fields before sending
-            const yesNoFields = [
-                'processingFeeRequired',
-                'tenderFeeRequired',
-                'pbgRequired',
-                'sdRequired',
-                'ldRequired',
-                'physicalDocsRequired',
-                'reverseAuctionApplicable',
-                'oemExperience'
-            ];
-
-            const invalidFields: string[] = [];
-            yesNoFields.forEach(field => {
-                const value = (payload as any)[field];
-                if (value !== null && value !== 'YES' && value !== 'NO' && value !== undefined) {
-                    invalidFields.push(`${field}: ${JSON.stringify(value)}`);
-                }
-            });
-
-            if (invalidFields.length > 0) {
-                console.error('Invalid YES/NO field values:', invalidFields);
-                toast.error(`Invalid field values detected: ${invalidFields.join(', ')}`);
-                return;
-            }
 
             if (mode === 'create') {
                 await createInfoSheet.mutateAsync({ tenderId, data: payload });
@@ -431,7 +401,7 @@ export function TenderInformationForm({
                                 )}
                                 <FieldWrapper
                                     control={form.control}
-                                    name="tenderValueGstInclusive"
+                                    name="tenderValue"
                                     label="Tender Value (GST Inclusive)"
                                 >
                                     {(field) => (

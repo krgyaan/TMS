@@ -20,7 +20,6 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
@@ -205,6 +204,14 @@ export class TenderInfoSheetsService {
                 const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
                 const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
 
+                // Convert pbgMode and sdMode arrays to JSON strings for storage (varchar(20) column)
+                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
+                    ? JSON.stringify(payload.pbgMode)
+                    : null;
+                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
+                    ? JSON.stringify(payload.sdMode)
+                    : null;
+
                 // Insert main info sheet
                 const [infoSheet] = await tx
                     .insert(tenderInformation)
@@ -235,11 +242,11 @@ export class TenderInfoSheetsService {
                         deliveryTimeInstallationDays:
                             payload.deliveryTimeInstallationDays ?? null,
                         pbgRequired: pbgRequiredValue,
-                        pbgMode: payload.pbgMode ?? null,
+                        pbgMode: pbgModeValue,
                         pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                         pbgDurationMonths: payload.pbgDurationMonths ?? null,
                         sdRequired: sdRequiredValue,
-                        sdMode: payload.sdMode ?? null,
+                        sdMode: sdModeValue,
                         sdPercentage: payload.sdPercentage?.toString() ?? null,
                         sdDurationMonths: payload.sdDurationMonths ?? null,
                         ldRequired: ldRequiredValue,
@@ -252,6 +259,7 @@ export class TenderInfoSheetsService {
                         orderValue1: payload.orderValue1?.toString() ?? null,
                         orderValue2: payload.orderValue2?.toString() ?? null,
                         orderValue3: payload.orderValue3?.toString() ?? null,
+                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
                         avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
                         avgAnnualTurnoverValue:
                             payload.avgAnnualTurnoverValue?.toString() ?? null,
@@ -347,6 +355,7 @@ export class TenderInfoSheetsService {
                     ldRequired: payload.ldRequired,
                     physicalDocsRequired: payload.physicalDocsRequired,
                     reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                    oemExperience: payload.oemExperience,
                 };
 
                 // Check each field for invalid values
@@ -422,6 +431,14 @@ export class TenderInfoSheetsService {
         // Update main info sheet
         try {
             await this.db.transaction(async (tx) => {
+                // Convert pbgMode and sdMode arrays to JSON strings for storage (varchar(20) column)
+                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
+                    ? JSON.stringify(payload.pbgMode)
+                    : null;
+                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
+                    ? JSON.stringify(payload.sdMode)
+                    : null;
+
                 await tx
                     .update(tenderInformation)
                     .set({
@@ -450,11 +467,11 @@ export class TenderInfoSheetsService {
                         deliveryTimeInstallationDays:
                             payload.deliveryTimeInstallationDays ?? null,
                         pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
-                        pbgMode: payload.pbgMode ?? null,
+                        pbgMode: pbgModeValue,
                         pbgPercentage: payload.pbgPercentage?.toString() ?? null,
                         pbgDurationMonths: payload.pbgDurationMonths ?? null,
                         sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
-                        sdMode: payload.sdMode ?? null,
+                        sdMode: sdModeValue,
                         sdPercentage: payload.sdPercentage?.toString() ?? null,
                         sdDurationMonths: payload.sdDurationMonths ?? null,
                         ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
@@ -467,6 +484,7 @@ export class TenderInfoSheetsService {
                         orderValue1: payload.orderValue1?.toString() ?? null,
                         orderValue2: payload.orderValue2?.toString() ?? null,
                         orderValue3: payload.orderValue3?.toString() ?? null,
+                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
                         avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
                         avgAnnualTurnoverValue:
                             payload.avgAnnualTurnoverValue?.toString() ?? null,
@@ -568,6 +586,7 @@ export class TenderInfoSheetsService {
                     ldRequired: payload.ldRequired,
                     physicalDocsRequired: payload.physicalDocsRequired,
                     reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                    oemExperience: payload.oemExperience,
                 };
 
                 // Check each field for invalid values
@@ -657,13 +676,9 @@ export class TenderInfoSheetsService {
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
 
-        // Get organization and website names
-        const [orgData, websiteData] = await Promise.all([
-            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
+        const [websiteData] = await Promise.all([
             tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
         ]);
-
-        const orgName = orgData[0]?.name || 'Not specified';
         const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
 
         // Format due date
@@ -695,7 +710,6 @@ export class TenderInfoSheetsService {
 
         // Build email data matching template
         const emailData: Record<string, any> = {
-            organization: orgName,
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,

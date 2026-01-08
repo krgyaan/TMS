@@ -23,6 +23,9 @@ export interface TenderClient {
 
 // Save/Update DTO - what we send to API
 export interface SaveTenderInfoSheetDto {
+    oemExperience: 'YES' | 'NO' | null;
+    tenderValue: number | null;
+
     teRecommendation: 'YES' | 'NO';
     teRejectionReason: number | null;
     teRejectionRemarks: string | null;
@@ -38,8 +41,6 @@ export interface SaveTenderInfoSheetDto {
     emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
     emdModes: string[] | null;
     emdAmount: number | null;
-
-    tenderValue: number | null;
 
     bidValidityDays: number | null;
     commercialEvaluation: string | null;
@@ -71,7 +72,6 @@ export interface SaveTenderInfoSheetDto {
     physicalDocsDeadline: string | null;
 
     techEligibilityAge: number | null;
-    oemExperience: 'YES' | 'NO' | null;
     workValueType: 'WORKS_VALUES' | 'CUSTOM' | null;
     orderValue1: number | null;
     orderValue2: number | null;
@@ -90,7 +90,6 @@ export interface SaveTenderInfoSheetDto {
     netWorthType: string | null;
     netWorthValue: number | null;
 
-    clientOrganization: string | null;
     courierAddress: string | null;
     clients: TenderClientDto[];
 
@@ -169,7 +168,6 @@ export interface TenderInfoSheetResponse {
     netWorthType: string | null;
     netWorthValue: string | number | null;
 
-    clientOrganization: string | null;
     courierAddress: string | null;
 
     clients: Array<{

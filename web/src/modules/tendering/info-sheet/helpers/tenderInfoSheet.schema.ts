@@ -22,10 +22,13 @@ export const TenderInformationFormSchema = z.object({
     emdAmount: z.coerce.number().nonnegative().optional(),
 
     // Tender Value
-    tenderValueGstInclusive: z.coerce.number().nonnegative().optional().refine(
+    tenderValue: z.coerce.number().nonnegative().optional().refine(
         (val) => val === undefined || val === null || val > 0,
         { message: 'Tender value must be greater than 0' }
     ),
+
+    // OEM Experience
+    oemExperience: z.enum(['YES', 'NO']).nullable().optional(),
 
     // Bid & Commercial
     bidValidityDays: z.coerce.number().int().min(0).max(366).optional(),
@@ -118,7 +121,6 @@ export const TenderInformationFormSchema = z.object({
     netWorthValue: z.coerce.number().nonnegative().optional(),
 
     // Client Details
-    clientOrganization: z.string().max(255).optional(),
     clients: z.array(z.object({
         clientName: z.string().min(1, 'Client name is required'),
         clientDesignation: z.string().optional(),

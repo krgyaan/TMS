@@ -50,7 +50,8 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     emdModes: [],
     emdAmount: tender?.emd ? toNumber(tender.emd) : 0,
 
-    tenderValueGstInclusive: tender?.gstValues ? toNumber(tender.gstValues) : 0,
+    tenderValue: tender?.gstValues ? toNumber(tender.gstValues) : 0,
+    oemExperience: tender?.oemExperience ? tender.oemExperience as 'YES' | 'NO' : null,
 
     bidValidityDays: 0,
     commercialEvaluation: undefined,
@@ -101,7 +102,6 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthCriteria: undefined,
     netWorthValue: 0,
 
-    clientOrganization: '',
     courierAddress: '',
     clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
 
@@ -134,8 +134,6 @@ export const mapResponseToForm = (
         emdModes: data.emdMode ?? [],
         emdAmount: toNumber(data.emdAmount),
 
-        tenderValueGstInclusive: toNumber(data.tenderValueGstInclusive),
-
         bidValidityDays: toNumber(data.bidValidityDays),
         commercialEvaluation: data.commercialEvaluation as TenderInfoSheetFormValues['commercialEvaluation'],
         mafRequired: data.mafRequired as TenderInfoSheetFormValues['mafRequired'],
@@ -149,12 +147,32 @@ export const mapResponseToForm = (
         deliveryTimeInstallation: data.deliveryTimeInstallationDays != null ? toNumber(data.deliveryTimeInstallationDays) : undefined,
 
         pbgRequired: data.pbgRequired ?? undefined,
-        pbgForm: Array.isArray(data.pbgMode) ? data.pbgMode : (data.pbgMode ? [data.pbgMode] : []),
+        pbgForm: (() => {
+            if (!data.pbgMode) return [];
+            if (Array.isArray(data.pbgMode)) return data.pbgMode;
+            // Try to parse as JSON string
+            try {
+                const parsed = JSON.parse(String(data.pbgMode));
+                return Array.isArray(parsed) ? parsed : [data.pbgMode];
+            } catch {
+                return [data.pbgMode];
+            }
+        })(),
         pbgPercentage: toNumber(data.pbgPercentage),
         pbgDurationMonths: toNumber(data.pbgDurationMonths),
 
         sdRequired: data.sdRequired ?? undefined,
-        sdForm: Array.isArray(data.sdMode) ? data.sdMode : (data.sdMode ? [data.sdMode] : []),
+        sdForm: (() => {
+            if (!data.sdMode) return [];
+            if (Array.isArray(data.sdMode)) return data.sdMode;
+            // Try to parse as JSON string
+            try {
+                const parsed = JSON.parse(String(data.sdMode));
+                return Array.isArray(parsed) ? parsed : [data.sdMode];
+            } catch {
+                return [data.sdMode];
+            }
+        })(),
         securityDepositPercentage: toNumber(data.sdPercentage),
         sdDurationMonths: toNumber(data.sdDurationMonths),
 
@@ -189,7 +207,6 @@ export const mapResponseToForm = (
         netWorthCriteria: data.netWorthType as TenderInfoSheetFormValues['netWorthCriteria'],
         netWorthValue: toNumber(data.netWorthValue),
 
-        clientOrganization: data.clientOrganization ?? '',
         courierAddress: data.courierAddress ?? '',
 
         clients: data.clients && data.clients.length > 0
@@ -250,6 +267,7 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
         'ldRequired',
         'physicalDocsRequired',
         'reverseAuctionApplicable',
+        'oemExperience',
     ];
 
     // Validate and clean YES/NO fields
@@ -268,6 +286,9 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
 // Map form values to API payload
 export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderInfoSheetDto => {
     const payload: SaveTenderInfoSheetDto = {
+        tenderValue: values.tenderValue ?? null,
+        oemExperience: safeYesNoValue(values.oemExperience),
+
         teRecommendation: values.teRecommendation,
         teRejectionReason: values.teRecommendation === 'NO' ? (values.teRejectionReason ?? null) : null,
         teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
@@ -297,8 +318,6 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         emdAmount: values.emdRequired === 'YES'
             ? (values.emdAmount ?? null)
             : null,
-
-        tenderValueGstInclusive: values.tenderValueGstInclusive ?? null,
 
         bidValidityDays: safeNumber(values.bidValidityDays),
         commercialEvaluation: values.commercialEvaluation ?? null,
@@ -367,7 +386,6 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             ? safeNumber(values.netWorthValue)
             : null,
 
-        clientOrganization: values.clientOrganization || null,
         courierAddress: values.courierAddress || null,
 
         clients: values.clients.map(client => ({

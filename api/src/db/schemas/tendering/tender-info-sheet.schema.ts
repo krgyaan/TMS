@@ -35,12 +35,12 @@ export const tenderInformation = pgTable("tender_information", {
     deliveryTimeInstallationDays: integer("delivery_time_installation_days"),
 
     pbgRequired: varchar("pbg_required", { length: 5 }),
-    pbgMode: varchar("pbg_mode", { length: 20 }),
+    pbgMode: varchar("pbg_mode", { length: 255 }),
     pbgPercentage: numeric("pbg_percentage", { precision: 5, scale: 2 }),
     pbgDurationMonths: integer("pbg_duration"),
 
     sdRequired: varchar("sd_required", { length: 5 }),
-    sdMode: varchar("sd_mode", { length: 20 }),
+    sdMode: varchar("sd_mode", { length: 255 }),
     sdPercentage: numeric("sd_percentage", { precision: 5, scale: 2 }),
     sdDurationMonths: integer("sd_duration"),
 
@@ -52,25 +52,24 @@ export const tenderInformation = pgTable("tender_information", {
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
     techEligibilityAge: integer("technical_eligibility_age"),
 
-    workValueType: varchar("work_value_type", { length: 20 }), // "WORKS_VALUES" | "CUSTOM"
+    workValueType: varchar("work_value_type", { length: 50 }), // "WORKS_VALUES" | "CUSTOM"
     orderValue1: numeric("order_value_1", { precision: 12, scale: 2 }),
     orderValue2: numeric("order_value_2", { precision: 12, scale: 2 }),
     orderValue3: numeric("order_value_3", { precision: 12, scale: 2 }),
     customEligibilityCriteria: text("custom_eligibility_criteria"),
 
-    avgAnnualTurnoverType: varchar("avg_annual_turnover_type", { length: 20 }),
+    avgAnnualTurnoverType: varchar("avg_annual_turnover_type", { length: 50 }),
     avgAnnualTurnoverValue: numeric("avg_annual_turnover_value", { precision: 12, scale: 2 }),
 
-    workingCapitalType: varchar("working_capital_type", { length: 20 }),
+    workingCapitalType: varchar("working_capital_type", { length: 50 }),
     workingCapitalValue: numeric("working_capital_value", { precision: 12, scale: 2 }),
 
-    solvencyCertificateType: varchar("solvency_certificate_type", { length: 20 }),
+    solvencyCertificateType: varchar("solvency_certificate_type", { length: 50 }),
     solvencyCertificateValue: numeric("solvency_certificate_value", { precision: 12, scale: 2 }),
 
-    netWorthType: varchar("net_worth_type", { length: 20 }),
+    netWorthType: varchar("net_worth_type", { length: 50 }),
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
-    clientOrganization: varchar("client_organization", { length: 255 }),
     courierAddress: text("courier_address"),
 
     teFinalRemark: text("te_final_remark"),
