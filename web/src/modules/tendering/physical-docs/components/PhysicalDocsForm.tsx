@@ -11,7 +11,7 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { SelectField } from '@/components/form/SelectField';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, MapPin } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
@@ -137,7 +137,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Courier Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <SelectField
                                     control={form.control}
                                     name="courierNo"
@@ -152,8 +152,23 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                                     options={submittedDocsOptions}
                                     placeholder="Select documents"
                                 />
+                                {/* Courier Address from Info Sheet */}
+                                {infoSheet?.courierAddress && (
+                                    <div className="space-y-4">
+                                        <div className="border rounded-lg p-4 bg-muted/30">
+                                            <div className="flex items-start gap-3">
+                                                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm text-muted-foreground mb-1">From Info Sheet</p>
+                                                    <p className="text-sm whitespace-pre-wrap">{infoSheet.courierAddress}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+
 
                         {/* Persons Submitting Documents */}
                         <div className="space-y-4">

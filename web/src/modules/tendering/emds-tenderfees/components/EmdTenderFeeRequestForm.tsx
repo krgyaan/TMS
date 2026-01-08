@@ -399,6 +399,7 @@ export function EmdTenderFeeRequestForm({
                                 allowedModes={allowedEmdModes}
                                 amount={emdAmount}
                                 defaultPurpose="EMD"
+                                courierAddress={infoSheet?.courierAddress || undefined}
                             />
                         )}
 
@@ -410,6 +411,7 @@ export function EmdTenderFeeRequestForm({
                                 allowedModes={allowedTenderFeeModes}
                                 amount={tenderFeeAmount}
                                 defaultPurpose="TENDER_FEES"
+                                courierAddress={infoSheet?.courierAddress || undefined}
                             />
                         )}
 
@@ -418,6 +420,7 @@ export function EmdTenderFeeRequestForm({
                             <ProcessingFeeSection
                                 amount={processingFeeAmount}
                                 allowedModes={allowedProcessingFeeModes}
+                                courierAddress={infoSheet?.courierAddress || undefined}
                             />
                         )}
 
