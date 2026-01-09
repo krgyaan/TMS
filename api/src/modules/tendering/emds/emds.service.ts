@@ -4,7 +4,7 @@ import {
     NotFoundException,
     BadRequestException,
 } from '@nestjs/common';
-import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray } from 'drizzle-orm';
+import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -27,6 +27,7 @@ import { InstrumentStatusService } from '@/modules/tendering/emds/services/instr
 import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { StatusCache } from '@/utils/status-cache';
 import type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
@@ -88,6 +89,7 @@ export interface DashboardCounts {
     approved: number;
     rejected: number;
     returned: number;
+    tenderDnb: number;
     total: number;
 }
 
@@ -113,23 +115,19 @@ export interface RequestTabResponse {
     };
 }
 
-export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
+export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
 
 const APPROVED_STATUSES = [
-    // Accounts form accepted
     DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     BG_STATUSES.BANK_REQUEST_ACCEPTED,
     CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
-    // Payment completed
     BT_STATUSES.PAYMENT_COMPLETED,
     PORTAL_STATUSES.PAYMENT_COMPLETED,
-    // Settled
     BT_STATUSES.SETTLED,
     PORTAL_STATUSES.SETTLED,
-    // BG specific
     BG_STATUSES.BG_CREATED,
     BG_STATUSES.EXTENSION_APPROVED,
     BG_STATUSES.EXTENSION_COMPLETED,
@@ -137,21 +135,17 @@ const APPROVED_STATUSES = [
 ];
 
 const RETURNED_STATUSES = [
-    // Courier returns
     DD_STATUSES.COURIER_RETURN_RECEIVED,
     FDR_STATUSES.COURIER_RETURN_RECEIVED,
     BG_STATUSES.COURIER_RETURN_RECEIVED,
-    // Bank returns
     DD_STATUSES.BANK_RETURN_COMPLETED,
     FDR_STATUSES.BANK_RETURN_COMPLETED,
     BT_STATUSES.RETURN_COMPLETED,
     PORTAL_STATUSES.RETURN_COMPLETED,
-    // Cancellations
     DD_STATUSES.CANCELLED_AT_BRANCH,
     BG_STATUSES.BG_CANCELLATION_CONFIRMED,
     BG_STATUSES.FDR_CANCELLATION_CONFIRMED,
     CHEQUE_STATUSES.CANCELLED,
-    // Project settlements
     DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
 ];
 
@@ -240,6 +234,10 @@ export class EmdsService {
             return this.getPendingTenders(userId, pagination, sort, counts);
         }
 
+        if (tab === 'tender-dnb') {
+            return this.getTenderDnbTenders(userId, pagination, sort, counts);
+        }
+
         return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
     }
 
@@ -255,13 +253,17 @@ export class EmdsService {
         // Count requests by status
         const requestCounts = await this.countRequestsByStatus(userId);
 
+        // Count tender-dnb tenders
+        const tenderDnbCount = await this.countTenderDnb(userId);
+
         return {
             pending: pendingCount,
             sent: requestCounts.sent,
             approved: requestCounts.approved,
             rejected: requestCounts.rejected,
             returned: requestCounts.returned,
-            total: pendingCount + requestCounts.sent + requestCounts.approved + requestCounts.rejected + requestCounts.returned,
+            tenderDnb: tenderDnbCount,
+            total: pendingCount + requestCounts.sent + requestCounts.approved + requestCounts.rejected + requestCounts.returned + tenderDnbCount,
         };
     }
 
@@ -286,7 +288,11 @@ export class EmdsService {
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                    // At least one payment required
+                    or(
+                        eq(tenderInformation.emdRequired, 'Yes'),
+                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                    ),
                     or(
                         gt(tenderInfos.emd, sql`0`),
                         gt(tenderInfos.tenderFees, sql`0`),
@@ -320,9 +326,11 @@ export class EmdsService {
         const requests = await this.db
             .select({
                 instrumentStatus: paymentInstruments.status,
+                tenderId: paymentRequests.tenderId,
             })
             .from(paymentRequests)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(
                 paymentInstruments,
                 and(
@@ -332,7 +340,21 @@ export class EmdsService {
             )
             .where(
                 and(
-                    TenderInfosService.getActiveCondition(),
+                    // Handle tender_id = 0 OR tender conditions
+                    or(
+                        eq(paymentRequests.tenderId, 0),
+                        and(
+                            gt(paymentRequests.tenderId, 0),
+                            TenderInfosService.getActiveCondition(),
+                            TenderInfosService.getApprovedCondition(),
+                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                            or(
+                                eq(tenderInformation.emdRequired, 'Yes'),
+                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                                eq(tenderInformation.processingFeeRequired, 'Yes')
+                            )
+                        )
+                    ),
                     userCondition
                 )
             );
@@ -420,11 +442,134 @@ export class EmdsService {
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     or(
+                        eq(tenderInformation.emdRequired, 'Yes'),
+                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                    ),
+                    or(
                         gt(tenderInfos.emd, sql`0`),
                         gt(tenderInfos.tenderFees, sql`0`),
                         gt(tenderInformation.processingFeeAmount, sql`0`)
                     ),
                     sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
+                    userCondition
+                )
+            )
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        const wrapped = wrapPaginatedResponse(rows as PendingTenderRow[], totalCount, page, limit);
+        return {
+            ...wrapped,
+            counts: counts || await this.getDashboardCounts(userId),
+        };
+    }
+
+    /**
+     * Count tender-dnb tenders
+     */
+    private async countTenderDnb(userId?: number): Promise<number> {
+        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
+        const dnbStatusIds = StatusCache.getIds('dnb');
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .where(
+                and(
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    inArray(tenderInfos.status, dnbStatusIds),
+                    or(
+                        eq(tenderInformation.emdRequired, 'Yes'),
+                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                    ),
+                    userCondition
+                )
+            );
+
+        return Number(result?.count || 0);
+    }
+
+    /**
+     * Get tender-dnb tenders (1 row per tender)
+     */
+    private async getTenderDnbTenders(
+        userId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts
+    ): Promise<PendingTabResponse> {
+        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+        const dnbStatusIds = StatusCache.getIds('dnb');
+
+        // Build order clause (same as getPendingTenders)
+        let orderClause: any = asc(tenderInfos.dueDate);
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMemberName':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = asc(tenderInfos.dueDate);
+            }
+        }
+
+        // Get total count
+        const totalCount = counts?.tenderDnb ?? await this.countTenderDnb(userId);
+
+        // Get paginated data
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                dueDate: tenderInfos.dueDate,
+                teamMemberId: tenderInfos.teamMember,
+                teamMemberName: users.name,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
+                tenderFee: tenderInfos.tenderFees,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
+                status: tenderInfos.status,
+                statusName: statuses.name,
+                gstValues: tenderInfos.gstValues,
+            })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(
+                and(
+                    TenderInfosService.getActiveCondition(),
+                    TenderInfosService.getApprovedCondition(),
+                    inArray(tenderInfos.status, dnbStatusIds),
+                    or(
+                        eq(tenderInformation.emdRequired, 'Yes'),
+                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                    ),
                     userCondition
                 )
             )
@@ -492,20 +637,28 @@ export class EmdsService {
         let statusFilter: any;
         switch (tab) {
             case 'approved':
-                statusFilter = inArray(paymentInstruments.status, APPROVED_STATUSES);
+                statusFilter = or(
+                    isNotNull(paymentInstruments.action),
+                    inArray(paymentInstruments.status, APPROVED_STATUSES)
+                );
                 break;
             case 'rejected':
-                statusFilter = sql`${paymentInstruments.status} LIKE '%_REJECTED'`;
+                statusFilter = or(
+                    isNotNull(paymentInstruments.action),
+                    sql`${paymentInstruments.status} LIKE '%_REJECTED'`
+                );
                 break;
             case 'returned':
-                statusFilter = inArray(paymentInstruments.status, RETURNED_STATUSES);
+                statusFilter = or(
+                    isNotNull(paymentInstruments.action),
+                    inArray(paymentInstruments.status, RETURNED_STATUSES)
+                );
                 break;
             case 'sent':
             default:
-                // Sent = exists but not in approved/rejected/returned
-                statusFilter = and(
-                    sql`${paymentInstruments.status} NOT LIKE '%_REJECTED'`,
-                    notInArray(paymentInstruments.status, [...APPROVED_STATUSES, ...RETURNED_STATUSES])
+                statusFilter = or(
+                    isNull(paymentInstruments.status),
+                    isNull(paymentInstruments.action)
                 );
                 break;
         }
@@ -514,7 +667,8 @@ export class EmdsService {
         const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(paymentRequests)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(
                 paymentInstruments,
                 and(
@@ -524,9 +678,21 @@ export class EmdsService {
             )
             .where(
                 and(
-                    TenderInfosService.getActiveCondition(),
-                    TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    // Handle tender_id = 0 OR tender conditions
+                    or(
+                        eq(paymentRequests.tenderId, 0),
+                        and(
+                            gt(paymentRequests.tenderId, 0),
+                            TenderInfosService.getActiveCondition(),
+                            TenderInfosService.getApprovedCondition(),
+                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                            or(
+                                eq(tenderInformation.emdRequired, 'Yes'),
+                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                                eq(tenderInformation.processingFeeRequired, 'Yes')
+                            )
+                        )
+                    ),
                     statusFilter,
                     userCondition
                 )
@@ -539,8 +705,8 @@ export class EmdsService {
             .select({
                 id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
+                tenderNo: sql<string>`COALESCE(${tenderInfos.tenderNo}, ${paymentRequests.tenderNo})`.as('tenderNo'),
+                tenderName: sql<string>`COALESCE(${tenderInfos.tenderName}, ${paymentRequests.projectName}, 'N/A')`.as('tenderName'),
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
@@ -552,7 +718,8 @@ export class EmdsService {
                 createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(
                 paymentInstruments,
@@ -563,9 +730,21 @@ export class EmdsService {
             )
             .where(
                 and(
-                    TenderInfosService.getActiveCondition(),
-                    TenderInfosService.getApprovedCondition(),
-                    TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                    // Handle tender_id = 0 OR tender conditions
+                    or(
+                        eq(paymentRequests.tenderId, 0),
+                        and(
+                            gt(paymentRequests.tenderId, 0),
+                            TenderInfosService.getActiveCondition(),
+                            TenderInfosService.getApprovedCondition(),
+                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                            or(
+                                eq(tenderInformation.emdRequired, 'Yes'),
+                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
+                                eq(tenderInformation.processingFeeRequired, 'Yes')
+                            )
+                        )
+                    ),
                     statusFilter,
                     userCondition
                 )

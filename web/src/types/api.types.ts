@@ -1069,7 +1069,7 @@ export interface PhysicalDocWithPersons {
 }
 
 export type EmdDashboardFilters = {
-    tab?: "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
+    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
     userId?: number;
     page?: number;
     limit?: number;
@@ -1094,15 +1094,6 @@ export interface EmdDashboardRow {
     teamMemberId: number | null;
     teamMemberName: string | null;
     requestedBy: string | null;
-}
-
-export interface EmdDashboardCounts {
-    pending: number;
-    "request-sent": number;
-    paid: number;
-    rejected: number;
-    "tender-dnb": number;
-    total: number;
 }
 
 export interface BidSubmissionDashboardCounts {
@@ -1226,10 +1217,11 @@ export interface PaymentRequestRow {
 
 export interface EmdDashboardCounts {
     pending: number;
-    "request-sent": number;
-    paid: number;
+    sent: number;
+    approved: number;
     rejected: number;
-    "tender-dnb": number;
+    returned: number;
+    tenderDnb: number;
     total: number;
 }
 
