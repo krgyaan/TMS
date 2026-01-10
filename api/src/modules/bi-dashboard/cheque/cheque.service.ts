@@ -1,8 +1,45 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or } from 'drizzle-orm';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import {
+    paymentRequests,
+    paymentInstruments,
+    instrumentChequeDetails,
+} from '@db/schemas/tendering/emds.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
 
 @Injectable()
 export class ChequeService {
-    getDashboardData(
+    private readonly logger = new Logger(ChequeService.name);
+
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+    ) {}
+
+    /**
+     * Get expired cheque IDs (cheques where dueDate + 3 months < CURRENT_DATE)
+     */
+    private async getExpiredChequeIds(): Promise<number[]> {
+        const expiredCheques = await this.db
+            .select({ id: instrumentChequeDetails.id })
+            .from(instrumentChequeDetails)
+            .where(
+                and(
+                    isNotNull(instrumentChequeDetails.dueDate),
+                    sql`${instrumentChequeDetails.dueDate} + INTERVAL '3 months' < CURRENT_DATE`
+                )
+            );
+
+        return expiredCheques.map((c) => c.id);
+    }
+
+    async getDashboardData(
         tab?: string,
         options?: {
             page?: number;
@@ -11,47 +48,308 @@ export class ChequeService {
             sortOrder?: 'asc' | 'desc';
             search?: string;
         },
-    ) {
+    ): Promise<PaginatedResult<ChequeDashboardRow>> {
         const page = options?.page || 1;
         const limit = options?.limit || 50;
+        const offset = (page - 1) * limit;
 
-        // Placeholder data
-        const mockData = Array.from({ length: Math.min(limit, 10) }, (_, i) => ({
-            id: i + 1,
-            date: new Date().toISOString(),
-            chequeNo: `CHQ${String(i + 1).padStart(6, '0')}`,
-            payeeName: `Payee ${i + 1}`,
-            bidValidity: new Date().toISOString(),
-            amount: (i + 1) * 20000,
-            type: i % 2 === 0 ? 'Security' : 'DD/FDR',
-            cheque: `Cheque ${i + 1}`,
-            dueDate: new Date().toISOString(),
-            expiry: new Date().toISOString(),
-            chequeStatus: tab || 'cheque-pending',
+        // Get expired cheque IDs
+        const expiredChequeIds = await this.getExpiredChequeIds();
+
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'Cheque'),
+            eq(paymentInstruments.isActive, true),
+        ];
+
+        // Apply tab-specific filters
+        if (tab === 'cheque-pending') {
+            conditions.push(
+                isNull(paymentInstruments.action),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'cheque-payable') {
+            conditions.push(
+                eq(instrumentChequeDetails.chequeReason, 'Payable'),
+                eq(paymentInstruments.action, 1),
+                ne(paymentInstruments.status, 'Rejected'),
+                ne(paymentInstruments.action, 6),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'cheque-paid-stop') {
+            conditions.push(
+                inArray(paymentInstruments.action, [3, 4, 5]),
+                ne(paymentInstruments.status, 'Rejected'),
+                ne(paymentInstruments.action, 6),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'cheque-for-security') {
+            conditions.push(
+                eq(instrumentChequeDetails.chequeReason, 'Security'),
+                ne(paymentInstruments.status, 'Rejected'),
+                ne(paymentInstruments.action, 6),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'cheque-for-dd-fdr') {
+            conditions.push(
+                inArray(instrumentChequeDetails.chequeReason, ['DD', 'FDR', 'EMD']),
+                ne(paymentInstruments.status, 'Rejected'),
+                ne(paymentInstruments.action, 6),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'rejected') {
+            conditions.push(
+                eq(paymentInstruments.status, 'Rejected'),
+                ne(paymentInstruments.action, 6),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'cancelled') {
+            conditions.push(
+                eq(paymentInstruments.action, 6),
+                ne(paymentInstruments.status, 'Rejected'),
+                expiredChequeIds.length > 0 ? notInArray(instrumentChequeDetails.id, expiredChequeIds) : sql`1=1`
+            );
+        } else if (tab === 'expired') {
+            // Expired tab explicitly fetches expired cheques
+            conditions.push(
+                isNotNull(instrumentChequeDetails.dueDate),
+                sql`${instrumentChequeDetails.dueDate} + INTERVAL '3 months' < CURRENT_DATE`
+            );
+        }
+
+        // Search filter
+        if (options?.search) {
+            const searchStr = `%${options.search}%`;
+            conditions.push(
+                sql`(
+                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
+                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${instrumentChequeDetails.chequeNo} ILIKE ${searchStr} OR
+                    ${instrumentChequeDetails.chequeReason} ILIKE ${searchStr}
+                )`
+            );
+        }
+
+        const whereClause = and(...conditions);
+
+        // Build order clause
+        let orderClause: any = desc(paymentInstruments.createdAt);
+        if (options?.sortBy) {
+            const direction = options.sortOrder === 'desc' ? desc : asc;
+            switch (options.sortBy) {
+                case 'date':
+                    orderClause = direction(instrumentChequeDetails.chequeDate);
+                    break;
+                case 'chequeNo':
+                    orderClause = direction(instrumentChequeDetails.chequeNo);
+                    break;
+                case 'amount':
+                    orderClause = direction(paymentInstruments.amount);
+                    break;
+                default:
+                    orderClause = direction(paymentInstruments.createdAt);
+            }
+        }
+
+        // Data query
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                date: instrumentChequeDetails.chequeDate,
+                chequeNo: instrumentChequeDetails.chequeNo,
+                payeeName: sql<string | null>`NULL`, // Cheque doesn't have payeeName in schema
+                bidValidity: tenderInfos.dueDate,
+                amount: paymentInstruments.amount,
+                type: instrumentChequeDetails.chequeReason,
+                cheque: sql<string | null>`NULL`, // Not in schema
+                dueDate: instrumentChequeDetails.dueDate,
+                expiry: sql<Date | null>`${instrumentChequeDetails.dueDate} + INTERVAL '3 months'`,
+                chequeStatus: paymentInstruments.status,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        // Count query
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(whereClause);
+
+        const total = Number(countResult?.count || 0);
+
+        const data: ChequeDashboardRow[] = rows.map((row) => ({
+            id: row.id,
+            date: row.date ? new Date(row.date) : null,
+            chequeNo: row.chequeNo,
+            payeeName: row.payeeName,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            amount: row.amount ? Number(row.amount) : null,
+            type: row.type,
+            cheque: row.cheque,
+            dueDate: row.dueDate ? new Date(row.dueDate) : null,
+            expiry: row.expiry ? new Date(row.expiry) : null,
+            chequeStatus: row.chequeStatus,
         }));
 
-        return {
-            data: mockData,
-            meta: {
-                total: 10,
-                page,
-                limit,
-                totalPages: Math.ceil(10 / limit),
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    getDashboardCounts() {
+    async getDashboardCounts(): Promise<ChequeDashboardCounts> {
+        // Get expired cheque IDs
+        const expiredChequeIds = await this.getExpiredChequeIds();
+
+        const baseConditions = [
+            eq(paymentInstruments.instrumentType, 'Cheque'),
+            eq(paymentInstruments.isActive, true),
+        ];
+
+        const excludeExpiredCondition = expiredChequeIds.length > 0
+            ? notInArray(instrumentChequeDetails.id, expiredChequeIds)
+            : sql`1=1`;
+
+        // Count cheque-pending
+        const chequePendingConditions = [
+            ...baseConditions,
+            isNull(paymentInstruments.action),
+            excludeExpiredCondition,
+        ];
+        const [chequePendingResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...chequePendingConditions));
+        const chequePending = Number(chequePendingResult?.count || 0);
+
+        // Count cheque-payable
+        const chequePayableConditions = [
+            ...baseConditions,
+            eq(instrumentChequeDetails.chequeReason, 'Payable'),
+            eq(paymentInstruments.action, 1),
+            ne(paymentInstruments.status, 'Rejected'),
+            ne(paymentInstruments.action, 6),
+            excludeExpiredCondition,
+        ];
+        const [chequePayableResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...chequePayableConditions));
+        const chequePayable = Number(chequePayableResult?.count || 0);
+
+        // Count cheque-paid-stop
+        const chequePaidStopConditions = [
+            ...baseConditions,
+            inArray(paymentInstruments.action, [3, 4, 5]),
+            ne(paymentInstruments.status, 'Rejected'),
+            ne(paymentInstruments.action, 6),
+            excludeExpiredCondition,
+        ];
+        const [chequePaidStopResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...chequePaidStopConditions));
+        const chequePaidStop = Number(chequePaidStopResult?.count || 0);
+
+        // Count cheque-for-security
+        const chequeForSecurityConditions = [
+            ...baseConditions,
+            eq(instrumentChequeDetails.chequeReason, 'Security'),
+            ne(paymentInstruments.status, 'Rejected'),
+            ne(paymentInstruments.action, 6),
+            excludeExpiredCondition,
+        ];
+        const [chequeForSecurityResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...chequeForSecurityConditions));
+        const chequeForSecurity = Number(chequeForSecurityResult?.count || 0);
+
+        // Count cheque-for-dd-fdr
+        const chequeForDdFdrConditions = [
+            ...baseConditions,
+            inArray(instrumentChequeDetails.chequeReason, ['DD', 'FDR', 'EMD']),
+            ne(paymentInstruments.status, 'Rejected'),
+            ne(paymentInstruments.action, 6),
+            excludeExpiredCondition,
+        ];
+        const [chequeForDdFdrResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...chequeForDdFdrConditions));
+        const chequeForDdFdr = Number(chequeForDdFdrResult?.count || 0);
+
+        // Count rejected
+        const rejectedConditions = [
+            ...baseConditions,
+            eq(paymentInstruments.status, 'Rejected'),
+            ne(paymentInstruments.action, 6),
+            excludeExpiredCondition,
+        ];
+        const [rejectedResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...rejectedConditions));
+        const rejected = Number(rejectedResult?.count || 0);
+
+        // Count cancelled
+        const cancelledConditions = [
+            ...baseConditions,
+            eq(paymentInstruments.action, 6),
+            ne(paymentInstruments.status, 'Rejected'),
+            excludeExpiredCondition,
+        ];
+        const [cancelledResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...cancelledConditions));
+        const cancelled = Number(cancelledResult?.count || 0);
+
+        // Count expired
+        const expiredConditions = [
+            ...baseConditions,
+            isNotNull(instrumentChequeDetails.dueDate),
+            sql`${instrumentChequeDetails.dueDate} + INTERVAL '3 months' < CURRENT_DATE`
+        ];
+        const [expiredResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(...expiredConditions));
+        const expired = Number(expiredResult?.count || 0);
+
         return {
-            'cheque-pending': 3,
-            'cheque-payable': 4,
-            'cheque-paid-stop': 2,
-            'cheque-for-security': 2,
-            'cheque-for-dd-fdr': 2,
-            rejected: 1,
-            cancelled: 1,
-            expired: 1,
-            total: 16,
+            'cheque-pending': chequePending,
+            'cheque-payable': chequePayable,
+            'cheque-paid-stop': chequePaidStop,
+            'cheque-for-security': chequeForSecurity,
+            'cheque-for-dd-fdr': chequeForDdFdr,
+            rejected,
+            cancelled,
+            expired,
+            total: chequePending + chequePayable + chequePaidStop + chequeForSecurity + chequeForDdFdr + rejected + cancelled + expired,
         };
     }
 }
