@@ -158,12 +158,14 @@ const FdrListPage = () => {
                 filter: true,
             },
             currencyCol<FdrDashboardRow>('fdrAmount', {
+                field:'fdrAmount',
                 headerName: 'FDR Amount',
                 width: 130,
                 colId: 'fdrAmount',
                 sortable: true,
             }),
             tenderNameCol<FdrDashboardRow>('tenderNo', {
+                field:'tenderNo',
                 headerName: 'Tender Name',
                 width: 200,
                 colId: 'tenderNo',
@@ -308,7 +310,7 @@ const FdrListPage = () => {
                                     className="data-[state=active]:shadow-md flex items-center gap-2"
                                 >
                                     {tab.icon}
-                                    <span className="font-semibold text-sm">{tab.name}</span>
+                                    <span className="font-semibold text-xs">{tab.name}</span>
                                     {tab.count > 0 && (
                                         <Badge variant="secondary" className="text-xs ml-1">
                                             {tab.count}
@@ -335,6 +337,7 @@ const FdrListPage = () => {
                                                 data={fdrData}
                                                 columnDefs={colDefs as ColDef<any>[]}
                                                 loading={isLoading}
+                                                autoSizeColumns={true}
                                                 manualPagination={true}
                                                 rowCount={totalRows}
                                                 paginationState={pagination}

@@ -317,6 +317,7 @@ const PayOnPortalListPage = () => {
                                                 data={popData}
                                                 columnDefs={colDefs as ColDef<any>[]}
                                                 loading={isLoading}
+                                                autoSizeColumns={true}
                                                 manualPagination={true}
                                                 rowCount={totalRows}
                                                 paginationState={pagination}

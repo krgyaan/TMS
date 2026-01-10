@@ -370,6 +370,7 @@ const BankGuaranteeListPage = () => {
                                                 data={bgData}
                                                 columnDefs={colDefs as ColDef<any>[]}
                                                 loading={isLoading}
+                                                autoSizeColumns={true}
                                                 manualPagination={true}
                                                 rowCount={totalRows}
                                                 paginationState={pagination}

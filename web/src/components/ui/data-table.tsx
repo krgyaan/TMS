@@ -31,6 +31,7 @@ export interface DataTableProps<T = any> {
         pageSize: number;
     };
     onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void;
+    autoSizeColumns?: boolean | string[];
 }
 
 const DataTable = <T extends Record<string, any>>({
@@ -53,6 +54,7 @@ const DataTable = <T extends Record<string, any>>({
     selectionType = 'single',
     onSelectionChanged,
     themeOverride,
+    autoSizeColumns,
 }: DataTableProps<T>) => {
 
     // 1. Calculate Pagination Logic
@@ -94,8 +96,21 @@ const DataTable = <T extends Record<string, any>>({
     }), [enablePagination, activePageSize, enableSorting, enableFiltering, enableColumnResizing, enableRowSelection, selectionType, manualPagination]);
 
     const handleGridReady = useCallback((event: GridReadyEvent<T>) => {
+        // Auto-size columns if enabled
+        if (autoSizeColumns) {
+            if (Array.isArray(autoSizeColumns)) {
+                // Auto-size specific columns
+                event.api.autoSizeColumns(autoSizeColumns);
+            } else {
+                // Auto-size all columns - get all column IDs
+                const allColumnIds = event.api.getColumns()?.map(col => col.getColId()).filter((id): id is string => id !== null) || [];
+                if (allColumnIds.length > 0) {
+                    event.api.autoSizeColumns(allColumnIds);
+                }
+            }
+        }
         if (onGridReady) onGridReady(event);
-    }, [onGridReady]);
+    }, [onGridReady, autoSizeColumns]);
 
     const handleSelectionChanged = useCallback((event: any) => {
         if (onSelectionChanged && enableRowSelection) {
