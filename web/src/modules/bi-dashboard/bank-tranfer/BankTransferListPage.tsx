@@ -7,12 +7,13 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
 import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
 import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { BankTransferActionForm } from './components/BankTransferActionForm';
 
 const TABS_CONFIG: Array<{ key: BankTransferDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -67,6 +68,8 @@ const BankTransferListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const [actionFormOpen, setActionFormOpen] = useState(false);
+    const [selectedInstrument, setSelectedInstrument] = useState<BankTransferDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -102,6 +105,11 @@ const BankTransferListPage = () => {
         console.log('View details:', row);
     }, []);
 
+    const handleOpenActionForm = useCallback((row: BankTransferDashboardRow) => {
+        setSelectedInstrument(row);
+        setActionFormOpen(true);
+    }, []);
+
     const btActions: ActionItem<BankTransferDashboardRow>[] = useMemo(
         () => [
             {
@@ -109,8 +117,13 @@ const BankTransferListPage = () => {
                 icon: <Eye className="h-4 w-4" />,
                 onClick: handleViewDetails,
             },
+            {
+                label: 'Action Form',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: handleOpenActionForm,
+            },
         ],
-        [handleViewDetails]
+        [handleViewDetails, handleOpenActionForm]
     );
 
     const colDefs = useMemo<ColDef<BankTransferDashboardRow>[]>(
@@ -341,6 +354,22 @@ const BankTransferListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Action Form Dialog */}
+            {selectedInstrument && (
+                <BankTransferActionForm
+                    open={actionFormOpen}
+                    onOpenChange={setActionFormOpen}
+                    instrumentId={selectedInstrument.id}
+                    instrumentData={{
+                        utrNo: selectedInstrument.utrNo || undefined,
+                        accountName: selectedInstrument.accountName || undefined,
+                        amount: selectedInstrument.amount || undefined,
+                        tenderName: selectedInstrument.tenderName || undefined,
+                        tenderNo: selectedInstrument.tenderNo || undefined,
+                    }}
+                />
+            )}
         </>
     );
 };
