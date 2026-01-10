@@ -2,12 +2,12 @@ import { lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
-const BI_DemandDraft = lazy(() => import('@/modules/bi-dashboard/demand-draft'));
-const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr'));
-const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque'));
-const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee'));
-const BI_BankTransfer = lazy(() => import('@/modules/bi-dashboard/bank-tranfer'));
-const BI_PayOnPortal = lazy(() => import('@/modules/bi-dashboard/pay-on-portal'));
+const BI_DemandDraft = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftListPage'));
+const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr/FdrListPage'));
+const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeListPage'));
+const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeListPage'));
+const BI_BankTransfer = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferListPage'));
+const BI_PayOnPortal = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalListPage'));
 
 export default function BIDashboardRoutes() {
     return (
