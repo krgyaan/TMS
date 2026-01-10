@@ -7,14 +7,13 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { dateCol, currencyCol } from '@/components/data-grid/columns';
+import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -72,6 +71,8 @@ const BankGuaranteeListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const [actionFormOpen, setActionFormOpen] = useState(false);
+    const [selectedInstrument, setSelectedInstrument] = useState<BankGuaranteeDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -107,6 +108,11 @@ const BankGuaranteeListPage = () => {
         console.log('View details:', row);
     }, []);
 
+    const handleOpenActionForm = useCallback((row: BankGuaranteeDashboardRow) => {
+        setSelectedInstrument(row);
+        setActionFormOpen(true);
+    }, []);
+
     const bgActions: ActionItem<BankGuaranteeDashboardRow>[] = useMemo(
         () => [
             {
@@ -114,8 +120,13 @@ const BankGuaranteeListPage = () => {
                 icon: <Eye className="h-4 w-4" />,
                 onClick: handleViewDetails,
             },
+            {
+                label: 'Action Form',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: handleOpenActionForm,
+            },
         ],
-        [handleViewDetails]
+        [handleViewDetails, handleOpenActionForm]
     );
 
     const colDefs = useMemo<ColDef<BankGuaranteeDashboardRow>[]>(
@@ -144,19 +155,25 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            tenderNameCol<BankGuaranteeDashboardRow>('tenderNo', {
+            {
+                field: 'tenderNo',
                 headerName: 'Tender Name',
                 width: 200,
                 colId: 'tenderNo',
                 sortable: true,
-            }),
+                valueGetter: (params) => {
+                    const tenderNo = params.data?.tenderNo || '';
+                    const tenderName = params.data?.tenderName || '';
+                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
+                },
+            },
             dateCol<BankGuaranteeDashboardRow>('bidValidity', {
                 headerName: 'Bid Validity',
                 width: 130,
                 colId: 'bidValidity',
                 sortable: true,
             }),
-            currencyCol<BankGuaranteeDashboardRow>('amount', {
+            currencyCol<BankGuaranteeDashboardRow>('amount', {}, {
                 headerName: 'Amount',
                 width: 130,
                 colId: 'amount',
@@ -186,13 +203,13 @@ const BankGuaranteeListPage = () => {
                 colId: 'expiryDate',
                 sortable: true,
             }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesPaid', {
+            currencyCol<BankGuaranteeDashboardRow>('bgChargesPaid', {}, {
                 headerName: 'BG Charges paid',
                 width: 150,
                 colId: 'bgChargesPaid',
                 sortable: true,
             }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesCalculated', {
+            currencyCol<BankGuaranteeDashboardRow>('bgChargesCalculated', {}, {
                 headerName: 'BG Charges Calculated',
                 width: 180,
                 colId: 'bgChargesCalculated',
@@ -207,7 +224,7 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            currencyCol<BankGuaranteeDashboardRow>('fdrValue', {
+            currencyCol<BankGuaranteeDashboardRow>('fdrValue', {}, {
                 headerName: 'FDR Value',
                 width: 130,
                 colId: 'fdrValue',
@@ -394,6 +411,22 @@ const BankGuaranteeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Action Form Dialog */}
+            {selectedInstrument && (
+                <BankGuaranteeActionForm
+                    open={actionFormOpen}
+                    onOpenChange={setActionFormOpen}
+                    instrumentId={selectedInstrument.id}
+                    instrumentData={{
+                        bgNo: selectedInstrument.bgNo || undefined,
+                        bgDate: selectedInstrument.bgDate || undefined,
+                        amount: selectedInstrument.amount || undefined,
+                        tenderName: selectedInstrument.tenderName || undefined,
+                        tenderNo: selectedInstrument.tenderNo || undefined,
+                    }}
+                />
+            )}
         </>
     );
 };

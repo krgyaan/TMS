@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankTransfersService } from '@/services/api/bank-transfers.service';
 import type {
     BankTransferDashboardRow,
@@ -52,6 +52,19 @@ export const useBankTransferDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdateBankTransferAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            bankTransfersService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankTransfersKey.all });
+            queryClient.invalidateQueries({ queryKey: bankTransfersKey.counts() });
+        },
+    });
 };
 
 export type { BankTransferDashboardRow, BankTransferDashboardCounts };

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, and, or, inArray, isNull, sql, asc, desc, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -13,6 +13,8 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -125,7 +127,7 @@ export class BankGuaranteeService {
                 bidValidity: tenderInfos.dueDate,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: instrumentBgDetails.validityDate,
-                bgClaimPeriod: sql<number | null>`EXTRACT(DAY FROM (${instrumentBgDetails.claimExpiryDate} - ${instrumentBgDetails.validityDate}))`,
+                bgClaimPeriod: sql<number | null>`CASE WHEN ${instrumentBgDetails.claimExpiryDate} IS NOT NULL AND ${instrumentBgDetails.validityDate} IS NOT NULL THEN (${instrumentBgDetails.claimExpiryDate} - ${instrumentBgDetails.validityDate}) ELSE NULL END`,
                 expiryDate: instrumentBgDetails.claimExpiryDate,
                 bgChargesPaid: sql<number | null>`COALESCE(${instrumentBgDetails.stampChargesDeducted}, 0) + COALESCE(${instrumentBgDetails.sfmsChargesDeducted}, 0) + COALESCE(${instrumentBgDetails.otherChargesDeducted}, 0)`,
                 bgChargesCalculated: sql<number | null>`COALESCE(${instrumentBgDetails.stampCharges}, 0) + COALESCE(${instrumentBgDetails.sfmsCharges}, 0)`,
@@ -278,6 +280,199 @@ export class BankGuaranteeService {
             cancelled,
             rejected,
             total: newRequests + liveYes + livePnb + liveBgLimit + cancelled + rejected,
+        };
+    }
+
+    /**
+     * Map action string to action number
+     */
+    private mapActionToNumber(action: string): number {
+        const actionMap: Record<string, number> = {
+            'accounts-form-1': 1,
+            'accounts-form-2': 2,
+            'accounts-form-3': 3,
+            'initiate-followup': 4,
+            'request-extension': 5,
+            'returned-courier': 6,
+            'request-cancellation': 7,
+            'bg-cancellation-confirmation': 8,
+            'fdr-cancellation-confirmation': 9,
+        };
+        return actionMap[action] || 1;
+    }
+
+    /**
+     * Update instrument action with form data
+     */
+    async updateAction(
+        instrumentId: number,
+        body: any,
+        files: Express.Multer.File[],
+        user: any,
+    ) {
+        // Get instrument
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`Instrument ${instrumentId} not found`);
+        }
+
+        if (instrument.instrumentType !== 'BG') {
+            throw new BadRequestException('Instrument is not a Bank Guarantee');
+        }
+
+        // Map action string to number
+        const actionNumber = this.mapActionToNumber(body.action);
+
+        // Parse contacts if provided
+        let contacts: any[] = [];
+        if (body.contacts) {
+            try {
+                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+            } catch (e) {
+                this.logger.warn('Failed to parse contacts', e);
+            }
+        }
+
+        // Handle file paths
+        const filePaths: string[] = [];
+        if (files && files.length > 0) {
+            for (const file of files) {
+                const relativePath = `bi-dashboard/${file.filename}`;
+                filePaths.push(relativePath);
+            }
+        }
+
+        // Update payment_instruments
+        const updateData: any = {
+            action: actionNumber,
+            updatedAt: new Date(),
+        };
+
+        // Update status based on action
+        if (body.action === 'accounts-form-1') {
+            if (body.bg_req === 'Accepted') {
+                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+            } else if (body.bg_req === 'Rejected') {
+                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.rejectionReason = body.reason_req || null;
+            }
+        } else if (body.action === 'accounts-form-2') {
+            updateData.status = 'BG_CREATED';
+        } else if (body.action === 'accounts-form-3') {
+            updateData.status = 'FDR_DETAILS_CAPTURED';
+        } else if (body.action === 'initiate-followup') {
+            updateData.status = 'FOLLOWUP_INITIATED';
+        } else if (body.action === 'request-extension') {
+            updateData.status = 'EXTENSION_REQUESTED';
+        } else if (body.action === 'returned-courier') {
+            updateData.status = 'RETURNED_VIA_COURIER';
+            if (filePaths.length > 0) {
+                updateData.docketSlip = filePaths[0];
+            }
+        } else if (body.action === 'request-cancellation') {
+            updateData.status = 'CANCELLATION_REQUESTED';
+            if (filePaths.length > 0) {
+                updateData.coveringLetter = filePaths[0];
+            }
+        } else if (body.action === 'bg-cancellation-confirmation') {
+            updateData.status = 'BG_CANCELLED';
+            if (filePaths.length > 0) {
+                updateData.cancelPdf = filePaths[0];
+            }
+        } else if (body.action === 'fdr-cancellation-confirmation') {
+            updateData.status = 'FDR_CANCELLED';
+        }
+
+        await this.db
+            .update(paymentInstruments)
+            .set(updateData)
+            .where(eq(paymentInstruments.id, instrumentId));
+
+        // Update instrument_bg_details
+        const bgDetailsUpdate: any = {};
+
+        if (body.action === 'accounts-form-1') {
+            if (body.prefilled_signed_bg && filePaths.length > 0) {
+                bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
+            }
+        } else if (body.action === 'accounts-form-2') {
+            if (body.bg_no) bgDetailsUpdate.bgNo = body.bg_no;
+            if (body.bg_date) bgDetailsUpdate.bgDate = body.bg_date;
+            if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
+            if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
+        } else if (body.action === 'accounts-form-3') {
+            if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
+            if (body.fdr_amount) bgDetailsUpdate.fdrAmt = body.fdr_amount;
+            if (body.fdr_validity) bgDetailsUpdate.fdrValidityDate = body.fdr_validity;
+            if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
+            if (body.bg_charges) bgDetailsUpdate.stampCharges = body.bg_charges;
+            if (body.sfms_charges) bgDetailsUpdate.sfmsCharges = body.sfms_charges;
+            if (body.stamp_charges) bgDetailsUpdate.stampCharges = body.stamp_charges;
+            if (body.other_charges) bgDetailsUpdate.otherChargesDeducted = body.other_charges;
+        } else if (body.action === 'request-extension') {
+            if (body.modification_fields) {
+                const modFields = typeof body.modification_fields === 'string'
+                    ? JSON.parse(body.modification_fields)
+                    : body.modification_fields;
+                // Store modification fields in extended fields
+                if (modFields && modFields.length > 0) {
+                    const amountField = modFields.find((f: any) => f.field_name === 'amount');
+                    const validityField = modFields.find((f: any) => f.field_name === 'validity');
+                    if (amountField) bgDetailsUpdate.extendedAmount = amountField.new_value;
+                    if (validityField) bgDetailsUpdate.extendedValidityDate = validityField.new_value;
+                }
+            }
+            if (filePaths.length > 0) {
+                bgDetailsUpdate.extensionLetterPath = filePaths[0];
+            }
+        } else if (body.action === 'bg-cancellation-confirmation') {
+            if (filePaths.length > 0) {
+                bgDetailsUpdate.cancellationLetterPath = filePaths[0];
+            }
+        }
+
+        if (Object.keys(bgDetailsUpdate).length > 0) {
+            bgDetailsUpdate.updatedAt = new Date();
+            await this.db
+                .update(instrumentBgDetails)
+                .set(bgDetailsUpdate)
+                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+        }
+
+        // Create follow-up if action is initiate-followup
+        if (body.action === 'initiate-followup' && contacts.length > 0) {
+            // Get payment request to get tender info
+            const [paymentRequest] = await this.db
+                .select()
+                .from(paymentRequests)
+                .where(eq(paymentRequests.id, instrument.requestId))
+                .limit(1);
+
+            if (paymentRequest) {
+                const [tenderInfo] = await this.db
+                    .select()
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, paymentRequest.tenderId))
+                    .limit(1);
+
+                if (tenderInfo) {
+                    // Import follow-up service or create follow-up directly
+                    // For now, we'll just log it - follow-up creation can be added later
+                    this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+                }
+            }
+        }
+
+        return {
+            success: true,
+            instrumentId,
+            action: body.action,
+            actionNumber,
         };
     }
 }

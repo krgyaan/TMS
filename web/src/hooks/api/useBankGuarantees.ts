@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
 import type {
     BankGuaranteeDashboardRow,
@@ -52,6 +52,19 @@ export const useBankGuaranteeDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdateBankGuaranteeAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            bankGuaranteesService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+        },
+    });
 };
 
 export type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts };
