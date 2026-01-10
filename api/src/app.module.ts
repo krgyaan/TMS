@@ -64,6 +64,12 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
+import { BankGuaranteeModule } from "@/modules/bi-dashboard/bank-guarantee/bank-guarantee.module";
+import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-draft.module";
+import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
+import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
+import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 
 @Module({
     imports: [
@@ -139,6 +145,12 @@ import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        PayOnPortalModule,
+        BankGuaranteeModule,
+        DemandDraftModule,
+        FdrModule,
+        BankTransferModule,
+        ChequeModule,
     ],
     controllers: [AppController],
     providers: [
