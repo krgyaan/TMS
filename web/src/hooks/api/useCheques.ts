@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chequesService } from '@/services/api/cheques.service';
 import type {
     ChequeDashboardRow,
@@ -52,6 +52,19 @@ export const useChequeDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdateChequeAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            chequesService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: chequesKey.all });
+            queryClient.invalidateQueries({ queryKey: chequesKey.counts() });
+        },
+    });
 };
 
 export type { ChequeDashboardRow, ChequeDashboardCounts };

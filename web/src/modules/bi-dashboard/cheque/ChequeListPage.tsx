@@ -7,12 +7,13 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
 import { dateCol, currencyCol } from '@/components/data-grid/columns';
+import { ChequeActionForm } from './components/ChequeActionForm';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -82,6 +83,8 @@ const ChequeListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const [actionFormOpen, setActionFormOpen] = useState(false);
+    const [selectedInstrument, setSelectedInstrument] = useState<ChequeDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -117,6 +120,11 @@ const ChequeListPage = () => {
         console.log('View details:', row);
     }, []);
 
+    const handleOpenActionForm = useCallback((row: ChequeDashboardRow) => {
+        setSelectedInstrument(row);
+        setActionFormOpen(true);
+    }, []);
+
     const chequeActions: ActionItem<ChequeDashboardRow>[] = useMemo(
         () => [
             {
@@ -124,8 +132,13 @@ const ChequeListPage = () => {
                 icon: <Eye className="h-4 w-4" />,
                 onClick: handleViewDetails,
             },
+            {
+                label: 'Action Form',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: handleOpenActionForm,
+            },
         ],
-        [handleViewDetails]
+        [handleViewDetails, handleOpenActionForm]
     );
 
     const colDefs = useMemo<ColDef<ChequeDashboardRow>[]>(
@@ -362,6 +375,22 @@ const ChequeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Action Form Dialog */}
+            {selectedInstrument && (
+                <ChequeActionForm
+                    open={actionFormOpen}
+                    onOpenChange={setActionFormOpen}
+                    instrumentId={selectedInstrument.id}
+                    instrumentData={{
+                        chequeNo: selectedInstrument.chequeNo || undefined,
+                        chequeDate: selectedInstrument.date || undefined,
+                        amount: selectedInstrument.amount || undefined,
+                        tenderName: selectedInstrument.tenderName || undefined,
+                        tenderNo: selectedInstrument.tenderNo || undefined,
+                    }}
+                />
+            )}
         </>
     );
 };
