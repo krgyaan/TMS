@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, and, inArray, isNull, sql, asc, desc, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -227,6 +227,114 @@ export class DemandDraftService {
             returned,
             cancelled,
             total: pending + created + rejected + returned + cancelled,
+        };
+    }
+
+    private mapActionToNumber(action: string): number {
+        const actionMap: Record<string, number> = {
+            'accounts-form-1': 1,
+            'accounts-form-2': 2,
+            'accounts-form-3': 3,
+            'initiate-followup': 4,
+            'request-extension': 5,
+            'returned-courier': 6,
+            'request-cancellation': 7,
+        };
+        return actionMap[action] || 1;
+    }
+
+    async updateAction(
+        instrumentId: number,
+        body: any,
+        files: Express.Multer.File[],
+        user: any,
+    ) {
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`Instrument ${instrumentId} not found`);
+        }
+
+        if (instrument.instrumentType !== 'DD') {
+            throw new BadRequestException('Instrument is not a Demand Draft');
+        }
+
+        const actionNumber = this.mapActionToNumber(body.action);
+        let contacts: any[] = [];
+        if (body.contacts) {
+            try {
+                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+            } catch (e) {
+                this.logger.warn('Failed to parse contacts', e);
+            }
+        }
+
+        const filePaths: string[] = [];
+        if (files && files.length > 0) {
+            for (const file of files) {
+                const relativePath = `bi-dashboard/${file.filename}`;
+                filePaths.push(relativePath);
+            }
+        }
+
+        const updateData: any = {
+            action: actionNumber,
+            updatedAt: new Date(),
+        };
+
+        if (body.action === 'accounts-form-1') {
+            if (body.dd_req === 'Accepted') {
+                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+            } else if (body.dd_req === 'Rejected') {
+                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.rejectionReason = body.reason_req || null;
+            }
+        } else if (body.action === 'accounts-form-2') {
+            updateData.status = 'DD_CREATED';
+        } else if (body.action === 'accounts-form-3') {
+            updateData.status = 'DD_DETAILS_CAPTURED';
+        } else if (body.action === 'initiate-followup') {
+            updateData.status = 'FOLLOWUP_INITIATED';
+        } else if (body.action === 'request-extension') {
+            updateData.status = 'EXTENSION_REQUESTED';
+        } else if (body.action === 'returned-courier') {
+            updateData.status = 'RETURNED_VIA_COURIER';
+        } else if (body.action === 'request-cancellation') {
+            updateData.status = 'CANCELLATION_REQUESTED';
+        }
+
+        await this.db
+            .update(paymentInstruments)
+            .set(updateData)
+            .where(eq(paymentInstruments.id, instrumentId));
+
+        const ddDetailsUpdate: any = {};
+        if (body.action === 'accounts-form-2') {
+            if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
+            if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
+        }
+
+        if (Object.keys(ddDetailsUpdate).length > 0) {
+            ddDetailsUpdate.updatedAt = new Date();
+            await this.db
+                .update(instrumentDdDetails)
+                .set(ddDetailsUpdate)
+                .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+        }
+
+        if (body.action === 'initiate-followup' && contacts.length > 0) {
+            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+        }
+
+        return {
+            success: true,
+            instrumentId,
+            action: body.action,
+            actionNumber,
         };
     }
 }

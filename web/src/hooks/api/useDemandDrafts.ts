@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { demandDraftsService } from '@/services/api/demand-drafts.service';
 import type {
     DemandDraftDashboardRow,
@@ -52,6 +52,19 @@ export const useDemandDraftDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdateDemandDraftAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            demandDraftsService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: demandDraftsKey.all });
+            queryClient.invalidateQueries({ queryKey: demandDraftsKey.counts() });
+        },
+    });
 };
 
 export type { DemandDraftDashboardRow, DemandDraftDashboardCounts };

@@ -7,12 +7,13 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { dateCol, currencyCol } from '@/components/data-grid/columns';
+import { DemandDraftActionForm } from './components/DemandDraftActionForm';
 
 const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -67,6 +68,8 @@ const DemandDraftListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const [actionFormOpen, setActionFormOpen] = useState(false);
+    const [selectedInstrument, setSelectedInstrument] = useState<DemandDraftDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -102,6 +105,11 @@ const DemandDraftListPage = () => {
         console.log('View details:', row);
     }, []);
 
+    const handleOpenActionForm = useCallback((row: DemandDraftDashboardRow) => {
+        setSelectedInstrument(row);
+        setActionFormOpen(true);
+    }, []);
+
     const ddActions: ActionItem<DemandDraftDashboardRow>[] = useMemo(
         () => [
             {
@@ -109,8 +117,13 @@ const DemandDraftListPage = () => {
                 icon: <Eye className="h-4 w-4" />,
                 onClick: handleViewDetails,
             },
+            {
+                label: 'Action Form',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: handleOpenActionForm,
+            },
         ],
-        [handleViewDetails]
+        [handleViewDetails, handleOpenActionForm]
     );
 
     const colDefs = useMemo<ColDef<DemandDraftDashboardRow>[]>(
@@ -139,18 +152,24 @@ const DemandDraftListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            currencyCol<DemandDraftDashboardRow>('ddAmount', {
+            currencyCol<DemandDraftDashboardRow>('ddAmount', {}, {
                 headerName: 'DD Amount',
                 width: 130,
                 colId: 'ddAmount',
                 sortable: true,
             }),
-            tenderNameCol<DemandDraftDashboardRow>('tenderNo', {
+            {
+                field: 'tenderNo',
                 headerName: 'Tender Name',
                 width: 200,
                 colId: 'tenderNo',
                 sortable: true,
-            }),
+                valueGetter: (params) => {
+                    const tenderNo = params.data?.tenderNo || '';
+                    const tenderName = params.data?.tenderName || '';
+                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
+                },
+            },
             dateCol<DemandDraftDashboardRow>('bidValidity', {
                 headerName: 'Bid Validity',
                 width: 130,
@@ -347,6 +366,22 @@ const DemandDraftListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Action Form Dialog */}
+            {selectedInstrument && (
+                <DemandDraftActionForm
+                    open={actionFormOpen}
+                    onOpenChange={setActionFormOpen}
+                    instrumentId={selectedInstrument.id}
+                    instrumentData={{
+                        ddNo: selectedInstrument.ddNo || undefined,
+                        ddDate: selectedInstrument.ddCreationDate || undefined,
+                        amount: selectedInstrument.ddAmount || undefined,
+                        tenderName: selectedInstrument.tenderName || undefined,
+                        tenderNo: selectedInstrument.tenderNo || undefined,
+                    }}
+                />
+            )}
         </>
     );
 };
