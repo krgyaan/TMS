@@ -1,7 +1,7 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from '@db/schemas';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import * as schema from "@db/schemas";
 
 export const createPool = (url: string, max?: number, ssl?: boolean) =>
     new Pool({
@@ -10,8 +10,9 @@ export const createPool = (url: string, max?: number, ssl?: boolean) =>
         ssl: ssl ? { rejectUnauthorized: false } : undefined,
     });
 
-export const createDb = (pool: Pool) => drizzle(pool, {
-    schema: { ...schema }
-});
+export const createDb = (pool: Pool) =>
+    drizzle(pool, {
+        schema: { ...schema },
+    });
 
 export type DbInstance = NodePgDatabase<typeof schema>;
