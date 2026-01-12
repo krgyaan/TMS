@@ -7,12 +7,13 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
 import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -97,9 +98,17 @@ const PayOnPortalListPage = () => {
     const popData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
+    const [selectedInstrument, setSelectedInstrument] = useState<PayOnPortalDashboardRow | null>(null);
+    const [actionFormOpen, setActionFormOpen] = useState(false);
+
     const handleViewDetails = useCallback((row: PayOnPortalDashboardRow) => {
         // TODO: Implement navigation to detail page
         console.log('View details:', row);
+    }, []);
+
+    const handleOpenActionForm = useCallback((row: PayOnPortalDashboardRow) => {
+        setSelectedInstrument(row);
+        setActionFormOpen(true);
     }, []);
 
     const popActions: ActionItem<PayOnPortalDashboardRow>[] = useMemo(
@@ -109,8 +118,13 @@ const PayOnPortalListPage = () => {
                 icon: <Eye className="h-4 w-4" />,
                 onClick: handleViewDetails,
             },
+            {
+                label: 'Action Form',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: handleOpenActionForm,
+            },
         ],
-        [handleViewDetails]
+        [handleViewDetails, handleOpenActionForm]
     );
 
     const colDefs = useMemo<ColDef<PayOnPortalDashboardRow>[]>(
@@ -341,6 +355,22 @@ const PayOnPortalListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Action Form Dialog */}
+            {selectedInstrument && (
+                <PayOnPortalActionForm
+                    open={actionFormOpen}
+                    onOpenChange={setActionFormOpen}
+                    instrumentId={selectedInstrument.id}
+                    instrumentData={{
+                        utrNo: selectedInstrument.utrNo || undefined,
+                        portalName: selectedInstrument.portalName || undefined,
+                        amount: selectedInstrument.amount || undefined,
+                        tenderName: selectedInstrument.tenderName || undefined,
+                        tenderNo: selectedInstrument.tenderNo || undefined,
+                    }}
+                />
+            )}
         </>
     );
 };

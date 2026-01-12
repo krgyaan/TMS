@@ -56,6 +56,10 @@ class PayOnPortalsService extends BaseApiService {
             throw error;
         }
     }
+
+    async updateAction(id: number, formData: FormData): Promise<any> {
+        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    }
 }
 
 export const payOnPortalsService = new PayOnPortalsService();

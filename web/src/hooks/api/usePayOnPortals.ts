@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
 import type {
     PayOnPortalDashboardRow,
@@ -52,6 +52,19 @@ export const usePayOnPortalDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdatePayOnPortalAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            payOnPortalsService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: payOnPortalsKey.all });
+            queryClient.invalidateQueries({ queryKey: payOnPortalsKey.counts() });
+        },
+    });
 };
 
 export type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts };

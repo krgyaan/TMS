@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, and, inArray, isNull, sql, asc, desc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -223,6 +223,113 @@ export class PayOnPortalService {
             returned,
             settled,
             total: pending + accepted + rejected + returned + settled,
+        };
+    }
+
+    private mapActionToNumber(action: string): number {
+        const actionMap: Record<string, number> = {
+            'accounts-form-1': 1,
+            'initiate-followup': 2,
+            'returned': 3,
+            'settled': 4,
+        };
+        return actionMap[action] || 1;
+    }
+
+    async updateAction(
+        instrumentId: number,
+        body: any,
+        files: Express.Multer.File[],
+        user: any,
+    ) {
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`Instrument ${instrumentId} not found`);
+        }
+
+        if (instrument.instrumentType !== 'Portal Payment') {
+            throw new BadRequestException('Instrument is not a Portal Payment');
+        }
+
+        const actionNumber = this.mapActionToNumber(body.action);
+        let contacts: any[] = [];
+        if (body.contacts) {
+            try {
+                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+            } catch (e) {
+                this.logger.warn('Failed to parse contacts', e);
+            }
+        }
+
+        const filePaths: string[] = [];
+        if (files && files.length > 0) {
+            for (const file of files) {
+                const relativePath = `bi-dashboard/${file.filename}`;
+                filePaths.push(relativePath);
+            }
+        }
+
+        const updateData: any = {
+            action: actionNumber,
+            updatedAt: new Date(),
+        };
+
+        if (body.action === 'accounts-form-1') {
+            if (body.pop_req === 'Accepted') {
+                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+            } else if (body.pop_req === 'Rejected') {
+                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.rejectionReason = body.reason_req || null;
+            }
+        } else if (body.action === 'initiate-followup') {
+            updateData.status = 'FOLLOWUP_INITIATED';
+        } else if (body.action === 'returned') {
+            updateData.status = 'RETURNED';
+        } else if (body.action === 'settled') {
+            updateData.status = 'SETTLED';
+        }
+
+        await this.db
+            .update(paymentInstruments)
+            .set(updateData)
+            .where(eq(paymentInstruments.id, instrumentId));
+
+        const transferDetailsUpdate: any = {};
+        if (body.action === 'accounts-form-1') {
+            if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
+            if (body.portal_name) transferDetailsUpdate.portalName = body.portal_name;
+            if (body.amount) transferDetailsUpdate.amount = body.amount;
+            if (body.payment_date) transferDetailsUpdate.transactionDate = body.payment_date;
+        } else if (body.action === 'returned') {
+            if (body.return_date) transferDetailsUpdate.transactionDate = body.return_date;
+        } else if (body.action === 'settled') {
+            if (body.settlement_date) transferDetailsUpdate.transactionDate = body.settlement_date;
+            if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
+            if (body.settlement_reference_no) transferDetailsUpdate.reference = body.settlement_reference_no;
+        }
+
+        if (Object.keys(transferDetailsUpdate).length > 0) {
+            transferDetailsUpdate.updatedAt = new Date();
+            await this.db
+                .update(instrumentTransferDetails)
+                .set(transferDetailsUpdate)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+        }
+
+        if (body.action === 'initiate-followup' && contacts.length > 0) {
+            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+        }
+
+        return {
+            success: true,
+            instrumentId,
+            action: body.action,
+            actionNumber,
         };
     }
 }
