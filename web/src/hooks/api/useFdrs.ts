@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fdrsService } from '@/services/api/fdrs.service';
 import type {
     FdrDashboardRow,
@@ -52,6 +52,19 @@ export const useFdrDashboardCounts = () => {
     });
 
     return query;
+};
+
+export const useUpdateFdrAction = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            fdrsService.updateAction(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: fdrsKey.all });
+            queryClient.invalidateQueries({ queryKey: fdrsKey.counts() });
+        },
+    });
 };
 
 export type { FdrDashboardRow, FdrDashboardCounts };
