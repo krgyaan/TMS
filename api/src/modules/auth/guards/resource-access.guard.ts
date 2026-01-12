@@ -1,15 +1,9 @@
-import {
-    Injectable,
-    CanActivate,
-    ExecutionContext,
-    ForbiddenException,
-    Inject,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { DataScope } from '@/common/constants/roles.constant';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Inject } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { DataScope } from "@/common/constants/roles.constant";
 
-export const RESOURCE_CONFIG_KEY = 'resourceConfig';
+export const RESOURCE_CONFIG_KEY = "resourceConfig";
 
 export type ResourceConfig = {
     // Field names in the resource that represent ownership/team
@@ -22,13 +16,10 @@ export type ResourceConfig = {
 
 @Injectable()
 export class ResourceAccessGuard implements CanActivate {
-    constructor(private reflector: Reflector) { }
+    constructor(private reflector: Reflector) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const config = this.reflector.getAllAndOverride<ResourceConfig>(
-            RESOURCE_CONFIG_KEY,
-            [context.getHandler(), context.getClass()]
-        );
+        const config = this.reflector.getAllAndOverride<ResourceConfig>(RESOURCE_CONFIG_KEY, [context.getHandler(), context.getClass()]);
 
         // No resource config = allow (permission check is enough)
         if (!config) {
@@ -39,7 +30,7 @@ export class ResourceAccessGuard implements CanActivate {
         const user = request.user as ValidatedUser;
 
         if (!user) {
-            throw new ForbiddenException('Not authenticated');
+            throw new ForbiddenException("Not authenticated");
         }
 
         // ALL scope can access everything
