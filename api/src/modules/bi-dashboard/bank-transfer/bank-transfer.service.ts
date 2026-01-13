@@ -10,9 +10,12 @@ import {
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 
 @Injectable()
 export class BankTransferService {
@@ -20,7 +23,8 @@ export class BankTransferService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) {}
+        private readonly followUpService: FollowUpService,
+    ) { }
 
     async getDashboardData(
         tab?: string,
@@ -286,6 +290,13 @@ export class BankTransferService {
                 updateData.status = 'ACCOUNTS_FORM_REJECTED';
                 updateData.rejectionReason = body.reason_req || null;
             }
+            // Store date_time in legacyData for timer stop functionality
+            if (body.date_time) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    date_time: body.date_time,
+                };
+            }
         } else if (body.action === 'initiate-followup') {
             updateData.status = 'FOLLOWUP_INITIATED';
         } else if (body.action === 'returned') {
@@ -299,6 +310,7 @@ export class BankTransferService {
             .set(updateData)
             .where(eq(paymentInstruments.id, instrumentId));
 
+        // Handle transfer details update or creation
         const transferDetailsUpdate: any = {};
         if (body.action === 'accounts-form-1') {
             if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
@@ -307,9 +319,13 @@ export class BankTransferService {
             if (body.ifsc_code) transferDetailsUpdate.ifsc = body.ifsc_code;
             if (body.amount) transferDetailsUpdate.amount = body.amount;
             if (body.payment_date) transferDetailsUpdate.transactionDate = body.payment_date;
+            if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
+            if (body.utr_mgs) transferDetailsUpdate.utrMsg = body.utr_mgs;
         } else if (body.action === 'returned') {
             if (body.return_date) transferDetailsUpdate.returnTransferDate = body.return_date;
             if (body.return_reason) transferDetailsUpdate.reason = body.return_reason;
+            if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
+            if (body.utr_num) transferDetailsUpdate.returnUtr = body.utr_num;
         } else if (body.action === 'settled') {
             if (body.settlement_date) transferDetailsUpdate.transactionDate = body.settlement_date;
             if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
@@ -318,14 +334,116 @@ export class BankTransferService {
 
         if (Object.keys(transferDetailsUpdate).length > 0) {
             transferDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentTransferDetails)
-                .set(transferDetailsUpdate)
-                .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+
+            // Check if transfer details record exists
+            const [existingDetails] = await this.db
+                .select()
+                .from(instrumentTransferDetails)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingDetails) {
+                await this.db
+                    .update(instrumentTransferDetails)
+                    .set(transferDetailsUpdate)
+                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+            } else {
+                // Create new transfer details record
+                await this.db.insert(instrumentTransferDetails).values({
+                    instrumentId,
+                    ...transferDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
         }
 
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+        // Handle followup creation
+        if (body.action === 'initiate-followup') {
+            try {
+                // Get payment request and tender info
+                const [request] = await this.db
+                    .select({
+                        requestId: paymentRequests.id,
+                        tenderId: paymentRequests.tenderId,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
+                    .limit(1);
+
+                if (request) {
+                    const [tender] = await this.db
+                        .select({
+                            teamId: tenderInfos.team,
+                            teamMemberId: tenderInfos.teamMember,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, request.tenderId))
+                        .limit(1);
+
+                    if (tender) {
+                        // Get team name
+                        const [team] = await this.db
+                            .select({ name: teams.name })
+                            .from(teams)
+                            .where(eq(teams.id, tender.teamId))
+                            .limit(1);
+
+                        const area = team?.name === 'AC' ? 'AC Team' : 'DC Team';
+
+                        // Identify proof image from files
+                        let proofImagePath: string | null = null;
+                        if (files && files.length > 0) {
+                            // Look for proof image by field name or filename pattern
+                            const proofImage = files.find(
+                                (f) => f.fieldname === 'proof_image' || f.filename?.includes('proof')
+                            );
+                            if (proofImage) {
+                                proofImagePath = proofImage.filename;
+                            }
+                        }
+
+                        // Map contacts to ContactPersonDto format and filter out invalid ones
+                        const mappedContacts = contacts
+                            .filter((contact) => contact.name && contact.name.trim().length > 0)
+                            .map((contact) => ({
+                                name: contact.name.trim(),
+                                email: contact.email || null,
+                                phone: contact.phone || null,
+                                org: contact.org || null,
+                            }));
+
+                        if (mappedContacts.length === 0) {
+                            throw new BadRequestException('At least one valid contact with name is required');
+                        }
+
+                        // Create followup DTO
+                        const followUpDto: CreateFollowUpDto = {
+                            area,
+                            partyName: body.organisation_name || '',
+                            amount: instrument.amount ? Number(instrument.amount) : 0,
+                            followupFor: 'Bank Transfer',
+                            assignedToId: tender.teamMemberId || null,
+                            emdId: request.requestId,
+                            contacts: mappedContacts,
+                            frequency: body.frequency ? Number(body.frequency) : 1,
+                            startFrom: body.followup_start_date || undefined,
+                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
+                            proofText: body.proof_text || null,
+                            proofImagePath: proofImagePath,
+                            stopRemarks: body.stop_remarks || null,
+                            attachments: [],
+                            createdById: user.id,
+                            followUpHistory: [],
+                        };
+
+                        await this.followUpService.create(followUpDto, user.id);
+                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
+                // Don't throw - allow the action to complete even if followup creation fails
+            }
         }
 
         return {
