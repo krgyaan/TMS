@@ -1,53 +1,16 @@
 // ============================================================================
-// EMD STATUS CONSTANTS
-// ============================================================================
-
-/**
- * Status naming convention: {INSTRUMENT_TYPE}_{STAGE}_{STATE}
- *
- * INSTRUMENT_TYPE: DD, FDR, BG, CHEQUE, BT (Bank Transfer), PORTAL
- * STAGE: ACCOUNTS_FORM, FOLLOWUP, COURIER_RETURN, etc.
- * STATE: PENDING, SUBMITTED, ACCEPTED, REJECTED, COMPLETED, etc.
- */
-
-// ============================================================================
 // DD (Demand Draft) STATUSES - 7 Stages
 // ============================================================================
 
 export const DD_STATUSES = {
-    // Initial
-    PENDING: 'DD_PENDING',
-
-    // Stage 1: Accounts Form
-    ACCOUNTS_FORM_PENDING: 'DD_ACCOUNTS_FORM_PENDING',
-    ACCOUNTS_FORM_SUBMITTED: 'DD_ACCOUNTS_FORM_SUBMITTED',
+    PENDING: 'DD_REQUESTED',
     ACCOUNTS_FORM_ACCEPTED: 'DD_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'DD_ACCOUNTS_FORM_REJECTED',
-
-    // Stage 2: Followup
     FOLLOWUP_INITIATED: 'DD_FOLLOWUP_INITIATED',
-    FOLLOWUP_IN_PROGRESS: 'DD_FOLLOWUP_IN_PROGRESS',
-    FOLLOWUP_COMPLETED: 'DD_FOLLOWUP_COMPLETED',
-
-    // Stage 3: Returned via Courier
-    COURIER_RETURN_INITIATED: 'DD_COURIER_RETURN_INITIATED',
-    COURIER_RETURN_DISPATCHED: 'DD_COURIER_RETURN_DISPATCHED',
-    COURIER_RETURN_RECEIVED: 'DD_COURIER_RETURN_RECEIVED',
-
-    // Stage 4: Returned via Bank Transfer
-    BANK_RETURN_INITIATED: 'DD_BANK_RETURN_INITIATED',
-    BANK_RETURN_COMPLETED: 'DD_BANK_RETURN_COMPLETED',
-
-    // Stage 5: Settled with Project
-    PROJECT_SETTLEMENT_INITIATED: 'DD_PROJECT_SETTLEMENT_INITIATED',
-    PROJECT_SETTLEMENT_COMPLETED: 'DD_PROJECT_SETTLEMENT_COMPLETED',
-
-    // Stage 6: Cancellation Request
+    COURIER_RETURN_RECEIVED: 'DD_RETURN_VIA_COURIER',
+    BANK_RETURN_COMPLETED: 'DD_RETURN_VIA_BANK_TRANSFER',
+    PROJECT_SETTLEMENT_COMPLETED: 'DD_SETTLED_WITH_PROJECT',
     CANCELLATION_REQUESTED: 'DD_CANCELLATION_REQUESTED',
-    CANCELLATION_APPROVED: 'DD_CANCELLATION_APPROVED',
-    CANCELLATION_REJECTED: 'DD_CANCELLATION_REJECTED',
-
-    // Stage 7: Cancelled at Branch
     CANCELLED_AT_BRANCH: 'DD_CANCELLED_AT_BRANCH',
 } as const;
 
@@ -55,10 +18,15 @@ export const DD_STAGES = {
     1: {
         name: 'Accounts Form',
         statuses: [
-            DD_STATUSES.ACCOUNTS_FORM_PENDING,
-            DD_STATUSES.ACCOUNTS_FORM_SUBMITTED,
+            DD_STATUSES.PENDING,
             DD_STATUSES.ACCOUNTS_FORM_ACCEPTED,
             DD_STATUSES.ACCOUNTS_FORM_REJECTED,
+            DD_STATUSES.FOLLOWUP_INITIATED,
+            DD_STATUSES.COURIER_RETURN_RECEIVED,
+            DD_STATUSES.BANK_RETURN_COMPLETED,
+            DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
+            DD_STATUSES.CANCELLATION_REQUESTED,
+            DD_STATUSES.CANCELLED_AT_BRANCH,
         ],
         terminalStatuses: [DD_STATUSES.ACCOUNTS_FORM_REJECTED],
         nextStages: [2, 3, 4, 5, 6],
@@ -67,17 +35,13 @@ export const DD_STAGES = {
         name: 'Followup',
         statuses: [
             DD_STATUSES.FOLLOWUP_INITIATED,
-            DD_STATUSES.FOLLOWUP_IN_PROGRESS,
-            DD_STATUSES.FOLLOWUP_COMPLETED,
         ],
-        terminalStatuses: [],
+        terminalStatuses: [DD_STATUSES.FOLLOWUP_INITIATED],
         nextStages: [3, 4, 5, 6],
     },
     3: {
         name: 'Returned via Courier',
         statuses: [
-            DD_STATUSES.COURIER_RETURN_INITIATED,
-            DD_STATUSES.COURIER_RETURN_DISPATCHED,
             DD_STATUSES.COURIER_RETURN_RECEIVED,
         ],
         terminalStatuses: [DD_STATUSES.COURIER_RETURN_RECEIVED],
@@ -86,7 +50,6 @@ export const DD_STAGES = {
     4: {
         name: 'Returned via Bank Transfer',
         statuses: [
-            DD_STATUSES.BANK_RETURN_INITIATED,
             DD_STATUSES.BANK_RETURN_COMPLETED,
         ],
         terminalStatuses: [DD_STATUSES.BANK_RETURN_COMPLETED],
@@ -95,7 +58,6 @@ export const DD_STAGES = {
     5: {
         name: 'Settled with Project',
         statuses: [
-            DD_STATUSES.PROJECT_SETTLEMENT_INITIATED,
             DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
         ],
         terminalStatuses: [DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED],
@@ -105,10 +67,8 @@ export const DD_STAGES = {
         name: 'Cancellation Request',
         statuses: [
             DD_STATUSES.CANCELLATION_REQUESTED,
-            DD_STATUSES.CANCELLATION_APPROVED,
-            DD_STATUSES.CANCELLATION_REJECTED,
         ],
-        terminalStatuses: [DD_STATUSES.CANCELLATION_REJECTED],
+        terminalStatuses: [],
         nextStages: [7],
     },
     7: {
@@ -120,59 +80,78 @@ export const DD_STAGES = {
 };
 
 // ============================================================================
-// FDR STATUSES - 4 Stages
+// FDR STATUSES - 7 Stages
 // ============================================================================
 
 export const FDR_STATUSES = {
-    PENDING: 'FDR_PENDING',
-
-    // Stage 1
-    ACCOUNTS_FORM_PENDING: 'FDR_ACCOUNTS_FORM_PENDING',
-    ACCOUNTS_FORM_SUBMITTED: 'FDR_ACCOUNTS_FORM_SUBMITTED',
+    PENDING: 'FDR_REQUESTED',
     ACCOUNTS_FORM_ACCEPTED: 'FDR_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'FDR_ACCOUNTS_FORM_REJECTED',
-
-    // Stage 2
     FOLLOWUP_INITIATED: 'FDR_FOLLOWUP_INITIATED',
-    FOLLOWUP_COMPLETED: 'FDR_FOLLOWUP_COMPLETED',
-
-    // Stage 3
-    COURIER_RETURN_INITIATED: 'FDR_COURIER_RETURN_INITIATED',
-    COURIER_RETURN_RECEIVED: 'FDR_COURIER_RETURN_RECEIVED',
-
-    // Stage 4
-    BANK_RETURN_INITIATED: 'FDR_BANK_RETURN_INITIATED',
-    BANK_RETURN_COMPLETED: 'FDR_BANK_RETURN_COMPLETED',
+    COURIER_RETURN_RECEIVED: 'FDR_RETURN_VIA_COURIER',
+    BANK_RETURN_COMPLETED: 'FDR_RETURN_VIA_BANK_TRANSFER',
+    PROJECT_SETTLEMENT_COMPLETED: 'FDR_SETTLED_WITH_PROJECT',
+    CANCELLATION_REQUESTED: 'FDR_CANCELLATION_REQUESTED',
+    CANCELLED_AT_BRANCH: 'FDR_CANCELLED_AT_BRANCH',
 } as const;
 
 export const FDR_STAGES = {
     1: {
         name: 'Accounts Form',
         statuses: [
-            FDR_STATUSES.ACCOUNTS_FORM_PENDING,
-            FDR_STATUSES.ACCOUNTS_FORM_SUBMITTED,
+            FDR_STATUSES.PENDING,
             FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED,
             FDR_STATUSES.ACCOUNTS_FORM_REJECTED,
+            FDR_STATUSES.FOLLOWUP_INITIATED,
+            FDR_STATUSES.COURIER_RETURN_RECEIVED,
+            FDR_STATUSES.BANK_RETURN_COMPLETED,
+            FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
+            FDR_STATUSES.CANCELLATION_REQUESTED,
+            FDR_STATUSES.CANCELLED_AT_BRANCH,
         ],
         terminalStatuses: [FDR_STATUSES.ACCOUNTS_FORM_REJECTED],
-        nextStages: [2, 3, 4],
+        nextStages: [2, 3, 4, 5, 6],
     },
     2: {
         name: 'Followup',
-        statuses: [FDR_STATUSES.FOLLOWUP_INITIATED, FDR_STATUSES.FOLLOWUP_COMPLETED],
-        terminalStatuses: [],
-        nextStages: [3, 4],
+        statuses: [
+            FDR_STATUSES.FOLLOWUP_INITIATED,
+        ],
+        terminalStatuses: [FDR_STATUSES.FOLLOWUP_INITIATED],
+        nextStages: [3, 4, 5, 6],
     },
     3: {
         name: 'Returned via Courier',
-        statuses: [FDR_STATUSES.COURIER_RETURN_INITIATED, FDR_STATUSES.COURIER_RETURN_RECEIVED],
+        statuses: [FDR_STATUSES.COURIER_RETURN_RECEIVED],
         terminalStatuses: [FDR_STATUSES.COURIER_RETURN_RECEIVED],
         nextStages: [],
     },
     4: {
         name: 'Returned via Bank Transfer',
-        statuses: [FDR_STATUSES.BANK_RETURN_INITIATED, FDR_STATUSES.BANK_RETURN_COMPLETED],
+        statuses: [FDR_STATUSES.BANK_RETURN_COMPLETED],
         terminalStatuses: [FDR_STATUSES.BANK_RETURN_COMPLETED],
+        nextStages: [],
+    },
+    5: {
+        name: 'Settled with Project',
+        statuses: [
+            FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
+        ],
+        terminalStatuses: [FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED],
+        nextStages: [],
+    },
+    6: {
+        name: 'Cancellation Request',
+        statuses: [
+            FDR_STATUSES.CANCELLATION_REQUESTED,
+        ],
+        terminalStatuses: [],
+        nextStages: [7],
+    },
+    7: {
+        name: 'Cancelled at Branch',
+        statuses: [FDR_STATUSES.CANCELLED_AT_BRANCH],
+        terminalStatuses: [FDR_STATUSES.CANCELLED_AT_BRANCH],
         nextStages: [],
     },
 };
@@ -182,40 +161,21 @@ export const FDR_STAGES = {
 // ============================================================================
 
 export const CHEQUE_STATUSES = {
-    PENDING: 'CHEQUE_PENDING',
-
-    // Stage 1
-    ACCOUNTS_FORM_PENDING: 'CHEQUE_ACCOUNTS_FORM_PENDING',
-    ACCOUNTS_FORM_SUBMITTED: 'CHEQUE_ACCOUNTS_FORM_SUBMITTED',
+    PENDING: 'CHEQUE_REQUESTED',
     ACCOUNTS_FORM_ACCEPTED: 'CHEQUE_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'CHEQUE_ACCOUNTS_FORM_REJECTED',
-
-    // Stage 2
     FOLLOWUP_INITIATED: 'CHEQUE_FOLLOWUP_INITIATED',
-    FOLLOWUP_COMPLETED: 'CHEQUE_FOLLOWUP_COMPLETED',
-
-    // Stage 3
-    STOP_REQUESTED: 'CHEQUE_STOP_REQUESTED',
-    STOP_COMPLETED: 'CHEQUE_STOP_COMPLETED',
-
-    // Stage 4
-    BANK_PAYMENT_INITIATED: 'CHEQUE_BANK_PAYMENT_INITIATED',
-    BANK_PAYMENT_COMPLETED: 'CHEQUE_BANK_PAYMENT_COMPLETED',
-
-    // Stage 5
-    DEPOSIT_INITIATED: 'CHEQUE_DEPOSIT_INITIATED',
-    DEPOSIT_COMPLETED: 'CHEQUE_DEPOSIT_COMPLETED',
-
-    // Stage 6
-    CANCELLED: 'CHEQUE_CANCELLED',
+    STOP_REQUESTED: 'CHEQUE_STOP_FROM_BANK',
+    DEPOSITED_IN_BANK: 'CHEQUE_DEPOSITED_IN_BANK',
+    PAID_VIA_BANK_TRANSFER: 'CHEQUE_PAID_VIA_BANK_TRANSFER',
+    CANCELLED_TORN: 'CHEQUE_CANCELLED_TORN',
 } as const;
 
 export const CHEQUE_STAGES = {
     1: {
         name: 'Accounts Form',
         statuses: [
-            CHEQUE_STATUSES.ACCOUNTS_FORM_PENDING,
-            CHEQUE_STATUSES.ACCOUNTS_FORM_SUBMITTED,
+            CHEQUE_STATUSES.PENDING,
             CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
             CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED,
         ],
@@ -224,32 +184,32 @@ export const CHEQUE_STAGES = {
     },
     2: {
         name: 'Followup',
-        statuses: [CHEQUE_STATUSES.FOLLOWUP_INITIATED, CHEQUE_STATUSES.FOLLOWUP_COMPLETED],
+        statuses: [CHEQUE_STATUSES.FOLLOWUP_INITIATED],
         terminalStatuses: [],
         nextStages: [3, 4, 5, 6],
     },
     3: {
         name: 'Stop Cheque',
-        statuses: [CHEQUE_STATUSES.STOP_REQUESTED, CHEQUE_STATUSES.STOP_COMPLETED],
-        terminalStatuses: [CHEQUE_STATUSES.STOP_COMPLETED],
+        statuses: [CHEQUE_STATUSES.STOP_REQUESTED],
+        terminalStatuses: [CHEQUE_STATUSES.STOP_REQUESTED],
         nextStages: [4, 6],
     },
     4: {
         name: 'Paid via Bank Transfer',
-        statuses: [CHEQUE_STATUSES.BANK_PAYMENT_INITIATED, CHEQUE_STATUSES.BANK_PAYMENT_COMPLETED],
-        terminalStatuses: [CHEQUE_STATUSES.BANK_PAYMENT_COMPLETED],
+        statuses: [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER],
+        terminalStatuses: [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER],
         nextStages: [],
     },
     5: {
         name: 'Deposited in Bank',
-        statuses: [CHEQUE_STATUSES.DEPOSIT_INITIATED, CHEQUE_STATUSES.DEPOSIT_COMPLETED],
-        terminalStatuses: [CHEQUE_STATUSES.DEPOSIT_COMPLETED],
+        statuses: [CHEQUE_STATUSES.DEPOSITED_IN_BANK],
+        terminalStatuses: [CHEQUE_STATUSES.DEPOSITED_IN_BANK],
         nextStages: [],
     },
     6: {
         name: 'Cancelled/Torn',
-        statuses: [CHEQUE_STATUSES.CANCELLED],
-        terminalStatuses: [CHEQUE_STATUSES.CANCELLED],
+        statuses: [CHEQUE_STATUSES.CANCELLED_TORN],
+        terminalStatuses: [],
         nextStages: [],
     },
 };
@@ -259,46 +219,16 @@ export const CHEQUE_STAGES = {
 // ============================================================================
 
 export const BG_STATUSES = {
-    PENDING: 'BG_PENDING',
-
-    // Stage 1: Request to Bank
-    BANK_REQUEST_PENDING: 'BG_BANK_REQUEST_PENDING',
-    BANK_REQUEST_SUBMITTED: 'BG_BANK_REQUEST_SUBMITTED',
+    PENDING: 'BG_REQUESTED',
     BANK_REQUEST_ACCEPTED: 'BG_BANK_REQUEST_ACCEPTED',
     BANK_REQUEST_REJECTED: 'BG_BANK_REQUEST_REJECTED',
-
-    // Stage 2: BG Created
-    BG_CREATION_PENDING: 'BG_CREATION_PENDING',
     BG_CREATED: 'BG_CREATED',
-
-    // Stage 3: FDR Details Captured
-    FDR_CAPTURE_PENDING: 'BG_FDR_CAPTURE_PENDING',
     FDR_CAPTURED: 'BG_FDR_CAPTURED',
-
-    // Stage 4: Followup
     FOLLOWUP_INITIATED: 'BG_FOLLOWUP_INITIATED',
-    FOLLOWUP_COMPLETED: 'BG_FOLLOWUP_COMPLETED',
-
-    // Stage 5: Extension
     EXTENSION_REQUESTED: 'BG_EXTENSION_REQUESTED',
-    EXTENSION_APPROVED: 'BG_EXTENSION_APPROVED',
-    EXTENSION_REJECTED: 'BG_EXTENSION_REJECTED',
-    EXTENSION_COMPLETED: 'BG_EXTENSION_COMPLETED',
-
-    // Stage 6: Returned via Courier
-    COURIER_RETURN_INITIATED: 'BG_COURIER_RETURN_INITIATED',
-    COURIER_RETURN_DISPATCHED: 'BG_COURIER_RETURN_DISPATCHED',
-    COURIER_RETURN_RECEIVED: 'BG_COURIER_RETURN_RECEIVED',
-
-    // Stage 7: Cancellation Request
+    COURIER_RETURN_RECEIVED: 'BG_RETURN_VIA_COURIER',
     CANCELLATION_REQUESTED: 'BG_CANCELLATION_REQUESTED',
-    CANCELLATION_APPROVED: 'BG_CANCELLATION_APPROVED',
-    CANCELLATION_REJECTED: 'BG_CANCELLATION_REJECTED',
-
-    // Stage 8: BG Cancelled
     BG_CANCELLATION_CONFIRMED: 'BG_CANCELLATION_CONFIRMED',
-
-    // Stage 9: FDR Cancelled
     FDR_CANCELLATION_CONFIRMED: 'BG_FDR_CANCELLATION_CONFIRMED',
 } as const;
 
@@ -306,29 +236,36 @@ export const BG_STAGES = {
     1: {
         name: 'Accounts Form 1 - Request to Bank',
         statuses: [
-            BG_STATUSES.BANK_REQUEST_PENDING,
-            BG_STATUSES.BANK_REQUEST_SUBMITTED,
+            BG_STATUSES.PENDING,
             BG_STATUSES.BANK_REQUEST_ACCEPTED,
             BG_STATUSES.BANK_REQUEST_REJECTED,
+            BG_STATUSES.BG_CREATED,
+            BG_STATUSES.FDR_CAPTURED,
+            BG_STATUSES.FOLLOWUP_INITIATED,
+            BG_STATUSES.EXTENSION_REQUESTED,
+            BG_STATUSES.COURIER_RETURN_RECEIVED,
+            BG_STATUSES.CANCELLATION_REQUESTED,
+            BG_STATUSES.BG_CANCELLATION_CONFIRMED,
+            BG_STATUSES.FDR_CANCELLATION_CONFIRMED,
         ],
-        terminalStatuses: [BG_STATUSES.BANK_REQUEST_REJECTED],
+        terminalStatuses: [BG_STATUSES.BANK_REQUEST_REJECTED, BG_STATUSES.BG_CANCELLATION_CONFIRMED, BG_STATUSES.FDR_CANCELLATION_CONFIRMED],
         nextStages: [2],
     },
     2: {
         name: 'Accounts Form 2 - After BG Creation',
-        statuses: [BG_STATUSES.BG_CREATION_PENDING, BG_STATUSES.BG_CREATED],
+        statuses: [BG_STATUSES.BG_CREATED],
         terminalStatuses: [],
         nextStages: [3, 4, 5, 6, 7],
     },
     3: {
         name: 'Accounts Form 3 - Capture FDR Details',
-        statuses: [BG_STATUSES.FDR_CAPTURE_PENDING, BG_STATUSES.FDR_CAPTURED],
+        statuses: [BG_STATUSES.FDR_CAPTURED],
         terminalStatuses: [],
         nextStages: [4, 5, 6, 7],
     },
     4: {
         name: 'Followup',
-        statuses: [BG_STATUSES.FOLLOWUP_INITIATED, BG_STATUSES.FOLLOWUP_COMPLETED],
+        statuses: [BG_STATUSES.FOLLOWUP_INITIATED],
         terminalStatuses: [],
         nextStages: [5, 6, 7],
     },
@@ -336,18 +273,13 @@ export const BG_STAGES = {
         name: 'Extension',
         statuses: [
             BG_STATUSES.EXTENSION_REQUESTED,
-            BG_STATUSES.EXTENSION_APPROVED,
-            BG_STATUSES.EXTENSION_REJECTED,
-            BG_STATUSES.EXTENSION_COMPLETED,
         ],
-        terminalStatuses: [BG_STATUSES.EXTENSION_REJECTED],
+        terminalStatuses: [BG_STATUSES.EXTENSION_REQUESTED],
         nextStages: [4, 6, 7],
     },
     6: {
         name: 'Returned via Courier',
         statuses: [
-            BG_STATUSES.COURIER_RETURN_INITIATED,
-            BG_STATUSES.COURIER_RETURN_DISPATCHED,
             BG_STATUSES.COURIER_RETURN_RECEIVED,
         ],
         terminalStatuses: [BG_STATUSES.COURIER_RETURN_RECEIVED],
@@ -357,22 +289,20 @@ export const BG_STAGES = {
         name: 'Cancellation Request',
         statuses: [
             BG_STATUSES.CANCELLATION_REQUESTED,
-            BG_STATUSES.CANCELLATION_APPROVED,
-            BG_STATUSES.CANCELLATION_REJECTED,
         ],
-        terminalStatuses: [BG_STATUSES.CANCELLATION_REJECTED],
+        terminalStatuses: [],
         nextStages: [8],
     },
     8: {
         name: 'BG Cancellation Confirmation',
         statuses: [BG_STATUSES.BG_CANCELLATION_CONFIRMED],
-        terminalStatuses: [BG_STATUSES.BG_CANCELLATION_CONFIRMED],
+        terminalStatuses: [],
         nextStages: [9],
     },
     9: {
         name: 'FDR Cancellation Confirmation',
         statuses: [BG_STATUSES.FDR_CANCELLATION_CONFIRMED],
-        terminalStatuses: [BG_STATUSES.FDR_CANCELLATION_CONFIRMED],
+        terminalStatuses: [],
         nextStages: [],
     },
 };
@@ -382,56 +312,44 @@ export const BG_STAGES = {
 // ============================================================================
 
 export const BT_STATUSES = {
-    PENDING: 'BT_PENDING',
-
-    // Stage 1
-    ACCOUNTS_FORM_PENDING: 'BT_ACCOUNTS_FORM_PENDING',
-    ACCOUNTS_FORM_SUBMITTED: 'BT_ACCOUNTS_FORM_SUBMITTED',
+    PENDING: 'BT_REQUESTED',
     ACCOUNTS_FORM_ACCEPTED: 'BT_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'BT_ACCOUNTS_FORM_REJECTED',
-    PAYMENT_COMPLETED: 'BT_PAYMENT_COMPLETED',
-
-    // Stage 2
     FOLLOWUP_INITIATED: 'BT_FOLLOWUP_INITIATED',
-    FOLLOWUP_COMPLETED: 'BT_FOLLOWUP_COMPLETED',
-
-    // Stage 3
-    RETURN_INITIATED: 'BT_RETURN_INITIATED',
-    RETURN_COMPLETED: 'BT_RETURN_COMPLETED',
-
-    // Stage 4
-    SETTLED: 'BT_SETTLED',
+    RETURN_VIA_BANK_TRANSFER: 'BT_RETURN_VIA_BANK_TRANSFER',
+    SETTLED_WITH_PROJECT: 'BT_SETTLED_WITH_PROJECT',
 } as const;
 
 export const BT_STAGES = {
     1: {
         name: 'Accounts Form',
         statuses: [
-            BT_STATUSES.ACCOUNTS_FORM_PENDING,
-            BT_STATUSES.ACCOUNTS_FORM_SUBMITTED,
+            BT_STATUSES.PENDING,
             BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
             BT_STATUSES.ACCOUNTS_FORM_REJECTED,
-            BT_STATUSES.PAYMENT_COMPLETED,
+            BT_STATUSES.FOLLOWUP_INITIATED,
+            BT_STATUSES.RETURN_VIA_BANK_TRANSFER,
+            BT_STATUSES.SETTLED_WITH_PROJECT,
         ],
         terminalStatuses: [BT_STATUSES.ACCOUNTS_FORM_REJECTED],
         nextStages: [2, 3, 4],
     },
     2: {
         name: 'Followup',
-        statuses: [BT_STATUSES.FOLLOWUP_INITIATED, BT_STATUSES.FOLLOWUP_COMPLETED],
+        statuses: [BT_STATUSES.FOLLOWUP_INITIATED],
         terminalStatuses: [],
         nextStages: [3, 4],
     },
     3: {
         name: 'Returned via Bank Transfer',
-        statuses: [BT_STATUSES.RETURN_INITIATED, BT_STATUSES.RETURN_COMPLETED],
-        terminalStatuses: [BT_STATUSES.RETURN_COMPLETED],
+        statuses: [BT_STATUSES.RETURN_VIA_BANK_TRANSFER],
+        terminalStatuses: [BT_STATUSES.RETURN_VIA_BANK_TRANSFER],
         nextStages: [],
     },
     4: {
         name: 'Settled with Project',
-        statuses: [BT_STATUSES.SETTLED],
-        terminalStatuses: [BT_STATUSES.SETTLED],
+        statuses: [BT_STATUSES.SETTLED_WITH_PROJECT],
+        terminalStatuses: [],
         nextStages: [],
     },
 };
@@ -441,56 +359,44 @@ export const BT_STAGES = {
 // ============================================================================
 
 export const PORTAL_STATUSES = {
-    PENDING: 'PORTAL_PENDING',
-
-    // Stage 1
-    ACCOUNTS_FORM_PENDING: 'PORTAL_ACCOUNTS_FORM_PENDING',
-    ACCOUNTS_FORM_SUBMITTED: 'PORTAL_ACCOUNTS_FORM_SUBMITTED',
+    PENDING: 'PORTAL_REQUESTED',
     ACCOUNTS_FORM_ACCEPTED: 'PORTAL_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'PORTAL_ACCOUNTS_FORM_REJECTED',
-    PAYMENT_COMPLETED: 'PORTAL_PAYMENT_COMPLETED',
-
-    // Stage 2
     FOLLOWUP_INITIATED: 'PORTAL_FOLLOWUP_INITIATED',
-    FOLLOWUP_COMPLETED: 'PORTAL_FOLLOWUP_COMPLETED',
-
-    // Stage 3
-    RETURN_INITIATED: 'PORTAL_RETURN_INITIATED',
-    RETURN_COMPLETED: 'PORTAL_RETURN_COMPLETED',
-
-    // Stage 4
-    SETTLED: 'PORTAL_SETTLED',
+    RETURN_VIA_BANK_TRANSFER: 'PORTAL_RETURN_VIA_BANK_TRANSFER',
+    SETTLED_WITH_PROJECT: 'PORTAL_SETTLED_WITH_PROJECT',
 } as const;
 
 export const PORTAL_STAGES = {
     1: {
         name: 'Accounts Form',
         statuses: [
-            PORTAL_STATUSES.ACCOUNTS_FORM_PENDING,
-            PORTAL_STATUSES.ACCOUNTS_FORM_SUBMITTED,
+            PORTAL_STATUSES.PENDING,
             PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
             PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED,
-            PORTAL_STATUSES.PAYMENT_COMPLETED,
+            PORTAL_STATUSES.FOLLOWUP_INITIATED,
+            PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER,
+            PORTAL_STATUSES.SETTLED_WITH_PROJECT,
         ],
         terminalStatuses: [PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED],
         nextStages: [2, 3, 4],
     },
     2: {
         name: 'Followup',
-        statuses: [PORTAL_STATUSES.FOLLOWUP_INITIATED, PORTAL_STATUSES.FOLLOWUP_COMPLETED],
+        statuses: [PORTAL_STATUSES.FOLLOWUP_INITIATED],
         terminalStatuses: [],
         nextStages: [3, 4],
     },
     3: {
         name: 'Returned via Bank Transfer',
-        statuses: [PORTAL_STATUSES.RETURN_INITIATED, PORTAL_STATUSES.RETURN_COMPLETED],
-        terminalStatuses: [PORTAL_STATUSES.RETURN_COMPLETED],
+        statuses: [PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER],
+        terminalStatuses: [PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER],
         nextStages: [],
     },
     4: {
         name: 'Settled with Project',
-        statuses: [PORTAL_STATUSES.SETTLED],
-        terminalStatuses: [PORTAL_STATUSES.SETTLED],
+        statuses: [PORTAL_STATUSES.SETTLED_WITH_PROJECT],
+        terminalStatuses: [],
         nextStages: [],
     },
 };
