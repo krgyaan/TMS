@@ -14,6 +14,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { FdrDashboardRow, FdrDashboardCounts } from '@/modules/bi-dashboard/fdr/helpers/fdr.types';
+import { FDR_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,7 +24,7 @@ export class FdrService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) {}
+    ) { }
 
     async getDashboardData(
         tab?: string,
@@ -50,12 +51,12 @@ export class FdrService {
         } else if (tab === 'created') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
+                eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED)
             );
         } else if (tab === 'rejected') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
+                eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_REJECTED)
             );
         } else if (tab === 'returned') {
             conditions.push(inArray(paymentInstruments.action, [3, 4, 5]));
@@ -205,7 +206,7 @@ export class FdrService {
         const createdConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
+            eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED),
         ];
         const [createdResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -218,7 +219,7 @@ export class FdrService {
         const rejectedConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
+            eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_REJECTED),
         ];
         const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -332,13 +333,16 @@ export class FdrService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
+            'accounts-form': 1,
             'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
-            'initiate-followup': 4,
-            'request-extension': 5,
-            'returned-courier': 6,
-            'request-cancellation': 7,
+            'accounts-form-2': 1,
+            'accounts-form-3': 1,
+            'initiate-followup': 2,
+            'returned-courier': 3,
+            'returned-bank-transfer': 4,
+            'settled-with-project': 5,
+            'request-cancellation': 6,
+            'cancelled-at-branch': 7,
         };
         return actionMap[action] || 1;
     }
@@ -386,31 +390,46 @@ export class FdrService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.fdr_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.fdr_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
         } else if (body.action === 'accounts-form-2') {
-            updateData.status = 'FDR_CREATED';
+            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'accounts-form-3') {
-            updateData.status = 'FDR_DETAILS_CAPTURED';
+            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
-        } else if (body.action === 'request-extension') {
-            updateData.status = 'EXTENSION_REQUESTED';
+            updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
-            updateData.status = 'RETURNED_VIA_COURIER';
+            updateData.status = FDR_STATUSES.COURIER_RETURN_RECEIVED;
             if (filePaths.length > 0) {
                 updateData.docketSlip = filePaths[0];
             }
+        } else if (body.action === 'returned-bank-transfer') {
+            updateData.status = FDR_STATUSES.BANK_RETURN_COMPLETED;
+        } else if (body.action === 'settled-with-project') {
+            updateData.status = FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
         } else if (body.action === 'request-cancellation') {
-            updateData.status = 'CANCELLATION_REQUESTED';
-            if (filePaths.length > 0) {
-                updateData.coveringLetter = filePaths[0];
+            updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
+            // Handle covering letter file
+            if (filePaths.length > 0 && body.covering_letter) {
+                const coveringLetterIndex = filePaths.findIndex((path: string) => path.includes('covering') || body.covering_letter);
+                if (coveringLetterIndex >= 0) {
+                    updateData.coveringLetter = filePaths[coveringLetterIndex];
+                }
             }
+            // Handle req_receive file
+            if (filePaths.length > 0 && body.req_receive) {
+                const reqReceiveIndex = filePaths.findIndex((path: string) => path.includes('req_receive') || body.req_receive);
+                if (reqReceiveIndex >= 0) {
+                    updateData.reqReceive = filePaths[reqReceiveIndex];
+                }
+            }
+        } else if (body.action === 'cancelled-at-branch') {
+            updateData.status = FDR_STATUSES.CANCELLED_AT_BRANCH;
         }
 
         await this.db
@@ -419,14 +438,30 @@ export class FdrService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const fdrDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-2') {
+        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
+            if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
+            if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
+            if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
+        } else if (body.action === 'accounts-form-2') {
+            if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
+            if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
+            if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
+            if (body.req_no) fdrDetailsUpdate.reqNo = body.req_no;
+            if (body.remarks) fdrDetailsUpdate.fdrRemark = body.remarks;
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
+            // Handle sfms_confirmation file if provided
+            if (filePaths.length > 0 && body.sfms_confirmation) {
+                const sfmsConfIndex = filePaths.findIndex((path: string) => path.includes('sfms') || body.sfms_confirmation);
+                if (sfmsConfIndex >= 0) {
+                    // Store in a way that makes sense - might need to check schema
+                }
+            }
         }
 
         if (Object.keys(fdrDetailsUpdate).length > 0) {

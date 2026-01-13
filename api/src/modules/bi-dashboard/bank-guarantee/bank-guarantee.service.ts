@@ -647,35 +647,65 @@ export class BankGuaranteeService {
             if (body.bg_date) bgDetailsUpdate.bgDate = body.bg_date;
             if (body.bg_validity) bgDetailsUpdate.validityDate = body.bg_validity;
             if (body.bg_claim_period) bgDetailsUpdate.claimExpiryDate = body.bg_claim_period;
+            if (body.courier_no) bgDetailsUpdate.courierNo = body.courier_no;
+            if (body.bg2_remark) bgDetailsUpdate.bg2Remark = body.bg2_remark;
         } else if (body.action === 'accounts-form-3') {
             if (body.fdr_no) bgDetailsUpdate.fdrNo = body.fdr_no;
-            if (body.fdr_amount) bgDetailsUpdate.fdrAmt = body.fdr_amount;
-            if (body.fdr_validity) bgDetailsUpdate.fdrValidityDate = body.fdr_validity;
+            if (body.fdr_amt) bgDetailsUpdate.fdrAmt = body.fdr_amt;
+            if (body.fdr_per) bgDetailsUpdate.fdrPer = body.fdr_per;
+            if (body.fdr_validity) bgDetailsUpdate.fdrValidity = body.fdr_validity;
             if (body.fdr_roi) bgDetailsUpdate.fdrRoi = body.fdr_roi;
-            if (body.bg_charges) bgDetailsUpdate.stampCharges = body.bg_charges;
-            if (body.sfms_charges) bgDetailsUpdate.sfmsCharges = body.sfms_charges;
-            if (body.stamp_charges) bgDetailsUpdate.stampCharges = body.stamp_charges;
-            if (body.other_charges) bgDetailsUpdate.otherChargesDeducted = body.other_charges;
-        } else if (body.action === 'request-extension') {
-            if (body.modification_fields) {
-                const modFields = typeof body.modification_fields === 'string'
-                    ? JSON.parse(body.modification_fields)
-                    : body.modification_fields;
-                // Store modification fields in extended fields
-                if (modFields && modFields.length > 0) {
-                    const amountField = modFields.find((f: any) => f.field_name === 'amount');
-                    const validityField = modFields.find((f: any) => f.field_name === 'validity');
-                    if (amountField) bgDetailsUpdate.extendedAmount = amountField.new_value;
-                    if (validityField) bgDetailsUpdate.extendedValidityDate = validityField.new_value;
+            if (body.bg_charge_deducted) bgDetailsUpdate.bgChargeDeducted = body.bg_charge_deducted;
+            if (body.sfms_charge_deducted) bgDetailsUpdate.sfmsChargesDeducted = body.sfms_charge_deducted;
+            if (body.stamp_charge_deducted) bgDetailsUpdate.stampChargesDeducted = body.stamp_charge_deducted;
+            if (body.other_charge_deducted) bgDetailsUpdate.otherChargesDeducted = body.other_charge_deducted;
+            // Handle fdr_copy file if provided
+            if (filePaths.length > 0 && body.fdr_copy) {
+                const fdrCopyIndex = filePaths.findIndex((path: string) => path.includes('fdr_copy') || body.fdr_copy);
+                if (fdrCopyIndex >= 0) {
+                    bgDetailsUpdate.fdrCopy = filePaths[fdrCopyIndex];
                 }
             }
-            if (filePaths.length > 0) {
-                bgDetailsUpdate.extensionLetterPath = filePaths[0];
+            // Handle sfms_conf file if provided
+            if (filePaths.length > 0 && body.sfms_conf) {
+                const sfmsConfIndex = filePaths.findIndex((path: string) => path.includes('sfms_conf') || body.sfms_conf);
+                if (sfmsConfIndex >= 0) {
+                    bgDetailsUpdate.sfmsConf = filePaths[sfmsConfIndex];
+                }
+            }
+        } else if (body.action === 'request-extension') {
+            // Handle modification fields
+            if (body.new_bg_amt) bgDetailsUpdate.extendedAmount = body.new_bg_amt;
+            if (body.new_bg_expiry) bgDetailsUpdate.extendedValidityDate = body.new_bg_expiry;
+            if (body.new_bg_claim) bgDetailsUpdate.extendedClaimExpiryDate = body.new_bg_claim;
+            if (body.new_bg_bank_name) bgDetailsUpdate.extendedBankName = body.new_bg_bank_name;
+            if (body.new_stamp_charge_deducted) bgDetailsUpdate.newStampChargeDeducted = body.new_stamp_charge_deducted;
+            // Handle extension letter file
+            if (filePaths.length > 0 && body.ext_letter) {
+                const extLetterIndex = filePaths.findIndex((path: string) => path.includes('ext_letter') || body.ext_letter);
+                if (extLetterIndex >= 0) {
+                    bgDetailsUpdate.extensionLetterPath = filePaths[extLetterIndex];
+                }
+            }
+        } else if (body.action === 'request-cancellation') {
+            if (body.cancel_remark) bgDetailsUpdate.cancelRemark = body.cancel_remark;
+            if (filePaths.length > 0 && body.stamp_covering_letter) {
+                const coveringLetterIndex = filePaths.findIndex((path: string) => path.includes('stamp_covering') || body.stamp_covering_letter);
+                if (coveringLetterIndex >= 0) {
+                    bgDetailsUpdate.stampCoveringLetter = filePaths[coveringLetterIndex];
+                }
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
-            if (filePaths.length > 0) {
-                bgDetailsUpdate.cancellationLetterPath = filePaths[0];
+            if (filePaths.length > 0 && body.cancell_confirm) {
+                const cancellConfirmIndex = filePaths.findIndex((path: string) => path.includes('cancell_confirm') || body.cancell_confirm);
+                if (cancellConfirmIndex >= 0) {
+                    bgDetailsUpdate.cancellConfirm = filePaths[cancellConfirmIndex];
+                }
             }
+        } else if (body.action === 'fdr-cancellation-confirmation') {
+            if (body.bg_fdr_cancel_date) bgDetailsUpdate.bgFdrCancelDate = body.bg_fdr_cancel_date;
+            if (body.bg_fdr_cancel_amount) bgDetailsUpdate.bgFdrCancelAmount = body.bg_fdr_cancel_amount;
+            if (body.bg_fdr_cancel_ref_no) bgDetailsUpdate.bgFdrCancelRefNo = body.bg_fdr_cancel_ref_no;
         }
 
         if (Object.keys(bgDetailsUpdate).length > 0) {

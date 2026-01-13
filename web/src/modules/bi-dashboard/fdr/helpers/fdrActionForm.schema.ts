@@ -24,7 +24,7 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
     fdr_no: z.string().optional(),
     fdr_date: z.string().optional(),
     fdr_validity: z.string().optional(),
-    courier_request_no: z.string().optional(),
+    req_no: z.string().optional(),
     remarks: z.string().optional(),
 
     // Accounts Form (FDR) 3 - Capture FDR Details
@@ -62,6 +62,7 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
 
     // Request Cancellation
     covering_letter: z.any().optional(), // File
+    req_receive: z.any().optional(), // File - Bank FDR cancellation request
     cancellation_remarks: z.string().optional(),
 
     // FDR Cancellation Confirmation

@@ -83,7 +83,7 @@ export function BankGuaranteeActionForm({
 
             // Append scalar fields
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('bank_bg') || key.includes('proof_image')) {
+                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('stamp_covering') || key.includes('cancell_confirm') || key.includes('sfms_conf') || key.includes('fdr_copy') || key.includes('ext_letter') || key.includes('proof_image')) {
                     return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
@@ -109,20 +109,23 @@ export function BankGuaranteeActionForm({
             if (values.prefilled_signed_bg && fileUploads.prefilled_signed_bg) {
                 allFiles.push(...fileUploads.prefilled_signed_bg);
             }
-            if (values.sfms_confirmation && fileUploads.sfms_confirmation) {
-                allFiles.push(...fileUploads.sfms_confirmation);
+            if (values.sfms_conf && fileUploads.sfms_conf) {
+                allFiles.push(...fileUploads.sfms_conf);
             }
-            if (values.request_letter_email && fileUploads.request_letter_email) {
-                allFiles.push(...fileUploads.request_letter_email);
+            if (values.fdr_copy && fileUploads.fdr_copy) {
+                allFiles.push(...fileUploads.fdr_copy);
+            }
+            if (values.ext_letter && fileUploads.ext_letter) {
+                allFiles.push(...fileUploads.ext_letter);
             }
             if (values.docket_slip && fileUploads.docket_slip) {
                 allFiles.push(...fileUploads.docket_slip);
             }
-            if (values.covering_letter && fileUploads.covering_letter) {
-                allFiles.push(...fileUploads.covering_letter);
+            if (values.stamp_covering_letter && fileUploads.stamp_covering_letter) {
+                allFiles.push(...fileUploads.stamp_covering_letter);
             }
-            if (values.bank_bg_cancellation_request && fileUploads.bank_bg_cancellation_request) {
-                allFiles.push(...fileUploads.bank_bg_cancellation_request);
+            if (values.cancell_confirm && fileUploads.cancell_confirm) {
+                allFiles.push(...fileUploads.cancell_confirm);
             }
             if (values.proof_image && fileUploads.proof_image) {
                 allFiles.push(...fileUploads.proof_image);
@@ -166,8 +169,9 @@ export function BankGuaranteeActionForm({
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         {/* Action Selection */}
                         <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(field) => (
+                            {(_field) => (
                                 <SelectField
+                                    label="Choose What to do"
                                     control={form.control}
                                     name="action"
                                     options={ACTION_OPTIONS}
@@ -213,29 +217,27 @@ export function BankGuaranteeActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="approve_bg" label="Approved BG Format">
-                                    {(field) => (
+                                    {(_field) => (
                                         <SelectField
+                                            label="Approved BG Format"
                                             control={form.control}
                                             name="approve_bg"
-                                            options={[
-                                                { value: 'Accept the BG given by TE', label: 'Accept the BG given by TE' },
-                                                { value: 'Upload by Imran', label: 'Upload by Imran' },
-                                            ]}
-                                            placeholder="Select option"
+                                            options={[{ value: 'Accept the BG given by TE', label: 'Accept the BG given by TE' }, { value: 'Upload by Imran', label: 'Upload by Imran' }]}
+                                            placeholder="Select an option"
                                         />
                                     )}
                                 </FieldWrapper>
 
                                 {approveBg === 'Upload by Imran' && (
                                     <FieldWrapper control={form.control} name="bg_format_imran" label="Upload Documents *">
-                                        {(field) => (
+                                        {(_field) => (
                                             <FileUploadField
                                                 control={form.control}
                                                 name="bg_format_imran"
                                                 label=""
                                                 allowMultiple={false}
                                                 acceptedFileTypes={['application/pdf', 'image/*']}
-                                                onChange={(files) => {
+                                                onChange={(files: File[]) => {
                                                     setFileUploads((prev) => ({ ...prev, bg_format_imran: files }));
                                                 }}
                                             />
@@ -244,14 +246,14 @@ export function BankGuaranteeActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Prefilled Bank Formats">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="prefilled_signed_bg"
                                             label=""
                                             allowMultiple={true}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, prefilled_signed_bg: files }));
                                             }}
                                         />
@@ -295,11 +297,11 @@ export function BankGuaranteeActionForm({
                                     </FieldWrapper>
                                 </div>
 
-                                <FieldWrapper control={form.control} name="courier_request_no" label="Courier Request No.">
+                                <FieldWrapper control={form.control} name="courier_no" label="Courier Request No.">
                                     {(field) => <Input {...field} placeholder="Enter courier request number" />}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                <FieldWrapper control={form.control} name="bg2_remark" label="Remarks">
                                     {(field) => (
                                         <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
                                     )}
@@ -312,15 +314,15 @@ export function BankGuaranteeActionForm({
                             <div className="space-y-4 border rounded-lg p-4">
                                 <h4 className="font-semibold text-base">Accounts Form (BG) 3 - Capture FDR Details</h4>
 
-                                <FieldWrapper control={form.control} name="sfms_confirmation" label="SFMS Confirmation">
-                                    {(field) => (
+                                <FieldWrapper control={form.control} name="sfms_conf" label="SFMS Confirmation">
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
-                                            name="sfms_confirmation"
+                                            name="sfms_conf"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, sfms_confirmation: files }));
                                             }}
                                         />
@@ -328,11 +330,25 @@ export function BankGuaranteeActionForm({
                                 </FieldWrapper>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="fdr_percentage" label="FDR Percentage">
+                                    <FieldWrapper control={form.control} name="fdr_per" label="FDR Percentage">
                                         {(field) => <Input {...field} type="number" placeholder="Enter percentage" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="fdr_amount" label="FDR Amount">
+                                    <FieldWrapper control={form.control} name="fdr_amt" label="FDR Amount">
                                         {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="fdr_copy" label="FDR Copy">
+                                        {(_field) => (
+                                            <FileUploadField
+                                                control={form.control}
+                                                name="fdr_copy"
+                                                label=""
+                                                allowMultiple={false}
+                                                acceptedFileTypes={['application/pdf', 'image/*']}
+                                                onChange={(files: File[]) => {
+                                                    setFileUploads((prev) => ({ ...prev, fdr_request: files }));
+                                                }}
+                                            />
+                                        )}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="fdr_no" label="FDR No.">
                                         {(field) => <Input {...field} placeholder="Enter FDR number" />}
@@ -352,16 +368,16 @@ export function BankGuaranteeActionForm({
 
                                 <h5 className="font-medium text-sm mt-4">Charges</h5>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="bg_charges" label="BG Charges">
+                                    <FieldWrapper control={form.control} name="bg_charge_deducted" label="BG Charges Deducted">
                                         {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="sfms_charges" label="SFMS Charges">
+                                    <FieldWrapper control={form.control} name="sfms_charge_deducted" label="SFMS Charges Deducted">
                                         {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="stamp_charges" label="Stamp Charges">
+                                    <FieldWrapper control={form.control} name="stamp_charge_deducted" label="Stamp Charges Deducted">
                                         {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="other_charges" label="Other Charges">
+                                    <FieldWrapper control={form.control} name="other_charge_deducted" label="Other Charges Deducted">
                                         {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
                                     </FieldWrapper>
                                 </div>
@@ -425,27 +441,51 @@ export function BankGuaranteeActionForm({
                                     )}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="request_letter_email" label="Request Letter/Email">
-                                    {(field) => (
+                                <FieldWrapper control={form.control} name="ext_letter" label="Request Letter/Email">
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
-                                            name="request_letter_email"
+                                            name="ext_letter"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
-                                                setFileUploads((prev) => ({ ...prev, request_letter_email: files }));
+                                            onChange={(files: File[]) => {
+                                                setFileUploads((prev) => ({ ...prev, ext_letter: files }));
                                             }}
                                         />
                                     )}
                                 </FieldWrapper>
 
                                 {modificationRequired === 'Yes' && (
-                                    <div className="space-y-2">
-                                        <Label>Modification Fields</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Modification fields table can be added here
-                                        </p>
+                                    <div className="space-y-4 border rounded-lg p-4">
+                                        <Label className="text-base font-semibold">Modification Fields</Label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FieldWrapper control={form.control} name="new_stamp_charge_deducted" label="Stamp Paper Amount">
+                                                {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="new_bg_bank_name" label="Beneficiary Name">
+                                                {(field) => <Input {...field} placeholder="Enter beneficiary name" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="new_bg_amt" label="Amount">
+                                                {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="new_bg_expiry" label="Expiry Date">
+                                                {(field) => (
+                                                    <DatePicker
+                                                        date={field.value ? new Date(field.value) : undefined}
+                                                        onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="new_bg_claim" label="Claim Date">
+                                                {(field) => (
+                                                    <DatePicker
+                                                        date={field.value ? new Date(field.value) : undefined}
+                                                        onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -461,14 +501,14 @@ export function BankGuaranteeActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="docket_slip"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, docket_slip: files }));
                                             }}
                                         />
@@ -482,22 +522,22 @@ export function BankGuaranteeActionForm({
                             <div className="space-y-4 border rounded-lg p-4">
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
-                                <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
+                                <FieldWrapper control={form.control} name="stamp_covering_letter" label="Upload a Signed, Stamped Covering Letter">
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
-                                            name="covering_letter"
+                                            name="stamp_covering_letter"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
-                                                setFileUploads((prev) => ({ ...prev, covering_letter: files }));
+                                            onChange={(files: File[]) => {
+                                                setFileUploads((prev) => ({ ...prev, stamp_covering_letter: files }));
                                             }}
                                         />
                                     )}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="cancellation_remarks" label="Remarks">
+                                <FieldWrapper control={form.control} name="cancel_remark" label="Remarks">
                                     {(field) => (
                                         <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
                                     )}
@@ -510,16 +550,16 @@ export function BankGuaranteeActionForm({
                             <div className="space-y-4 border rounded-lg p-4">
                                 <h4 className="font-semibold text-base">BG Cancellation Confirmation</h4>
 
-                                <FieldWrapper control={form.control} name="bank_bg_cancellation_request" label="Bank BG Cancellation Request Upload">
-                                    {(field) => (
+                                <FieldWrapper control={form.control} name="cancell_confirm" label="Upload the Bank BG cancellation request">
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
-                                            name="bank_bg_cancellation_request"
+                                            name="cancell_confirm"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
-                                                setFileUploads((prev) => ({ ...prev, bank_bg_cancellation_request: files }));
+                                            onChange={(files: File[]) => {
+                                                setFileUploads((prev) => ({ ...prev, cancell_confirm: files }));
                                             }}
                                         />
                                     )}
@@ -533,7 +573,7 @@ export function BankGuaranteeActionForm({
                                 <h4 className="font-semibold text-base">FDR Cancellation Confirmation</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="fdr_cancellation_date" label="Date">
+                                    <FieldWrapper control={form.control} name="bg_fdr_cancel_date" label="Date">
                                         {(field) => (
                                             <DatePicker
                                                 date={field.value ? new Date(field.value) : undefined}
@@ -541,10 +581,10 @@ export function BankGuaranteeActionForm({
                                             />
                                         )}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="fdr_cancellation_amount" label="Amount">
+                                    <FieldWrapper control={form.control} name="bg_fdr_cancel_amount" label="Amount credited">
                                         {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="fdr_cancellation_reference_no" label="Reference No.">
+                                    <FieldWrapper control={form.control} name="bg_fdr_cancel_ref_no" label="Bank reference No">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
                                     </FieldWrapper>
                                 </div>

@@ -23,7 +23,7 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     // Accounts Form (DD) 2 - After DD Creation
     dd_no: z.string().optional(),
     dd_date: z.string().optional(),
-    courier_request_no: z.string().optional(),
+    req_no: z.string().optional(),
     remarks: z.string().optional(),
 
     // Accounts Form (DD) 3 - Capture DD Details
@@ -56,6 +56,10 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     docket_no: z.string().optional(),
     docket_slip: z.any().optional(), // File
 
+    // Returned via Bank Transfer
+    transfer_date: z.string().optional(),
+    utr: z.string().optional(),
+
     // Request Cancellation
     covering_letter: z.any().optional(), // File
     cancellation_remarks: z.string().optional(),
@@ -65,6 +69,18 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     dd_cancellation_amount: z.coerce.number().optional(),
     dd_cancellation_reference_no: z.string().optional(),
 }).refine(
+    (data) => {
+        // Action 1: status is required
+        if (data.action === 'accounts-form-1') {
+            return !!data.dd_req;
+        }
+        return true;
+    },
+    {
+        message: 'DD Request status is required',
+        path: ['dd_req'],
+    }
+).refine(
     (data) => {
         if (data.action === 'accounts-form-1' && data.dd_req === 'Rejected') {
             return !!data.reason_req;
@@ -77,14 +93,77 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
+        // Action 2: org_name, contacts[].name, contacts[].phone, frequency are required
         if (data.action === 'initiate-followup') {
-            return data.contacts && data.contacts.length > 0;
+            if (!data.organisation_name) return false;
+            if (!data.contacts || data.contacts.length === 0) return false;
+            if (!data.frequency) return false;
+            return data.contacts.every(contact => contact.name && contact.phone);
         }
         return true;
     },
     {
-        message: 'At least one contact person is required',
+        message: 'Organisation name, at least one contact with name and phone, and frequency are required',
+        path: ['organisation_name'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup' && data.contacts && data.contacts.length > 0) {
+            const invalidContact = data.contacts.find(c => !c.name || !c.phone);
+            return !invalidContact;
+        }
+        return true;
+    },
+    {
+        message: 'Each contact must have a name and phone number',
         path: ['contacts'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup') {
+            return !!data.frequency;
+        }
+        return true;
+    },
+    {
+        message: 'Frequency is required',
+        path: ['frequency'],
+    }
+).refine(
+    (data) => {
+        // Action 3: docket_no, docket_slip are required
+        if (data.action === 'returned-courier') {
+            return !!data.docket_no && !!data.docket_slip;
+        }
+        return true;
+    },
+    {
+        message: 'Docket number and docket slip are required',
+        path: ['docket_no'],
+    }
+).refine(
+    (data) => {
+        // Action 4: transfer_date, utr are required
+        if (data.action === 'returned-bank-transfer') {
+            return !!data.transfer_date && !!data.utr;
+        }
+        return true;
+    },
+    {
+        message: 'Transfer date and UTR are required',
+        path: ['transfer_date'],
+    }
+).refine(
+    (data) => {
+        // Action 7: date, amount, reference_no are required
+        if (data.action === 'dd-cancellation-confirmation') {
+            return !!data.dd_cancellation_date && !!data.dd_cancellation_amount && !!data.dd_cancellation_reference_no;
+        }
+        return true;
+    },
+    {
+        message: 'Cancellation date, amount, and reference number are required',
+        path: ['dd_cancellation_date'],
     }
 );
 

@@ -35,7 +35,9 @@ const ACTION_OPTIONS = [
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'request-extension', label: 'Request Extension' },
     { value: 'returned-courier', label: 'Returned via Courier' },
+    { value: 'returned-bank-transfer', label: 'Returned via Bank Transfer' },
     { value: 'request-cancellation', label: 'Request Cancellation' },
+    { value: 'dd-cancellation-confirmation', label: 'DD Cancellation Confirmation' },
 ];
 
 interface DemandDraftActionFormProps {
@@ -80,7 +82,7 @@ export function DemandDraftActionForm({
 
             Object.entries(values).forEach(([key, value]) => {
                 if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('proof_image')) {
-                    return;
+                    return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
@@ -153,12 +155,13 @@ export function DemandDraftActionForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(field) => (
+                            {(_field) => (
                                 <SelectField
+                                    label="Choose What to do"
                                     control={form.control}
                                     name="action"
                                     options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
+                                    placeholder="Select an option"
                                 />
                             )}
                         </FieldWrapper>
@@ -200,14 +203,14 @@ export function DemandDraftActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="dd_format_imran" label="DD Format (Upload by Imran)">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="dd_format_imran"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, dd_format_imran: files }));
                                             }}
                                         />
@@ -215,14 +218,14 @@ export function DemandDraftActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_dd" label="Prefilled Bank Formats">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="prefilled_signed_dd"
                                             label=""
                                             allowMultiple={true}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, prefilled_signed_dd: files }));
                                             }}
                                         />
@@ -250,7 +253,7 @@ export function DemandDraftActionForm({
                                     </FieldWrapper>
                                 </div>
 
-                                <FieldWrapper control={form.control} name="courier_request_no" label="Courier Request No.">
+                                <FieldWrapper control={form.control} name="req_no" label="Courier Request No.">
                                     {(field) => <Input {...field} placeholder="Enter courier request number" />}
                                 </FieldWrapper>
 
@@ -349,14 +352,14 @@ export function DemandDraftActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="request_letter_email" label="Request Letter/Email">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="request_letter_email"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, request_letter_email: files }));
                                             }}
                                         />
@@ -384,19 +387,40 @@ export function DemandDraftActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="docket_slip"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, docket_slip: files }));
                                             }}
                                         />
                                     )}
                                 </FieldWrapper>
+                            </div>
+                        </ConditionalSection>
+
+                        {/* Returned via Bank Transfer */}
+                        <ConditionalSection show={action === 'returned-bank-transfer'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
+                                        {(field) => (
+                                            <DatePicker
+                                                date={field.value ? new Date(field.value) : undefined}
+                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr" label="UTR Number">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                    </FieldWrapper>
+                                </div>
                             </div>
                         </ConditionalSection>
 
@@ -406,14 +430,14 @@ export function DemandDraftActionForm({
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
                                 <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="covering_letter"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, covering_letter: files }));
                                             }}
                                         />

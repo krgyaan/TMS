@@ -80,8 +80,8 @@ export function FdrActionForm({
 
             // Append scalar fields
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('proof_image')) {
-                    return;
+                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('req_receive') || key.includes('proof_image')) {
+                    return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
@@ -117,6 +117,9 @@ export function FdrActionForm({
             }
             if (values.covering_letter && fileUploads.covering_letter) {
                 allFiles.push(...fileUploads.covering_letter);
+            }
+            if (values.req_receive && fileUploads.req_receive) {
+                allFiles.push(...fileUploads.req_receive);
             }
             if (values.proof_image && fileUploads.proof_image) {
                 allFiles.push(...fileUploads.proof_image);
@@ -160,12 +163,13 @@ export function FdrActionForm({
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         {/* Action Selection */}
                         <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(field) => (
+                            {(_field) => (
                                 <SelectField
+                                    label="Choose What to do"
                                     control={form.control}
                                     name="action"
                                     options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
+                                    placeholder="Select an option"
                                 />
                             )}
                         </FieldWrapper>
@@ -207,14 +211,14 @@ export function FdrActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="fdr_format_imran" label="FDR Format (Upload by Imran)">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="fdr_format_imran"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, fdr_format_imran: files }));
                                             }}
                                         />
@@ -222,14 +226,14 @@ export function FdrActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_fdr" label="Prefilled Bank Formats">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="prefilled_signed_fdr"
                                             label=""
                                             allowMultiple={true}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, prefilled_signed_fdr: files }));
                                             }}
                                         />
@@ -265,7 +269,7 @@ export function FdrActionForm({
                                     </FieldWrapper>
                                 </div>
 
-                                <FieldWrapper control={form.control} name="courier_request_no" label="Courier Request No.">
+                                <FieldWrapper control={form.control} name="req_no" label="Courier Request No.">
                                     {(field) => <Input {...field} placeholder="Enter courier request number" />}
                                 </FieldWrapper>
 
@@ -283,14 +287,14 @@ export function FdrActionForm({
                                 <h4 className="font-semibold text-base">Accounts Form (FDR) 3 - Capture FDR Details</h4>
 
                                 <FieldWrapper control={form.control} name="sfms_confirmation" label="SFMS Confirmation">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="sfms_confirmation"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, sfms_confirmation: files }));
                                             }}
                                         />
@@ -385,14 +389,14 @@ export function FdrActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="request_letter_email" label="Request Letter/Email">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="request_letter_email"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, request_letter_email: files }));
                                             }}
                                         />
@@ -420,14 +424,14 @@ export function FdrActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="docket_slip"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, docket_slip: files }));
                                             }}
                                         />
@@ -441,16 +445,31 @@ export function FdrActionForm({
                             <div className="space-y-4 border rounded-lg p-4">
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
-                                <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
+                                <FieldWrapper control={form.control} name="covering_letter" label="Upload Signed Stamped Covering Letter">
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="covering_letter"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, covering_letter: files }));
+                                            }}
+                                        />
+                                    )}
+                                </FieldWrapper>
+
+                                <FieldWrapper control={form.control} name="req_receive" label="Upload the Bank FDR cancellation request">
+                                    {(_field) => (
+                                        <FileUploadField
+                                            control={form.control}
+                                            name="req_receive"
+                                            label=""
+                                            allowMultiple={false}
+                                            acceptedFileTypes={['application/pdf', 'image/*']}
+                                            onChange={(files: File[]) => {
+                                                setFileUploads((prev) => ({ ...prev, req_receive: files }));
                                             }}
                                         />
                                     )}

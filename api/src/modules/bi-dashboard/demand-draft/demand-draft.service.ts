@@ -13,6 +13,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
+import { DD_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 
 @Injectable()
 export class DemandDraftService {
@@ -20,7 +21,7 @@ export class DemandDraftService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) {}
+    ) { }
 
     async getDashboardData(
         tab?: string,
@@ -47,12 +48,12 @@ export class DemandDraftService {
         } else if (tab === 'created') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
             );
         } else if (tab === 'rejected') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED)
             );
         } else if (tab === 'returned') {
             conditions.push(inArray(paymentInstruments.action, [3, 4, 5]));
@@ -174,7 +175,7 @@ export class DemandDraftService {
         const createdConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
+            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED),
         ];
         const [createdResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -187,7 +188,7 @@ export class DemandDraftService {
         const rejectedConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
+            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED),
         ];
         const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -235,10 +236,12 @@ export class DemandDraftService {
             'accounts-form-1': 1,
             'accounts-form-2': 2,
             'accounts-form-3': 3,
-            'initiate-followup': 4,
+            'initiate-followup': 2,
             'request-extension': 5,
-            'returned-courier': 6,
+            'returned-courier': 3,
+            'returned-bank-transfer': 4,
             'request-cancellation': 7,
+            'dd-cancellation-confirmation': 7,
         };
         return actionMap[action] || 1;
     }
@@ -286,25 +289,31 @@ export class DemandDraftService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form-1' || body.action === 'accounts-form') {
             if (body.dd_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = DD_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.dd_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = DD_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-        } else if (body.action === 'accounts-form-2') {
-            updateData.status = 'DD_CREATED';
-        } else if (body.action === 'accounts-form-3') {
-            updateData.status = 'DD_DETAILS_CAPTURED';
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
-        } else if (body.action === 'request-extension') {
-            updateData.status = 'EXTENSION_REQUESTED';
+            updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
-            updateData.status = 'RETURNED_VIA_COURIER';
+            updateData.status = DD_STATUSES.COURIER_RETURN_RECEIVED;
+            if (filePaths.length > 0) {
+                updateData.docketSlip = filePaths[0];
+            }
+        } else if (body.action === 'returned-bank-transfer') {
+            updateData.status = DD_STATUSES.BANK_RETURN_COMPLETED;
+            if (body.transfer_date) updateData.transferDate = body.transfer_date;
+            if (body.utr) updateData.utr = body.utr;
         } else if (body.action === 'request-cancellation') {
-            updateData.status = 'CANCELLATION_REQUESTED';
+            updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
+        } else if (body.action === 'dd-cancellation-confirmation') {
+            updateData.status = DD_STATUSES.CANCELLED_AT_BRANCH;
+            if (body.dd_cancellation_date) updateData.creditDate = body.dd_cancellation_date;
+            if (body.dd_cancellation_amount) updateData.creditAmount = body.dd_cancellation_amount;
+            if (body.dd_cancellation_reference_no) updateData.referenceNo = body.dd_cancellation_reference_no;
         }
 
         await this.db
@@ -316,6 +325,11 @@ export class DemandDraftService {
         if (body.action === 'accounts-form-2') {
             if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
             if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
+            if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
+            if (body.remarks) ddDetailsUpdate.ddRemarks = body.remarks;
+        } else if (body.action === 'dd-cancellation-confirmation') {
+            // Store cancellation details - these might go to paymentInstruments instead
+            // Based on schema, these fields might need to be stored differently
         }
 
         if (Object.keys(ddDetailsUpdate).length > 0) {

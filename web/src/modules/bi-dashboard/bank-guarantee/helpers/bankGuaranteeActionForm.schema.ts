@@ -26,20 +26,21 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_date: z.string().optional(),
     bg_validity: z.string().optional(),
     bg_claim_period: z.string().optional(),
-    courier_request_no: z.string().optional(),
-    remarks: z.string().optional(),
+    courier_no: z.string().optional(),
+    bg2_remark: z.string().optional(),
 
     // Accounts Form (BG) 3 - Capture FDR Details
-    sfms_confirmation: z.any().optional(), // File
-    fdr_percentage: z.coerce.number().optional(),
-    fdr_amount: z.coerce.number().optional(),
+    sfms_conf: z.any().optional(), // File
+    fdr_per: z.coerce.number().optional(),
+    fdr_amt: z.coerce.number().optional(),
+    fdr_copy: z.any().optional(), // File
     fdr_no: z.string().optional(),
     fdr_validity: z.string().optional(),
     fdr_roi: z.coerce.number().optional(),
-    bg_charges: z.coerce.number().optional(),
-    sfms_charges: z.coerce.number().optional(),
-    stamp_charges: z.coerce.number().optional(),
-    other_charges: z.coerce.number().optional(),
+    bg_charge_deducted: z.coerce.number().optional(),
+    sfms_charge_deducted: z.coerce.number().optional(),
+    stamp_charge_deducted: z.coerce.number().optional(),
+    other_charge_deducted: z.coerce.number().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
@@ -53,7 +54,12 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
 
     // Request Extension
     modification_required: z.enum(['Yes', 'No']).optional(),
-    request_letter_email: z.any().optional(), // File
+    ext_letter: z.any().optional(), // File
+    new_stamp_charge_deducted: z.coerce.number().optional(),
+    new_bg_bank_name: z.string().optional(),
+    new_bg_amt: z.coerce.number().optional(),
+    new_bg_expiry: z.string().optional(),
+    new_bg_claim: z.string().optional(),
     modification_fields: z.array(z.object({
         field_name: z.string(),
         old_value: z.string(),
@@ -65,16 +71,16 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     docket_slip: z.any().optional(), // File
 
     // Request Cancellation
-    covering_letter: z.any().optional(), // File
-    cancellation_remarks: z.string().optional(),
+    stamp_covering_letter: z.any().optional(), // File
+    cancel_remark: z.string().optional(),
 
     // BG Cancellation Confirmation
-    bank_bg_cancellation_request: z.any().optional(), // File
+    cancell_confirm: z.any().optional(), // File
 
     // FDR Cancellation Confirmation
-    fdr_cancellation_date: z.string().optional(),
-    fdr_cancellation_amount: z.coerce.number().optional(),
-    fdr_cancellation_reference_no: z.string().optional(),
+    bg_fdr_cancel_date: z.string().optional(),
+    bg_fdr_cancel_amount: z.coerce.number().optional(),
+    bg_fdr_cancel_ref_no: z.string().optional(),
 }).refine(
     (data) => {
         // Conditional validation: reason_req required when rejected
@@ -137,15 +143,101 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Conditional validation: modification_fields required when modification_required is Yes
-        if (data.action === 'request-extension' && data.modification_required === 'Yes') {
-            return data.modification_fields && data.modification_fields.length > 0;
+        // Action 4: org_name, contacts[].name, contacts[].phone, frequency are required
+        if (data.action === 'initiate-followup') {
+            if (!data.organisation_name) return false;
+            if (!data.contacts || data.contacts.length === 0) return false;
+            if (!data.frequency) return false;
+            return data.contacts.every(contact => contact.name && contact.phone);
         }
         return true;
     },
     {
-        message: 'Modification fields are required when modification is required',
-        path: ['modification_fields'],
+        message: 'Organisation name, at least one contact with name and phone, and frequency are required',
+        path: ['organisation_name'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup' && data.contacts && data.contacts.length > 0) {
+            const invalidContact = data.contacts.find(c => !c.name || !c.phone);
+            return !invalidContact;
+        }
+        return true;
+    },
+    {
+        message: 'Each contact must have a name and phone number',
+        path: ['contacts'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup') {
+            return !!data.frequency;
+        }
+        return true;
+    },
+    {
+        message: 'Frequency is required',
+        path: ['frequency'],
+    }
+).refine(
+    (data) => {
+        // Action 5: ext_letter is required
+        if (data.action === 'request-extension') {
+            return !!data.ext_letter;
+        }
+        return true;
+    },
+    {
+        message: 'Request letter/email is required',
+        path: ['ext_letter'],
+    }
+).refine(
+    (data) => {
+        // Action 6: docket_no, docket_slip are required
+        if (data.action === 'returned-courier') {
+            return !!data.docket_no && !!data.docket_slip;
+        }
+        return true;
+    },
+    {
+        message: 'Docket number and docket slip are required',
+        path: ['docket_no'],
+    }
+).refine(
+    (data) => {
+        // Action 7: stamp_covering_letter is required
+        if (data.action === 'request-cancellation') {
+            return !!data.stamp_covering_letter;
+        }
+        return true;
+    },
+    {
+        message: 'Signed, stamped covering letter is required',
+        path: ['stamp_covering_letter'],
+    }
+).refine(
+    (data) => {
+        // Action 8: cancell_confirm is required
+        if (data.action === 'bg-cancellation-confirmation') {
+            return !!data.cancell_confirm;
+        }
+        return true;
+    },
+    {
+        message: 'Bank BG cancellation request is required',
+        path: ['cancell_confirm'],
+    }
+).refine(
+    (data) => {
+        // Action 9: bg_fdr_cancel_date, bg_fdr_cancel_amount, bg_fdr_cancel_ref_no are required
+        if (data.action === 'fdr-cancellation-confirmation') {
+            return !!data.bg_fdr_cancel_date && !!data.bg_fdr_cancel_amount && !!data.bg_fdr_cancel_ref_no;
+        }
+        return true;
+    },
+    {
+        message: 'FDR cancellation date, amount, and reference number are required',
+        path: ['bg_fdr_cancel_date'],
     }
 );
 
