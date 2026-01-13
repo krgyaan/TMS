@@ -39,12 +39,25 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     return_reason: z.string().optional(),
     return_date: z.string().optional(),
     return_remarks: z.string().optional(),
+    utr_num: z.string().optional(),
 
     // Settled
     settlement_date: z.string().optional(),
     settlement_amount: z.coerce.number().optional(),
     settlement_reference_no: z.string().optional(),
 }).refine(
+    (data) => {
+        // Action 1: status is required
+        if (data.action === 'accounts-form-1') {
+            return !!data.bt_req;
+        }
+        return true;
+    },
+    {
+        message: 'BT Request status is required',
+        path: ['bt_req'],
+    }
+).refine(
     (data) => {
         if (data.action === 'accounts-form-1' && data.bt_req === 'Rejected') {
             return !!data.reason_req;
@@ -57,14 +70,53 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
+        // Action 2: org_name, contacts[].name, contacts[].phone, frequency are required
         if (data.action === 'initiate-followup') {
-            return data.contacts && data.contacts.length > 0;
+            if (!data.organisation_name) return false;
+            if (!data.contacts || data.contacts.length === 0) return false;
+            if (!data.frequency) return false;
+            return data.contacts.every(contact => contact.name && contact.phone);
         }
         return true;
     },
     {
-        message: 'At least one contact person is required',
+        message: 'Organisation name, at least one contact with name and phone, and frequency are required',
+        path: ['organisation_name'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup' && data.contacts && data.contacts.length > 0) {
+            const invalidContact = data.contacts.find(c => !c.name || !c.phone);
+            return !invalidContact;
+        }
+        return true;
+    },
+    {
+        message: 'Each contact must have a name and phone number',
         path: ['contacts'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup') {
+            return !!data.frequency;
+        }
+        return true;
+    },
+    {
+        message: 'Frequency is required',
+        path: ['frequency'],
+    }
+).refine(
+    (data) => {
+        // Action 3: return_reason, return_date, utr_num are required
+        if (data.action === 'returned') {
+            return !!data.return_reason && !!data.return_date && !!data.utr_num;
+        }
+        return true;
+    },
+    {
+        message: 'Return reason, return date, and UTR number are required',
+        path: ['return_reason'],
     }
 );
 

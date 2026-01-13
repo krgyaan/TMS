@@ -33,6 +33,10 @@ const ACTION_OPTIONS = [
     { value: 'accounts-form-2', label: 'Accounts Form (CHQ) 2 - After Cheque Creation' },
     { value: 'accounts-form-3', label: 'Accounts Form (CHQ) 3 - Capture Cheque Details' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
+    { value: 'stop-cheque', label: 'Stop the cheque from the bank' },
+    { value: 'paid-via-bank-transfer', label: 'Paid via Bank Transfer' },
+    { value: 'deposited-in-bank', label: 'Deposited in Bank' },
+    { value: 'cancelled-torn', label: 'Cancelled/Torn' },
     { value: 'returned-courier', label: 'Returned via Courier' },
     { value: 'request-cancellation', label: 'Request Cancellation' },
 ];
@@ -78,8 +82,8 @@ export function ChequeActionForm({
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('cheque_images') || key.includes('proof_image')) {
-                    return;
+                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('cheque_images') || key.includes('cancelled_image_path') || key.includes('proof_image')) {
+                    return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
@@ -110,6 +114,9 @@ export function ChequeActionForm({
             }
             if (values.covering_letter && fileUploads.covering_letter) {
                 allFiles.push(...fileUploads.covering_letter);
+            }
+            if (values.cancelled_image_path && fileUploads.cancelled_image_path) {
+                allFiles.push(...fileUploads.cancelled_image_path);
             }
             if (values.proof_image && fileUploads.proof_image) {
                 allFiles.push(...fileUploads.proof_image);
@@ -152,12 +159,13 @@ export function ChequeActionForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(field) => (
+                            {(_field) => (
                                 <SelectField
+                                    label="Choose What to do"
                                     control={form.control}
                                     name="action"
                                     options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
+                                    placeholder="Select an option"
                                 />
                             )}
                         </FieldWrapper>
@@ -199,14 +207,14 @@ export function ChequeActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="cheque_format_imran" label="Cheque Format (Upload by Imran)">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="cheque_format_imran"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, cheque_format_imran: files }));
                                             }}
                                         />
@@ -214,14 +222,14 @@ export function ChequeActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_cheque" label="Prefilled Bank Formats">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="prefilled_signed_cheque"
                                             label=""
                                             allowMultiple={true}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, prefilled_signed_cheque: files }));
                                             }}
                                         />
@@ -284,14 +292,14 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Accounts Form (CHQ) 3 - Capture Cheque Details</h4>
 
                                 <FieldWrapper control={form.control} name="cheque_images" label="Cheque Images (Max 2)">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="cheque_images"
                                             label=""
                                             allowMultiple={true}
                                             acceptedFileTypes={['image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 if (files.length <= 2) {
                                                     setFileUploads((prev) => ({ ...prev, cheque_images: files }));
                                                 }
@@ -348,6 +356,90 @@ export function ChequeActionForm({
                             </div>
                         </ConditionalSection>
 
+                        {/* Stop the cheque from the bank */}
+                        <ConditionalSection show={action === 'stop-cheque'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Stop the cheque from the bank</h4>
+
+                                <FieldWrapper control={form.control} name="stop_reason_text" label="Reason for Stopping of Cheque">
+                                    {(field) => (
+                                        <Textarea
+                                            {...field}
+                                            placeholder="Enter reason for stopping the cheque"
+                                            className="min-h-[80px]"
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            </div>
+                        </ConditionalSection>
+
+                        {/* Paid via Bank Transfer */}
+                        <ConditionalSection show={action === 'paid-via-bank-transfer'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Paid via Bank Transfer</h4>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
+                                        {(field) => (
+                                            <DatePicker
+                                                date={field.value ? new Date(field.value) : undefined}
+                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr" label="UTR Number">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="amount" label="UTR Amount">
+                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
+                        </ConditionalSection>
+
+                        {/* Deposited in Bank */}
+                        <ConditionalSection show={action === 'deposited-in-bank'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Deposited in Bank</h4>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FieldWrapper control={form.control} name="bt_transfer_date" label="Transfer Date">
+                                        {(field) => (
+                                            <DatePicker
+                                                date={field.value ? new Date(field.value) : undefined}
+                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="reference" label="Bank Reference No">
+                                        {(field) => <Input {...field} placeholder="Enter reference number" />}
+                                    </FieldWrapper>
+                                </div>
+                            </div>
+                        </ConditionalSection>
+
+                        {/* Cancelled/Torn */}
+                        <ConditionalSection show={action === 'cancelled-torn'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Cancelled/Torn</h4>
+
+                                <FieldWrapper control={form.control} name="cancelled_image_path" label="Upload Photo/confirmation from Beneficiary">
+                                    {(_field) => (
+                                        <FileUploadField
+                                            control={form.control}
+                                            name="cancelled_image_path"
+                                            label=""
+                                            allowMultiple={false}
+                                            acceptedFileTypes={['application/pdf', 'image/*']}
+                                            onChange={(files: File[]) => {
+                                                setFileUploads((prev) => ({ ...prev, cancelled_image_path: files }));
+                                            }}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            </div>
+                        </ConditionalSection>
+
                         {/* Returned via courier */}
                         <ConditionalSection show={action === 'returned-courier'}>
                             <div className="space-y-4 border rounded-lg p-4">
@@ -358,14 +450,14 @@ export function ChequeActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="docket_slip"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, docket_slip: files }));
                                             }}
                                         />
@@ -380,14 +472,14 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
                                 <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
+                                    {(_field) => (
                                         <FileUploadField
                                             control={form.control}
                                             name="covering_letter"
                                             label=""
                                             allowMultiple={false}
                                             acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files) => {
+                                            onChange={(files: File[]) => {
                                                 setFileUploads((prev) => ({ ...prev, covering_letter: files }));
                                             }}
                                         />

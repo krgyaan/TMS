@@ -13,6 +13,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
+import { CHEQUE_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 
 @Injectable()
 export class ChequeService {
@@ -358,7 +359,11 @@ export class ChequeService {
             'accounts-form-1': 1,
             'accounts-form-2': 2,
             'accounts-form-3': 3,
-            'initiate-followup': 4,
+            'initiate-followup': 2,
+            'stop-cheque': 3,
+            'paid-via-bank-transfer': 4,
+            'deposited-in-bank': 5,
+            'cancelled-torn': 6,
             'returned-courier': 5,
             'request-cancellation': 6,
         };
@@ -410,21 +415,34 @@ export class ChequeService {
 
         if (body.action === 'accounts-form-1') {
             if (body.cheque_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.cheque_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
         } else if (body.action === 'accounts-form-2') {
-            updateData.status = 'CHEQUE_CREATED';
+            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'accounts-form-3') {
-            updateData.status = 'CHEQUE_DETAILS_CAPTURED';
+            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            updateData.status = CHEQUE_STATUSES.FOLLOWUP_INITIATED;
+        } else if (body.action === 'stop-cheque') {
+            updateData.status = CHEQUE_STATUSES.STOP_REQUESTED;
+        } else if (body.action === 'paid-via-bank-transfer') {
+            updateData.status = CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER;
+            if (body.transfer_date) updateData.transferDate = body.transfer_date;
+            if (body.utr) updateData.utr = body.utr;
+        } else if (body.action === 'deposited-in-bank') {
+            updateData.status = CHEQUE_STATUSES.DEPOSITED_IN_BANK;
+        } else if (body.action === 'cancelled-torn') {
+            updateData.status = CHEQUE_STATUSES.CANCELLED_TORN;
         } else if (body.action === 'returned-courier') {
-            updateData.status = 'RETURNED_VIA_COURIER';
+            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
+            if (filePaths.length > 0) {
+                updateData.docketSlip = filePaths[0];
+            }
         } else if (body.action === 'request-cancellation') {
-            updateData.status = 'CANCELLATION_REQUESTED';
+            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
         }
 
         await this.db
@@ -441,8 +459,29 @@ export class ChequeService {
             if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
         } else if (body.action === 'accounts-form-3') {
-            if (filePaths.length > 0) {
-                chequeDetailsUpdate.chequeImagePath = filePaths.join(',');
+            if (filePaths.length > 0 && body.cheque_images) {
+                const chequeImageIndexes = filePaths
+                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
+                    .filter(idx => idx >= 0);
+                if (chequeImageIndexes.length > 0) {
+                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
+                }
+            }
+        } else if (body.action === 'stop-cheque') {
+            if (body.stop_reason_text) chequeDetailsUpdate.stopReasonText = body.stop_reason_text;
+        } else if (body.action === 'paid-via-bank-transfer') {
+            if (body.transfer_date) chequeDetailsUpdate.transferDate = body.transfer_date;
+            if (body.utr) chequeDetailsUpdate.reference = body.utr;
+            if (body.amount) chequeDetailsUpdate.amount = body.amount;
+        } else if (body.action === 'deposited-in-bank') {
+            if (body.bt_transfer_date) chequeDetailsUpdate.btTransferDate = body.bt_transfer_date;
+            if (body.reference) chequeDetailsUpdate.reference = body.reference;
+        } else if (body.action === 'cancelled-torn') {
+            if (filePaths.length > 0 && body.cancelled_image_path) {
+                const cancelledImageIndex = filePaths.findIndex((path: string) => path.includes('cancelled') || body.cancelled_image_path);
+                if (cancelledImageIndex >= 0) {
+                    chequeDetailsUpdate.cancelledImagePath = filePaths[cancelledImageIndex];
+                }
             }
         }
 

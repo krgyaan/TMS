@@ -50,6 +50,21 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     docket_no: z.string().optional(),
     docket_slip: z.any().optional(), // File
 
+    // Stop the cheque from the bank
+    stop_reason_text: z.string().optional(),
+
+    // Paid via Bank Transfer
+    transfer_date: z.string().optional(),
+    utr: z.string().optional(),
+    amount: z.coerce.number().optional(),
+
+    // Deposited in Bank
+    bt_transfer_date: z.string().optional(),
+    reference: z.string().optional(),
+
+    // Cancelled/Torn
+    cancelled_image_path: z.any().optional(), // File
+
     // Request Cancellation
     covering_letter: z.any().optional(), // File
     cancellation_remarks: z.string().optional(),
@@ -59,6 +74,18 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     cheque_cancellation_amount: z.coerce.number().optional(),
     cheque_cancellation_reference_no: z.string().optional(),
 }).refine(
+    (data) => {
+        // Action 1: status is required
+        if (data.action === 'accounts-form-1') {
+            return !!data.cheque_req;
+        }
+        return true;
+    },
+    {
+        message: 'Cheque Request status is required',
+        path: ['cheque_req'],
+    }
+).refine(
     (data) => {
         if (data.action === 'accounts-form-1' && data.cheque_req === 'Rejected') {
             return !!data.reason_req;
@@ -71,14 +98,89 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
+        // Action 2: org_name, contacts[].name, contacts[].phone, frequency are required
         if (data.action === 'initiate-followup') {
-            return data.contacts && data.contacts.length > 0;
+            if (!data.organisation_name) return false;
+            if (!data.contacts || data.contacts.length === 0) return false;
+            if (!data.frequency) return false;
+            return data.contacts.every(contact => contact.name && contact.phone);
         }
         return true;
     },
     {
-        message: 'At least one contact person is required',
+        message: 'Organisation name, at least one contact with name and phone, and frequency are required',
+        path: ['organisation_name'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup' && data.contacts && data.contacts.length > 0) {
+            const invalidContact = data.contacts.find(c => !c.name || !c.phone);
+            return !invalidContact;
+        }
+        return true;
+    },
+    {
+        message: 'Each contact must have a name and phone number',
         path: ['contacts'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'initiate-followup') {
+            return !!data.frequency;
+        }
+        return true;
+    },
+    {
+        message: 'Frequency is required',
+        path: ['frequency'],
+    }
+).refine(
+    (data) => {
+        // Action 3: stop_reason_text is required
+        if (data.action === 'stop-cheque') {
+            return !!data.stop_reason_text;
+        }
+        return true;
+    },
+    {
+        message: 'Stop reason text is required',
+        path: ['stop_reason_text'],
+    }
+).refine(
+    (data) => {
+        // Action 4: transfer_date, utr, amount are required
+        if (data.action === 'paid-via-bank-transfer') {
+            return !!data.transfer_date && !!data.utr && data.amount !== undefined && data.amount !== null;
+        }
+        return true;
+    },
+    {
+        message: 'Transfer date, UTR, and amount are required',
+        path: ['transfer_date'],
+    }
+).refine(
+    (data) => {
+        // Action 5: bt_transfer_date, reference are required
+        if (data.action === 'deposited-in-bank') {
+            return !!data.bt_transfer_date && !!data.reference;
+        }
+        return true;
+    },
+    {
+        message: 'Transfer date and reference are required',
+        path: ['bt_transfer_date'],
+    }
+).refine(
+    (data) => {
+        // Action 6: cancelled_image_path is required
+        if (data.action === 'cancelled-torn') {
+            return !!data.cancelled_image_path;
+        }
+        return true;
+    },
+    {
+        message: 'Cancelled image is required',
+        path: ['cancelled_image_path'],
     }
 ).refine(
     (data) => {

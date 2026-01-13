@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import {
@@ -121,12 +121,13 @@ export function PayOnPortalActionForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(field) => (
+                            {(_field) => (
                                 <SelectField
+                                    label="Choose What to do"
                                     control={form.control}
                                     name="action"
                                     options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
+                                    placeholder="Select an option"
                                 />
                             )}
                         </FieldWrapper>
@@ -247,6 +248,9 @@ export function PayOnPortalActionForm({
                                                 onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
                                             />
                                         )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                 </div>
 
