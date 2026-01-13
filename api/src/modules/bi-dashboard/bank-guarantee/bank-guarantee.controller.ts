@@ -20,7 +20,7 @@ const biDashboardMulterConfig = {
 
 @Controller('bank-guarantees')
 export class BankGuaranteeController {
-    constructor(private readonly bankGuaranteeService: BankGuaranteeService) {}
+    constructor(private readonly bankGuaranteeService: BankGuaranteeService) { }
 
     @Get('dashboard')
     getDashboard(
@@ -43,6 +43,11 @@ export class BankGuaranteeController {
     @Get('dashboard/counts')
     getDashboardCounts() {
         return this.bankGuaranteeService.getDashboardCounts();
+    }
+
+    @Get('dashboard/card-stats')
+    getDashboardCardStats() {
+        return this.bankGuaranteeService.getDashboardCardStats();
     }
 
     @Put('instruments/:id/action')

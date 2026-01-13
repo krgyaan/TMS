@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
+import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
 import { dateCol, currencyCol } from '@/components/data-grid/columns';
 import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
@@ -99,9 +99,23 @@ const BankGuaranteeListPage = () => {
     });
 
     const { data: counts } = useBankGuaranteeDashboardCounts();
+    const { data: cardStats } = useBankGuaranteeCardStats();
 
     const bgData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
+
+    // Bank name mappings
+    const bankNameMap: Record<string, string> = {
+        'YESBANK_2011': 'Yes Bank 2011',
+        'YESBANK_0771': 'Yes Bank 0771',
+        'PNB_6011': 'Punjab National Bank',
+        'BGLIMIT_0771': 'BG Limit',
+    };
+
+    const formatCurrency = (amount: number | null | undefined): string => {
+        if (!amount) return '₹ 0.00';
+        return `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
     const handleViewDetails = useCallback((row: BankGuaranteeDashboardRow) => {
         // TODO: Implement navigation to detail page
@@ -239,12 +253,21 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            dateCol<BankGuaranteeDashboardRow>('expiry', {
+            {
                 headerName: 'Expiry',
                 width: 120,
-                colId: 'expiry',
+                colId: 'expiryStatus',
                 sortable: true,
-            }),
+                valueGetter: (params) => {
+                    return params.data?.expiryStatus || '—';
+                },
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status || status === '—') return '—';
+                    const variant = status === 'Valid' ? 'default' : status === 'Claim Period' ? 'secondary' : 'destructive';
+                    return <Badge variant={variant as any}>{status}</Badge>;
+                },
+            },
             {
                 field: 'bgStatus',
                 headerName: 'BG Status',
@@ -324,6 +347,30 @@ const BankGuaranteeListPage = () => {
 
     return (
         <>
+            {/* Bank Statistics Cards */}
+            {cardStats && cardStats.bankStats && Object.keys(cardStats.bankStats).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    {Object.entries(cardStats.bankStats).map(([bankName, stats]) => (
+                        <Card key={bankName} className="relative">
+                            <CardHeader className="pb-0">
+                                <CardTitle className="text-lg">{bankNameMap[bankName] || bankName}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-1">
+                                <p className="text-sm font-medium text-green-600">BG: {formatCurrency(stats.amount)}</p>
+                                <p className="text-sm font-medium text-green-600">FDR (10%): {formatCurrency(stats.fdrAmount10)}</p>
+                                <p className="text-sm font-medium text-green-600">FDR (15%): {formatCurrency(stats.fdrAmount15)}</p>
+                                <p className="text-sm font-medium text-green-600">FDR (100%): {formatCurrency(stats.fdrAmount100)}</p>
+                                <div className="pt-2 mt-2">
+                                    <Badge variant="outline" className="w-full justify-center">
+                                        Total {stats.count} BGs Created, {stats.percentage.toFixed(2)}% of BG
+                                    </Badge>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">

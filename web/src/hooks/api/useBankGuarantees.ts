@@ -4,6 +4,7 @@ import type {
     BankGuaranteeDashboardRow,
     BankGuaranteeDashboardCounts,
     BankGuaranteeDashboardFilters,
+    BankGuaranteeCardStats,
 } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -14,6 +15,7 @@ export const bankGuaranteesKey = {
     details: () => [...bankGuaranteesKey.all, 'detail'] as const,
     detail: (id: number) => [...bankGuaranteesKey.details(), id] as const,
     counts: () => [...bankGuaranteesKey.all, 'counts'] as const,
+    cardStats: () => [...bankGuaranteesKey.all, 'card-stats'] as const,
 };
 
 export const useBankGuaranteeDashboard = (
@@ -54,6 +56,18 @@ export const useBankGuaranteeDashboardCounts = () => {
     return query;
 };
 
+export const useBankGuaranteeCardStats = () => {
+    const query = useQuery<BankGuaranteeCardStats>({
+        queryKey: bankGuaranteesKey.cardStats(),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getCardStats();
+            return result;
+        },
+    });
+
+    return query;
+};
+
 export const useUpdateBankGuaranteeAction = () => {
     const queryClient = useQueryClient();
 
@@ -67,4 +81,4 @@ export const useUpdateBankGuaranteeAction = () => {
     });
 };
 
-export type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts };
+export type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts, BankGuaranteeCardStats };

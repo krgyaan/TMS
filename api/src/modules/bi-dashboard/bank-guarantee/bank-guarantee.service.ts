@@ -8,13 +8,11 @@ import {
     instrumentBgDetails,
 } from '@db/schemas/tendering/emds.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
-import * as fs from 'fs';
-import * as path from 'path';
+import { BG_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -22,7 +20,7 @@ export class BankGuaranteeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) {}
+    ) { }
 
     async getDashboardData(
         tab?: string,
@@ -50,7 +48,7 @@ export class BankGuaranteeService {
                     isNull(paymentInstruments.action),
                     eq(paymentInstruments.action, 1)
                 ),
-                eq(paymentRequests.status, 'Accepted')
+                eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED)
             );
         } else if (tab === 'live-yes') {
             conditions.push(
@@ -73,8 +71,10 @@ export class BankGuaranteeService {
             );
         } else if (tab === 'rejected') {
             conditions.push(
-                eq(paymentInstruments.action, 1),
-                eq(paymentRequests.status, 'Rejected')
+                or(
+                    eq(paymentInstruments.action, 1),
+                    eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED)
+                )
             );
         }
 
@@ -83,8 +83,8 @@ export class BankGuaranteeService {
             const searchStr = `%${options.search}%`;
             conditions.push(
                 sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
+                    ${paymentRequests.projectName} ILIKE ${searchStr} OR
+                    ${paymentRequests.tenderNo} ILIKE ${searchStr} OR
                     ${instrumentBgDetails.bgNo} ILIKE ${searchStr} OR
                     ${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}
                 )`
@@ -93,8 +93,8 @@ export class BankGuaranteeService {
 
         const whereClause = and(...conditions);
 
-        // Build order clause
-        let orderClause: any = desc(paymentInstruments.createdAt);
+        // Build order clause - default to validityDate desc, fallback to createdAt
+        let orderClause: any = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
         if (options?.sortBy) {
             const direction = options.sortOrder === 'desc' ? desc : asc;
             switch (options.sortBy) {
@@ -105,43 +105,52 @@ export class BankGuaranteeService {
                     orderClause = direction(instrumentBgDetails.bgNo);
                     break;
                 case 'tenderNo':
-                    orderClause = direction(tenderInfos.tenderNo);
+                    orderClause = direction(paymentRequests.tenderNo);
                     break;
                 case 'amount':
                     orderClause = direction(paymentInstruments.amount);
                     break;
                 default:
-                    orderClause = direction(paymentInstruments.createdAt);
+                    orderClause = sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`;
             }
         }
 
-        // Data query
+        // Data query - fetch raw column data only
         const rows = await this.db
             .select({
                 id: paymentInstruments.id,
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
-                tenderName: tenderInfos.tenderName,
-                tenderNo: tenderInfos.tenderNo,
-                bidValidity: tenderInfos.dueDate,
+                // Get tender info from payment_requests table
+                tenderName: paymentRequests.projectName,
+                tenderNo: paymentRequests.tenderNo,
+                bidValidity: paymentRequests.dueDate,
+                tenderId: paymentRequests.tenderId,
+                tenderType: paymentRequests.type,
                 amount: paymentInstruments.amount,
                 bgExpiryDate: instrumentBgDetails.validityDate,
-                bgClaimPeriod: sql<number | null>`CASE WHEN ${instrumentBgDetails.claimExpiryDate} IS NOT NULL AND ${instrumentBgDetails.validityDate} IS NOT NULL THEN (${instrumentBgDetails.claimExpiryDate} - ${instrumentBgDetails.validityDate}) ELSE NULL END`,
-                expiryDate: instrumentBgDetails.claimExpiryDate,
-                bgChargesPaid: sql<number | null>`COALESCE(${instrumentBgDetails.stampChargesDeducted}, 0) + COALESCE(${instrumentBgDetails.sfmsChargesDeducted}, 0) + COALESCE(${instrumentBgDetails.otherChargesDeducted}, 0)`,
-                bgChargesCalculated: sql<number | null>`COALESCE(${instrumentBgDetails.stampCharges}, 0) + COALESCE(${instrumentBgDetails.sfmsCharges}, 0)`,
+                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                // Raw charge fields for calculation
+                stampCharges: instrumentBgDetails.stampCharges,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrValue: instrumentBgDetails.fdrAmt,
-                tenderStatus: statuses.name,
-                expiry: instrumentBgDetails.validityDate,
+                // Conditional tender status from tenderInfos if tender_id != 0
+                tenderStatusFromTender: statuses.name,
                 bgStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
@@ -153,32 +162,51 @@ export class BankGuaranteeService {
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
-        const data: BankGuaranteeDashboardRow[] = rows.map((row) => ({
-            id: row.id,
-            bgDate: row.bgDate ? new Date(row.bgDate) : null,
-            bgNo: row.bgNo,
-            beneficiaryName: row.beneficiaryName,
-            tenderName: row.tenderName,
-            tenderNo: row.tenderNo,
-            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
-            amount: row.amount ? Number(row.amount) : null,
-            bgExpiryDate: row.bgExpiryDate ? new Date(row.bgExpiryDate) : null,
-            bgClaimPeriod: row.bgClaimPeriod ? Number(row.bgClaimPeriod) : null,
-            expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
-            bgChargesPaid: row.bgChargesPaid ? Number(row.bgChargesPaid) : null,
-            bgChargesCalculated: row.bgChargesCalculated ? Number(row.bgChargesCalculated) : null,
-            fdrNo: row.fdrNo,
-            fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
-            tenderStatus: row.tenderStatus,
-            expiry: row.expiry ? new Date(row.expiry) : null,
-            bgStatus: row.bgStatus,
-        }));
+        // Map rows and apply calculations using helper functions
+        const data: BankGuaranteeDashboardRow[] = rows.map((row) => {
+            const bgDate = row.bgDate ? new Date(row.bgDate) : null;
+            const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
+            const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const amount = row.amount ? Number(row.amount) : null;
+
+            return {
+                id: row.id,
+                bgDate,
+                bgNo: row.bgNo,
+                beneficiaryName: row.beneficiaryName,
+                tenderName: row.tenderName,
+                tenderNo: row.tenderNo,
+                bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+                amount,
+                bgExpiryDate,
+                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                expiryDate: claimExpiryDate,
+                bgChargesPaid: this.calculateBgChargesPaid(
+                    row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.sfmsChargesDeducted ? Number(row.sfmsChargesDeducted) : null,
+                    row.otherChargesDeducted ? Number(row.otherChargesDeducted) : null
+                ),
+                bgChargesCalculated: this.calculateBgChargesCalculated(
+                    amount,
+                    bgDate,
+                    claimExpiryDate,
+                    row.stampCharges ? Number(row.stampCharges) : null,
+                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                ),
+                fdrNo: row.fdrNo,
+                fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
+                tenderStatus: row.tenderId && row.tenderId !== 0 ? row.tenderStatusFromTender : row.tenderType,
+                expiry: bgExpiryDate,
+                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
+                bgStatus: row.bgStatus,
+            };
+        });
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
@@ -196,7 +224,7 @@ export class BankGuaranteeService {
                 isNull(paymentInstruments.action),
                 eq(paymentInstruments.action, 1)
             ),
-            eq(paymentRequests.status, 'Accepted'),
+            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED),
         ];
         const [newRequestsResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -263,7 +291,7 @@ export class BankGuaranteeService {
         const rejectedConditions = [
             ...baseConditions,
             eq(paymentInstruments.action, 1),
-            eq(paymentRequests.status, 'Rejected'),
+            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED),
         ];
         const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -281,6 +309,220 @@ export class BankGuaranteeService {
             rejected,
             total: newRequests + liveYes + livePnb + liveBgLimit + cancelled + rejected,
         };
+    }
+
+    async getDashboardCardStats(): Promise<{
+        bankStats: Record<string, {
+            count: number;
+            percentage: number;
+            amount: number;
+            fdrAmount10: number;
+            fdrAmount15: number;
+            fdrAmount100: number;
+        }>;
+        totalBgCount: number;
+        totalBgAmount: number;
+    }> {
+        const conditions = [
+            eq(paymentInstruments.instrumentType, 'BG'),
+            eq(paymentInstruments.isActive, true),
+            inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7])
+        ];
+
+        const rows = await this.db
+            .select({
+                bankName: instrumentBgDetails.bankName,
+                bgNo: instrumentBgDetails.bgNo,
+                amount: paymentInstruments.amount,
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrAmt: instrumentBgDetails.fdrAmt,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(and(...conditions));
+
+        // Group by bank name
+        const groupedByBank: Record<string, typeof rows> = {};
+        for (const row of rows) {
+            const bankName = row.bankName || 'UNKNOWN';
+            if (!groupedByBank[bankName]) {
+                groupedByBank[bankName] = [];
+            }
+            groupedByBank[bankName].push(row);
+        }
+
+        // Calculate totals
+        const totalBgCount = rows.length;
+        const totalBgAmount = rows.reduce((sum, row) => sum + (row.amount ? Number(row.amount) : 0), 0);
+
+        // Calculate stats for each bank
+        const bankStats: Record<string, {
+            count: number;
+            percentage: number;
+            amount: number;
+            fdrAmount10: number;
+            fdrAmount15: number;
+            fdrAmount100: number;
+        }> = {};
+
+        for (const [bankName, bgs] of Object.entries(groupedByBank)) {
+            // Count BGs with bg_no not null
+            const bankCount = bgs.filter(bg => bg.bgNo !== null && bg.bgNo !== '').length;
+
+            // Sum of bg_amt where bg_no is not null
+            const bankAmount = bgs
+                .filter(bg => bg.bgNo !== null && bg.bgNo !== '')
+                .reduce((sum, bg) => sum + (bg.amount ? Number(bg.amount) : 0), 0);
+
+            // FDR amounts by percentage
+            const fdrAmount10 = bgs
+                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 10)
+                .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
+
+            const fdrAmount15 = bgs
+                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 15)
+                .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
+
+            const fdrAmount100 = bgs
+                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 100)
+                .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
+
+            const percentage = totalBgCount > 0 ? (bankCount / totalBgCount) * 100 : 0;
+
+            bankStats[bankName] = {
+                count: bankCount,
+                percentage,
+                amount: bankAmount,
+                fdrAmount10,
+                fdrAmount15,
+                fdrAmount100,
+            };
+        }
+
+        return {
+            bankStats,
+            totalBgCount,
+            totalBgAmount,
+        };
+    }
+
+    /**
+     * Calculate BG charges calculated with interest
+     * Formula: stamp paper (300) + SFMS (590) + interest component
+     * Interest: bgValue * (0.01/365) * monthsDifference * 1.18 (GST)
+     * Note: Laravel uses diffInMonths which returns integer months, then multiplies by daily rate
+     */
+    private calculateBgChargesCalculated(
+        bgValue: number | null,
+        bgDate: Date | null,
+        claimExpiryDate: Date | null,
+        stampCharges: number | null,
+        sfmsCharges: number | null
+    ): number | null {
+        if (!bgValue || !bgDate || !claimExpiryDate) {
+            return null;
+        }
+
+        const bgStampPaperValue = stampCharges ?? 300;
+        const sfmsChargesValue = sfmsCharges ?? 590;
+
+        // Calculate months difference (integer months, matching Laravel's diffInMonths)
+        const monthsDifference = this.calculateMonthsDifference(bgDate, claimExpiryDate);
+
+        // Daily interest rate: 0.01 / 365
+        const dailyInterestRate = 0.01 / 365;
+
+        // Interest component (matching Laravel: bgValue * dailyRate * months)
+        const interestComponent = bgValue * dailyInterestRate * monthsDifference;
+
+        // Add GST (1.18)
+        const interestWithGST = interestComponent * 1.18;
+
+        return bgStampPaperValue + sfmsChargesValue + interestWithGST;
+    }
+
+    /**
+     * Calculate BG charges paid (sum of all deducted charges)
+     */
+    private calculateBgChargesPaid(
+        bgChargeDeducted: number | null,
+        stampChargesDeducted: number | null,
+        sfmsChargesDeducted: number | null,
+        otherChargesDeducted: number | null
+    ): number | null {
+        const total = (bgChargeDeducted ?? 0) +
+            (stampChargesDeducted ?? 0) +
+            (sfmsChargesDeducted ?? 0) +
+            (otherChargesDeducted ?? 0);
+
+        return total > 0 ? total : null;
+    }
+
+    /**
+     * Calculate expiry status based on current date
+     * Returns: "Valid", "Claim Period", "Expired", or "N/A"
+     */
+    private calculateExpiryStatus(
+        bgExpiryDate: Date | null,
+        claimExpiryDate: Date | null
+    ): string | null {
+        if (!bgExpiryDate || !claimExpiryDate) {
+            return 'N/A';
+        }
+
+        const now = new Date();
+        const bgExpiry = new Date(bgExpiryDate);
+        const claimExpiry = new Date(claimExpiryDate);
+
+        if (now <= bgExpiry) {
+            return 'Valid';
+        } else if (now <= claimExpiry) {
+            return 'Claim Period';
+        } else {
+            return 'Expired';
+        }
+    }
+
+    /**
+     * Calculate BG claim period in days
+     */
+    private calculateBgClaimPeriod(
+        validityDate: Date | null,
+        claimExpiryDate: Date | null
+    ): number | null {
+        if (!validityDate || !claimExpiryDate) {
+            return null;
+        }
+
+        const validity = new Date(validityDate);
+        const claimExpiry = new Date(claimExpiryDate);
+        const diffTime = claimExpiry.getTime() - validity.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays;
+    }
+
+    /**
+     * Calculate months difference between two dates
+     * Returns integer months (matching Laravel's diffInMonths behavior)
+     */
+    private calculateMonthsDifference(startDate: Date, endDate: Date): number {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        const yearsDiff = end.getFullYear() - start.getFullYear();
+        const monthsDiff = end.getMonth() - start.getMonth();
+
+        // Calculate total months (integer, matching Laravel's diffInMonths)
+        let totalMonths = yearsDiff * 12 + monthsDiff;
+
+        // Adjust if end day is before start day (same logic as Carbon's diffInMonths)
+        if (end.getDate() < start.getDate()) {
+            totalMonths--;
+        }
+
+        return totalMonths;
     }
 
     /**

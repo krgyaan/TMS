@@ -2,7 +2,7 @@ import type { BankGuaranteeDashboardFilters } from '@/modules/bi-dashboard/bank-
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
-import type { BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
+import type { BankGuaranteeDashboardCounts, BankGuaranteeCardStats } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 
 class BankGuaranteesService extends BaseApiService {
     constructor() {
@@ -40,7 +40,6 @@ class BankGuaranteesService extends BaseApiService {
             const result = await this.get<PaginatedResult<BankGuaranteeDashboardRow>>(url);
             return result;
         } catch (error) {
-            console.error('=== bankGuaranteesService.getAll Error ===');
             console.error('error:', error);
             throw error;
         }
@@ -51,7 +50,16 @@ class BankGuaranteesService extends BaseApiService {
             const result = await this.get<BankGuaranteeDashboardCounts>('/dashboard/counts');
             return result;
         } catch (error) {
-            console.error('=== bankGuaranteesService.getCounts Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getCardStats(): Promise<BankGuaranteeCardStats> {
+        try {
+            const result = await this.get<BankGuaranteeCardStats>('/dashboard/card-stats');
+            return result;
+        } catch (error) {
             console.error('error:', error);
             throw error;
         }

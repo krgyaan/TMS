@@ -16,6 +16,7 @@ export interface BankGuaranteeDashboardRow {
     fdrValue: number | null;
     tenderStatus: string | null;
     expiry: Date | null;
+    expiryStatus: string | null;
     bgStatus: string | null;
 }
 
@@ -27,4 +28,17 @@ export interface BankGuaranteeDashboardCounts {
     cancelled: number;
     rejected: number;
     total: number;
+}
+
+export interface BankGuaranteeCardStats {
+    bankStats: Record<string, {
+        count: number;
+        percentage: number;
+        amount: number;
+        fdrAmount10: number;
+        fdrAmount15: number;
+        fdrAmount100: number;
+    }>;
+    totalBgCount: number;
+    totalBgAmount: number;
 }
