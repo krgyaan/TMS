@@ -9,10 +9,13 @@ import {
 } from '@db/schemas/tendering/emds.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
 import { BG_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 
 @Injectable()
 export class BankGuaranteeService {
@@ -20,6 +23,7 @@ export class BankGuaranteeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly followUpService: FollowUpService,
     ) { }
 
     async getDashboardData(
@@ -544,6 +548,46 @@ export class BankGuaranteeService {
     }
 
     /**
+     * Get single file for a field by checking if body field exists
+     * Files are processed in order as they appear in the files array
+     */
+    private getFileForField(
+        fieldname: string,
+        files: Express.Multer.File[],
+        body: any,
+        fileIndexTracker: { current: number }
+    ): Express.Multer.File | null {
+        // Check if body has this field (indicating a file was uploaded)
+        if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+            const file = files[fileIndexTracker.current];
+            fileIndexTracker.current++;
+            return file;
+        }
+        return null;
+    }
+
+    /**
+     * Get multiple files for a field (like prefilled_signed_bg)
+     * Takes remaining files from current index
+     */
+    private getMultipleFilesForField(
+        fieldname: string,
+        files: Express.Multer.File[],
+        body: any,
+        fileIndexTracker: { current: number }
+    ): Express.Multer.File[] {
+        if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+            // For multiple files, take all remaining files
+            // This works because prefilled_signed_bg is typically the last file field in accounts-form-1
+            const startIndex = fileIndexTracker.current;
+            const extractedFiles = files.slice(startIndex);
+            fileIndexTracker.current = files.length;
+            return extractedFiles;
+        }
+        return [];
+    }
+
+    /**
      * Update instrument action with form data
      */
     async updateAction(
@@ -580,14 +624,8 @@ export class BankGuaranteeService {
             }
         }
 
-        // Handle file paths
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
 
         // Update payment_instruments
         const updateData: any = {
@@ -613,18 +651,21 @@ export class BankGuaranteeService {
             updateData.status = 'EXTENSION_REQUESTED';
         } else if (body.action === 'returned-courier') {
             updateData.status = 'RETURNED_VIA_COURIER';
-            if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
+            const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
+            if (docketSlipFile) {
+                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
             }
         } else if (body.action === 'request-cancellation') {
             updateData.status = 'CANCELLATION_REQUESTED';
-            if (filePaths.length > 0) {
-                updateData.coveringLetter = filePaths[0];
+            const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            if (coveringLetterFile) {
+                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
             updateData.status = 'BG_CANCELLED';
-            if (filePaths.length > 0) {
-                updateData.cancelPdf = filePaths[0];
+            const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            if (cancellConfirmFile) {
+                updateData.cancelPdf = `bi-dashboard/${cancellConfirmFile.filename}`;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             updateData.status = 'FDR_CANCELLED';
@@ -639,7 +680,24 @@ export class BankGuaranteeService {
         const bgDetailsUpdate: any = {};
 
         if (body.action === 'accounts-form-1') {
-            if (body.prefilled_signed_bg && filePaths.length > 0) {
+            // Map approve_bg field
+            if (body.approve_bg) bgDetailsUpdate.approveBg = body.approve_bg;
+
+            // Map reason_req when rejected
+            if (body.bg_req === 'Rejected' && body.reason_req) {
+                bgDetailsUpdate.reasonReq = body.reason_req;
+            }
+
+            // Handle bg_format_imran file (single file)
+            const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
+            if (bgFormatImranFile) {
+                bgDetailsUpdate.bgFormatTe = `bi-dashboard/${bgFormatImranFile.filename}`;
+            }
+
+            // Handle prefilled_signed_bg files (multiple files)
+            const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
+            if (prefilledFiles.length > 0) {
+                const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
             }
         } else if (body.action === 'accounts-form-2') {
@@ -659,48 +717,46 @@ export class BankGuaranteeService {
             if (body.sfms_charge_deducted) bgDetailsUpdate.sfmsChargesDeducted = body.sfms_charge_deducted;
             if (body.stamp_charge_deducted) bgDetailsUpdate.stampChargesDeducted = body.stamp_charge_deducted;
             if (body.other_charge_deducted) bgDetailsUpdate.otherChargesDeducted = body.other_charge_deducted;
-            // Handle fdr_copy file if provided
-            if (filePaths.length > 0 && body.fdr_copy) {
-                const fdrCopyIndex = filePaths.findIndex((path: string) => path.includes('fdr_copy') || body.fdr_copy);
-                if (fdrCopyIndex >= 0) {
-                    bgDetailsUpdate.fdrCopy = filePaths[fdrCopyIndex];
-                }
+
+            // Handle sfms_conf file
+            const sfmsConfFile = this.getFileForField('sfms_conf', files, body, fileIndexTracker);
+            if (sfmsConfFile) {
+                bgDetailsUpdate.sfmsConf = `bi-dashboard/${sfmsConfFile.filename}`;
             }
-            // Handle sfms_conf file if provided
-            if (filePaths.length > 0 && body.sfms_conf) {
-                const sfmsConfIndex = filePaths.findIndex((path: string) => path.includes('sfms_conf') || body.sfms_conf);
-                if (sfmsConfIndex >= 0) {
-                    bgDetailsUpdate.sfmsConf = filePaths[sfmsConfIndex];
-                }
+
+            // Handle fdr_copy file
+            const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
+            if (fdrCopyFile) {
+                bgDetailsUpdate.fdrCopy = `bi-dashboard/${fdrCopyFile.filename}`;
             }
         } else if (body.action === 'request-extension') {
-            // Handle modification fields
-            if (body.new_bg_amt) bgDetailsUpdate.extendedAmount = body.new_bg_amt;
-            if (body.new_bg_expiry) bgDetailsUpdate.extendedValidityDate = body.new_bg_expiry;
-            if (body.new_bg_claim) bgDetailsUpdate.extendedClaimExpiryDate = body.new_bg_claim;
-            if (body.new_bg_bank_name) bgDetailsUpdate.extendedBankName = body.new_bg_bank_name;
-            if (body.new_stamp_charge_deducted) bgDetailsUpdate.newStampChargeDeducted = body.new_stamp_charge_deducted;
-            // Handle extension letter file
-            if (filePaths.length > 0 && body.ext_letter) {
-                const extLetterIndex = filePaths.findIndex((path: string) => path.includes('ext_letter') || body.ext_letter);
-                if (extLetterIndex >= 0) {
-                    bgDetailsUpdate.extensionLetterPath = filePaths[extLetterIndex];
-                }
+            // Handle modification fields only if modification_required is 'Yes'
+            if (body.modification_required === 'Yes') {
+                if (body.new_bg_amt) bgDetailsUpdate.extendedAmount = body.new_bg_amt;
+                if (body.new_bg_expiry) bgDetailsUpdate.extendedValidityDate = body.new_bg_expiry;
+                if (body.new_bg_claim) bgDetailsUpdate.extendedClaimExpiryDate = body.new_bg_claim;
+                if (body.new_bg_bank_name) bgDetailsUpdate.extendedBankName = body.new_bg_bank_name;
+                if (body.new_stamp_charge_deducted) bgDetailsUpdate.newStampChargeDeducted = body.new_stamp_charge_deducted;
             }
+
+            // Handle extension letter file
+            const extLetterFile = this.getFileForField('ext_letter', files, body, fileIndexTracker);
+            if (extLetterFile) {
+                bgDetailsUpdate.extensionLetterPath = `bi-dashboard/${extLetterFile.filename}`;
+            }
+        } else if (body.action === 'returned-courier') {
+            if (body.docket_no) bgDetailsUpdate.courierNo = body.docket_no;
+            // Note: docket_slip file is already handled in updateData section (paymentInstruments.docketSlip)
         } else if (body.action === 'request-cancellation') {
             if (body.cancel_remark) bgDetailsUpdate.cancelRemark = body.cancel_remark;
-            if (filePaths.length > 0 && body.stamp_covering_letter) {
-                const coveringLetterIndex = filePaths.findIndex((path: string) => path.includes('stamp_covering') || body.stamp_covering_letter);
-                if (coveringLetterIndex >= 0) {
-                    bgDetailsUpdate.stampCoveringLetter = filePaths[coveringLetterIndex];
-                }
+            const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            if (coveringLetterFile) {
+                bgDetailsUpdate.stampCoveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
-            if (filePaths.length > 0 && body.cancell_confirm) {
-                const cancellConfirmIndex = filePaths.findIndex((path: string) => path.includes('cancell_confirm') || body.cancell_confirm);
-                if (cancellConfirmIndex >= 0) {
-                    bgDetailsUpdate.cancellConfirm = filePaths[cancellConfirmIndex];
-                }
+            const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            if (cancellConfirmFile) {
+                bgDetailsUpdate.cancellConfirm = `bi-dashboard/${cancellConfirmFile.filename}`;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             if (body.bg_fdr_cancel_date) bgDetailsUpdate.bgFdrCancelDate = body.bg_fdr_cancel_date;
@@ -708,35 +764,121 @@ export class BankGuaranteeService {
             if (body.bg_fdr_cancel_ref_no) bgDetailsUpdate.bgFdrCancelRefNo = body.bg_fdr_cancel_ref_no;
         }
 
+        // Ensure bgDetails record exists before updating
         if (Object.keys(bgDetailsUpdate).length > 0) {
             bgDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentBgDetails)
-                .set(bgDetailsUpdate)
-                .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+
+            // Check if bgDetails record exists
+            const [existingBgDetails] = await this.db
+                .select()
+                .from(instrumentBgDetails)
+                .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingBgDetails) {
+                await this.db
+                    .update(instrumentBgDetails)
+                    .set(bgDetailsUpdate)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+            } else {
+                // Create new bgDetails record
+                await this.db.insert(instrumentBgDetails).values({
+                    instrumentId,
+                    ...bgDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
         }
 
         // Create follow-up if action is initiate-followup
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            // Get payment request to get tender info
-            const [paymentRequest] = await this.db
-                .select()
-                .from(paymentRequests)
-                .where(eq(paymentRequests.id, instrument.requestId))
-                .limit(1);
-
-            if (paymentRequest) {
-                const [tenderInfo] = await this.db
-                    .select()
-                    .from(tenderInfos)
-                    .where(eq(tenderInfos.id, paymentRequest.tenderId))
+        if (body.action === 'initiate-followup') {
+            try {
+                // Get payment request and tender info
+                const [paymentRequest] = await this.db
+                    .select({
+                        requestId: paymentRequests.id,
+                        tenderId: paymentRequests.tenderId,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
                     .limit(1);
 
-                if (tenderInfo) {
-                    // Import follow-up service or create follow-up directly
-                    // For now, we'll just log it - follow-up creation can be added later
-                    this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+                if (paymentRequest) {
+                    const [tenderInfo] = await this.db
+                        .select({
+                            teamId: tenderInfos.team,
+                            teamMemberId: tenderInfos.teamMember,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, paymentRequest.tenderId))
+                        .limit(1);
+
+                    if (tenderInfo) {
+                        // Get team name
+                        const [team] = await this.db
+                            .select({ name: teams.name })
+                            .from(teams)
+                            .where(eq(teams.id, tenderInfo.teamId))
+                            .limit(1);
+
+                        // Map team name to area format (AC → 'AC Team', Accounts → 'Accounts', others → '{team} Team')
+                        let area = 'DC Team';
+                        if (team?.name === 'AC') {
+                            area = 'AC Team';
+                        } else if (team?.name === 'Accounts') {
+                            area = 'Accounts';
+                        } else if (team?.name) {
+                            area = `${team.name} Team`;
+                        }
+
+                        // Identify proof image from files
+                        let proofImagePath: string | null = null;
+                        const proofImageFile = this.getFileForField('proof_image', files, body, fileIndexTracker);
+                        if (proofImageFile) {
+                            proofImagePath = proofImageFile.filename;
+                        }
+
+                        // Map contacts to ContactPersonDto format and filter out invalid ones
+                        const mappedContacts = contacts
+                            .filter((contact) => contact.name && contact.name.trim().length > 0)
+                            .map((contact) => ({
+                                name: contact.name.trim(),
+                                email: contact.email || null,
+                                phone: contact.phone || null,
+                                org: contact.org || null,
+                            }));
+
+                        if (mappedContacts.length === 0) {
+                            throw new BadRequestException('At least one valid contact with name is required');
+                        }
+
+                        // Create followup DTO
+                        const followUpDto: CreateFollowUpDto = {
+                            area,
+                            partyName: body.organisation_name || '',
+                            amount: instrument.amount ? Number(instrument.amount) : 0,
+                            followupFor: 'Bank Guarantee',
+                            assignedToId: tenderInfo.teamMemberId || null,
+                            emdId: paymentRequest.requestId,
+                            contacts: mappedContacts,
+                            frequency: body.frequency ? Number(body.frequency) : 1,
+                            startFrom: body.followup_start_date || undefined,
+                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
+                            proofText: body.proof_text || null,
+                            proofImagePath: proofImagePath,
+                            stopRemarks: body.stop_remarks || null,
+                            attachments: [],
+                            createdById: user.id,
+                            followUpHistory: [],
+                        };
+
+                        await this.followUpService.create(followUpDto, user.id);
+                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
+                    }
                 }
+            } catch (error) {
+                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
+                // Don't throw - allow the action to complete even if followup creation fails
             }
         }
 

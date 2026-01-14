@@ -12,7 +12,7 @@ export const createPool = (url: string, max?: number, ssl?: boolean) =>
 
 export const createDb = (pool: Pool) => drizzle(pool, {
     schema: { ...schema },
-    logger: true,
+    // logger: true,
 });
 
 export type DbInstance = NodePgDatabase<typeof schema>;
