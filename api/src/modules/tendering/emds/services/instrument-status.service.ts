@@ -326,14 +326,16 @@ export class InstrumentStatusService {
         switch (instrumentType) {
             case 'DD':
                 if (currentStage === 1) return DD_STATUSES.ACCOUNTS_FORM_REJECTED;
-                if (currentStage === 6) return DD_STATUSES.CANCELLATION_REJECTED;
+                if (currentStage === 6) return DD_STATUSES.CANCELLATION_REQUESTED;
                 return DD_STATUSES.ACCOUNTS_FORM_REJECTED;
             case 'FDR':
+                if (currentStage === 1) return FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
+                if (currentStage === 6) return FDR_STATUSES.ACCOUNTS_FORM_REJECTED; // Cancellation request rejection
                 return FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
             case 'BG':
                 if (currentStage === 1) return BG_STATUSES.BANK_REQUEST_REJECTED;
-                if (currentStage === 5) return BG_STATUSES.EXTENSION_REJECTED;
-                if (currentStage === 7) return BG_STATUSES.CANCELLATION_REJECTED;
+                if (currentStage === 5) return BG_STATUSES.EXTENSION_REQUESTED;
+                if (currentStage === 7) return BG_STATUSES.CANCELLATION_REQUESTED;
                 return BG_STATUSES.BANK_REQUEST_REJECTED;
             case 'Cheque':
                 return CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED;
@@ -349,17 +351,17 @@ export class InstrumentStatusService {
     private getInitialStatus(instrumentType: InstrumentType): string {
         switch (instrumentType) {
             case 'DD':
-                return DD_STATUSES.ACCOUNTS_FORM_PENDING;
+                return DD_STATUSES.PENDING;
             case 'FDR':
-                return FDR_STATUSES.ACCOUNTS_FORM_PENDING;
+                return FDR_STATUSES.PENDING;
             case 'BG':
-                return BG_STATUSES.BANK_REQUEST_PENDING;
+                return BG_STATUSES.PENDING;
             case 'Cheque':
-                return CHEQUE_STATUSES.ACCOUNTS_FORM_PENDING;
+                return CHEQUE_STATUSES.PENDING;
             case 'Bank Transfer':
-                return BT_STATUSES.ACCOUNTS_FORM_PENDING;
+                return BT_STATUSES.PENDING;
             case 'Portal Payment':
-                return PORTAL_STATUSES.ACCOUNTS_FORM_PENDING;
+                return PORTAL_STATUSES.PENDING;
             default:
                 return 'PENDING';
         }
