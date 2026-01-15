@@ -1,14 +1,10 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { eq, and, between, desc, SQL } from 'drizzle-orm';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import * as schema from '@db';
 import { stepInstances } from '@db/schemas/workflow/workflows.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
-
-// ============================================
-// TYPES
-// ============================================
+import { DRIZZLE } from '@/db/database.module';
+import type { DbInstance } from '@db';
 
 export interface UserStepPerformance {
     userId: string;
@@ -123,22 +119,13 @@ export interface TeamPerformanceComparison {
     };
 }
 
-// ============================================
-// ANALYTICS SERVICE
-// ============================================
-
 @Injectable()
 export class AnalyticsService {
     private readonly logger = new Logger(AnalyticsService.name);
 
     constructor(
-        @Inject('DATABASE_CONNECTION')
-        private readonly db: PostgresJsDatabase<typeof schema>,
+        @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
-
-    // ============================================
-    // USER PERFORMANCE
-    // ============================================
 
     /**
      * Get detailed performance for a user on a specific entity
@@ -663,10 +650,6 @@ export class AnalyticsService {
         };
     }
 
-    // ============================================
-    // TIME-BASED ANALYTICS
-    // ============================================
-
     /**
      * Get performance trends over time
      */
@@ -754,10 +737,6 @@ export class AnalyticsService {
             avgTimeUsed: parseFloat(week.avgTimeUsed.toFixed(2)),
         }));
     }
-
-    // ============================================
-    // HELPER METHODS
-    // ============================================
 
     /**
      * Get entity name for display

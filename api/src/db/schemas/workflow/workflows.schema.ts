@@ -13,10 +13,6 @@ import {
 import { relations } from 'drizzle-orm';
 import { users } from '../auth/users.schema';
 
-// ============================================
-// ENUMS
-// ============================================
-
 export const entityTypeEnum = pgEnum('entity_type', [
     'TENDER',
     'COURIER',
@@ -43,10 +39,6 @@ export const stepStatusEnum = pgEnum('step_status', [
     'REJECTED',
     'ON_HOLD'
 ]);
-
-// ============================================
-// MAIN TABLE - Replaces timer_trackers
-// ============================================
 
 /**
  * STEP INSTANCES
@@ -181,10 +173,6 @@ export const stepInstances = pgTable('step_instances', {
     { workflowCodeIdx: index('step_instances_workflow_code_idx').on(table.workflowCode) }
 ]));
 
-// ============================================
-// AUDIT TRAIL
-// ============================================
-
 /**
  * TIMER EVENTS
  * Complete history of every action on timers
@@ -228,10 +216,6 @@ export const timerEvents = pgTable('timer_events', {
     { createdAtIdx: index('timer_events_created_idx').on(table.createdAt) },
 ]));
 
-// ============================================
-// BUSINESS CALENDAR (Holidays)
-// ============================================
-
 /**
  * BUSINESS CALENDAR
  * Track holidays and non-working days
@@ -251,10 +235,6 @@ export const businessCalendar = pgTable('business_calendar', {
     { dateIdx: index('business_calendar_date_idx').on(table.date) },
     { isHolidayIdx: index('business_calendar_holiday_idx').on(table.isHoliday) },
 ]));
-
-// ============================================
-// APP SETTINGS (Replaces multiple config tables)
-// ============================================
 
 /**
  * APP SETTINGS
@@ -277,9 +257,6 @@ export const appSettings = pgTable('app_settings', {
     updatedBy: bigserial('updated_by', { mode: 'number' }).references(() => users.id),
 });
 
-// ============================================
-// RELATIONS
-// ============================================
 
 export const stepInstancesRelations = relations(stepInstances, ({ one, many }) => ({
     assignedTo: one(users, {

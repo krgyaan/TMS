@@ -1,42 +1,31 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { eq, and, sql } from 'drizzle-orm';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import * as schema from '@db';
 import { stepInstances, timerEvents } from '@db/schemas/workflow/workflows.schema';
 import { BusinessCalendarService } from '@/modules/timers/services/business-calendar.service';
+import { DRIZZLE } from '@/db/database.module';
+import type { DbInstance } from '@db';
+
+export type TimerType = 'FIXED_DURATION' | 'DEADLINE_BASED' | 'NEGATIVE_COUNTDOWN' | 'DYNAMIC' | 'NO_TIMER';
+export type TimerStatus = 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE' | 'SKIPPED' | 'CANCELLED';
 
 export interface TimerState {
     stepInstanceId: string;
-
-    // Status
     status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'REJECTED' | 'ON_HOLD';
-    timerStatus: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE' | 'SKIPPED' | 'CANCELLED';
-
-    // Color indicator
+    timerStatus: TimerStatus;
     colorIndicator: 'GREEN' | 'YELLOW' | 'RED' | 'GREY';
-
-    // Time calculations
     totalAllocatedMs: number | null;
     elapsedMs: number | null;
     remainingMs: number | null;
     pausedDurationMs: number;
     extensionDurationMs: number;
-
-    // Dates
     startedAt: Date | null;
     scheduledEndAt: Date | null;
     actualEndAt: Date | null;
-
-    // Percentages
     percentageComplete: number;
     percentageOverdue: number;
-
-    // Display
     displayText: string;
     isOverdue: boolean;
     isNegativeCountdown: boolean;
-
-    // Step info
     stepKey: string;
     stepName: string;
     stepOrder: number;
@@ -48,16 +37,24 @@ export class TimerEngineService {
     private readonly logger = new Logger(TimerEngineService.name);
 
     constructor(
-        @Inject('DATABASE_CONNECTION')
-        private readonly db: PostgresJsDatabase<typeof schema>,
+        @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly businessCalendar: BusinessCalendarService,
     ) { }
 
     /**
-     * Calculate current timer state for a step instance
+     * Start a timer for a step instance
      */
-    async calculateTimerState(stepInstanceId: string): Promise<TimerState> {
-        // Load step instance with full data
+    async startTimer(params: {
+        stepInstanceId: string;
+        customDurationHours?: number;
+        customDeadline?: Date;
+    }): Promise<TimerState> {
+        const { stepInstanceId, customDurationHours, customDeadline } = params;
+        const now = new Date();
+
+        this.logger.log(`Starting timer for step instance ${stepInstanceId}`);
+
+        // 1. Get step instance
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -65,7 +62,409 @@ export class TimerEngineService {
             .limit(1);
 
         if (!stepInstance) {
-            throw new Error(`Step instance ${stepInstanceId} not found`);
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Validate timer can be started
+        if (stepInstance.timerStatus !== 'NOT_STARTED') {
+            throw new BadRequestException(`Timer already started (status: ${stepInstance.timerStatus})`);
+        }
+
+        // 3. Get timer configuration
+        const timerConfig = stepInstance.timerConfig;
+        if (timerConfig.type === 'NO_TIMER') {
+            throw new BadRequestException('Cannot start timer for NO_TIMER type');
+        }
+
+        let allocatedTimeMs: number | null = null;
+        let scheduledEndAt: Date | null = null;
+
+        // 4. Calculate timer parameters based on type
+        switch (timerConfig.type) {
+            case 'FIXED_DURATION':
+                const durationHours = customDurationHours || timerConfig.durationHours;
+                if (durationHours === undefined) {
+                    throw new BadRequestException('Duration hours required for FIXED_DURATION timer');
+                }
+
+                allocatedTimeMs = durationHours * 60 * 60 * 1000;
+
+                if (timerConfig.isBusinessDaysOnly) {
+                    scheduledEndAt = await this.businessCalendar.addBusinessHours(now, allocatedTimeMs);
+                } else {
+                    scheduledEndAt = new Date(now.getTime() + allocatedTimeMs);
+                }
+                break;
+
+            case 'DEADLINE_BASED':
+                const deadline = customDeadline || stepInstance.customDeadline;
+                if (!deadline) {
+                    throw new BadRequestException('Deadline required for DEADLINE_BASED timer');
+                }
+                scheduledEndAt = deadline;
+                allocatedTimeMs = scheduledEndAt.getTime() - now.getTime();
+                break;
+
+            case 'NEGATIVE_COUNTDOWN':
+                const entityDeadline = stepInstance.customDeadline;
+                if (!entityDeadline) {
+                    throw new BadRequestException('Deadline required for NEGATIVE_COUNTDOWN timer');
+                }
+
+                const hoursBeforeDeadline = timerConfig.hoursBeforeDeadline || -72;
+                scheduledEndAt = new Date(entityDeadline.getTime() + (hoursBeforeDeadline * 60 * 60 * 1000));
+                allocatedTimeMs = Math.abs(hoursBeforeDeadline * 60 * 60 * 1000);
+                break;
+
+            case 'DYNAMIC':
+                if (!customDurationHours) {
+                    throw new BadRequestException('Custom duration required for DYNAMIC timer');
+                }
+                allocatedTimeMs = customDurationHours * 60 * 60 * 1000;
+                scheduledEndAt = new Date(now.getTime() + allocatedTimeMs);
+                break;
+        }
+
+        // 5. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                timerStatus: 'RUNNING',
+                status: 'IN_PROGRESS',
+                actualStartAt: now,
+                allocatedTimeMs,
+                customDeadline: scheduledEndAt,
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 6. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'START',
+            newStatus: 'RUNNING',
+            metadata: {
+                scheduledEndAt: scheduledEndAt?.toISOString(),
+                allocatedTimeMs,
+                customDurationHours,
+                customDeadline: customDeadline?.toISOString(),
+            },
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer started successfully for step instance ${stepInstanceId}`);
+
+        // 7. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Stop a running timer
+     */
+    async stopTimer(stepInstanceId: string): Promise<TimerState> {
+        const now = new Date();
+
+        this.logger.log(`Stopping timer for step instance ${stepInstanceId}`);
+
+        // 1. Get step instance
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Validate timer can be stopped
+        if (!['RUNNING', 'PAUSED', 'OVERDUE'].includes(stepInstance.timerStatus)) {
+            throw new BadRequestException(`Cannot stop timer with status: ${stepInstance.timerStatus}`);
+        }
+
+        // 3. Calculate actual time taken
+        let actualTimeMs: number | null = null;
+        if (stepInstance.actualStartAt) {
+            actualTimeMs = now.getTime() - stepInstance.actualStartAt.getTime() -
+                (stepInstance.totalPausedDurationMs || 0);
+        }
+
+        // 4. Determine if overdue
+        let remainingTimeMs: number | null = null;
+        let isOverdue = false;
+
+        if (stepInstance.allocatedTimeMs && actualTimeMs) {
+            remainingTimeMs = stepInstance.allocatedTimeMs - actualTimeMs;
+            isOverdue = remainingTimeMs < 0;
+        }
+
+        // 5. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                timerStatus: isOverdue ? 'OVERDUE' : 'COMPLETED',
+                status: 'COMPLETED',
+                actualEndAt: now,
+                actualTimeMs,
+                remainingTimeMs,
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 6. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'COMPLETE',
+            previousStatus: stepInstance.timerStatus,
+            newStatus: isOverdue ? 'OVERDUE' : 'COMPLETED',
+            metadata: {
+                actualTimeMs,
+                remainingTimeMs,
+                isOverdue,
+            },
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer stopped successfully for step instance ${stepInstanceId}`);
+
+        // 7. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Pause a running timer
+     */
+    async pauseTimer(stepInstanceId: string): Promise<TimerState> {
+        const now = new Date();
+
+        this.logger.log(`Pausing timer for step instance ${stepInstanceId}`);
+
+        // 1. Get step instance
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Validate timer can be paused
+        if (stepInstance.timerStatus !== 'RUNNING') {
+            throw new BadRequestException(`Cannot pause timer with status: ${stepInstance.timerStatus}`);
+        }
+
+        // 3. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                timerStatus: 'PAUSED',
+                metadata: {
+                    ...stepInstance.metadata as any,
+                    lastPausedAt: now.toISOString(),
+                },
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 4. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'PAUSE',
+            previousStatus: 'RUNNING',
+            newStatus: 'PAUSED',
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer paused successfully for step instance ${stepInstanceId}`);
+
+        // 5. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Resume a paused timer
+     */
+    async resumeTimer(stepInstanceId: string): Promise<TimerState> {
+        const now = new Date();
+
+        this.logger.log(`Resuming timer for step instance ${stepInstanceId}`);
+
+        // 1. Get step instance
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Validate timer can be resumed
+        if (stepInstance.timerStatus !== 'PAUSED') {
+            throw new BadRequestException(`Cannot resume timer with status: ${stepInstance.timerStatus}`);
+        }
+
+        // 3. Calculate paused duration
+        const metadata = stepInstance.metadata as any;
+        const lastPausedAt = metadata?.lastPausedAt ? new Date(metadata.lastPausedAt) : null;
+        let pausedDuration = 0;
+
+        if (lastPausedAt) {
+            pausedDuration = now.getTime() - lastPausedAt.getTime();
+        }
+
+        // 4. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                timerStatus: 'RUNNING',
+                totalPausedDurationMs: (stepInstance.totalPausedDurationMs || 0) + pausedDuration,
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 5. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'RESUME',
+            previousStatus: 'PAUSED',
+            newStatus: 'RUNNING',
+            metadata: {
+                pausedDurationMs: pausedDuration,
+            },
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer resumed successfully for step instance ${stepInstanceId}`);
+
+        // 6. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Extend a timer's duration
+     */
+    async extendTimer(stepInstanceId: string, extensionHours: number): Promise<TimerState> {
+        const now = new Date();
+        const extensionMs = extensionHours * 60 * 60 * 1000;
+
+        this.logger.log(`Extending timer for step instance ${stepInstanceId} by ${extensionHours} hours`);
+
+        // 1. Get step instance
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Validate timer can be extended
+        if (!['RUNNING', 'PAUSED', 'OVERDUE'].includes(stepInstance.timerStatus)) {
+            throw new BadRequestException(`Cannot extend timer with status: ${stepInstance.timerStatus}`);
+        }
+
+        // 3. Calculate new end time
+        let newEndTime: Date | null = null;
+        if (stepInstance.customDeadline) {
+            newEndTime = new Date(stepInstance.customDeadline.getTime() + extensionMs);
+        }
+
+        // 4. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                extensionDurationMs: (stepInstance.extensionDurationMs || 0) + extensionMs,
+                allocatedTimeMs: stepInstance.allocatedTimeMs
+                    ? stepInstance.allocatedTimeMs + extensionMs
+                    : null,
+                customDeadline: newEndTime,
+                timerStatus: stepInstance.timerStatus === 'OVERDUE' ? 'RUNNING' : stepInstance.timerStatus,
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 5. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'EXTEND',
+            durationChangeMs: extensionMs,
+            metadata: {
+                extensionHours,
+                totalExtensionMs: (stepInstance.extensionDurationMs || 0) + extensionMs,
+            },
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer extended successfully for step instance ${stepInstanceId}`);
+
+        // 6. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Cancel a timer
+     */
+    async cancelTimer(stepInstanceId: string): Promise<TimerState> {
+        const now = new Date();
+
+        this.logger.log(`Cancelling timer for step instance ${stepInstanceId}`);
+
+        // 1. Get step instance
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
+        }
+
+        // 2. Update step instance
+        await this.db
+            .update(stepInstances)
+            .set({
+                timerStatus: 'CANCELLED',
+                status: 'ON_HOLD',
+                actualEndAt: now,
+                updatedAt: now,
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+
+        // 3. Create timer event
+        await this.db.insert(timerEvents).values({
+            stepInstanceId: stepInstance.id,
+            eventType: 'CANCEL',
+            previousStatus: stepInstance.timerStatus,
+            newStatus: 'CANCELLED',
+            createdAt: now,
+        });
+
+        this.logger.log(`Timer cancelled successfully for step instance ${stepInstanceId}`);
+
+        // 4. Return current timer state
+        return this.calculateTimerState(stepInstanceId);
+    }
+
+    /**
+     * Calculate current timer state (existing method with enhancements)
+     */
+    async calculateTimerState(stepInstanceId: string): Promise<TimerState> {
+        // Get step instance with full data
+        const [stepInstance] = await this.db
+            .select()
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        if (!stepInstance) {
+            throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
 
         const now = new Date();
@@ -83,7 +482,7 @@ export class TimerEngineService {
             pausedDurationMs: stepInstance.totalPausedDurationMs || 0,
             extensionDurationMs: stepInstance.extensionDurationMs || 0,
             startedAt: stepInstance.actualStartAt,
-            scheduledEndAt: null,
+            scheduledEndAt: stepInstance.customDeadline,
             actualEndAt: stepInstance.actualEndAt,
             percentageComplete: 0,
             percentageOverdue: 0,
@@ -128,19 +527,23 @@ export class TimerEngineService {
         // Calculate based on timer type
         switch (timerConfig.type) {
             case 'FIXED_DURATION':
-                state = await this.calculateFixedDurationTimer(stepInstance, timerConfig, now);
+                if (timerConfig.isBusinessDaysOnly) {
+                    state = await this.calculateBusinessHoursTimer(stepInstance, timerConfig, now);
+                } else {
+                    state = this.calculateFixedDurationTimer(stepInstance, timerConfig, now);
+                }
                 break;
 
             case 'DEADLINE_BASED':
-                state = await this.calculateDeadlineBasedTimer(stepInstance, timerConfig, now);
+                state = this.calculateDeadlineBasedTimer(stepInstance, timerConfig, now);
                 break;
 
             case 'NEGATIVE_COUNTDOWN':
-                state = await this.calculateNegativeCountdownTimer(stepInstance, timerConfig, now);
+                state = this.calculateNegativeCountdownTimer(stepInstance, timerConfig, now);
                 break;
 
             case 'DYNAMIC':
-                state = await this.calculateDynamicTimer(stepInstance, timerConfig, now);
+                state = this.calculateDynamicTimer(stepInstance, timerConfig, now);
                 break;
         }
 
@@ -156,13 +559,54 @@ export class TimerEngineService {
     }
 
     /**
-     * Calculate FIXED_DURATION timer (e.g., 72h, 24h, 48h)
+     * Calculate FIXED_DURATION timer (business hours)
      */
-    private async calculateFixedDurationTimer(
+    private async calculateBusinessHoursTimer(
         stepInstance: any,
         timerConfig: any,
         now: Date
     ): Promise<TimerState> {
+        const startTime = stepInstance.actualStartAt;
+        if (!startTime) {
+            throw new Error('Start time not set for business hours timer');
+        }
+
+        const baseDurationMs = (timerConfig.durationHours || 0) * 60 * 60 * 1000;
+        const extensionMs = stepInstance.extensionDurationMs || 0;
+        const totalDurationMs = baseDurationMs + extensionMs;
+
+        // Calculate business hours elapsed
+        const elapsedMs = await this.businessCalendar.calculateBusinessHours(startTime, now) * 60 * 60 * 1000;
+
+        // Calculate scheduled end time
+        const scheduledEndAt = await this.businessCalendar.addBusinessHours(startTime, totalDurationMs);
+
+        const remainingMs = totalDurationMs - elapsedMs;
+        const isOverdue = remainingMs < 0;
+        const percentageComplete = Math.min((elapsedMs / totalDurationMs) * 100, 100);
+        const percentageOverdue = isOverdue ? ((Math.abs(remainingMs) / totalDurationMs) * 100) : 0;
+
+        return {
+            ...this.getBaseTimerState(stepInstance),
+            totalAllocatedMs: totalDurationMs,
+            elapsedMs,
+            remainingMs,
+            scheduledEndAt,
+            percentageComplete,
+            percentageOverdue,
+            displayText: this.formatTimerDisplay(remainingMs, isOverdue),
+            isOverdue,
+        };
+    }
+
+    /**
+     * Calculate FIXED_DURATION timer (calendar time)
+     */
+    private calculateFixedDurationTimer(
+        stepInstance: any,
+        timerConfig: any,
+        now: Date
+    ): TimerState {
         const startTime = stepInstance.actualStartAt;
         if (!startTime) {
             throw new Error('Start time not set for fixed duration timer');
@@ -172,57 +616,34 @@ export class TimerEngineService {
         const extensionMs = stepInstance.extensionDurationMs || 0;
         const totalDurationMs = baseDurationMs + extensionMs;
 
-        let elapsedMs: number;
-        let scheduledEndAt: Date;
-
-        if (timerConfig.isBusinessDaysOnly) {
-            // Calculate business hours
-            elapsedMs = await this.businessCalendar.calculateBusinessHours(startTime, now);
-            scheduledEndAt = await this.businessCalendar.addBusinessHours(startTime, totalDurationMs);
-        } else {
-            // Calendar time
-            elapsedMs = now.getTime() - startTime.getTime() - (stepInstance.totalPausedDurationMs || 0);
-            scheduledEndAt = new Date(startTime.getTime() + totalDurationMs);
-        }
-
+        const elapsedMs = now.getTime() - startTime.getTime() - (stepInstance.totalPausedDurationMs || 0);
+        const scheduledEndAt = new Date(startTime.getTime() + totalDurationMs);
         const remainingMs = totalDurationMs - elapsedMs;
         const isOverdue = remainingMs < 0;
         const percentageComplete = Math.min((elapsedMs / totalDurationMs) * 100, 100);
         const percentageOverdue = isOverdue ? ((Math.abs(remainingMs) / totalDurationMs) * 100) : 0;
 
         return {
-            stepInstanceId: stepInstance.id,
-            status: stepInstance.status,
-            timerStatus: isOverdue ? 'OVERDUE' : (stepInstance.timerStatus === 'PAUSED' ? 'PAUSED' : 'RUNNING'),
-            colorIndicator: 'GREEN',
+            ...this.getBaseTimerState(stepInstance),
             totalAllocatedMs: totalDurationMs,
             elapsedMs,
             remainingMs,
-            pausedDurationMs: stepInstance.totalPausedDurationMs || 0,
-            extensionDurationMs: stepInstance.extensionDurationMs || 0,
-            startedAt: startTime,
             scheduledEndAt,
-            actualEndAt: stepInstance.actualEndAt,
             percentageComplete,
             percentageOverdue,
             displayText: this.formatTimerDisplay(remainingMs, isOverdue),
             isOverdue,
-            isNegativeCountdown: false,
-            stepKey: stepInstance.stepKey,
-            stepName: stepInstance.stepName,
-            stepOrder: stepInstance.stepOrder,
-            assignedRole: stepInstance.assignedRole,
         };
     }
 
     /**
-     * Calculate DEADLINE_BASED timer (countdown to specific date)
+     * Calculate DEADLINE_BASED timer
      */
-    private async calculateDeadlineBasedTimer(
+    private calculateDeadlineBasedTimer(
         stepInstance: any,
         timerConfig: any,
         now: Date
-    ): Promise<TimerState> {
+    ): TimerState {
         const deadline = stepInstance.customDeadline;
         const startTime = stepInstance.actualStartAt;
 
@@ -242,38 +663,26 @@ export class TimerEngineService {
         const percentageOverdue = isOverdue ? ((Math.abs(remainingMs) / totalDurationMs) * 100) : 0;
 
         return {
-            stepInstanceId: stepInstance.id,
-            status: stepInstance.status,
-            timerStatus: isOverdue ? 'OVERDUE' : 'RUNNING',
-            colorIndicator: 'GREEN',
+            ...this.getBaseTimerState(stepInstance),
             totalAllocatedMs: totalDurationMs,
             elapsedMs,
             remainingMs,
-            pausedDurationMs: 0,
-            extensionDurationMs: 0,
-            startedAt: startTime,
             scheduledEndAt: deadline,
-            actualEndAt: stepInstance.actualEndAt,
             percentageComplete,
             percentageOverdue,
             displayText: this.formatTimerDisplay(remainingMs, isOverdue),
             isOverdue,
-            isNegativeCountdown: false,
-            stepKey: stepInstance.stepKey,
-            stepName: stepInstance.stepName,
-            stepOrder: stepInstance.stepOrder,
-            assignedRole: stepInstance.assignedRole,
         };
     }
 
     /**
-     * Calculate NEGATIVE_COUNTDOWN timer (-72h, -48h, -24h before deadline)
+     * Calculate NEGATIVE_COUNTDOWN timer
      */
-    private async calculateNegativeCountdownTimer(
+    private calculateNegativeCountdownTimer(
         stepInstance: any,
         timerConfig: any,
         now: Date
-    ): Promise<TimerState> {
+    ): TimerState {
         const deadline = stepInstance.customDeadline;
         const hoursBeforeDeadline = timerConfig.hoursBeforeDeadline || -72;
 
@@ -306,72 +715,66 @@ export class TimerEngineService {
         }
 
         return {
-            stepInstanceId: stepInstance.id,
-            status: stepInstance.status,
-            timerStatus: isOverdue ? 'OVERDUE' : (isInCriticalZone ? 'RUNNING' : 'RUNNING'),
-            colorIndicator: 'GREEN',
+            ...this.getBaseTimerState(stepInstance),
             totalAllocatedMs: Math.abs(hoursBeforeDeadline * 60 * 60 * 1000),
             elapsedMs: null,
             remainingMs,
-            pausedDurationMs: 0,
-            extensionDurationMs: 0,
-            startedAt: stepInstance.actualStartAt,
             scheduledEndAt: deadline,
-            actualEndAt: stepInstance.actualEndAt,
             percentageComplete,
             percentageOverdue: isOverdue ? 100 : 0,
             displayText,
             isOverdue,
             isNegativeCountdown: true,
+        };
+    }
+
+    /**
+     * Calculate DYNAMIC timer
+     */
+    private calculateDynamicTimer(
+        stepInstance: any,
+        timerConfig: any,
+        now: Date
+    ): TimerState {
+        // For dynamic timers, we use the customDurationHours if available
+        if (!stepInstance.allocatedTimeMs) {
+            return {
+                ...this.getBaseTimerState(stepInstance),
+                displayText: 'Waiting for duration input',
+            };
+        }
+
+        // Calculate similar to FIXED_DURATION
+        return this.calculateFixedDurationTimer(stepInstance, timerConfig, now);
+    }
+
+    /**
+     * Get base timer state from step instance
+     */
+    private getBaseTimerState(stepInstance: any): TimerState {
+        return {
+            stepInstanceId: stepInstance.id.toString(),
+            status: stepInstance.status,
+            timerStatus: stepInstance.timerStatus,
+            colorIndicator: 'GREY',
+            totalAllocatedMs: stepInstance.allocatedTimeMs,
+            elapsedMs: null,
+            remainingMs: null,
+            pausedDurationMs: stepInstance.totalPausedDurationMs || 0,
+            extensionDurationMs: stepInstance.extensionDurationMs || 0,
+            startedAt: stepInstance.actualStartAt,
+            scheduledEndAt: stepInstance.customDeadline,
+            actualEndAt: stepInstance.actualEndAt,
+            percentageComplete: 0,
+            percentageOverdue: 0,
+            displayText: '',
+            isOverdue: false,
+            isNegativeCountdown: stepInstance.timerConfig.type === 'NEGATIVE_COUNTDOWN',
             stepKey: stepInstance.stepKey,
             stepName: stepInstance.stepName,
             stepOrder: stepInstance.stepOrder,
             assignedRole: stepInstance.assignedRole,
         };
-    }
-
-    /**
-     * Calculate DYNAMIC timer (user-defined duration)
-     */
-    private async calculateDynamicTimer(
-        stepInstance: any,
-        timerConfig: any,
-        now: Date
-    ): Promise<TimerState> {
-        const customDuration = stepInstance.customDurationHours;
-
-        if (!customDuration) {
-            return {
-                stepInstanceId: stepInstance.id,
-                status: stepInstance.status,
-                timerStatus: 'NOT_STARTED',
-                colorIndicator: 'GREY',
-                totalAllocatedMs: null,
-                elapsedMs: null,
-                remainingMs: null,
-                pausedDurationMs: 0,
-                extensionDurationMs: 0,
-                startedAt: null,
-                scheduledEndAt: null,
-                actualEndAt: null,
-                percentageComplete: 0,
-                percentageOverdue: 0,
-                displayText: 'Waiting for duration input',
-                isOverdue: false,
-                isNegativeCountdown: false,
-                stepKey: stepInstance.stepKey,
-                stepName: stepInstance.stepName,
-                stepOrder: stepInstance.stepOrder,
-                assignedRole: stepInstance.assignedRole,
-            };
-        }
-
-        // Calculate similar to FIXED_DURATION
-        return this.calculateFixedDurationTimer(
-            stepInstance,
-            { ...timerConfig, durationHours: customDuration },
-            now
-        );
     }
 
     /**

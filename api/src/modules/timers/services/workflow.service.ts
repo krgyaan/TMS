@@ -1,11 +1,11 @@
 import { Injectable, Inject, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { eq, and, sql, inArray } from 'drizzle-orm';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import * as schema from '@db';
 import { stepInstances, timerEvents } from '@db/schemas/workflow/workflows.schema';
 import { TenderInfo, tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { TimerEngineService } from '@/modules/timers/services/timer-engine.service';
 import { getWorkflow, getStepDefinition, WorkflowCode } from '@/config/timer.config';
+import { DRIZZLE } from '@/db/database.module';
+import type { DbInstance } from '@db';
 
 interface StartWorkflowDto {
     workflowCode: WorkflowCode;
@@ -49,14 +49,9 @@ export class WorkflowService {
     private readonly logger = new Logger(WorkflowService.name);
 
     constructor(
-        @Inject('DATABASE_CONNECTION')
-        private readonly db: PostgresJsDatabase<typeof schema>,
+        @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly timerEngine: TimerEngineService,
     ) { }
-
-    // ============================================
-    // START WORKFLOW
-    // ============================================
 
     /**
      * Start a complete workflow for an entity
@@ -94,15 +89,12 @@ export class WorkflowService {
             throw new BadRequestException(`Workflow already started for this entity`);
         }
 
-        // Get entity data for conditional logic
         const entityData = await this.getEntityData(dto.entityType, dto.entityId);
 
         // Find steps that can start immediately
         const stepsToStart = workflow.steps.filter(step => {
-            // Check if has no dependencies
             const noDependencies = !step.dependsOn || step.dependsOn.length === 0;
 
-            // Check conditional logic
             const meetsCondition = this.checkConditionalLogic(step, entityData, dto.metadata);
 
             return noDependencies && meetsCondition && !step.isOptional;
@@ -110,7 +102,6 @@ export class WorkflowService {
 
         let firstStepId: string | null = null;
 
-        // Create step instances for initial steps
         for (const step of stepsToStart) {
             const stepInstanceId = await this.createStepInstance({
                 workflowCode: dto.workflowCode,
@@ -127,7 +118,11 @@ export class WorkflowService {
 
             // Auto-start if configured
             if (step.timerConfig.type !== 'NO_TIMER') {
-                await this.startStep(stepInstanceId, { stepKey: step.stepKey });
+                await this.startStep(stepInstanceId, {
+                    stepKey: step.stepKey,
+                    customDurationHours: step.timerConfig.durationHours,
+                    customDeadline: step.timerConfig.type === 'DEADLINE_BASED' ? new Date(entityData.dueDate).getTime() - (step.timerConfig.durationHours ?? 0) * 60 * 60 * 1000 : undefined
+                } as StartStepDto);
             }
         }
 
@@ -138,10 +133,6 @@ export class WorkflowService {
             firstStepId,
         };
     }
-
-    // ============================================
-    // START STEP
-    // ============================================
 
     /**
      * Start a step timer
@@ -171,100 +162,15 @@ export class WorkflowService {
             throw new BadRequestException(`Dependencies not met for step ${stepInstance.stepKey}`);
         }
 
-        const now = new Date();
-        const timerConfig = stepInstance.timerConfig as any;
-
-        // Calculate scheduled end time
-        let scheduledEndAt: Date | null = null;
-        let allocatedTimeMs: number | null = null;
-        let customDeadline: Date | null = dto.customDeadline || stepInstance.customDeadline || null;
-
-        switch (timerConfig.type) {
-            case 'FIXED_DURATION':
-                const durationHours = dto.customDurationHours || timerConfig.durationHours;
-                allocatedTimeMs = durationHours * 60 * 60 * 1000;
-
-                if (timerConfig.isBusinessDaysOnly) {
-                    // Will be calculated by timer engine
-                    scheduledEndAt = null;
-                } else {
-                    scheduledEndAt = new Date(now.getTime() + allocatedTimeMs);
-                }
-                break;
-
-            case 'DEADLINE_BASED':
-                if (!customDeadline) {
-                    throw new BadRequestException('Custom deadline required for deadline-based timer');
-                }
-                scheduledEndAt = customDeadline;
-                allocatedTimeMs = scheduledEndAt.getTime() - now.getTime();
-                break;
-
-            case 'NEGATIVE_COUNTDOWN':
-                // Deadline should be set from entity (e.g., tender submission deadline)
-                if (!customDeadline) {
-                    const entityData = await this.getEntityData(stepInstance.entityType, stepInstance.entityId.toString());
-                    customDeadline = entityData?.submissionDeadline || null;
-
-                    if (!customDeadline) {
-                        throw new BadRequestException('Deadline not found for negative countdown timer');
-                    }
-                }
-
-                const hoursBeforeDeadline = timerConfig.hoursBeforeDeadline || -72;
-                scheduledEndAt = new Date(customDeadline.getTime() + (hoursBeforeDeadline * 60 * 60 * 1000));
-                allocatedTimeMs = Math.abs(hoursBeforeDeadline * 60 * 60 * 1000);
-                break;
-
-            case 'DYNAMIC':
-                if (!dto.customDurationHours) {
-                    throw new BadRequestException('Custom duration required for dynamic timer');
-                }
-                allocatedTimeMs = dto.customDurationHours * 60 * 60 * 1000;
-                scheduledEndAt = new Date(now.getTime() + allocatedTimeMs);
-                break;
-
-            case 'NO_TIMER':
-                // No timer needed
-                break;
-        }
-
-        // Update step instance
-        await this.db
-            .update(stepInstances)
-            .set({
-                status: 'IN_PROGRESS',
-                timerStatus: timerConfig.type === 'NO_TIMER' ? 'NOT_STARTED' : 'RUNNING',
-                actualStartAt: now,
-                allocatedTimeMs,
-                customDeadline,
-                assignedToUserId: dto.assignedToUserId ? parseInt(dto.assignedToUserId) : stepInstance.assignedToUserId,
-                updatedAt: now,
-            })
-            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
-
-        // Create START event
-        if (timerConfig.type !== 'NO_TIMER') {
-            await this.db.insert(timerEvents).values({
-                stepInstanceId: stepInstance.id as number,
-                eventType: 'START',
-                performedByUserId: dto.assignedToUserId ? parseInt(dto.assignedToUserId) : undefined,
-                previousStatus: null,
-                newStatus: 'RUNNING',
-                metadata: {
-                    scheduledEndAt: scheduledEndAt?.toISOString(),
-                    allocatedTimeMs,
-                },
-                createdAt: now,
-            });
-        }
+        // Start the timer
+        await this.timerEngine.startTimer({
+            stepInstanceId,
+            customDurationHours: dto.customDurationHours,
+            customDeadline: dto.customDeadline
+        });
 
         this.logger.log(`Step ${stepInstanceId} started successfully`);
     }
-
-    // ============================================
-    // COMPLETE STEP
-    // ============================================
 
     /**
      * Complete a step
@@ -289,22 +195,13 @@ export class WorkflowService {
         }
 
         const now = dto.completedAt || new Date();
-        const startTime = stepInstance.actualStartAt;
 
-        // Calculate actual time taken
-        let actualTimeMs: number | null = null;
-        let remainingTimeMs: number | null = null;
-
-        if (startTime) {
-            actualTimeMs = now.getTime() - startTime.getTime() - (stepInstance.totalPausedDurationMs || 0);
-
-            if (stepInstance.allocatedTimeMs) {
-                remainingTimeMs = stepInstance.allocatedTimeMs - actualTimeMs;
-            }
-        }
+        // Stop the timer
+        await this.timerEngine.stopTimer(stepInstanceId);
 
         // Determine if overdue
-        const isOverdue = remainingTimeMs !== null && remainingTimeMs < 0;
+        const timerState = await this.timerEngine.calculateTimerState(stepInstanceId);
+        const isOverdue = timerState.isOverdue;
 
         // Update step instance
         await this.db
@@ -313,12 +210,10 @@ export class WorkflowService {
                 status: 'COMPLETED',
                 timerStatus: isOverdue ? 'OVERDUE' : 'COMPLETED',
                 actualEndAt: now,
-                actualTimeMs,
-                remainingTimeMs,
                 metadata: {
                     ...stepInstance.metadata as any,
                     completionNotes: dto.notes,
-                    completedEarly: remainingTimeMs !== null && remainingTimeMs > 0,
+                    completedEarly: timerState.remainingMs !== null && timerState.remainingMs > 0,
                 },
                 updatedAt: now,
             })
@@ -332,9 +227,9 @@ export class WorkflowService {
             previousStatus: stepInstance.timerStatus,
             newStatus: isOverdue ? 'OVERDUE' : 'COMPLETED',
             metadata: {
-                actualTimeMs,
-                remainingTimeMs,
-                completedEarly: remainingTimeMs !== null && remainingTimeMs > 0,
+                actualTimeMs: timerState.elapsedMs,
+                remainingTimeMs: timerState.remainingMs,
+                completedEarly: timerState.remainingMs !== null && timerState.remainingMs > 0,
                 notes: dto.notes,
             },
             createdAt: now,
@@ -342,13 +237,8 @@ export class WorkflowService {
 
         this.logger.log(`Step ${stepInstanceId} completed`);
 
-        // Trigger dependent steps
         await this.triggerDependentSteps(stepInstance);
     }
-
-    // ============================================
-    // PAUSE STEP
-    // ============================================
 
     /**
      * Pause a running timer
@@ -356,6 +246,12 @@ export class WorkflowService {
     async pauseStep(stepInstanceId: string, dto: PauseStepDto): Promise<void> {
         this.logger.log(`Pausing step ${stepInstanceId}`);
 
+        // Pause the timer
+        await this.timerEngine.pauseTimer(stepInstanceId);
+
+        const now = new Date();
+
+        // Get step instance for event creation
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -365,25 +261,6 @@ export class WorkflowService {
         if (!stepInstance) {
             throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
-
-        if (stepInstance.timerStatus !== 'RUNNING') {
-            throw new BadRequestException(`Cannot pause step with status: ${stepInstance.timerStatus}`);
-        }
-
-        const now = new Date();
-
-        // Update step instance
-        await this.db
-            .update(stepInstances)
-            .set({
-                timerStatus: 'PAUSED',
-                metadata: {
-                    ...stepInstance.metadata as any,
-                    lastPausedAt: now.toISOString(),
-                },
-                updatedAt: now,
-            })
-            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
 
         // Create PAUSE event
         await this.db.insert(timerEvents).values({
@@ -409,6 +286,12 @@ export class WorkflowService {
     async resumeStep(stepInstanceId: string, userId: string): Promise<void> {
         this.logger.log(`Resuming step ${stepInstanceId}`);
 
+        // Resume the timer
+        await this.timerEngine.resumeTimer(stepInstanceId);
+
+        const now = new Date();
+
+        // Get step instance for event creation
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -419,30 +302,6 @@ export class WorkflowService {
             throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
 
-        if (stepInstance.timerStatus !== 'PAUSED') {
-            throw new BadRequestException(`Cannot resume step with status: ${stepInstance.timerStatus}`);
-        }
-
-        const now = new Date();
-        const metadata = stepInstance.metadata as any;
-        const lastPausedAt = metadata?.lastPausedAt ? new Date(metadata.lastPausedAt) : null;
-
-        // Calculate paused duration
-        let pausedDuration = 0;
-        if (lastPausedAt) {
-            pausedDuration = now.getTime() - lastPausedAt.getTime();
-        }
-
-        // Update step instance
-        await this.db
-            .update(stepInstances)
-            .set({
-                timerStatus: 'RUNNING',
-                totalPausedDurationMs: (stepInstance.totalPausedDurationMs || 0) + pausedDuration,
-                updatedAt: now,
-            })
-            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
-
         // Create RESUME event
         await this.db.insert(timerEvents).values({
             stepInstanceId: stepInstance.id as number,
@@ -450,9 +309,6 @@ export class WorkflowService {
             performedByUserId: parseInt(userId),
             previousStatus: 'PAUSED',
             newStatus: 'RUNNING',
-            metadata: {
-                pausedDurationMs: pausedDuration,
-            },
             createdAt: now,
         });
 
@@ -469,6 +325,12 @@ export class WorkflowService {
     async extendStep(stepInstanceId: string, dto: ExtendStepDto): Promise<void> {
         this.logger.log(`Extending step ${stepInstanceId} by ${dto.extensionHours} hours`);
 
+        // Extend the timer
+        await this.timerEngine.extendTimer(stepInstanceId, dto.extensionHours);
+
+        const now = new Date();
+
+        // Get step instance for event creation
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -479,36 +341,15 @@ export class WorkflowService {
             throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
 
-        if (!['RUNNING', 'PAUSED', 'OVERDUE'].includes(stepInstance.timerStatus)) {
-            throw new BadRequestException(`Cannot extend step with status: ${stepInstance.timerStatus}`);
-        }
-
-        const extensionMs = dto.extensionHours * 60 * 60 * 1000;
-        const now = new Date();
-
-        // Update step instance
-        await this.db
-            .update(stepInstances)
-            .set({
-                extensionDurationMs: (stepInstance.extensionDurationMs || 0) + extensionMs,
-                allocatedTimeMs: stepInstance.allocatedTimeMs
-                    ? stepInstance.allocatedTimeMs + extensionMs
-                    : null,
-                timerStatus: stepInstance.timerStatus === 'OVERDUE' ? 'RUNNING' : stepInstance.timerStatus,
-                updatedAt: now,
-            })
-            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
-
         // Create EXTEND event
         await this.db.insert(timerEvents).values({
             stepInstanceId: stepInstance.id as number,
             eventType: 'EXTEND',
             performedByUserId: parseInt(dto.userId),
-            durationChangeMs: extensionMs,
+            durationChangeMs: dto.extensionHours * 60 * 60 * 1000,
             reason: dto.reason,
             metadata: {
                 extensionHours: dto.extensionHours,
-                totalExtensionMs: (stepInstance.extensionDurationMs || 0) + extensionMs,
             },
             createdAt: now,
         });
@@ -526,6 +367,14 @@ export class WorkflowService {
     async rejectStep(stepInstanceId: string, dto: RejectStepDto): Promise<void> {
         this.logger.log(`Rejecting step ${stepInstanceId}`);
 
+        const now = new Date();
+
+        if (dto.shouldResetTimer) {
+            // Cancel the timer
+            await this.timerEngine.cancelTimer(stepInstanceId);
+        }
+
+        // Get step instance for event creation
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -535,8 +384,6 @@ export class WorkflowService {
         if (!stepInstance) {
             throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
-
-        const now = new Date();
 
         if (dto.shouldResetTimer) {
             // Reset timer completely
@@ -618,6 +465,11 @@ export class WorkflowService {
 
         const now = new Date();
 
+        // Cancel any active timer
+        if (stepInstance.timerStatus !== 'NOT_STARTED') {
+            await this.timerEngine.cancelTimer(stepInstanceId);
+        }
+
         // Update step instance
         await this.db
             .update(stepInstances)
@@ -660,6 +512,12 @@ export class WorkflowService {
     async cancelStep(stepInstanceId: string, userId: string, reason?: string): Promise<void> {
         this.logger.log(`Cancelling step ${stepInstanceId}`);
 
+        // Cancel the timer
+        await this.timerEngine.cancelTimer(stepInstanceId);
+
+        const now = new Date();
+
+        // Get step instance for event creation
         const [stepInstance] = await this.db
             .select()
             .from(stepInstances)
@@ -669,23 +527,6 @@ export class WorkflowService {
         if (!stepInstance) {
             throw new NotFoundException(`Step instance ${stepInstanceId} not found`);
         }
-
-        const now = new Date();
-
-        // Update step instance
-        await this.db
-            .update(stepInstances)
-            .set({
-                status: 'ON_HOLD',
-                timerStatus: 'CANCELLED',
-                actualEndAt: now,
-                metadata: {
-                    ...stepInstance.metadata as any,
-                    cancelReason: reason,
-                },
-                updatedAt: now,
-            })
-            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
 
         // Create CANCEL event
         await this.db.insert(timerEvents).values({
@@ -779,8 +620,8 @@ export class WorkflowService {
 
         // Get custom deadline for negative countdown timers
         let customDeadline: Date | null = null;
-        if (stepDef.timerConfig.type === 'NEGATIVE_COUNTDOWN' && entityData?.submissionDeadline) {
-            customDeadline = new Date(entityData.submissionDeadline);
+        if (stepDef.timerConfig.type === 'NEGATIVE_COUNTDOWN' && entityData?.dueDate) {
+            customDeadline = new Date(entityData.dueDate);
         }
 
         // Create step instance

@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import { AnalyticsService } from '@/modules/timers/services/analytics.service';
 
-@Controller('api/analytics')
+@Controller('analytics')
 @UseGuards(JwtAuthGuard)
 export class AnalyticsController {
     constructor(private readonly analyticsService: AnalyticsService) { }
