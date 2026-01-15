@@ -70,6 +70,7 @@ import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-dr
 import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
+import { TimersModule } from "@/modules/timers/timers.module";
 
 @Module({
     imports: [
@@ -151,6 +152,7 @@ import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
         FdrModule,
         BankTransferModule,
         ChequeModule,
+        TimersModule,
     ],
     controllers: [AppController],
     providers: [
@@ -161,4 +163,4 @@ import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }

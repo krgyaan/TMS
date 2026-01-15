@@ -5,7 +5,7 @@ import * as schema from '@db';
 import { stepInstances, timerEvents } from '@db/schemas/workflow/workflows.schema';
 import { TenderInfo, tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { TimerEngineService } from '@/modules/timers/services/timer-engine.service';
-import { WORKFLOWS, getWorkflow, getStepDefinition, WorkflowCode } from 'scripts/timer-workflow-seed';
+import { getWorkflow, getStepDefinition, WorkflowCode } from '@/config/timer.config';
 
 interface StartWorkflowDto {
     workflowCode: WorkflowCode;
