@@ -17,6 +17,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -38,6 +39,7 @@ export class TenderInfosService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
@@ -469,19 +471,35 @@ export class TenderInfosService {
     async create(data: NewTenderInfo, createdBy: number): Promise<TenderInfo> {
         const rows = await this.db.insert(tenderInfos).values(data).returning();
         const newTender = rows[0];
+        this.logger.log(`New tender created: ${newTender.id}`);
 
         // Track initial status (status = 1) automatically
         const initialStatus = data.status ?? 1;
         await this.tenderStatusHistoryService.trackStatusChange(
-            newTender.id as number,
-            initialStatus,
-            createdBy,
-            null,
-            'Tender created'
+            newTender.id as number, initialStatus, createdBy, null, 'Tender created'
         );
 
         // Send email notification
         await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
+
+        // START TIMER: Add this code to start the workflow and timers
+        try {
+            this.logger.log(`Starting workflow for tender ${newTender.id}`);
+            const workflowResult = await this.workflowService.startWorkflow({
+                workflowCode: 'TENDERING_WF',
+                entityType: 'TENDER',
+                entityId: newTender.id.toString(),
+                metadata: {
+                    createdBy,
+                    tenderNo: newTender.tenderNo,
+                    dueDate: newTender.dueDate
+                }
+            });
+
+            this.logger.log(`Started workflow for tender ${newTender.id} with ${workflowResult.stepsStarted} steps`);
+        } catch (error) {
+            this.logger.error(`Failed to start workflow for tender ${newTender.id}:`, error);
+        }
 
         return newTender;
     }
@@ -604,7 +622,6 @@ export class TenderInfosService {
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
-            // Don't throw - email failure shouldn't break main operation
         }
     }
 
@@ -686,7 +703,7 @@ export class TenderInfosService {
                     {
                         ...emailData,
                         assignee: assignee.name,
-                        tenderInfoSheet: '#', // TODO: Add actual link
+                        tenderInfoSheet: `/tendering/info-sheet/${tender.id}`,
                     },
                     {
                         to: [{ type: 'user', userId: tender.teamMember }],

@@ -349,20 +349,23 @@ const BankGuaranteeListPage = () => {
         <>
             {/* Bank Statistics Cards */}
             {cardStats && cardStats.bankStats && Object.keys(cardStats.bankStats).length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                     {Object.entries(cardStats.bankStats).map(([bankName, stats]) => (
-                        <Card key={bankName} className="relative">
-                            <CardHeader className="pb-0">
-                                <CardTitle className="text-lg">{bankNameMap[bankName] || bankName}</CardTitle>
+                        <Card key={bankName} className="gap-2">
+                            <CardHeader>
+                                <CardTitle>{bankNameMap[bankName] || bankName}</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-1">
+                            <CardContent>
                                 <p className="text-sm font-medium text-green-600">BG: {formatCurrency(stats.amount)}</p>
                                 <p className="text-sm font-medium text-green-600">FDR (10%): {formatCurrency(stats.fdrAmount10)}</p>
                                 <p className="text-sm font-medium text-green-600">FDR (15%): {formatCurrency(stats.fdrAmount15)}</p>
                                 <p className="text-sm font-medium text-green-600">FDR (100%): {formatCurrency(stats.fdrAmount100)}</p>
-                                <div className="pt-2 mt-2">
-                                    <Badge variant="outline" className="w-full justify-center">
-                                        Total {stats.count} BGs Created, {stats.percentage.toFixed(2)}% of BG
+                                <div>
+                                    <Badge variant="outline" className="justify-center">
+                                        {stats.count} BGs Created
+                                    </Badge>
+                                    <Badge variant="outline" className="justify-center">
+                                        {stats.percentage.toFixed(2)}% of BGs
                                     </Badge>
                                 </div>
                             </CardContent>
