@@ -1025,3 +1025,4 @@ export class TenderInfosService {
         return result?.count ?? 0;
     }
 }
+

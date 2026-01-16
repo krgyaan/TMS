@@ -3,7 +3,7 @@ import { eq, and, sql, inArray } from 'drizzle-orm';
 import { stepInstances, timerEvents } from '@db/schemas/workflow/workflows.schema';
 import { TenderInfo, tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { TimerEngineService } from '@/modules/timers/services/timer-engine.service';
-import { getWorkflow, getStepDefinition, WorkflowCode } from '@/config/timer.config';
+import { getWorkflow, getStepDefinition, WorkflowCode, WorkflowStep } from '@/config/timer.config';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@db';
 
@@ -89,49 +89,88 @@ export class WorkflowService {
             throw new BadRequestException(`Workflow already started for this entity`);
         }
 
+        // Get entity data for conditional logic
         const entityData = await this.getEntityData(dto.entityType, dto.entityId);
 
-        // Find steps that can start immediately
-        const stepsToStart = workflow.steps.filter(step => {
-            const noDependencies = !step.dependsOn || step.dependsOn.length === 0;
-
-            const meetsCondition = this.checkConditionalLogic(step, entityData, dto.metadata);
-
-            return noDependencies && meetsCondition && !step.isOptional;
-        });
-
+        // CREATE ALL STEP INSTANCES UPFRONT
+        const createdStepIds: string[] = [];
         let firstStepId: string | null = null;
+        let stepsStarted = 0;
 
-        for (const step of stepsToStart) {
-            const stepInstanceId = await this.createStepInstance({
-                workflowCode: dto.workflowCode,
-                entityType: dto.entityType,
-                entityId: dto.entityId,
-                stepDef: step,
-                entityData,
-                metadata: dto.metadata,
-            });
+        this.logger.log(`Creating ${workflow.steps.length} step instances for workflow ${dto.workflowCode}`);
 
-            if (!firstStepId) {
-                firstStepId = stepInstanceId;
-            }
+        // First pass: Create all step instances
+        for (const step of workflow.steps) {
+            try {
+                const stepInstanceId = await this.createStepInstance({
+                    workflowCode: dto.workflowCode,
+                    entityType: dto.entityType,
+                    entityId: dto.entityId,
+                    stepDef: step,
+                    entityData,
+                    metadata: dto.metadata,
+                });
 
-            // Auto-start if configured
-            if (step.timerConfig.type !== 'NO_TIMER') {
-                await this.startStep(stepInstanceId, {
-                    stepKey: step.stepKey,
-                    customDurationHours: step.timerConfig.durationHours,
-                    customDeadline: step.timerConfig.type === 'DEADLINE_BASED' ? new Date(entityData.dueDate).getTime() - (step.timerConfig.durationHours ?? 0) * 60 * 60 * 1000 : undefined
-                } as StartStepDto);
+                createdStepIds.push(stepInstanceId);
+
+                // Track the first step that can be started
+                if (!firstStepId) {
+                    const noDependencies = !step.dependsOn || step.dependsOn.length === 0;
+                    const meetsCondition = this.checkConditionalLogic(step, entityData, dto.metadata);
+                    if (noDependencies && meetsCondition && !step.isOptional) {
+                        firstStepId = stepInstanceId;
+                    }
+                }
+
+                this.logger.debug(`Created step instance ${stepInstanceId} for step ${step.stepKey}`);
+            } catch (error) {
+                this.logger.error(`Failed to create step instance for step ${step.stepKey}:`, error);
+                throw new Error(`Failed to create step instance: ${error.message}`);
             }
         }
 
-        this.logger.log(`Started ${stepsToStart.length} initial steps for workflow ${dto.workflowCode}`);
+        // Second pass: Start steps that can run immediately
+        for (let i = 0; i < workflow.steps.length; i++) {
+            const step = workflow.steps[i];
+            const noDependencies = !step.dependsOn || step.dependsOn.length === 0;
+            const meetsCondition = this.checkConditionalLogic(step, entityData, dto.metadata);
+
+            if (noDependencies && meetsCondition && !step.isOptional && step.timerConfig.type !== 'NO_TIMER') {
+                const stepInstanceId = createdStepIds[i];
+
+                try {
+                    await this.startStep(stepInstanceId, {
+                        stepKey: step.stepKey,
+                        customDurationHours: step.timerConfig.durationHours,
+                        customDeadline: this.calculateDeadline(step, entityData)
+                    });
+                    stepsStarted++;
+                    this.logger.debug(`Started step ${step.stepKey} (${stepInstanceId})`);
+                } catch (error) {
+                    this.logger.error(`Failed to start step ${step.stepKey}:`, error);
+                    // Continue with other steps even if one fails
+                }
+            }
+        }
+
+        this.logger.log(`Created ${workflow.steps.length} step instances, started ${stepsStarted} initial steps for workflow ${dto.workflowCode}`);
 
         return {
-            stepsStarted: stepsToStart.length,
+            stepsStarted,
             firstStepId,
         };
+    }
+
+    /**
+     * Calculate deadline for negative countdown timers
+     */
+    private calculateDeadline(step: WorkflowStep, entityData: any): Date | undefined {
+        if (step.timerConfig.type === 'NEGATIVE_COUNTDOWN' && entityData?.dueDate) {
+            const dueDate = new Date(entityData.dueDate);
+            const hoursBeforeDeadline = step.timerConfig.hoursBeforeDeadline || -72;
+            return new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+        }
+        return undefined;
     }
 
     /**
@@ -276,10 +315,6 @@ export class WorkflowService {
         this.logger.log(`Step ${stepInstanceId} paused`);
     }
 
-    // ============================================
-    // RESUME STEP
-    // ============================================
-
     /**
      * Resume a paused timer
      */
@@ -314,10 +349,6 @@ export class WorkflowService {
 
         this.logger.log(`Step ${stepInstanceId} resumed`);
     }
-
-    // ============================================
-    // EXTEND STEP
-    // ============================================
 
     /**
      * Extend timer duration
@@ -356,10 +387,6 @@ export class WorkflowService {
 
         this.logger.log(`Step ${stepInstanceId} extended by ${dto.extensionHours} hours`);
     }
-
-    // ============================================
-    // REJECT STEP
-    // ============================================
 
     /**
      * Reject a step (send back for rework)
@@ -437,10 +464,6 @@ export class WorkflowService {
         this.logger.log(`Step ${stepInstanceId} rejected`);
     }
 
-    // ============================================
-    // SKIP STEP
-    // ============================================
-
     /**
      * Skip an optional step
      */
@@ -502,10 +525,6 @@ export class WorkflowService {
         await this.triggerDependentSteps(stepInstance);
     }
 
-    // ============================================
-    // CANCEL STEP
-    // ============================================
-
     /**
      * Cancel a step
      */
@@ -541,10 +560,6 @@ export class WorkflowService {
 
         this.logger.log(`Step ${stepInstanceId} cancelled`);
     }
-
-    // ============================================
-    // GET WORKFLOW STATUS
-    // ============================================
 
     /**
      * Get complete workflow status for an entity
@@ -591,10 +606,6 @@ export class WorkflowService {
         };
     }
 
-    // ============================================
-    // HELPER METHODS
-    // ============================================
-
     /**
      * Create a step instance
      */
@@ -602,7 +613,7 @@ export class WorkflowService {
         workflowCode: WorkflowCode;
         entityType: 'TENDER' | 'COURIER' | 'EMD' | 'SERVICE' | 'OPERATION';
         entityId: string;
-        stepDef: any;
+        stepDef: WorkflowStep;
         entityData: any;
         metadata?: Record<string, any>;
     }): Promise<string> {
@@ -621,7 +632,9 @@ export class WorkflowService {
         // Get custom deadline for negative countdown timers
         let customDeadline: Date | null = null;
         if (stepDef.timerConfig.type === 'NEGATIVE_COUNTDOWN' && entityData?.dueDate) {
-            customDeadline = new Date(entityData.dueDate);
+            const dueDate = new Date(entityData.dueDate);
+            const hoursBeforeDeadline = stepDef.timerConfig.hoursBeforeDeadline || -72;
+            customDeadline = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
         }
 
         // Create step instance
@@ -656,6 +669,8 @@ export class WorkflowService {
      * Trigger dependent steps
      */
     private async triggerDependentSteps(completedStep: any): Promise<void> {
+        this.logger.log(`Triggering dependent steps for completed step ${completedStep.stepKey} (${completedStep.id})`);
+
         // Find all steps that depend on this one
         const potentialDependents = await this.db
             .select()
@@ -669,33 +684,42 @@ export class WorkflowService {
                 )
             );
 
+        this.logger.debug(`Found ${potentialDependents.length} potential dependent steps`);
+
         for (const step of potentialDependents) {
             const dependsOn = step.dependsOnSteps as string[] || [];
 
             // Check if this step depends on the completed one
             if (dependsOn.includes(completedStep.stepKey)) {
+                this.logger.debug(`Step ${step.stepKey} depends on ${completedStep.stepKey}`);
+
                 // Check if all dependencies are met
                 const allDepsMet = await this.checkDependencies(step);
 
                 if (allDepsMet) {
+                    this.logger.debug(`All dependencies met for step ${step.stepKey}`);
+
                     // Check conditional logic
                     const entityData = await this.getEntityData(step.entityType, step.entityId.toString());
                     const stepDef = getStepDefinition(step.workflowCode as WorkflowCode, step.stepKey);
 
                     if (stepDef && this.checkConditionalLogic(stepDef, entityData, step.metadata as any)) {
-                        // Auto-start this step
+                        this.logger.log(`Auto-starting dependent step: ${step.stepKey} (${step.id})`);
+
                         try {
                             await this.startStep(step.id.toString(), { stepKey: step.stepKey });
-                            this.logger.log(`Auto-started dependent step: ${step.stepKey}`);
                         } catch (error) {
                             this.logger.error(`Failed to auto-start step ${step.stepKey}:`, error);
                         }
+                    } else {
+                        this.logger.debug(`Conditional logic not met for step ${step.stepKey}`);
                     }
+                } else {
+                    this.logger.debug(`Dependencies not met for step ${step.stepKey}`);
                 }
             }
         }
     }
-
     /**
      * Check if dependencies are met
      */
@@ -733,7 +757,7 @@ export class WorkflowService {
     /**
      * Check conditional logic
      */
-    private checkConditionalLogic(stepDef: any, entityData: any, metadata?: any): boolean {
+    private checkConditionalLogic(stepDef: WorkflowStep, entityData: any, metadata?: any): boolean {
         if (!stepDef.conditional) {
             return true;
         }
@@ -773,5 +797,71 @@ export class WorkflowService {
 
         // Add other entity types as needed
         return null;
+    }
+
+    /**
+     * Update step deadline for negative countdown timers
+     */
+    async updateStepDeadline(stepInstanceId: string, deadline: Date, hoursBeforeDeadline: number): Promise<void> {
+        this.logger.log(`Updating deadline for step ${stepInstanceId} to ${deadline.toISOString()}`);
+
+        await this.db
+            .update(stepInstances)
+            .set({
+                customDeadline: deadline,
+                timerConfig: {
+                    ...(await this.getStepTimerConfig(stepInstanceId)),
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline: hoursBeforeDeadline
+                }
+            })
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)));
+    }
+
+    /**
+     * Get timer config for a step
+     */
+    private async getStepTimerConfig(stepInstanceId: string): Promise<any> {
+        const [step] = await this.db
+            .select({ timerConfig: stepInstances.timerConfig })
+            .from(stepInstances)
+            .where(eq(stepInstances.id, parseInt(stepInstanceId)))
+            .limit(1);
+
+        return step?.timerConfig || {};
+    }
+
+    /**
+     * Get all pending steps for a tender
+     */
+    async getPendingSteps(tenderId: number, workflowCode: WorkflowCode): Promise<any[]> {
+        return this.db
+            .select()
+            .from(stepInstances)
+            .where(
+                and(
+                    eq(stepInstances.entityType, 'TENDER'),
+                    eq(stepInstances.entityId, tenderId),
+                    eq(stepInstances.workflowCode, workflowCode),
+                    eq(stepInstances.status, 'PENDING')
+                )
+            );
+    }
+
+    /**
+     * Get all steps for a tender
+     */
+    async getAllSteps(tenderId: number, workflowCode: WorkflowCode): Promise<any[]> {
+        return this.db
+            .select()
+            .from(stepInstances)
+            .where(
+                and(
+                    eq(stepInstances.entityType, 'TENDER'),
+                    eq(stepInstances.entityId, tenderId),
+                    eq(stepInstances.workflowCode, workflowCode)
+                )
+            )
+            .orderBy(stepInstances.stepOrder);
     }
 }

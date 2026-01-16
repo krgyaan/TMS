@@ -421,7 +421,7 @@ export const EMD_WORKFLOW = {
     ]
 };
 
-const OPERATION_WORKFLOW = {
+export const OPERATION_WORKFLOW = {
     code: 'OPERATION_WF',
     name: 'Operation Workflow',
     entityType: 'OPERATION' as const,
@@ -475,4 +475,43 @@ export function getWorkflow(code: WorkflowCode) {
 export function getStepDefinition(workflowCode: WorkflowCode, stepKey: string) {
     const workflow = WORKFLOWS[workflowCode];
     return workflow.steps.find(s => s.stepKey === stepKey);
+}
+
+export type TimerType = 'FIXED_DURATION' | 'DEADLINE_BASED' | 'NEGATIVE_COUNTDOWN' | 'DYNAMIC' | 'NO_TIMER';
+export type OperatorType = 'equals' | 'notEquals' | 'greaterThan' | 'lessThan' | 'contains';
+
+export interface TimerConfig {
+    type: TimerType;
+    durationHours?: number;
+    hoursBeforeDeadline?: number;
+    isBusinessDaysOnly?: boolean;
+    warningThreshold?: number;
+    criticalThreshold?: number;
+}
+
+export interface ConditionalLogic {
+    field: string;
+    operator: OperatorType;
+    value: any;
+}
+
+export interface WorkflowStep {
+    stepKey: string;
+    stepName: string;
+    stepOrder: number;
+    assignedRole: string;
+    timerConfig: TimerConfig;
+    dependsOn?: string[];
+    canRunInParallel?: boolean;
+    isOptional?: boolean;
+    conditional?: ConditionalLogic;
+    metadata?: Record<string, any>;
+}
+
+export interface WorkflowDefinition {
+    code: string;
+    name: string;
+    entityType: 'TENDER' | 'COURIER' | 'EMD' | 'SERVICE' | 'OPERATION';
+    description: string;
+    steps: WorkflowStep[];
 }

@@ -5,10 +5,11 @@ import { TenderInfoSheetsController } from '@/modules/tendering/info-sheets/info
 import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
+import { TimersModule } from '@/modules/timers/timers.module';
 
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule],
     controllers: [TenderInfoSheetsController],
     providers: [TenderInfoSheetsService],
 })
