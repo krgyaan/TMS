@@ -1,14 +1,14 @@
 import { BaseApiService } from './base.service';
 import type {
     BidSubmission,
-    PaginatedResult,
     BidSubmissionDashboardCounts,
     BidSubmissionListParams,
     BidSubmissionDashboardRow,
     SubmitBidDto,
     MarkAsMissedDto,
     UpdateBidSubmissionDto,
-} from '@/types/api.types';
+} from '@/modules/tendering/bid-submissions/helpers/bidSubmission.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 
 class BidSubmissionsService extends BaseApiService {

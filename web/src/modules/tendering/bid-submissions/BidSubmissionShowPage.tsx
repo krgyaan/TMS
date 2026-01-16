@@ -12,7 +12,7 @@ import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { paths } from '@/app/routes/paths';
-import type { TenderWithRelations } from '@/types/api.types';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
