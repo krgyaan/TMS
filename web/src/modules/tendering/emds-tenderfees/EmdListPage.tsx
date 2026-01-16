@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { PendingTenderRow, PaymentRequestRow } from "@/types/api.types";
+import type { PendingTenderRow, PaymentRequestRow } from "./helpers/emdTenderFee.types";
 import { tenderNameCol } from "@/components/data-grid";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 

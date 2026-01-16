@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TenderWithRelations } from "@/types/api.types";
+import type { TenderWithRelations } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { PhysicalDocsView } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";

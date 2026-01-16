@@ -1,6 +1,13 @@
 import { BaseApiService } from './base.service';
-import type { EmdDashboardResponse, EmdDashboardCounts, CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, EmdDashboardRow } from '@/types/api.types';
-import type { EmdDashboardFilters } from '@/types/api.types';
+import type {
+    EmdDashboardResponse,
+    EmdDashboardCounts,
+    CreatePaymentRequestDto,
+    UpdatePaymentRequestDto,
+    UpdateStatusDto,
+    EmdDashboardRow,
+    EmdDashboardFilters,
+} from '@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types';
 
 class EmdsService extends BaseApiService {
     constructor() {
