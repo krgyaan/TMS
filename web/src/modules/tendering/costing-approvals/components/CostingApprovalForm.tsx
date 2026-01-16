@@ -12,7 +12,7 @@ import { ArrowLeft, Save, IndianRupee, Percent } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useApproveCosting, useUpdateApprovedCosting } from '@/hooks/api/useCostingApprovals';
-import type { TenderCostingSheet } from '@/types/api.types';
+import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
