@@ -680,14 +680,14 @@ export interface IncompleteField {
 
 export interface SaveTenderApprovalDto {
     tlStatus: "0" | "1" | "2" | "3" | number;
-    rfqTo?: number[]; // vendor org IDs
+    rfqTo?: number[];
     processingFeeMode?: string;
     tenderFeeMode?: string;
     emdMode?: string;
     approvePqrSelection?: "1" | "2";
     approveFinanceDocSelection?: "1" | "2";
-    tenderStatus?: number; // status ID
-    oemNotAllowed?: string; // vendor org ID
+    tenderStatus?: number;
+    oemNotAllowed?: string;
     tlRejectionRemarks?: string;
     incompleteFields?: IncompleteField[];
 }
@@ -696,7 +696,7 @@ export interface TenderApproval {
     id?: number;
     tenderId?: number;
     tlStatus?: "0" | "1" | "2" | "3" | number;
-    tlDecision?: "0" | "1" | "2" | "3" | number; // Alias for tlStatus for backward compatibility
+    tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqTo: number[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
@@ -1248,3 +1248,23 @@ export interface RequestTabResponse {
 }
 
 export type EmdDashboardResponse = PendingTabResponse | RequestTabResponse;
+
+export type TimerStatus = 'RUNNING' | 'PAUSED' | 'OVERDUE' | 'COMPLETED' | 'NOT_STARTED';
+
+export interface TenderTimer {
+    hasTimer: boolean;
+    stepKey: string | null;
+    stepName: string | null;
+    remainingSeconds: number;
+    status: TimerStatus;
+    deadline?: string;
+    allocatedHours?: number;
+}
+
+export interface TenderWithTimer extends TenderInfoWithNames {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepKey: string;
+    } | null;
+}

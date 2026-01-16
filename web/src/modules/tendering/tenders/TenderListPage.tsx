@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
@@ -184,6 +185,26 @@ const TenderListPage = () => {
                 return <Badge variant='outline'>
                     {status}
                 </Badge>
+            },
+        },
+        {
+            field: "timer",
+            headerName: "Timer",
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+
+                if (!data.timer) {
+                    return <span className="text-gray-400">No timer</span>;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={data.timer.remainingSeconds}
+                        status={data.timer.status}
+                        stepKey={data.timer.stepKey}
+                    />
+                );
             },
         },
         {
