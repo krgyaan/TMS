@@ -8,7 +8,7 @@ import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/api/useTenderApprovals';
-import type { TenderApprovalRow } from './helpers/tenderApproval.types';
+import type { TenderApprovalWithTimer } from './helpers/tenderApproval.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, Search } from 'lucide-react';
@@ -17,6 +17,8 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
 import { tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
 type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
@@ -113,8 +115,8 @@ const TenderApprovalListPage = () => {
         });
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<TenderApprovalRow>[]>(() => [
-        tenderNameCol<TenderApprovalRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<TenderApprovalWithTimer>[]>(() => [
+        tenderNameCol<TenderApprovalWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 250,
@@ -150,12 +152,7 @@ const TenderApprovalListPage = () => {
             valueGetter: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
-                return new Intl.NumberFormat('en-IN', {
-                    style: 'currency',
-                    currency: 'INR',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                }).format(value);
+                return formatINR(value);
             },
             sortable: true,
             filter: true,
@@ -168,7 +165,7 @@ const TenderApprovalListPage = () => {
             valueGetter: (params: any) => {
                 const value = params.data?.emd;
                 if (value === null || value === undefined) return '—';
-                return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+                return formatINR(value);
             },
             sortable: true,
             filter: true,
@@ -176,7 +173,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'statusName',
             headerName: 'Status',
-            width: 250,
+            width: 180,
             colId: 'statusName',
             cellRenderer: (params: any) => {
                 const status = params.data?.statusName;
@@ -193,7 +190,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'tlStatus',
             headerName: 'TL Status',
-            width: 150,
+            width: 105,
             colId: 'tlStatus',
             cellRenderer: (params: any) => {
                 const tlStatus = params.data?.tlStatus;
@@ -217,6 +214,29 @@ const TenderApprovalListPage = () => {
             },
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
         },
         {
             headerName: '',

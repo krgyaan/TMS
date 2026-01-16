@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TenderApprovalFormSchema } from './tenderApproval.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 // Form Values Type (inferred from Zod schema)
 export type TenderApprovalFormValues = z.infer<typeof TenderApprovalFormSchema>;
@@ -194,3 +195,11 @@ export const infoSheetFieldOptions = [
     { value: 'courierAddress', label: 'Courier Address' },
     { value: 'teRemark', label: 'TE Final Remark' },
 ];
+
+export interface TenderApprovalWithTimer extends TenderApprovalRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
