@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertTriangle, CheckCircle, PauseCircle, Clock } from "lucide-react";
-import type { TimerStatus } from '@/types/api.types';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 interface TenderTimerDisplayProps {
     remainingSeconds: number;

@@ -15,7 +15,7 @@ import { DateTimeInput } from "@/components/form/DateTimeInput";
 import { DateInput } from "@/components/form/DateInput";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
-import type { TenderInfoWithNames } from "@/types/api.types";
+import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";

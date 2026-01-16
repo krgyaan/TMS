@@ -4,19 +4,9 @@ import type {
     TenderInfo,
     TenderInfoWithNames,
     UpdateTenderRequest,
-    PaginatedResult,
-} from '@/types/api.types';
-
-export type TenderListParams = {
-    statusIds?: number[];
-    category?: string;
-    unallocated?: boolean;
-    teamId?: number | null;
-    assignedTo?: number | null;
-    search?: string;
-    page?: number;
-    limit?: number;
-};
+    TenderListParams,
+} from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 class TenderInfosService extends BaseApiService {
     constructor() {

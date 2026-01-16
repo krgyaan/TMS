@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { TenderTimer } from '@/types/api.types';
+import type { TenderTimer } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export const useTenderTimer = (tenderId: number, initialData?: TenderTimer) => {
     const [timerData, setTimerData] = useState<TenderTimer | null>(
