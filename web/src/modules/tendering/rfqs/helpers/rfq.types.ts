@@ -99,3 +99,11 @@ export interface UpdateRfqDto {
 
 // Re-export form value types
 export type { RfqFormValues };
+
+export interface RfqDashboardCounts {
+    pending: number;
+    sent: number;
+    "rfq-rejected": number;
+    "tender-dnb": number;
+    total: number;
+}

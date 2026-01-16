@@ -24,7 +24,7 @@ import { NumberInput } from '@/components/form/NumberInput';
 // Hooks & Types
 import { useCreateRfq, useUpdateRfq } from '@/hooks/api/useRfqs';
 import { useRfqVendors } from '@/hooks/api/useRfqs';
-import type { Rfq, RfqDashboardRow } from '@/types/api.types';
+import type { Rfq, RfqDashboardRow } from '../helpers/rfq.types';
 import { Input } from '@/components/ui/input';
 
 const RfqFormSchema = z.object({
