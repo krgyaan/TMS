@@ -1,5 +1,51 @@
-import type { TenderDocumentChecklist } from '@/types/api.types';
 import type { DocumentChecklistFormValues } from './documentChecklist.schema';
+
+export interface ExtraDocument {
+    name: string;
+    path?: string;
+}
+
+export interface TenderDocumentChecklist {
+    id: number;
+    tenderId: number;
+    selectedDocuments: string[] | null;
+    extraDocuments: ExtraDocument[] | null;
+    submittedBy: number | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+export interface CreateDocumentChecklistDto {
+    tenderId: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export interface UpdateDocumentChecklistDto {
+    id: number;
+    tenderId: number;
+    selectedDocuments?: string[];
+    extraDocuments?: ExtraDocument[];
+}
+
+export type TenderDocumentChecklistDashboardRow = {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    teamMemberName: string | null;
+    itemName: string | null;
+    statusName: string | null;
+    dueDate: Date | null;
+    gstValues: number;
+    checklistSubmitted: boolean;
+};
+
+export interface DocumentChecklistsDashboardCounts {
+    pending: number;
+    submitted: number;
+    "tender-dnb": number;
+    total: number;
+}
 
 /**
  * Tender details for document checklist forms

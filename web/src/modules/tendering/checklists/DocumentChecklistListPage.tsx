@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
-import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import type { TenderDocumentChecklistDashboardRow } from './helpers/documentChecklist.types';
 import { tenderNameCol } from '@/components/data-grid';
 
 const Checklists = () => {

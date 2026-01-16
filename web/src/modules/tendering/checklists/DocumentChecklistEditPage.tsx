@@ -4,7 +4,7 @@ import { useTender } from '@/hooks/api/useTenders';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import type { TenderDocumentChecklist } from '@/types/api.types';
+import type { TenderDocumentChecklist } from './helpers/documentChecklist.types';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
