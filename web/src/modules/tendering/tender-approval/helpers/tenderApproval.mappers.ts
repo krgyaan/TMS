@@ -1,5 +1,4 @@
-import type { TenderApprovalFormValues } from './tenderApproval.types';
-import type { SaveTenderApprovalDto, TenderApproval } from '@/types/api.types';
+import type { TenderApprovalFormValues, SaveTenderApprovalDto, TenderApproval } from './tenderApproval.types';
 
 export const getInitialValues = (approval?: TenderApproval | null): TenderApprovalFormValues => {
     if (!approval) {

@@ -26,7 +26,7 @@ import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
-import type { TenderInfoWithNames } from '@/types/api.types';
+import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import {
     yesNoOptions,
     emdRequiredOptions,

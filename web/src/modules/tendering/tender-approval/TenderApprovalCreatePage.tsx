@@ -3,7 +3,7 @@ import { TenderApprovalForm } from './components/TenderApprovalForm';
 import { useTender } from '@/hooks/api/useTenders';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
-import type { TenderWithRelations } from '@/types/api.types';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export default function TenderApprovalCreatePage() {
     const { tenderId } = useParams<{ tenderId: string }>();

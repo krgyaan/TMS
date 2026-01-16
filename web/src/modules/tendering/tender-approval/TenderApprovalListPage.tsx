@@ -8,7 +8,7 @@ import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/api/useTenderApprovals';
-import type { TenderApprovalRow } from '@/types/api.types';
+import type { TenderApprovalRow } from './helpers/tenderApproval.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, Search } from 'lucide-react';

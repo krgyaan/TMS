@@ -3,7 +3,7 @@ import type {
     TenderInfoSheetResponse,
     SaveTenderInfoSheetDto,
 } from './tenderInfoSheet.types';
-import type { TenderInfoWithNames } from '@/types/api.types';
+import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 // Helper to convert string/number to number
 const toNumber = (val: string | number | null | undefined, defaultValue = 0): number => {

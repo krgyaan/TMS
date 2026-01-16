@@ -6,50 +6,93 @@ export type TenderApprovalFormValues = z.infer<typeof TenderApprovalFormSchema>;
 
 // Incomplete Field
 export interface IncompleteField {
+    id?: number;
     fieldName: string;
     comment: string;
+    status?: "pending" | "resolved";
 }
 
 // Save DTO - what we send to API
 export interface SaveTenderApprovalDto {
-    tlDecision: string;
-    rfqTo: string[] | null;
-    processingFeeMode: string | null;
-    tenderFeeMode: string | null;
-    emdMode: string | null;
-    approvePqrSelection: string | null;
-    approveFinanceDocSelection: string | null;
-    alternativeTechnicalDocs: string[] | null;
-    alternativeFinancialDocs: string[] | null;
-    tenderStatus: string | null;
-    oemNotAllowed: string | null;
-    tlRejectionRemarks: string | null;
-    incompleteFields: IncompleteField[] | null;
+    tlStatus: "0" | "1" | "2" | "3" | number;
+    rfqTo?: number[];
+    processingFeeMode?: string;
+    tenderFeeMode?: string;
+    emdMode?: string;
+    approvePqrSelection?: "1" | "2";
+    approveFinanceDocSelection?: "1" | "2";
+    tenderStatus?: number;
+    oemNotAllowed?: string;
+    tlRejectionRemarks?: string;
+    incompleteFields?: IncompleteField[];
 }
 
 // Response from API
 export interface TenderApproval {
-    id: number;
-    tenderId: number;
-    tlDecision: string;
-    rfqTo: string[] | null;
+    id?: number;
+    tenderId?: number;
+    tlStatus?: "0" | "1" | "2" | "3" | number;
+    tlDecision?: "0" | "1" | "2" | "3" | number;
+    rfqTo: number[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
-    approvePqrSelection: string | null;
-    approveFinanceDocSelection: string | null;
-    alternativeTechnicalDocs: string[] | null;
-    alternativeFinancialDocs: string[] | null;
-    tenderStatus: string | null;
+    approvePqrSelection: "1" | "2" | null;
+    approveFinanceDocSelection: "1" | "2" | null;
+    alternativeTechnicalDocs?: string[] | null;
+    alternativeFinancialDocs?: string[] | null;
+    tenderStatus: number | null;
     oemNotAllowed: string | null;
     tlRejectionRemarks: string | null;
-    incompleteFields: IncompleteField[] | null;
-    createdAt: string;
-    updatedAt: string;
+    incompleteFields?: IncompleteField[];
+    createdAt?: string;
+    updatedAt?: string;
 }
 
-// Re-export from API types
-export type { TenderWithRelations } from '@/types/api.types';
+// Re-export from tenders module
+export type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+
+export interface TenderApprovalRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    item: number;
+    gstValues: number;
+    tenderFees: number;
+    emd: number;
+    teamMember: number;
+    dueDate: string;
+    status: number;
+    teamMemberName: string;
+    itemName: string;
+    statusName: string;
+    tlStatus: number;
+}
+
+export type TenderApprovalFilters = {
+    tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb";
+    tlStatus?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    search?: string;
+};
+
+export type TenderApprovalTabData = {
+    key: "pending" | "accepted" | "rejected" | "tender-dnb";
+    name: string;
+    count: number;
+    data: TenderApprovalRow[];
+};
+
+export interface TenderApprovalDashboardCounts {
+    pending: number;
+    accepted: number;
+    rejected: number;
+    "tender-dnb": number;
+    total: number;
+}
 
 export const tlDecisionOptions = [
     { value: '0', label: 'Pending' },
