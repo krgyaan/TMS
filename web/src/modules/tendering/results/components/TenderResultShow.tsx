@@ -6,7 +6,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import type { ResultDashboardRow } from '@/types/api.types';
+import type { ResultDashboardRow } from '../helpers/tenderResult.types';
 
 interface TenderResultShowProps {
     result: ResultDashboardRow & {
