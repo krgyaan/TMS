@@ -190,19 +190,21 @@ const TenderListPage = () => {
         {
             field: "timer",
             headerName: "Timer",
-            width: 100,
+            width: 150,
             cellRenderer: (params: any) => {
                 const { data } = params;
+                const timer = data.timer;
 
-                if (!data.timer) {
-                    return <span className="text-gray-400">No timer</span>;
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
                 }
-
                 return (
                     <TenderTimerDisplay
-                        remainingSeconds={data.timer.remainingSeconds}
-                        status={data.timer.status}
-                        stepKey={data.timer.stepKey}
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
                     />
                 );
             },

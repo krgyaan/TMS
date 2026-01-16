@@ -44,6 +44,16 @@ interface RejectStepDto {
     shouldResetTimer: boolean;
 }
 
+export type TimerStatus = 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE' | 'SKIPPED' | 'CANCELLED';
+
+export interface TimerData {
+    hasTimer: boolean;
+    remainingSeconds: number;
+    status: TimerStatus;
+    startTime?: Date;
+    endTime?: Date;
+}
+
 @Injectable()
 export class WorkflowService {
     private readonly logger = new Logger(WorkflowService.name);
@@ -863,5 +873,92 @@ export class WorkflowService {
                 )
             )
             .orderBy(stepInstances.stepOrder);
+    }
+    /**
+      * Get timer data for a specific step of an entity
+      */
+    async getTimerForStep(
+        entityType: string,
+        entityId: number,
+        stepKey: string
+    ): Promise<TimerData> {
+        try {
+            // Query only the specific step instance we need
+            const [step] = await this.db
+                .select({
+                    id: stepInstances.id,
+                    status: stepInstances.status,
+                    timerStatus: stepInstances.timerStatus,
+                    actualStartAt: stepInstances.actualStartAt,
+                    customDeadline: stepInstances.customDeadline,
+                    remainingTimeMs: stepInstances.remainingTimeMs,
+                    timerConfig: stepInstances.timerConfig
+                })
+                .from(stepInstances)
+                .where(
+                    and(
+                        eq(stepInstances.entityType, entityType as 'TENDER' | 'COURIER' | 'EMD' | 'SERVICE' | 'OPERATION'),
+                        eq(stepInstances.entityId, entityId),
+                        eq(stepInstances.stepKey, stepKey)
+                    )
+                )
+                .limit(1);
+
+            if (!step) {
+                this.logger.debug(`No step found for ${entityType} ${entityId} with stepKey ${stepKey}`);
+                return {
+                    hasTimer: false,
+                    remainingSeconds: 0,
+                    status: 'NOT_STARTED',
+                    startTime: undefined,
+                    endTime: undefined
+                };
+            }
+
+            // Calculate remaining time
+            let remainingSeconds = 0;
+            if (step.remainingTimeMs) {
+                remainingSeconds = Math.floor(step.remainingTimeMs / 1000);
+            } else if (step.status === 'IN_PROGRESS' && step.timerConfig.type !== 'NO_TIMER') {
+                const timerState = await this.timerEngine.calculateTimerState(step.id.toString());
+                remainingSeconds = Math.floor((timerState.remainingMs || 0) / 1000);
+            }
+
+            // Determine status
+            let status: TimerStatus;
+            if (step.status === 'COMPLETED') {
+                status = 'COMPLETED';
+            } else if (step.status === 'SKIPPED') {
+                status = 'SKIPPED';
+            } else if (step.status === 'REJECTED') {
+                status = 'CANCELLED';
+            } else if (step.status === 'PENDING') {
+                status = 'NOT_STARTED';
+            } else if (step.status === 'IN_PROGRESS') {
+                status = step.timerStatus;
+            } else {
+                status = 'NOT_STARTED';
+            }
+
+            return {
+                hasTimer: step.timerConfig.type !== 'NO_TIMER',
+                remainingSeconds,
+                status,
+                startTime: step.actualStartAt as Date,
+                endTime: step.customDeadline as Date
+            };
+        } catch (error) {
+            this.logger.error(
+                `Error getting timer for ${entityType} ${entityId} and step ${stepKey}:`,
+                error
+            );
+            return {
+                hasTimer: false,
+                remainingSeconds: 0,
+                status: 'NOT_STARTED',
+                startTime: undefined,
+                endTime: undefined
+            };
+        }
     }
 }

@@ -166,6 +166,6 @@ export interface TenderWithTimer extends TenderInfoWithNames {
     timer?: {
         remainingSeconds: number;
         status: TimerStatus;
-        stepKey: string;
+        stepName: string;
     } | null;
 }

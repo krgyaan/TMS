@@ -4,7 +4,7 @@ import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema } from './dto/tender.dto';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
 
 @Controller('tenders')
 export class TenderInfoController {
@@ -54,27 +54,21 @@ export class TenderInfoController {
 
         const tendersWithTimers = await Promise.all(
             tenders.data.map(async (tender) => {
-                try {
-                    const timer = await this.getTenderTimer(tender.id.toString());
-                    return {
-                        ...tender,
-                        timer: timer.hasTimer ? {
-                            remainingSeconds: timer.remainingSeconds,
-                            status: timer.status,
-                            stepKey: timer.stepKey
-                        } : null
-                    };
-                } catch (error) {
-                    return {
-                        ...tender,
-                        timer: null
-                    };
+                let timer: TimerData | null = null;
+                timer = await this.workflowService.getTimerForStep('TENDER', tender.id, 'tender_info');
+                if (!timer.hasTimer) {
+                    timer = null;
                 }
+
+                return {
+                    ...tender,
+                    timer
+                };
             })
         );
 
         return {
-            ...tenders.data,
+            ...tenders,
             data: tendersWithTimers
         };
     }
@@ -141,8 +135,6 @@ export class TenderInfoController {
 
     @Get(':id/timer')
     async getTenderTimer(@Param('id') id: string) {
-        const tender = await this.tenderInfosService.validateExists(parseInt(id));
-
         try {
             const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', id);
             const currentStep = workflowStatus.steps.find(step => step.status === 'IN_PROGRESS');

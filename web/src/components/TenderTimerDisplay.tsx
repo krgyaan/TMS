@@ -1,33 +1,17 @@
-import { useState, useEffect } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, CheckCircle, PauseCircle, Clock } from "lucide-react";
-import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import { Badge } from "@/components/ui/badge";
+import { Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface TenderTimerDisplayProps {
     remainingSeconds: number;
-    status: TimerStatus;
-    stepKey?: string;
-    size?: 'sm' | 'md' | 'lg';
-    showLabel?: boolean;
+    status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE';
 }
-
-const stepNames: Record<string, string> = {
-    'tender_info': 'Tender Info',
-    'tender_approval': 'Approval',
-    'emd_submission': 'EMD Submission',
-    'bid_preparation': 'Bid Preparation',
-    'bid_submission': 'Bid Submission',
-    'courier': 'Courier',
-    'document_verification': 'Document Verification'
-};
 
 export const TenderTimerDisplay = ({
     remainingSeconds,
-    status,
-    stepKey = 'current_step',
-    size = 'md',
-    showLabel = false
+    status
 }: TenderTimerDisplayProps) => {
+    const isRunning = status === 'RUNNING';
     const [timeLeft, setTimeLeft] = useState(remainingSeconds);
 
     // Format time as HH:MM:SS
@@ -41,68 +25,79 @@ export const TenderTimerDisplay = ({
 
         return {
             display: `${isNegative ? '-' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
+            shortDisplay: `${isNegative ? '-' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
             isNegative
         };
     };
 
-    // Get color based on status
-    const getColor = () => {
-        switch (status) {
-            case 'OVERDUE': return 'text-red-500';
-            case 'RUNNING':
-                return timeLeft > 0 ? 'text-green-600' : 'text-yellow-500';
-            case 'PAUSED': return 'text-gray-500';
-            case 'COMPLETED': return 'text-blue-500';
-            default: return 'text-gray-400';
-        }
-    };
+    const formattedTime = formatTime(remainingSeconds);
 
-    // Update timer every second
     useEffect(() => {
         setTimeLeft(remainingSeconds);
 
-        if (status !== 'RUNNING') return;
+        if (!isRunning) return;
 
         const startTime = Date.now();
         const initialTime = remainingSeconds;
 
-        let animationFrameId: number;
-
         const update = () => {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             setTimeLeft(initialTime - elapsed);
-            animationFrameId = requestAnimationFrame(update);
         };
 
-        animationFrameId = requestAnimationFrame(update);
+        // Use requestAnimationFrame for smoother updates
+        let animationFrameId: number;
+        const animate = () => {
+            update();
+            animationFrameId = requestAnimationFrame(animate);
+        };
+
+        animationFrameId = requestAnimationFrame(animate);
 
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [remainingSeconds, status]);
+    }, [remainingSeconds, isRunning]);
 
-    const { display, isNegative } = formatTime(timeLeft);
-    const stepName = stepNames[stepKey] || stepKey.replace(/_/g, ' ');
+    // Get display component based on status
+    const getDisplay = () => {
+        switch (status) {
+            case 'RUNNING':
+                return (
+                    <Badge variant="outline" className={timeLeft < 0 ? "text-danger" : "text-emerald-400"}>
+                        {formatTime(timeLeft).display}
+                    </Badge>
+                );
+            case 'COMPLETED':
+                return (
+                    <Badge variant={formattedTime.isNegative ? "destructive" : "success"}>
+                        <CheckCircle />
+                        {formattedTime.shortDisplay}
+                    </Badge>
+                );
+            case 'OVERDUE':
+                return (
+                    <Badge variant="destructive">
+                        <AlertTriangle />
+                        {formattedTime.shortDisplay}
+                    </Badge>
+                );
+            case 'PAUSED':
+                return (
+                    <Badge variant="secondary">
+                        <Clock />
+                        {formattedTime.shortDisplay}
+                    </Badge>
+                );
+            default:
+                return <span className="text-muted-foreground">Not started</span>;
+        }
+    };
 
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <div className="flex items-center gap-1">
-                    <span className={`${getColor()} font-mono`}>
-                        {display}
-                    </span>
-                    {showLabel && <span className="text-xs text-gray-500">{stepName}</span>}
-                </div>
-            </TooltipTrigger>
-            <TooltipContent>
-                <p className="font-medium">{stepName}</p>
-                <p className="text-sm text-muted-foreground">
-                    {status === 'OVERDUE' ? 'Overdue by' : 'Time remaining:'} {display}
-                </p>
-                {status === 'RUNNING' && timeLeft <= 0 && (
-                    <p className="text-sm text-yellow-500">Timer has expired</p>
-                )}
-            </TooltipContent>
-        </Tooltip>
+        <>
+            <span className="hidden">{remainingSeconds}</span>
+            {getDisplay()}
+        </>
     );
 };
