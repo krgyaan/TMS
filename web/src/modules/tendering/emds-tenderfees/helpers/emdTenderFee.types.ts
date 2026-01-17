@@ -1,4 +1,5 @@
 import type { EmdRequestFormValues, PaymentDetailsFormValues } from './emdTenderFee.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
  * Props for EmdTenderFeeRequestForm component
@@ -96,6 +97,14 @@ export interface EmdDashboardRow {
     requestedBy: string | null;
 }
 
+export interface EmdDashboardRowWithTimer extends EmdDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
 export interface EmdDashboardCounts {
     pending: number;
     sent: number;
@@ -124,6 +133,14 @@ export interface PendingTenderRow {
     processingFeeMode: string | null;
 }
 
+export interface PendingTenderRowWithTimer extends PendingTenderRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
 export interface PaymentRequestRow {
     id: number;
     tenderId: number;
@@ -139,6 +156,14 @@ export interface PaymentRequestRow {
     instrumentStatus: string | null;
     displayStatus: string;
     createdAt: string | null;
+}
+
+export interface PaymentRequestRowWithTimer extends PaymentRequestRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
 }
 
 export interface PendingTabResponse {
