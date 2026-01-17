@@ -6,9 +6,10 @@ import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { GoogleIntegrationModule } from '@/modules/integrations/google/google.module';
 import { EmailModule } from '@/modules/email/email.module';
+import { TimersModule } from '@/modules/timers/timers.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, GoogleIntegrationModule, EmailModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, GoogleIntegrationModule, EmailModule, TimersModule],
     controllers: [CostingSheetsController],
     providers: [CostingSheetsService],
     exports: [CostingSheetsService],

@@ -1,4 +1,5 @@
 import type { CostingSheetFormValues } from './costingSheet.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
  * Tender details for costing sheet forms
@@ -73,6 +74,14 @@ export type CostingSheetDashboardRow = {
     googleSheetUrl: string | null;
     costingSheetId: number | null;
 };
+
+export interface CostingSheetDashboardRowWithTimer extends CostingSheetDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
 export type SubmitCostingSheetDto = {
     tenderId: number;
     submittedFinalPrice: string;
