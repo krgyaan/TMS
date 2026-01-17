@@ -14,12 +14,11 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { PendingTenderRow, PendingTenderRowWithTimer, PaymentRequestRow, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
+import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
 import { tenderNameCol } from "@/components/data-grid";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 
-// Tab configuration
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
     { value: 'sent', label: 'EMD Request Sent' },
@@ -31,7 +30,6 @@ const TABS = [
 
 type TabValue = typeof TABS[number]['value'];
 
-// Status badge colors
 const STATUS_COLORS: Record<string, string> = {
     'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'Sent': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -40,14 +38,12 @@ const STATUS_COLORS: Record<string, string> = {
     'Returned': 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
-// Purpose badge colors
 const PURPOSE_COLORS: Record<string, string> = {
     'EMD': 'bg-blue-50 text-blue-700 border-blue-200',
     'Tender Fee': 'bg-green-50 text-green-700 border-green-200',
     'Processing Fee': 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-// Instrument type display
 const INSTRUMENT_LABELS: Record<string, string> = {
     'DD': 'Demand Draft',
     'FDR': 'Fixed Deposit',
@@ -63,7 +59,6 @@ const EmdsAndTenderFeesPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
 
-    // Reset pagination when tab changes
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab]);
@@ -80,12 +75,7 @@ const EmdsAndTenderFeesPage = () => {
     }, []);
 
     // Fetch dashboard data
-    const {
-        data: dashboardData,
-        isLoading,
-        error,
-        refetch,
-    } = usePaymentDashboard(
+    const { data: dashboardData, isLoading, error, refetch } = usePaymentDashboard(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
@@ -193,7 +183,7 @@ const EmdsAndTenderFeesPage = () => {
         {
             field: 'statusName',
             headerName: 'Status',
-            width: 200,
+            width: 150,
             cellRenderer: (params: any) => {
                 return <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>{params.value}</Badge>;
             },
@@ -227,7 +217,7 @@ const EmdsAndTenderFeesPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -335,7 +325,7 @@ const EmdsAndTenderFeesPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -386,8 +376,6 @@ const EmdsAndTenderFeesPage = () => {
         },
     ], [navigate, activeTab]);
 
-    // Select column definitions based on active tab
-    // Both 'pending' and 'tender-dnb' tabs use tender-level columns
     const columnDefs = (activeTab === 'pending' || activeTab === 'tender-dnb') ? pendingColDefs : requestColDefs;
     const tableData = dashboardData?.data || [];
 
@@ -425,7 +413,6 @@ const EmdsAndTenderFeesPage = () => {
         );
     };
 
-    // Loading state
     if (isLoading && !dashboardData) {
         return (
             <Card>
@@ -444,7 +431,6 @@ const EmdsAndTenderFeesPage = () => {
         );
     }
 
-    // Error state
     if (error) {
         return (
             <Card>

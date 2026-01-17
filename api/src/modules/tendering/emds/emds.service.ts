@@ -4,7 +4,7 @@ import {
     NotFoundException,
     BadRequestException,
 } from '@nestjs/common';
-import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray, isNotNull } from 'drizzle-orm';
+import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray, isNotNull, not } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -231,16 +231,10 @@ export class EmdsService {
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
     ): Promise<PendingTabResponse | RequestTabResponse> {
-        // Get counts first (for all tabs)
         const counts = await this.getDashboardCounts(userId);
 
-        if (tab === 'pending') {
-            return this.getPendingTenders(userId, pagination, sort, counts);
-        }
-
-        if (tab === 'tender-dnb') {
-            return this.getTenderDnbTenders(userId, pagination, sort, counts);
-        }
+        if (tab === 'pending') return this.getPendingTenders(userId, pagination, sort, counts);
+        if (tab === 'tender-dnb') return this.getTenderDnbTenders(userId, pagination, sort, counts);
 
         return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
     }
@@ -249,15 +243,13 @@ export class EmdsService {
      * Get counts for all tabs
      */
     async getDashboardCounts(userId?: number): Promise<DashboardCounts> {
-        const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
-
-        // Count pending tenders (no payment requests)
+        // STRICT: Only show active, approved, valid tenders for "To Do"
         const pendingCount = await this.countPendingTenders(userId);
 
-        // Count requests by status
+        // PERMISSIVE: Show ALL active instruments regardless of Tender state
         const requestCounts = await this.countRequestsByStatus(userId);
 
-        // Count tender-dnb tenders
+        // STRICT: Only DNB
         const tenderDnbCount = await this.countTenderDnb(userId);
 
         return {
@@ -268,6 +260,173 @@ export class EmdsService {
             returned: requestCounts.returned,
             tenderDnb: tenderDnbCount,
             total: pendingCount + requestCounts.sent + requestCounts.approved + requestCounts.rejected + requestCounts.returned + tenderDnbCount,
+        };
+    }
+
+    /**
+     * Single source of truth for Tab Status logic
+     */
+    private getTabSqlCondition(tab: DashboardTab) {
+        // Status matching logic
+        const isRejected = sql`${paymentInstruments.status} LIKE ${'%' + REJECTED_STATUS_PATTERN}`;
+        const isReturned = inArray(paymentInstruments.status, RETURNED_STATUSES);
+        const isApproved = inArray(paymentInstruments.status, APPROVED_STATUSES);
+
+        // Sent = NULL or (Not Rejected AND Not Returned AND Not Approved)
+        const isSent = or(
+            isNull(paymentInstruments.status),
+            and(not(isRejected), not(isReturned), not(isApproved))
+        );
+
+        switch (tab) {
+            case 'rejected': return isRejected;
+            case 'returned': return isReturned;
+            case 'approved': return isApproved;
+            case 'sent': return isSent;
+            default: return isSent;
+        }
+    }
+
+    /**
+     * Optimized Count Query (Matches Database "True" Count)
+     */
+    private async countRequestsByStatus(userId?: number): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
+        const userCondition = userId
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            : undefined;
+
+        // Uses SQL Aggregation for performance
+        // NOTE: We do NOT filter by tenderInfos.deleteStatus or tlStatus here.
+        // If a request exists and instrument is active, we count it.
+        const [result] = await this.db
+            .select({
+                sent: sql<number>`COALESCE(SUM(CASE WHEN ${this.getTabSqlCondition('sent')} THEN 1 ELSE 0 END), 0)`,
+                approved: sql<number>`COALESCE(SUM(CASE WHEN ${this.getTabSqlCondition('approved')} THEN 1 ELSE 0 END), 0)`,
+                rejected: sql<number>`COALESCE(SUM(CASE WHEN ${this.getTabSqlCondition('rejected')} THEN 1 ELSE 0 END), 0)`,
+                returned: sql<number>`COALESCE(SUM(CASE WHEN ${this.getTabSqlCondition('returned')} THEN 1 ELSE 0 END), 0)`,
+            })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .where(and(
+                or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
+                userCondition
+            ));
+
+        return {
+            sent: Number(result?.sent || 0),
+            approved: Number(result?.approved || 0),
+            rejected: Number(result?.rejected || 0),
+            returned: Number(result?.returned || 0),
+        };
+    }
+
+    /**
+     * Optimized List Query (Shows Ghost/Messy Records)
+     */
+    private async getPaymentRequestsByTab(
+        tab: DashboardTab,
+        userId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts
+    ): Promise<RequestTabResponse> {
+        const userCondition = userId
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            : undefined;
+
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        // Sorting Logic
+        let orderClause: any = asc(tenderInfos.dueDate);
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo': orderClause = direction(tenderInfos.tenderNo); break;
+                case 'tenderName': orderClause = direction(tenderInfos.tenderName); break;
+                case 'dueDate': orderClause = direction(tenderInfos.dueDate); break;
+                case 'amountRequired': orderClause = direction(paymentRequests.amountRequired); break;
+                case 'purpose': orderClause = direction(paymentRequests.purpose); break;
+                default: orderClause = asc(tenderInfos.dueDate);
+            }
+        }
+
+        // Shared Where Clause
+        // Critical: This matches countRequestsByStatus exactly
+        const whereClause = and(
+            this.getTabSqlCondition(tab), // Use helper
+            eq(paymentInstruments.isActive, true),
+            or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
+            userCondition
+        );
+
+        // Get Total for Pagination
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .where(whereClause);
+
+        // Get Data
+        const rows = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                tenderNo: sql<string>`COALESCE(${tenderInfos.tenderNo}, ${paymentRequests.tenderNo})`.as('tenderNo'),
+                // Fallback for name to show users what this is
+                tenderName: sql<string>`COALESCE(${tenderInfos.tenderName}, ${paymentRequests.projectName}, 'N/A')`.as('tenderName'),
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                dueDate: tenderInfos.dueDate,
+                teamMemberId: tenderInfos.teamMember,
+                teamMemberName: users.name,
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                instrumentStatus: paymentInstruments.status,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .where(whereClause)
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        // Map response
+        const data: PaymentRequestRow[] = rows.map((row) => ({
+            id: row.id,
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo || '',
+            tenderName: row.tenderName || '',
+            purpose: row.purpose as PaymentPurpose,
+            amountRequired: row.amountRequired || '0',
+            dueDate: row.dueDate,
+            teamMemberId: row.teamMemberId,
+            teamMemberName: row.teamMemberName,
+            instrumentId: row.instrumentId,
+            instrumentType: row.instrumentType as InstrumentType | null,
+            instrumentStatus: row.instrumentStatus,
+            displayStatus: deriveDisplayStatus(row.instrumentStatus),
+            createdAt: row.createdAt,
+        }));
+
+        return {
+            ...wrapPaginatedResponse(data, Number(countResult?.count || 0), page, limit),
+            counts: counts || await this.getDashboardCounts(userId),
         };
     }
 
@@ -309,70 +468,6 @@ export class EmdsService {
             );
 
         return Number(result?.count || 0);
-    }
-
-    /**
-     * Count requests grouped by display status
-     */
-    private async countRequestsByStatus(userId?: number): Promise<{
-        sent: number;
-        approved: number;
-        rejected: number;
-        returned: number;
-    }> {
-        const userCondition = userId
-            ? or(
-                eq(tenderInfos.teamMember, userId),
-                eq(paymentRequests.requestedBy, userId.toString())
-            )
-            : undefined;
-
-        const requests = await this.db
-            .select({
-                instrumentStatus: paymentInstruments.status,
-                tenderId: paymentRequests.tenderId,
-            })
-            .from(paymentRequests)
-            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(
-                paymentInstruments,
-                and(
-                    eq(paymentInstruments.requestId, paymentRequests.id),
-                    eq(paymentInstruments.isActive, true)
-                )
-            )
-            .where(
-                and(
-                    // Handle tender_id = 0 OR tender conditions
-                    or(
-                        eq(paymentRequests.tenderId, 0),
-                        and(
-                            gt(paymentRequests.tenderId, 0),
-                            TenderInfosService.getActiveCondition(),
-                            TenderInfosService.getApprovedCondition(),
-                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                            or(
-                                eq(tenderInformation.emdRequired, 'Yes'),
-                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                                eq(tenderInformation.processingFeeRequired, 'Yes')
-                            )
-                        )
-                    ),
-                    userCondition
-                )
-            );
-
-        const counts = { sent: 0, approved: 0, rejected: 0, returned: 0 };
-
-        for (const req of requests) {
-            const tab = getDisplayTab(req.instrumentStatus);
-            if (tab !== 'pending') {
-                counts[tab]++;
-            }
-        }
-
-        return counts;
     }
 
     /**
@@ -582,199 +677,6 @@ export class EmdsService {
             .offset(offset);
 
         const wrapped = wrapPaginatedResponse(rows as PendingTenderRow[], totalCount, page, limit);
-        return {
-            ...wrapped,
-            counts: counts || await this.getDashboardCounts(userId),
-        };
-    }
-
-    /**
-     * Get payment requests by tab (1 row per request)
-     */
-    private async getPaymentRequestsByTab(
-        tab: DashboardTab,
-        userId?: number,
-        pagination?: { page?: number; limit?: number },
-        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
-    ): Promise<RequestTabResponse> {
-        const userCondition = userId
-            ? or(
-                eq(tenderInfos.teamMember, userId),
-                eq(paymentRequests.requestedBy, userId.toString())
-            )
-            : undefined;
-
-        const page = pagination?.page || 1;
-        const limit = pagination?.limit || 50;
-        const offset = (page - 1) * limit;
-
-        // Build order clause
-        let orderClause: any = asc(tenderInfos.dueDate);
-        if (sort?.sortBy) {
-            const direction = sort.sortOrder === 'desc' ? desc : asc;
-            switch (sort.sortBy) {
-                case 'tenderNo':
-                    orderClause = direction(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderClause = direction(tenderInfos.tenderName);
-                    break;
-                case 'dueDate':
-                    orderClause = direction(tenderInfos.dueDate);
-                    break;
-                case 'teamMemberName':
-                    orderClause = direction(users.name);
-                    break;
-                case 'amountRequired':
-                    orderClause = direction(paymentRequests.amountRequired);
-                    break;
-                case 'purpose':
-                    orderClause = direction(paymentRequests.purpose);
-                    break;
-                default:
-                    orderClause = asc(tenderInfos.dueDate);
-            }
-        }
-
-        // Build status filter based on tab
-        let statusFilter: any;
-        switch (tab) {
-            case 'approved':
-                statusFilter = or(
-                    isNotNull(paymentInstruments.action),
-                    inArray(paymentInstruments.status, APPROVED_STATUSES)
-                );
-                break;
-            case 'rejected':
-                statusFilter = or(
-                    isNotNull(paymentInstruments.action),
-                    sql`${paymentInstruments.status} LIKE '%_REJECTED'`
-                );
-                break;
-            case 'returned':
-                statusFilter = or(
-                    isNotNull(paymentInstruments.action),
-                    inArray(paymentInstruments.status, RETURNED_STATUSES)
-                );
-                break;
-            case 'sent':
-            default:
-                statusFilter = or(
-                    isNull(paymentInstruments.status),
-                    isNull(paymentInstruments.action)
-                );
-                break;
-        }
-
-        // Get total count for this tab
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(paymentRequests)
-            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(
-                paymentInstruments,
-                and(
-                    eq(paymentInstruments.requestId, paymentRequests.id),
-                    eq(paymentInstruments.isActive, true)
-                )
-            )
-            .where(
-                and(
-                    // Handle tender_id = 0 OR tender conditions
-                    or(
-                        eq(paymentRequests.tenderId, 0),
-                        and(
-                            gt(paymentRequests.tenderId, 0),
-                            TenderInfosService.getActiveCondition(),
-                            TenderInfosService.getApprovedCondition(),
-                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                            or(
-                                eq(tenderInformation.emdRequired, 'Yes'),
-                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                                eq(tenderInformation.processingFeeRequired, 'Yes')
-                            )
-                        )
-                    ),
-                    statusFilter,
-                    userCondition
-                )
-            );
-
-        const totalCount = Number(countResult?.count || 0);
-
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                id: paymentRequests.id,
-                tenderId: paymentRequests.tenderId,
-                tenderNo: sql<string>`COALESCE(${tenderInfos.tenderNo}, ${paymentRequests.tenderNo})`.as('tenderNo'),
-                tenderName: sql<string>`COALESCE(${tenderInfos.tenderName}, ${paymentRequests.projectName}, 'N/A')`.as('tenderName'),
-                purpose: paymentRequests.purpose,
-                amountRequired: paymentRequests.amountRequired,
-                dueDate: tenderInfos.dueDate,
-                teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
-                instrumentId: paymentInstruments.id,
-                instrumentType: paymentInstruments.instrumentType,
-                instrumentStatus: paymentInstruments.status,
-                createdAt: paymentRequests.createdAt,
-            })
-            .from(paymentRequests)
-            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(
-                paymentInstruments,
-                and(
-                    eq(paymentInstruments.requestId, paymentRequests.id),
-                    eq(paymentInstruments.isActive, true)
-                )
-            )
-            .where(
-                and(
-                    // Handle tender_id = 0 OR tender conditions
-                    or(
-                        eq(paymentRequests.tenderId, 0),
-                        and(
-                            gt(paymentRequests.tenderId, 0),
-                            TenderInfosService.getActiveCondition(),
-                            TenderInfosService.getApprovedCondition(),
-                            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                            or(
-                                eq(tenderInformation.emdRequired, 'Yes'),
-                                eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                                eq(tenderInformation.processingFeeRequired, 'Yes')
-                            )
-                        )
-                    ),
-                    statusFilter,
-                    userCondition
-                )
-            )
-            .orderBy(orderClause)
-            .limit(limit)
-            .offset(offset);
-
-        const data: PaymentRequestRow[] = rows.map((row) => ({
-            id: row.id,
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo || '',
-            tenderName: row.tenderName || '',
-            purpose: row.purpose as PaymentPurpose,
-            amountRequired: row.amountRequired || '0',
-            dueDate: row.dueDate,
-            teamMemberId: row.teamMemberId,
-            teamMemberName: row.teamMemberName,
-            instrumentId: row.instrumentId,
-            instrumentType: row.instrumentType as InstrumentType | null,
-            instrumentStatus: row.instrumentStatus,
-            displayStatus: deriveDisplayStatus(row.instrumentStatus),
-            createdAt: row.createdAt,
-        }));
-
-        const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
         return {
             ...wrapped,
             counts: counts || await this.getDashboardCounts(userId),
