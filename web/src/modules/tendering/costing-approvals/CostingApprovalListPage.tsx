@@ -14,8 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
-import type { CostingApprovalDashboardRow } from '@/modules/tendering/costing-approvals/helpers/costing-approval.types';
+import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer } from '@/modules/tendering/costing-approvals/helpers/costing-approval.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 type TabKey = 'pending' | 'approved' | 'tender-dnb';
 
@@ -51,7 +52,7 @@ const CostingApprovalListPage = () => {
     const costingApprovalsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const costingApprovalActions: ActionItem<CostingApprovalDashboardRow>[] = useMemo(() => [
+    const costingApprovalActions: ActionItem<CostingApprovalDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'Approve Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
@@ -105,8 +106,8 @@ const CostingApprovalListPage = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<CostingApprovalDashboardRow>[]>(() => [
-        tenderNameCol<CostingApprovalDashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<CostingApprovalDashboardRowWithTimer>[]>(() => [
+        tenderNameCol<CostingApprovalDashboardRowWithTimer>('tenderNo', {
             headerName: 'Tender',
             filter: true,
             flex: 2,
@@ -234,6 +235,29 @@ const CostingApprovalListPage = () => {
                     >
                         <ExternalLink className="h-4 w-4" />
                     </a>
+                );
+            },
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
                 );
             },
         },
