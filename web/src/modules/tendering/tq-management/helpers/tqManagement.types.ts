@@ -1,4 +1,5 @@
 import type { TqReceivedFormValues, TqRepliedFormValues, TqMissedFormValues } from './tqManagement.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
  * Tender details for TQ management forms
@@ -109,6 +110,14 @@ export type TqManagementDashboardRow = {
     tqCount: number;
     bidSubmissionId: number | null;
 };
+
+export interface TqManagementDashboardRowWithTimer extends TqManagementDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
 
 export type CreateTqReceivedDto = {
     tenderId: number;

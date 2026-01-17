@@ -6,7 +6,8 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    Query
+    Query,
+    Logger
 } from '@nestjs/common';
 import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
 import type {
@@ -19,13 +20,18 @@ import type {
 } from './dto/tq-management.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
 
 @Controller('tq-management')
 export class TqManagementController {
-    constructor(private readonly tqManagementService: TqManagementService) { }
+    private readonly logger = new Logger(TqManagementController.name);
+    constructor(
+        private readonly tqManagementService: TqManagementService,
+        private readonly workflowService: WorkflowService
+    ) { }
 
     @Get('dashboard')
-    getDashboard(
+    async getDashboard(
         @Query('tabKey') tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         @Query('page') page?: string,
@@ -37,13 +43,40 @@ export class TqManagementController {
         // Use tabKey if provided, otherwise fall back to tab for backward compatibility
         const activeTab = tabKey || tab;
 
-        return this.tqManagementService.getDashboardData(activeTab, {
+        const result = await this.tqManagementService.getDashboardData(activeTab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
         });
+        // Add timer data to each tender
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                let timer: TimerData | null = null;
+                try {
+                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'tq_replied');
+                    if (!timer.hasTimer) {
+                        timer = null;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to get timer for tender ${tender.tenderId}:`,
+                        error
+                    );
+                }
+
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
+
+        return {
+            ...result,
+            data: dataWithTimers
+        };
     }
 
     @Get('dashboard/counts')
