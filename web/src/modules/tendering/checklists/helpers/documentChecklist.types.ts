@@ -1,4 +1,5 @@
 import type { DocumentChecklistFormValues } from './documentChecklist.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export interface ExtraDocument {
     name: string;
@@ -39,6 +40,14 @@ export type TenderDocumentChecklistDashboardRow = {
     gstValues: number;
     checklistSubmitted: boolean;
 };
+
+export interface TenderDocumentChecklistDashboardRowWithTimer extends TenderDocumentChecklistDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
 
 export interface DocumentChecklistsDashboardCounts {
     pending: number;
