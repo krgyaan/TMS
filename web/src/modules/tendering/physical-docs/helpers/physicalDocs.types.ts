@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PhysicalDocsFormSchema } from './physicalDocs.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 // Form Values Type
 export type PhysicalDocsFormValues = z.infer<typeof PhysicalDocsFormSchema>;
@@ -82,6 +83,14 @@ export interface PhysicalDocsDashboardRow {
     physicalDocs: number | null;
     courierNo: number | null;
     courierDate: Date | null;
+}
+
+export interface PhysicalDocsDashboardRowWithTimer extends PhysicalDocsDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
 }
 
 export interface PhysicalDocWithPersons {
