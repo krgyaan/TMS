@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { RfqDashboardRow } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { RfqDashboardRow, RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
@@ -54,28 +55,28 @@ const Rfqs = () => {
 
     const deleteMutation = useDeleteRfq();
 
-    const rfqsActions: ActionItem<RfqDashboardRow>[] = [
+    const rfqsActions: ActionItem<RfqDashboardRowWithTimer>[] = [
         {
             label: 'Send',
-            onClick: (row: RfqDashboardRow) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
+            onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
             label: 'View',
-            onClick: (row: RfqDashboardRow) => {
+            onClick: (row: RfqDashboardRowWithTimer) => {
                 navigate(paths.tendering.rfqsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: 'Delete',
-            onClick: (row: RfqDashboardRow) => {
+            onClick: (row: RfqDashboardRowWithTimer) => {
                 if (row.rfqId && confirm('Are you sure you want to delete this RFQ?')) {
                     deleteMutation.mutate(row.rfqId);
                 }
             },
             icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: RfqDashboardRow) => row.rfqId !== null,
+            // show: (row: RfqDashboardRowWithTimer) => row.rfqId !== null,
         },
     ];
 
@@ -104,8 +105,8 @@ const Rfqs = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<RfqDashboardRow>[]>(() => [
-        tenderNameCol<RfqDashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<RfqDashboardRowWithTimer>[]>(() => [
+        tenderNameCol<RfqDashboardRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 250,
@@ -121,7 +122,7 @@ const Rfqs = () => {
             sortable: true,
             filter: true,
         },
-        dateCol<RfqDashboardRow>('dueDate', {
+        dateCol<RfqDashboardRowWithTimer>('dueDate', {
             headerName: 'Due Date',
             width: 150,
             colId: 'dueDate',
@@ -157,6 +158,29 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
         },
         {
             headerName: '',
