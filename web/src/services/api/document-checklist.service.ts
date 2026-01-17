@@ -5,8 +5,8 @@ import type {
     TenderDocumentChecklistDashboardRow,
     CreateDocumentChecklistDto,
     UpdateDocumentChecklistDto,
-    PaginatedResult,
-} from '@/types/api.types';
+} from '@/modules/tendering/checklists/helpers/documentChecklist.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 export type DocumentChecklistListParams = {
     tab?: 'pending' | 'submitted' | 'tender-dnb';

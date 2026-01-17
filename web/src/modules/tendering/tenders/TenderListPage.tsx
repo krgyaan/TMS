@@ -8,13 +8,14 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
-import type { TenderInfoWithNames, TenderWithRelations } from "@/types/api.types";
+import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
 import { Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
@@ -92,7 +93,7 @@ const TenderListPage = () => {
         ];
     }, [counts]);
 
-    const tenderActions: ActionItem<TenderInfoWithNames>[] = [
+    const tenderActions: ActionItem<TenderWithTimer>[] = [
         {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
@@ -124,7 +125,7 @@ const TenderListPage = () => {
         },
     ];
 
-    const [colDefs] = useState<ColDef<TenderInfoWithNames>[]>([
+    const [colDefs] = useState<ColDef<TenderWithTimer>[]>([
         tenderNameCol<TenderInfoWithNames>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
@@ -160,7 +161,7 @@ const TenderListPage = () => {
             headerName: "EMD",
             filter: true,
             sortable: true,
-            width: 120,
+            width: 100,
             cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
@@ -178,12 +179,34 @@ const TenderListPage = () => {
             headerName: "Status",
             filter: true,
             sortable: true,
-            width: 250,
+            width: 180,
             cellRenderer: (params: any) => {
                 let status = params.data?.statusName;
                 return <Badge variant='outline'>
                     {status}
                 </Badge>
+            },
+        },
+        {
+            field: "timer",
+            headerName: "Timer",
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
             },
         },
         {

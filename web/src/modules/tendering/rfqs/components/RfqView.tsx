@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
-import type { Rfq, TenderInfoWithNames } from '@/types/api.types';
+import type { Rfq } from '../helpers/rfq.types';
+import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface RfqViewProps {

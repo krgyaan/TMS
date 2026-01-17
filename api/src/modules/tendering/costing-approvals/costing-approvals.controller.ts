@@ -7,16 +7,22 @@ import {
     Param,
     ParseIntPipe,
     ForbiddenException,
-    Query
+    Query,
+    Logger
 } from '@nestjs/common';
 import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import type { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
-    constructor(private readonly costingApprovalsService: CostingApprovalsService) { }
+    private readonly logger = new Logger(CostingApprovalsController.name);
+    constructor(
+        private readonly costingApprovalsService: CostingApprovalsService,
+        private readonly workflowService: WorkflowService
+    ) { }
 
     @Get('dashboard')
     async getDashboard(
@@ -28,13 +34,40 @@ export class CostingApprovalsController {
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        return this.costingApprovalsService.getDashboardData((user as any).team, tab, {
+        const result = await this.costingApprovalsService.getDashboardData((user as any).team, tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
         });
+        // Add timer data to each tender
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                let timer: TimerData | null = null;
+                try {
+                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'costing_approval');
+                    if (!timer.hasTimer) {
+                        timer = null;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to get timer for tender ${tender.tenderId}:`,
+                        error
+                    );
+                }
+
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
+
+        return {
+            ...result,
+            data: dataWithTimers
+        };
     }
 
     @Get('dashboard/counts')

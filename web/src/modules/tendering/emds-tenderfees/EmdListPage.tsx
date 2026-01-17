@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -14,9 +14,10 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { PendingTenderRow, PaymentRequestRow } from "@/types/api.types";
+import type { PendingTenderRow, PendingTenderRowWithTimer, PaymentRequestRow, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
 import { tenderNameCol } from "@/components/data-grid";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 
 // Tab configuration
 const TABS = [
@@ -95,8 +96,8 @@ const EmdsAndTenderFeesPage = () => {
     const counts = dashboardData?.counts || countsFromHook;
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
 
-    const pendingColDefs = useMemo<ColDef<PendingTenderRow>[]>(() => [
-        tenderNameCol<PendingTenderRow>('tenderNo', {
+    const pendingColDefs = useMemo<ColDef<PendingTenderRowWithTimer>[]>(() => [
+        tenderNameCol<PendingTenderRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 200,
@@ -105,7 +106,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'gstValues',
             headerName: 'Tender Value',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 return <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>;
             },
         },
@@ -113,7 +114,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'emd',
             headerName: 'EMD',
             width: 100,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 const amount = Number(params.value) || 0;
                 if (amount <= 0) return <span className="text-gray-400">—</span>;
                 return (
@@ -132,7 +133,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'tenderFee',
             headerName: 'Tender Fee',
             width: 120,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 const amount = Number(params.value) || 0;
                 if (amount <= 0) return <span className="text-gray-400">—</span>;
                 return (
@@ -151,7 +152,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'processingFee',
             headerName: 'Processing Fee',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 const amount = Number(params.value) || 0;
                 if (amount <= 0) return <span className="text-gray-400">—</span>;
                 return (
@@ -170,14 +171,14 @@ const EmdsAndTenderFeesPage = () => {
             field: 'teamMemberName',
             headerName: 'Assigned To',
             width: 150,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) =>
+            cellRenderer: (params: any) =>
                 params.value || <span className="text-gray-400">Unassigned</span>,
         },
         {
             field: 'dueDate',
             headerName: 'Due Date',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 if (!params.value) return <span className="text-gray-400">—</span>;
                 const dueDate = new Date(params.value);
                 const isOverdue = dueDate < new Date();
@@ -193,7 +194,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'statusName',
             headerName: 'Status',
             width: 200,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
+            cellRenderer: (params: any) => {
                 return <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>{params.value}</Badge>;
             },
         },
@@ -202,8 +203,8 @@ const EmdsAndTenderFeesPage = () => {
             filter: false,
             sortable: false,
             width: 57,
-            cellRenderer: (params: ICellRendererParams<PendingTenderRow>) => {
-                const actions: ActionItem<PendingTenderRow>[] = [
+            cellRenderer: (params: any) => {
+                const actions: ActionItem<PendingTenderRowWithTimer>[] = [
                     {
                         label: 'View Tender',
                         icon: <EyeIcon className="w-4 h-4" />,
@@ -223,10 +224,33 @@ const EmdsAndTenderFeesPage = () => {
             },
             pinned: 'right',
         },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
+        },
     ], [navigate, activeTab]);
 
-    const requestColDefs = useMemo<ColDef<PaymentRequestRow>[]>(() => [
-        tenderNameCol<PaymentRequestRow>('tenderNo', {
+    const requestColDefs = useMemo<ColDef<PaymentRequestRowWithTimer>[]>(() => [
+        tenderNameCol<PaymentRequestRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 200,
@@ -235,7 +259,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'purpose',
             headerName: 'Type',
             width: 130,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 const purpose = params.value as string;
                 return (
                     <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
@@ -248,7 +272,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'amountRequired',
             headerName: 'Amount',
             width: 100,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) =>
+            cellRenderer: (params: any) =>
                 params.value ? (
                     <span className="font-medium">{formatINR(params.value)}</span>
                 ) : (
@@ -259,7 +283,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'instrumentType',
             headerName: 'Mode',
             width: 120,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
                 return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
             },
@@ -268,7 +292,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'displayStatus',
             headerName: 'Status',
             width: 90,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 const status = params.value as string;
                 return (
                     <Badge variant="outline" className={STATUS_COLORS[status] || ''}>
@@ -281,7 +305,7 @@ const EmdsAndTenderFeesPage = () => {
             field: 'dueDate',
             headerName: 'Due Date',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 if (!params.value) return <span className="text-gray-400">—</span>;
                 const dueDate = new Date(params.value);
                 const isOverdue = dueDate < new Date();
@@ -297,15 +321,38 @@ const EmdsAndTenderFeesPage = () => {
             field: 'teamMemberName',
             headerName: 'Assigned To',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) =>
+            cellRenderer: (params: any) =>
                 params.value || <span className="text-gray-400">Unassigned</span>,
         },
         {
             field: 'createdAt',
             headerName: 'Requested On',
             width: 140,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 return <span>{formatDateTime(params.value)}</span>;
+            },
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
             },
         },
         {
@@ -313,9 +360,9 @@ const EmdsAndTenderFeesPage = () => {
             filter: false,
             sortable: false,
             width: 57,
-            cellRenderer: (params: ICellRendererParams<PaymentRequestRow>) => {
+            cellRenderer: (params: any) => {
                 const row = params.data!;
-                const actions: ActionItem<PaymentRequestRow>[] = [
+                const actions: ActionItem<PaymentRequestRowWithTimer>[] = [
                     {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,

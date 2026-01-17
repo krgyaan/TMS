@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Pencil, ArrowLeft, Gavel, Calendar, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import type { RaDashboardRow } from '@/types/api.types';
+import type { RaDashboardRow } from '../helpers/reverseAuction.types';
 
 interface RaShowProps {
     ra: RaDashboardRow & {

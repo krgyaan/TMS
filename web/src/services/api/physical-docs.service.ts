@@ -4,10 +4,10 @@ import type {
     PhysicalDocsDashboardRow,
     CreatePhysicalDocsDto,
     UpdatePhysicalDocsDto,
-    PaginatedResult,
     PhysicalDocsListParams,
     PhysicalDocsDashboardCounts,
-} from '@/types/api.types';
+} from '@/modules/tendering/physical-docs/helpers/physicalDocs.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 class PhysicalDocsService extends BaseApiService {
     constructor() {

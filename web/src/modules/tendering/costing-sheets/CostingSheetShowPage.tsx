@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
 import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
 import { TenderApprovalView } from "@/modules/tendering/tender-approval/components/TenderApprovalView";
-import type { TenderWithRelations } from "@/types/api.types";
+import type { TenderWithRelations } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 import { AlertCircle } from "lucide-react";
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";

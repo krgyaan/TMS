@@ -3,10 +3,10 @@ import type {
     TenderApproval,
     SaveTenderApprovalDto,
     TenderApprovalRow,
-    PaginatedResult,
     TenderApprovalFilters,
     TenderApprovalDashboardCounts,
-} from '@/types/api.types';
+} from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
+import type { PaginatedResult } from '@/types/api.types';
 
 class TenderApprovalsService extends BaseApiService {
     constructor() {

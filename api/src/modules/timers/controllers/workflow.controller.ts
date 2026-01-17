@@ -3,14 +3,14 @@ import { WorkflowService } from '@/modules/timers/services/workflow.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 
-@Controller('api/workflows')
+@Controller('workflows')
 @UseGuards(JwtAuthGuard)
 export class WorkflowController {
     constructor(private readonly workflowService: WorkflowService) { }
 
     /**
      * Start a workflow for an entity
-     * POST /api/workflows/start
+     * POST /workflows/start
      */
     @Post('start')
     @HttpCode(HttpStatus.CREATED)
@@ -20,7 +20,7 @@ export class WorkflowController {
 
     /**
      * Get workflow status for an entity
-     * GET /api/workflows/entity/:entityType/:entityId
+     * GET /workflows/entity/:entityType/:entityId
      */
     @Get('entity/:entityType/:entityId')
     async getWorkflowStatus(
@@ -32,7 +32,7 @@ export class WorkflowController {
 
     /**
      * Start a step
-     * POST /api/workflows/steps/:stepInstanceId/start
+     * POST /workflows/steps/:stepInstanceId/start
      */
     @Post('steps/:stepInstanceId/start')
     async startStep(
@@ -45,7 +45,7 @@ export class WorkflowController {
 
     /**
      * Complete a step
-     * POST /api/workflows/steps/:stepInstanceId/complete
+     * POST /workflows/steps/:stepInstanceId/complete
      */
     @Post('steps/:stepInstanceId/complete')
     async completeStep(
@@ -62,7 +62,7 @@ export class WorkflowController {
 
     /**
      * Pause a step
-     * POST /api/workflows/steps/:stepInstanceId/pause
+     * POST /workflows/steps/:stepInstanceId/pause
      */
     @Post('steps/:stepInstanceId/pause')
     async pauseStep(
@@ -79,7 +79,7 @@ export class WorkflowController {
 
     /**
      * Resume a step
-     * POST /api/workflows/steps/:stepInstanceId/resume
+     * POST /workflows/steps/:stepInstanceId/resume
      */
     @Post('steps/:stepInstanceId/resume')
     async resumeStep(
@@ -92,7 +92,7 @@ export class WorkflowController {
 
     /**
      * Extend a step
-     * POST /api/workflows/steps/:stepInstanceId/extend
+     * POST /workflows/steps/:stepInstanceId/extend
      */
     @Post('steps/:stepInstanceId/extend')
     async extendStep(
@@ -109,7 +109,7 @@ export class WorkflowController {
 
     /**
      * Reject a step
-     * POST /api/workflows/steps/:stepInstanceId/reject
+     * POST /workflows/steps/:stepInstanceId/reject
      */
     @Post('steps/:stepInstanceId/reject')
     async rejectStep(
@@ -126,7 +126,7 @@ export class WorkflowController {
 
     /**
      * Skip a step
-     * POST /api/workflows/steps/:stepInstanceId/skip
+     * POST /workflows/steps/:stepInstanceId/skip
      */
     @Post('steps/:stepInstanceId/skip')
     async skipStep(
@@ -140,7 +140,7 @@ export class WorkflowController {
 
     /**
      * Cancel a step
-     * POST /api/workflows/steps/:stepInstanceId/cancel
+     * POST /workflows/steps/:stepInstanceId/cancel
      */
     @Post('steps/:stepInstanceId/cancel')
     async cancelStep(

@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pencil, ArrowLeft, FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
-import type { TenderQuery, TenderQueryItem, TqType } from '@/types/api.types';
+import type { TenderQuery, TenderQueryItem } from '../helpers/tqManagement.types';
+import type { TqType } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 

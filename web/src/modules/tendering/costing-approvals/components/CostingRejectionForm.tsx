@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useRejectCosting } from '@/hooks/api/useCostingApprovals';
-import type { TenderCostingSheet } from '@/types/api.types';
+import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 
 const CostingRejectionFormSchema = z.object({
