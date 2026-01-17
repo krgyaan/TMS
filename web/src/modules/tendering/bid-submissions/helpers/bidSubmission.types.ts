@@ -1,4 +1,5 @@
 import type { SubmitBidFormValues, MarkAsMissedFormValues } from './bidSubmission.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export type BidSubmissionStatus = "Submission Pending" | "Bid Submitted" | "Tender Missed";
 
@@ -38,6 +39,14 @@ export type BidSubmissionDashboardRow = {
     bidSubmissionId: number | null;
     costingSheetId: number | null;
 };
+
+export interface BidSubmissionDashboardRowWithTimer extends BidSubmissionDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
 
 export type BidSubmissionListParams = {
     tab?: "pending" | "submitted" | "disqualified" | "tender-dnb";

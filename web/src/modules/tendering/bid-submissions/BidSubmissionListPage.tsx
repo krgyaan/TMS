@@ -15,6 +15,8 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
 import { tenderNameCol } from '@/components/data-grid/columns';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import type { BidSubmissionDashboardRowWithTimer } from './helpers/bidSubmission.types';
 
 type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
@@ -63,7 +65,7 @@ const BidSubmissionListPage = () => {
         }
     };
 
-    const bidSubmissionActions: ActionItem<BidSubmissionDashboardRow>[] = useMemo(() => [
+    const bidSubmissionActions: ActionItem<BidSubmissionDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'Submit Bid',
             onClick: (row: BidSubmissionDashboardRow) => {
@@ -130,7 +132,7 @@ const BidSubmissionListPage = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<BidSubmissionDashboardRow>[]>(() => [
+    const colDefs = useMemo<ColDef<BidSubmissionDashboardRowWithTimer>[]>(() => [
         tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
             headerName: 'Tender',
             filter: true,
@@ -220,6 +222,29 @@ const BidSubmissionListPage = () => {
             },
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
         },
         {
             headerName: 'Actions',
