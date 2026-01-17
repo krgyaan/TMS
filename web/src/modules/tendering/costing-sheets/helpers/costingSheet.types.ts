@@ -99,7 +99,7 @@ export type UpdateCostingSheetDto = {
     teRemarks: string;
 };
 
-export type TabKey = 'pending' | 'submitted' | 'tender-dnb';
+export type CostingSheetTab = 'pending' | 'submitted' | 'tender-dnb';
 
 export interface CostingSheetDashboardCounts {
     pending: number;
@@ -109,7 +109,7 @@ export interface CostingSheetDashboardCounts {
 }
 
 export type CostingSheetListParams = {
-    tab?: TabKey;
+    tab?: CostingSheetTab;
     page?: number;
     limit?: number;
     sortBy?: string;

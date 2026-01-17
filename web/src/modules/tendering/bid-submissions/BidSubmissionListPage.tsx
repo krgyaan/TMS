@@ -169,19 +169,6 @@ const BidSubmissionListPage = () => {
             filter: true,
         },
         {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            width: 140,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
             field: 'finalCosting',
             colId: 'finalCosting',
             headerName: 'Final Costing',
@@ -210,7 +197,7 @@ const BidSubmissionListPage = () => {
         {
             field: 'bidStatus',
             headerName: 'Status',
-            width: 140,
+            width: 170,
             cellRenderer: (params: any) => {
                 const status = params.value;
                 if (!status) return '—';
@@ -226,7 +213,7 @@ const BidSubmissionListPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
