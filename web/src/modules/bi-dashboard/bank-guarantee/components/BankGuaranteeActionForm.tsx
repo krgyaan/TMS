@@ -168,17 +168,13 @@ export function BankGuaranteeActionForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         {/* Action Selection */}
-                        <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(_field) => (
-                                <SelectField
-                                    label="Choose What to do"
-                                    control={form.control}
-                                    name="action"
-                                    options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
-                                />
-                            )}
-                        </FieldWrapper>
+                        <SelectField
+                            label="Choose What to do"
+                            control={form.control}
+                            name="action"
+                            options={ACTION_OPTIONS}
+                            placeholder="Select an action"
+                        />
 
                         {/* Accounts Form (BG) 1 - Request to Bank */}
                         <ConditionalSection show={action === 'accounts-form-1'}>
