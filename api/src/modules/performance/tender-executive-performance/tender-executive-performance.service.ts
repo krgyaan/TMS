@@ -12,6 +12,7 @@ import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { TenderListQuery } from "./zod/tender.dto";
 import { TenderOutcomeStatus } from "./zod/stage-performance.type";
 import { fa } from "zod/v4/locales";
+import { reverseAuctions, tenderQueries } from "@/db/schemas";
 
 export interface TenderListRow {
     id: number;
@@ -33,6 +34,34 @@ function getWeekNumber(date: Date): number {
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil(((+d - +yearStart) / 86400000 + 1) / 7);
+}
+
+export type TenderKpiBucket = "ALLOCATED" | "APPROVED" | "REJECTED" | "PENDING" | "BID" | "MISSED" | "DISQUALIFIED" | "RESULT_AWAITED" | "LOST" | "WON";
+
+function mapStatusToKpi(statusCode: number): TenderKpiBucket {
+    // WON
+    if ([25, 26, 27, 28].includes(statusCode)) return "WON";
+
+    // LOST
+    if ([18, 21, 22, 24].includes(statusCode)) return "LOST";
+
+    // DISQUALIFIED
+    if ([33, 38, 39, 41].includes(statusCode)) return "DISQUALIFIED";
+
+    // MISSED (subset of DNB)
+    if ([8, 16, 36].includes(statusCode)) return "MISSED";
+
+    // REJECTED (Other DNB)
+    if ([9, 10, 11, 12, 13, 14, 15, 31, 32, 34, 35].includes(statusCode)) return "REJECTED";
+
+    // BID DONE, RESULT NOT YET
+    if ([17, 19, 20, 23, 37, 40].includes(statusCode)) return "RESULT_AWAITED";
+
+    // PRE-BID PENDING
+    if ([1, 2, 3, 4, 5, 6, 7, 29, 30].includes(statusCode)) return "PENDING";
+
+    // Fallback
+    return "ALLOCATED";
 }
 
 @Injectable()
@@ -84,9 +113,7 @@ export class TenderExecutiveService {
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
-        if (tenders.length === 0) {
-            return [];
-        }
+        if (tenders.length === 0) return [];
 
         const tenderIds = tenders.map(t => t.id);
 
@@ -113,9 +140,19 @@ export class TenderExecutiveService {
         const resultsRows = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
         const resultMap = new Map<number, (typeof resultsRows)[number]>();
-        for (const r of resultsRows) {
-            resultMap.set(Number(r.tenderId), r);
-        }
+        resultsRows.forEach(r => resultMap.set(Number(r.tenderId), r));
+
+        // TQ
+        const tqs = await this.db.select().from(tenderQueries).where(inArray(tenderQueries.tenderId, tenderIds));
+
+        const tqMap = new Map<number, (typeof tqs)[number]>();
+        tqs.forEach(tq => tqMap.set(Number(tq.tenderId), tq));
+
+        // RA
+        const raResults = await this.db.select().from(reverseAuctions).where(inArray(reverseAuctions.tenderId, tenderIds));
+
+        const raMap = new Map<number, (typeof raResults)[number]>();
+        raResults.forEach(ra => raMap.set(Number(ra.tenderId), ra));
 
         /* =====================================================
        STEP 4: Normalize stage performance
@@ -125,7 +162,10 @@ export class TenderExecutiveService {
 
         for (const tender of tenders) {
             for (const stage of activeStages) {
-                const applicable = stage.isApplicable(tender);
+                const hasTq = tqMap.has(tender.id);
+                const hasBid = tender.status >= 17; // adjust if field differs
+
+                const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.isApplicable(tender);
 
                 let completed = false;
                 let onTime: boolean | null = null;
@@ -139,7 +179,6 @@ export class TenderExecutiveService {
                     if (timerRow) {
                         startTime = timerRow.startTime;
                         endTime = timerRow.endTime ?? null;
-                        const present = new Date();
 
                         completed = timerRow.status === "completed";
 
@@ -147,31 +186,25 @@ export class TenderExecutiveService {
                         if (completed && deadline && endTime) {
                             onTime = endTime <= deadline;
                         }
-
-                        if (present >= tender.dueDate && endTime == null) {
-                            completed = true;
-                            onTime = false;
-                        }
                     }
                 }
 
                 /* ---------- EXISTENCE-BASED STAGES ---------- */
                 if (applicable && stage.type === "existence") {
                     if (stage.stageKey === "result") {
-                        completed = resultMap.has(tender.id);
+                        const result = resultMap.get(tender.id);
+                        completed = Boolean(result?.status);
                     }
 
                     if (stage.stageKey === "ra") {
-                        const result = resultMap.get(tender.id);
-                        completed = Boolean(result?.reverseAuctionId);
+                        completed = raMap.has(tender.id);
                     }
 
                     if (stage.stageKey === "tq") {
-                        // Placeholder – will be implemented when TQ schema exists
-                        completed = false;
+                        completed = tqMap.has(tender.id);
                     }
 
-                    onTime = null; // no timer-based SLA yet
+                    onTime = null;
                 }
 
                 output.push({
@@ -268,96 +301,89 @@ export class TenderExecutiveService {
     ===================================================== */
 
         const tenders = await this.db
-            .select({ id: tenderInfos.id })
+            .select({
+                id: tenderInfos.id,
+                statusCode: tenderInfos.status, // <-- important
+            })
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
-        if (tenders.length === 0) {
-            return {
-                resultAwaited: 0,
-                missed: 0,
-                won: 0,
-                lost: 0,
-                notBid: 0,
-            };
-        }
+        const counters = {
+            allocated: 0,
+            approved: 0,
+            rejected: 0,
+            pending: 0,
 
-        const tenderIds = tenders.map(t => t.id);
-
-        /* =====================================================
-       STEP 2: Fetch bid submissions (bulk)
-    ===================================================== */
-
-        const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
-
-        const bidMap = new Map<number, (typeof bids)[number]>();
-        for (const bid of bids) {
-            bidMap.set(Number(bid.tenderId), bid);
-        }
-
-        /* =====================================================
-       STEP 3: Fetch tender results (bulk)
-    ===================================================== */
-
-        const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
-
-        const resultMap = new Map<number, (typeof results)[number]>();
-        for (const result of results) {
-            resultMap.set(Number(result.tenderId), result);
-        }
-
-        /* =====================================================
-       STEP 4: Classify outcomes
-    ===================================================== */
-
-        let resultAwaited = 0;
-        let missed = 0;
-        let won = 0;
-        let lost = 0;
-        let notBid = 0;
-
-        for (const tenderId of tenderIds) {
-            const bid = bidMap.get(tenderId);
-            const result = resultMap.get(tenderId);
-
-            // -------------------------------
-            // Missed tender
-            // -------------------------------
-            if (bid?.status === "Tender Missed") {
-                missed++;
-                continue;
-            }
-
-            // -------------------------------
-            // Bid submitted
-            // -------------------------------
-            if (bid?.status === "Bid Submitted") {
-                resultAwaited++;
-
-                if (result?.status === "Won") {
-                    won++;
-                } else if (result?.status === "Lost" || result?.status === "Disqualified") {
-                    lost++;
-                } else {
-                    notBid++;
-                }
-
-                continue;
-            }
-
-            // -------------------------------
-            // No bid record / pending
-            // -------------------------------
-            notBid++;
-        }
-
-        return {
-            resultAwaited,
-            missed,
-            won,
-            lost,
-            notBid,
+            bid: 0,
+            missed: 0,
+            disqualified: 0,
+            resultAwaited: 0,
+            lost: 0,
+            won: 0,
         };
+
+        if (tenders.length === 0) return counters;
+
+        /* =====================================================
+       STEP 2: Classify each tender by workflow status
+    ===================================================== */
+
+        for (const tender of tenders) {
+            const code = Number(tender.statusCode);
+
+            counters.allocated++;
+
+            // ---------------- PRE-BID ----------------
+
+            // Approved for bidding (Price Bid Approved and beyond)
+            if (code === 7 || code >= 17) {
+                counters.approved++;
+            }
+
+            // Rejected before bidding (DNB reasons)
+            if ([9, 10, 11, 12, 13, 14, 15, 31, 32, 34, 35].includes(code)) {
+                counters.rejected++;
+            }
+
+            // Pending in preparation
+            if ([1, 2, 3, 4, 5, 6, 29, 30].includes(code)) {
+                counters.pending++;
+            }
+
+            // ---------------- POST-BID ----------------
+
+            // Bid submitted / competed
+            if ([17, 19, 20, 23, 37, 40, 18, 21, 22, 24, 25, 26, 27, 28, 33, 38, 39, 41].includes(code)) {
+                counters.bid++;
+            }
+
+            // Missed
+            if ([8, 16, 36].includes(code)) {
+                counters.missed++;
+            }
+
+            // Disqualified
+            if ([33, 38, 39, 41].includes(code)) {
+                counters.disqualified++;
+            }
+
+            // Result awaited
+            if ([17, 19, 20, 23, 37, 40].includes(code)) {
+                counters.resultAwaited++;
+            }
+
+            // Lost
+            if ([18, 21, 22, 24].includes(code)) {
+                counters.lost++;
+            }
+
+            // Won
+            if ([25, 26, 27, 28].includes(code)) {
+                counters.won++;
+            }
+        }
+
+        return counters;
     }
 
     async getStageMatrix(query: PerformanceQueryDto) {
