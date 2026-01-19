@@ -89,7 +89,7 @@ export const STAGE_CONFIG: StageConfig[] = [
     {
         stageKey: "tq",
         type: "existence",
-        isApplicable: () => true,
+        isApplicable: tender => Boolean(tender.currentStatusCode >= 17),
         resolveDeadline: () => null,
         tlStage: false,
     },
@@ -105,7 +105,7 @@ export const STAGE_CONFIG: StageConfig[] = [
     {
         stageKey: "result",
         type: "existence",
-        isApplicable: () => true,
+        isApplicable: tender => Boolean(tender.currentStatusCode >= 17),
         resolveDeadline: () => null,
         tlStage: false,
     },
