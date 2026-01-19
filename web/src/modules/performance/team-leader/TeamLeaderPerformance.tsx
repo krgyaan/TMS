@@ -44,6 +44,13 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
+const formatLabel = (label: string) => {
+    return label
+        .split("_")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+};
+
 const STAGE_ROW_TYPE_MAP: Record<string, string> = {
     done: "success",
     onTime: "default",
@@ -83,16 +90,16 @@ export default function TeamLeaderPerformance() {
     console.log("TENDERS:", tenders);
 
     const SCORING_COLORS: Record<ScoringKey, string> = {
-        Velocity: "#6366F1",
-        Accuracy: "#22C55E",
-        Outcome: "#F59E0B",
+        "Work Completion": "#6366F1",
+        "On Time Work": "#22C55E",
+        "Win Rate": "#F59E0B",
     };
 
     const SCORING_DATA = scoring
         ? [
-              { name: "Velocity", score: scoring.velocity },
-              { name: "Accuracy", score: scoring.accuracy },
-              { name: "Outcome", score: scoring.outcome },
+              { name: "Work Completion", score: scoring.workCompletion },
+              { name: "On Time Work", score: scoring.onTimeWork },
+              { name: "Win Rate", score: scoring.winRate },
           ].map(item => ({
               ...item,
               fill: SCORING_COLORS[item.name as keyof typeof SCORING_COLORS],
@@ -246,15 +253,15 @@ export default function TeamLeaderPerformance() {
                         </div>
                     </div>
 
-                    <Card className="shadow-sm border-0 ring-1 ring-border/50 overflow-hidden">
+                    <Card className="shadow-sm border-0 ring-1 ring-border/50 overflow-hidden pt-0">
                         <div className="overflow-x-auto">
                             <Table className="min-w-[1000px] border-collapse">
                                 <TableHeader className="bg-muted/30">
                                     <TableRow className="hover:bg-muted/30 border-b border-border/60">
-                                        <TableHead className="w-[150px] font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
+                                        <TableHead className="p-3 w-[150px] font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
                                         {STAGES.map((stage, i) => (
                                             <TableHead key={i} className="text-center text-xs uppercase font-semibold text-muted-foreground w-[90px]">
-                                                {stage}
+                                                {formatLabel(stage)}
                                             </TableHead>
                                         ))}
                                     </TableRow>
@@ -380,9 +387,9 @@ export default function TeamLeaderPerformance() {
                             <div className="space-y-1">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Target className="h-5 w-5 text-primary" />
-                                    Executive Scoring
+                                    Team Lead Scoring
                                 </CardTitle>
-                                <CardDescription>Weighted scores based on Velocity, Accuracy, and Outcome</CardDescription>
+                                <CardDescription>Weighted scores based on Work Completion, On Time Work and Win Rate</CardDescription>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -412,14 +419,14 @@ export default function TeamLeaderPerformance() {
                                             </div>
                                         </div>
                                     ))}
-                                    <div className="pt-4 border-t">
+                                    {/* <div className="pt-4 border-t">
                                         <div className="flex justify-between items-center">
                                             <span className="font-semibold text-lg">Total Score</span>
                                             <Badge variant="default" className="text-lg px-3 py-1">
                                                 {totalScore}
                                             </Badge>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                         </CardContent>

@@ -90,16 +90,16 @@ export default function TenderExecutivePerformance() {
     console.log("TENDERS:", tenders);
 
     const SCORING_COLORS: Record<ScoringKey, string> = {
-        Velocity: "#6366F1",
-        Accuracy: "#22C55E",
-        Outcome: "#F59E0B",
+        "Work Completion": "#6366F1",
+        "On Time Work": "#22C55E",
+        "Win Rate": "#F59E0B",
     };
 
     const SCORING_DATA = scoring
         ? [
-              { name: "Velocity", score: scoring.velocity },
-              { name: "Accuracy", score: scoring.accuracy },
-              { name: "Outcome", score: scoring.outcome },
+              { name: "Work Completion", score: scoring.workCompletion },
+              { name: "On Time Work", score: scoring.onTimeWork },
+              { name: "Win Rate", score: scoring.winRate },
           ].map(item => ({
               ...item,
               fill: SCORING_COLORS[item.name as keyof typeof SCORING_COLORS],
@@ -384,7 +384,7 @@ export default function TenderExecutivePerformance() {
                                     <Target className="h-5 w-5 text-primary" />
                                     Executive Scoring
                                 </CardTitle>
-                                <CardDescription>Weighted scores based on Velocity, Accuracy, and Outcome</CardDescription>
+                                <CardDescription>Weighted scores based on Work Completion, On Time Work and Win Rate</CardDescription>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -416,10 +416,10 @@ export default function TenderExecutivePerformance() {
                                     ))}
                                     <div className="pt-4 border-t">
                                         <div className="flex justify-between items-center">
-                                            <span className="font-semibold text-lg">Total Score</span>
-                                            <Badge variant="default" className="text-lg px-3 py-1">
+                                            {/* <span className="font-semibold text-lg">Total Score</span> */}
+                                            {/* <Badge variant="default" className="text-lg px-3 py-1">
                                                 {totalScore}
-                                            </Badge>
+                                            </Badge> */}
                                         </div>
                                     </div>
                                 </div>

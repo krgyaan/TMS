@@ -371,9 +371,9 @@ export class TeamLeaderPerformanceService {
         const total = Math.round(velocityScore * 0.4 + accuracyScore * 0.4 + outcomeScore * 0.2);
 
         return {
-            velocity: velocityScore,
-            accuracy: accuracyScore,
-            outcome: outcomeScore,
+            workCompletion: velocityScore,
+            onTimeWork: accuracyScore,
+            winRate: outcomeScore,
             total,
         };
     }
