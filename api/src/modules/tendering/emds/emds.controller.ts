@@ -1,29 +1,10 @@
-import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    Req,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Req, Logger } from '@nestjs/common';
 import { EmdsService } from '@/modules/tendering/emds/emds.service';
-import {
-    CreatePaymentRequestSchema,
-    UpdatePaymentRequestSchema,
-    UpdateStatusSchema,
-    DashboardQuerySchema,
-    type DashboardResponse,
-    type DashboardCounts,
-    type DashboardTab,
-} from '@/modules/tendering/emds/dto/emds.dto';
+import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from '@/modules/tendering/emds/dto/emds.dto';
 import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
 
 // Extend Express Request to include user
 interface AuthenticatedRequest extends Request {
@@ -37,7 +18,11 @@ interface AuthenticatedRequest extends Request {
 
 @Controller('emds-tenderfees')
 export class EmdsController {
-    constructor(private readonly emdsService: EmdsService) { }
+    private readonly logger = new Logger(EmdsController.name);
+    constructor(
+        private readonly emdsService: EmdsService,
+        private readonly workflowService: WorkflowService
+    ) { }
 
     @Get('/')
     async getDashboard(
@@ -47,12 +32,39 @@ export class EmdsController {
         const parsed = DashboardQuerySchema.parse(query);
         // Use current user's ID if not provided in query
         const userId = parsed.userId ?? req.user?.id;
-        return this.emdsService.getDashboardData(
+        const result = await this.emdsService.getDashboardData(
             parsed.tab as DashboardTab ?? 'pending',
             userId,
             parsed.page && parsed.limit ? { page: parsed.page, limit: parsed.limit } : undefined,
             parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined
         );
+        // Add timer data to each tender
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                let timer: TimerData | null = null;
+                try {
+                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'emd_requested');
+                    if (!timer.hasTimer) {
+                        timer = null;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to get timer for tender ${tender.tenderId}:`,
+                        error
+                    );
+                }
+
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
+
+        return {
+            ...result,
+            data: dataWithTimers
+        };
     }
 
     @Get('/dashboard/counts')

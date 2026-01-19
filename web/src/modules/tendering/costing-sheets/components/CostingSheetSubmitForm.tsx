@@ -13,7 +13,7 @@ import { ArrowLeft, Save, AlertCircle, Percent, IndianRupee } from 'lucide-react
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useSubmitCostingSheet, useUpdateCostingSheet } from '@/hooks/api/useCostingSheets';
-import type { TenderCostingSheet } from '@/types/api.types';
+import type { TenderCostingSheet } from '../helpers/costingSheet.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 const CostingSheetFormSchema = z.object({

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
-import type { BidSubmission } from '@/types/api.types';
+import type { BidSubmission } from '../helpers/bidSubmission.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';

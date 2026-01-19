@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
-import { AudioWaveform, Command, GalleryVerticalEnd, FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard } from "lucide-react";
+import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -85,12 +85,12 @@ const navMain: NavGroup[] = [
         title: "BI Dashboard",
         icon: BarChart3,
         items: [
-            { title: "Demand Draft", url: paths.bi.demandDraft, permission: "bi.demand-draft" },
-            { title: "FDR", url: paths.bi.fdr, permission: "bi.fdr" },
-            { title: "Cheque", url: paths.bi.cheque, permission: "bi.cheque" },
             { title: "Bank Guarantee", url: paths.bi.bankGuarantee, permission: "bi.bank-guarantee" },
+            { title: "Demand Draft", url: paths.bi.demandDraft, permission: "bi.demand-draft" },
             { title: "Bank Transfer", url: paths.bi.bankTransfer, permission: "bi.bank-transfer" },
             { title: "Pay on Portal", url: paths.bi.payOnPortal, permission: "bi.pay-on-portal" },
+            { title: "Cheque", url: paths.bi.cheque, permission: "bi.cheque" },
+            { title: "FDR", url: paths.bi.fdr, permission: "bi.fdr" },
         ],
     },
     {

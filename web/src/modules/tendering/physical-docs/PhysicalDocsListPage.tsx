@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { PhysicalDocsDashboardRow } from '@/types/api.types';
+import type { PhysicalDocsDashboardRow, PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Search } from 'lucide-react';
@@ -16,6 +16,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
@@ -51,15 +52,15 @@ const PhysicalDocsListPage = () => {
     const tabsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const physicalDocsActions: ActionItem<PhysicalDocsDashboardRow>[] = [
+    const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
         {
             label: 'Send',
-            onClick: (row: PhysicalDocsDashboardRow) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
+            onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
             label: 'View',
-            onClick: (row: PhysicalDocsDashboardRow) => {
+            onClick: (row: PhysicalDocsDashboardRowWithTimer) => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
@@ -86,8 +87,8 @@ const PhysicalDocsListPage = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<PhysicalDocsDashboardRow>[]>(() => [
-        tenderNameCol<PhysicalDocsDashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<PhysicalDocsDashboardRowWithTimer>[]>(() => [
+        tenderNameCol<PhysicalDocsDashboardRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 250,
@@ -141,6 +142,29 @@ const PhysicalDocsListPage = () => {
             valueGetter: (params: any) => params.data?.courierNo ? params.data.courierNo : '—',
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
         },
         {
             headerName: 'Actions',

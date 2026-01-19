@@ -13,9 +13,10 @@ import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { CostingSheetDashboardRow, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
+import type { CostingSheetDashboardRow, CostingSheetDashboardRowWithTimer, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import { tenderNameCol } from "@/components/data-grid/columns";
 import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ const CostingSheets = () => {
     const costingSheetsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleCreateCosting = useCallback(async (row: CostingSheetDashboardRow) => {
+    const handleCreateCosting = useCallback(async (row: CostingSheetDashboardRowWithTimer) => {
         // Check if user has Drive scopes
         if (!driveScopes?.hasScopes) {
             setConnectDriveOpen(true);
@@ -127,7 +128,7 @@ const CostingSheets = () => {
         window.location.href = authUrl;
     }, []);
 
-    const costingSheetActions: ActionItem<CostingSheetDashboardRow>[] = useMemo(() => [
+    const costingSheetActions: ActionItem<CostingSheetDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'Create Costing',
             onClick: handleCreateCosting,
@@ -137,7 +138,7 @@ const CostingSheets = () => {
         },
         {
             label: 'Submit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
+            onClick: (row: CostingSheetDashboardRowWithTimer) => {
                 navigate(paths.tendering.costingSheetSubmit(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
@@ -145,7 +146,7 @@ const CostingSheets = () => {
         },
         {
             label: 'Edit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
+            onClick: (row: CostingSheetDashboardRowWithTimer) => {
                 navigate(paths.tendering.costingSheetEdit(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
@@ -153,7 +154,7 @@ const CostingSheets = () => {
         },
         {
             label: 'Re-submit Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
+            onClick: (row: CostingSheetDashboardRowWithTimer) => {
                 navigate(paths.tendering.costingSheetResubmit(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
@@ -161,7 +162,7 @@ const CostingSheets = () => {
         },
         {
             label: 'View Costing',
-            onClick: (row: CostingSheetDashboardRow) => {
+            onClick: (row: CostingSheetDashboardRowWithTimer) => {
                 navigate(paths.tendering.costingSheetView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
@@ -188,8 +189,8 @@ const CostingSheets = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<CostingSheetDashboardRow>[]>(() => [
-        tenderNameCol<CostingSheetDashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<CostingSheetDashboardRowWithTimer>[]>(() => [
+        tenderNameCol<CostingSheetDashboardRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
             width: 200,
@@ -309,6 +310,29 @@ const CostingSheets = () => {
                     >
                         <ExternalLink className="h-4 w-4" />
                     </a>
+                );
+            },
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
                 );
             },
         },

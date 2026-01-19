@@ -20,7 +20,7 @@ import { useCreateTenderApproval, useUpdateTenderApproval } from '@/hooks/api/us
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { useStatuses } from '@/hooks/api/useStatuses';
 import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
-import type { TenderWithRelations } from '@/types/api.types';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';

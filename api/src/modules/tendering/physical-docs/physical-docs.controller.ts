@@ -11,16 +11,22 @@ import {
     HttpStatus,
     NotFoundException,
     Query,
+    Logger,
 } from '@nestjs/common';
 import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
 
 
 @Controller('physical-docs')
 export class PhysicalDocsController {
-    constructor(private readonly physicalDocsService: PhysicalDocsService) { }
+    private readonly logger = new Logger(PhysicalDocsController.name);
+    constructor(
+        private readonly physicalDocsService: PhysicalDocsService,
+        private readonly workflowService: WorkflowService
+    ) { }
 
     @Get('dashboard')
     async getDashboard(
@@ -31,13 +37,40 @@ export class PhysicalDocsController {
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        return this.physicalDocsService.getDashboardData(tab, {
+        const result = await this.physicalDocsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
         });
+        // Add timer data to each tender
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                let timer: TimerData | null = null;
+                try {
+                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'physical_docs');
+                    if (!timer.hasTimer) {
+                        timer = null;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to get timer for tender ${tender.tenderId}:`,
+                        error
+                    );
+                }
+
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
+
+        return {
+            ...result,
+            data: dataWithTimers
+        };
     }
 
     @Get('dashboard/counts')

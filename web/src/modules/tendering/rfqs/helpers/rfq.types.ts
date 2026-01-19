@@ -1,4 +1,5 @@
 import type { RfqFormValues } from './rfq.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
  * Props for RfqForm component
@@ -23,6 +24,14 @@ export interface RfqDashboardRow {
     dueDate: Date;
     rfqId: number | null;
     vendorOrganizationNames: string | null;
+}
+
+export interface RfqDashboardRowWithTimer extends RfqDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
 }
 
 export type RfqDashboardFilters = {
@@ -99,3 +108,11 @@ export interface UpdateRfqDto {
 
 // Re-export form value types
 export type { RfqFormValues };
+
+export interface RfqDashboardCounts {
+    pending: number;
+    sent: number;
+    "rfq-rejected": number;
+    "tender-dnb": number;
+    total: number;
+}

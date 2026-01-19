@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
-import type { TenderCostingSheet } from '@/types/api.types';
+import type { TenderCostingSheet } from '../helpers/costingSheet.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
