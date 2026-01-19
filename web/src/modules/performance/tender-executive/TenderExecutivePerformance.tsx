@@ -108,33 +108,72 @@ export default function TenderExecutivePerformance() {
 
     const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
 
-    const KPI_DATA = useMemo(() => {
+    const PRE_BID_KPIS = useMemo(() => {
         if (!outcomes) return [];
 
         return [
             {
-                key: "won",
-                label: "Won",
-                count: outcomes.won,
-                icon: Trophy,
+                key: "allocated",
+                label: "Allocated",
+                count: outcomes.allocated,
+                icon: Briefcase,
+                color: "text-indigo-600",
+                bg: "bg-indigo-50",
+            },
+            {
+                key: "approved",
+                label: "Approved",
+                count: outcomes.approved,
+                icon: CheckCircle2,
                 color: "text-emerald-600",
                 bg: "bg-emerald-50",
             },
             {
-                key: "lost",
-                label: "Lost",
-                count: outcomes.lost,
+                key: "rejected",
+                label: "Rejected",
+                count: outcomes.rejected,
                 icon: XCircle,
                 color: "text-red-600",
                 bg: "bg-red-50",
             },
             {
+                key: "pending",
+                label: "Pending",
+                count: outcomes.pending,
+                icon: Clock,
+                color: "text-amber-600",
+                bg: "bg-amber-50",
+            },
+        ];
+    }, [outcomes]);
+
+    const POST_BID_KPIS = useMemo(() => {
+        if (!outcomes) return [];
+
+        return [
+            {
+                key: "bid",
+                label: "Bid",
+                count: outcomes.bid,
+                icon: FileText,
+                color: "text-sky-600",
+                bg: "bg-sky-50",
+            },
+            {
                 key: "missed",
                 label: "Missed",
                 count: outcomes.missed,
-                icon: Target,
+                icon: AlertTriangle,
                 color: "text-rose-600",
                 bg: "bg-rose-50",
+            },
+            {
+                key: "disqualified",
+                label: "Disqualified",
+                count: outcomes.disqualified,
+                icon: AlertTriangle,
+                color: "text-orange-600",
+                bg: "bg-orange-50",
             },
             {
                 key: "resultAwaited",
@@ -145,16 +184,63 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-blue-50",
             },
             {
-                key: "notBid",
-                label: "Not Bid",
-                count: outcomes.notBid,
-                icon: Clock,
-                color: "text-amber-600",
-                bg: "bg-amber-50",
+                key: "lost",
+                label: "Lost",
+                count: outcomes.lost,
+                icon: XCircle,
+                color: "text-red-600",
+                bg: "bg-red-50",
+            },
+            {
+                key: "won",
+                label: "Won",
+                count: outcomes.won,
+                icon: Trophy,
+                color: "text-emerald-600",
+                bg: "bg-emerald-50",
             },
         ];
     }, [outcomes]);
 
+    const renderKpiCard = kpi => {
+        const isSelected = selectedMetric === kpi.key;
+
+        return (
+            <button
+                key={kpi.key}
+                onClick={() => setSelectedMetric(kpi.key)}
+                className={`
+                group relative overflow-hidden
+                flex flex-col
+                p-5 rounded-2xl border
+                transition-all duration-300 ease-out
+                hover:-translate-y-1 hover:shadow-xl
+                ${
+                    isSelected
+                        ? "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/40 ring-2 ring-primary/50"
+                        : "bg-card/80 backdrop-blur border-border hover:border-primary/30"
+                }
+            `}
+            >
+                {/* Glow Accent */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+
+                {/* KPI Row */}
+                <div className="relative flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${kpi.bg} shadow-sm`}>
+                        <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                    </div>
+
+                    <span className="text-[11px] tracking-wide font-semibold text-muted-foreground uppercase whitespace-nowrap">{kpi.label}</span>
+
+                    <span className="ml-auto text-2xl font-bold tracking-tight">{kpi.count}</span>
+                </div>
+
+                {/* Selection Bar */}
+                {isSelected && <div className="absolute bottom-0 left-0 h-1 w-full bg-primary rounded-t-full" />}
+            </button>
+        );
+    };
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
             <div className="mx-auto max-w-7xl p-6 space-y-8">
@@ -211,34 +297,18 @@ export default function TenderExecutivePerformance() {
                 </Card>
 
                 {/* ===== KPI CARDS ===== */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 ">
-                    {KPI_DATA.map(kpi => {
-                        const isSelected = selectedMetric === kpi.key;
-                        return (
-                            <button
-                                key={kpi.key}
-                                onClick={() => setSelectedMetric(kpi.key)}
-                                className={`
-                                    relative flex flex-col items-start p-4 rounded-xl border transition-all duration-200 text-left
-                                    hover:shadow-md hover:-translate-y-1 group
-                                    ${isSelected ? "bg-card ring-2 ring-primary border-transparent shadow-md" : "bg-card border-border"}
-                                `}
-                            >
-                                <div className={`p-2 rounded-lg mb-3 ${kpi.bg}`}>
-                                    <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase">{kpi.label}</span>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold">{kpi.count}</span>
-                                    </div>
-                                    {/* <span className={`text-[10px] font-medium ${kpi.key === "won" ? "text-emerald-600" : "text-muted-foreground"}`}>
-                                        {formatCurrency(kpi?.value) ?? ""}
-                                    </span> */}
-                                </div>
-                            </button>
-                        );
-                    })}
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid Funnel</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{PRE_BID_KPIS.map(renderKpiCard)}</div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Post-Bid Funnel</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">{POST_BID_KPIS.map(renderKpiCard)}</div>
+                    </div>
                 </div>
 
                 {/* ===== STAGE MATRIX / KANBAN METRICS ===== */}
@@ -433,7 +503,7 @@ export default function TenderExecutivePerformance() {
                     <CardHeader className="flex flex-row items-center justify-between pb-4">
                         <div>
                             <CardTitle className="text-lg flex items-center gap-2">
-                                {KPI_DATA.find(k => k.key === selectedMetric)?.label} Tenders
+                                {[...PRE_BID_KPIS, ...POST_BID_KPIS].find(k => k.key === selectedMetric)?.label ?? "All"} Tenders
                                 <Badge variant="secondary">{tenders.length}</Badge>
                             </CardTitle>
                         </div>
