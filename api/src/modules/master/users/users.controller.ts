@@ -37,6 +37,12 @@ export class UsersController {
         return this.usersService.findAll();
     }
 
+    @Public()
+    @Get("by-role/:roleId")
+    async getUsersByRole(@Param("roleId") roleId: number) {
+        return this.usersService.findUsersByRole(roleId);
+    }
+
     @Get(":id")
     @CanRead("users")
     async getById(@Param("id", ParseIntPipe) id: number) {
@@ -46,11 +52,13 @@ export class UsersController {
         }
         return user;
     }
+
     @Public()
     @Post()
-    @HttpCode(HttpStatus.CREATED)
-    @CanCreate("users")
+    // @HttpCode(HttpStatus.CREATED)
+    // @CanCreate("users")
     async create(@Body() body: unknown) {
+        console.log("Creating user with payload:", body);
         const parsed = CreateUserSchema.parse(body);
         const payload: CreateUserDto = {
             ...parsed,
@@ -223,9 +231,9 @@ export class UsersController {
         await this.usersService.removeUserPermission(userId, permissionId);
     }
 
-    @Get('team/:teamId/members')
-    @CanRead('users')
-    async getTeamMembers(@Param('teamId', ParseIntPipe) teamId: number) {
+    @Get("team/:teamId/members")
+    @CanRead("users")
+    async getTeamMembers(@Param("teamId", ParseIntPipe) teamId: number) {
         const members = await this.usersService.getTeamMembers(teamId);
         return members;
     }
