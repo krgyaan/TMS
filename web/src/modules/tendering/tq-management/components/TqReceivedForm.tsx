@@ -14,7 +14,7 @@ import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useCreateTqReceived, useUpdateTqReceived, useTqItems } from '@/hooks/api/useTqManagement';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
-import type { TenderQuery } from '@/types/api.types';
+import type { TenderQuery } from '../helpers/tqManagement.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import SelectField from '@/components/form/SelectField';
 import { TenderFileUploader } from '@/components/tender-file-upload';

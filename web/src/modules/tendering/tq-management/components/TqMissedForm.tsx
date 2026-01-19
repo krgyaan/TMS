@@ -11,7 +11,7 @@ import { ArrowLeft, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useUpdateTqMissed } from '@/hooks/api/useTqManagement';
-import type { TenderQuery } from '@/types/api.types';
+import type { TenderQuery } from '../helpers/tqManagement.types';
 
 const TqMissedFormSchema = z.object({
     missedReason: z.string().min(10, 'Reason must be at least 10 characters'),

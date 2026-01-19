@@ -14,8 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
-import type { TenderDocumentChecklistDashboardRow } from '@/types/api.types';
+import type { TenderDocumentChecklistDashboardRow, TenderDocumentChecklistDashboardRowWithTimer } from './helpers/documentChecklist.types';
 import { tenderNameCol } from '@/components/data-grid';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 const Checklists = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>('pending');
@@ -49,7 +50,7 @@ const Checklists = () => {
     const tabsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const checklistActions: ActionItem<TenderDocumentChecklistDashboardRow>[] = [
+    const checklistActions: ActionItem<TenderDocumentChecklistDashboardRowWithTimer>[] = [
         {
             label: 'Create',
             onClick: (row: TenderDocumentChecklistDashboardRow) => {
@@ -93,7 +94,7 @@ const Checklists = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRow>[]>(() => [
+    const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRowWithTimer>[]>(() => [
         tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
@@ -145,6 +146,29 @@ const Checklists = () => {
                     <Badge variant="default">
                         {status}
                     </Badge>
+                );
+            },
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
                 );
             },
         },

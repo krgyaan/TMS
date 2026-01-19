@@ -14,7 +14,7 @@ import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoShe
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
 import { RfqView } from './components/RfqView';
-import type { TenderWithRelations } from '@/types/api.types';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export default function RfqShowPage() {
     const navigate = useNavigate();

@@ -11,7 +11,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
 import { useUpdateTqReplied } from '@/hooks/api/useTqManagement';
-import type { TenderQuery } from '@/types/api.types';
+import type { TenderQuery } from '../helpers/tqManagement.types';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const TqRepliedFormSchema = z.object({

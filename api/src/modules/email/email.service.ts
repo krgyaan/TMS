@@ -147,7 +147,7 @@ export class EmailService {
                     fromUserId: options.fromUserId,
                     fromEmail: sender.email,
                     toEmails,
-                    ccEmails: ccEmailsResolved, // Save original CC for audit trail
+                    ccEmails: ccEmailsResolved,
                     subject: options.subject,
                     templateName: options.template,
                     templateData: options.data,

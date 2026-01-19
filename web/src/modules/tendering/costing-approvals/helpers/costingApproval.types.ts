@@ -1,4 +1,5 @@
 import type { CostingApprovalFormValues, CostingRejectionFormValues } from './costingApproval.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
  * Tender details for costing approval forms
@@ -126,6 +127,14 @@ export type CostingApprovalDashboardRow = {
     googleSheetUrl: string | null;
     costingSheetId: number | null;
 };
+
+export interface CostingApprovalDashboardRowWithTimer extends CostingApprovalDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
 
 export type ApproveCostingDto = {
     finalPrice: string;

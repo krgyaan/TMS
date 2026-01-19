@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { PhysicalDocsFormSchema } from './physicalDocs.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 // Form Values Type
 export type PhysicalDocsFormValues = z.infer<typeof PhysicalDocsFormSchema>;
 
 // Person type for form
 export interface PhysicalDocsPerson {
+    id?: number;
     name: string;
     email: string;
     phone: string;
@@ -34,16 +36,76 @@ export interface PhysicalDocsResponse {
 export interface CreatePhysicalDocsDto {
     tenderId: number;
     courierNo: number;
-    submittedDocs: string;
-    physicalDocsPersons: PhysicalDocsPerson[];
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, "id">[];
 }
 
 // Update DTO
 export interface UpdatePhysicalDocsDto {
     id: number;
+    courierNo?: number;
+    submittedDocs?: string;
+    physicalDocsPersons?: Omit<PhysicalDocsPerson, "id">[];
+}
+
+export interface PhysicalDocs {
+    id: number;
+    tenderId: number;
     courierNo: number;
-    submittedDocs: string;
-    physicalDocsPersons: PhysicalDocsPerson[];
+    submittedDocs: string | null;
+    persons: PhysicalDocsPerson[];
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface PhysicalDocsListParams {
+    physicalDocsSent?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    search?: string;
+}
+
+export interface PhysicalDocsDashboardRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    courierAddress: string;
+    physicalDocsRequired: string;
+    physicalDocsDeadline: Date;
+    teamMemberName: string;
+    status: number;
+    statusName: string;
+    latestStatus: number | null;
+    latestStatusName: string | null;
+    statusRemark: string | null;
+    physicalDocs: number | null;
+    courierNo: number | null;
+    courierDate: Date | null;
+}
+
+export interface PhysicalDocsDashboardRowWithTimer extends PhysicalDocsDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
+export interface PhysicalDocWithPersons {
+    id: number;
+    tenderId: number;
+    courierNo: number;
+    submittedDocs: string | null;
+    persons: PhysicalDocsPerson[];
+}
+
+export interface PhysicalDocsDashboardCounts {
+    pending: number;
+    sent: number;
+    "tender-dnb": number;
+    total: number;
 }
 
 // Constants - Courier Options

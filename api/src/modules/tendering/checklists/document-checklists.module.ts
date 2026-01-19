@@ -4,9 +4,10 @@ import { DocumentChecklistsController } from '@/modules/tendering/checklists/doc
 import { DocumentChecklistsService } from '@/modules/tendering/checklists/document-checklists.service';
 import { EmailModule } from '@/modules/email/email.module';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
+import { TimersModule } from '@/modules/timers/timers.module';
 
 @Module({
-    imports: [DatabaseModule, EmailModule, TendersModule],
+    imports: [DatabaseModule, EmailModule, TendersModule, TimersModule],
     controllers: [DocumentChecklistsController],
     providers: [DocumentChecklistsService],
     exports: [DocumentChecklistsService],

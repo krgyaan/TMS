@@ -15,7 +15,8 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import QualificationDialog from './components/QualificationDialog';
-import type { TabKey, TqManagementDashboardRow } from './helpers/tqManagement.types';
+import type { TabKey, TqManagementDashboardRow, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 
 const TqManagementListPage = () => {
@@ -106,10 +107,10 @@ const TqManagementListPage = () => {
         }
     };
 
-    const tqManagementActions: ActionItem<TqManagementDashboardRow>[] = useMemo(() => [
+    const tqManagementActions: ActionItem<TqManagementDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'TQ Received',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReceived(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
@@ -117,7 +118,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'Mark as No TQ',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 handleMarkAsNoTq(row.tenderId);
             },
             icon: <CheckCircle className="h-4 w-4" />,
@@ -125,7 +126,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'TQ Replied',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReplied(row.tqId!));
             },
             icon: <Send className="h-4 w-4" />,
@@ -133,7 +134,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'TQ Missed',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqMissed(row.tqId!));
             },
             icon: <XCircle className="h-4 w-4" />,
@@ -141,7 +142,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'Edit TQ Received',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqEditReceived(row.tqId!));
             },
             icon: <Edit className="h-4 w-4" />,
@@ -149,7 +150,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'Edit TQ Reply',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqEditReplied(row.tqId!));
             },
             icon: <Edit className="h-4 w-4" />,
@@ -157,7 +158,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'Edit TQ Missed',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqEditMissed(row.tqId!));
             },
             icon: <Edit className="h-4 w-4" />,
@@ -165,7 +166,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'View Details',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqView(row.tqId!));
             },
             icon: <Eye className="h-4 w-4" />,
@@ -173,7 +174,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'View All TQs',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqViewAll(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
@@ -181,7 +182,7 @@ const TqManagementListPage = () => {
         },
         {
             label: 'TQ Qualified',
-            onClick: (row: TqManagementDashboardRow) => {
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
                 handleTqQualified(row.tqId!);
             },
             icon: <FileCheck className="h-4 w-4" />,
@@ -219,8 +220,8 @@ const TqManagementListPage = () => {
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<TqManagementDashboardRow>[]>(() => [
-        tenderNameCol<TqManagementDashboardRow>('tenderNo', {
+    const colDefs = useMemo<ColDef<TqManagementDashboardRowWithTimer>[]>(() => [
+        tenderNameCol<TqManagementDashboardRowWithTimer>('tenderNo', {
             headerName: 'Tender',
             filter: true,
             width: 200,
@@ -293,6 +294,29 @@ const TqManagementListPage = () => {
                     return <Badge variant="outline">{count}</Badge>;
                 }
                 return count;
+            },
+        },
+        {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 150,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
             },
         },
         {

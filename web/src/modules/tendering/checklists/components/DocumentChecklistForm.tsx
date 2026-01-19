@@ -14,7 +14,7 @@ import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useEffect } from 'react';
 import { useCreateDocumentChecklist, useUpdateDocumentChecklist } from '@/hooks/api/useDocumentChecklists';
-import type { CreateDocumentChecklistDto, TenderDocumentChecklist, UpdateDocumentChecklistDto } from '@/types/api.types';
+import type { CreateDocumentChecklistDto, TenderDocumentChecklist, UpdateDocumentChecklistDto } from '../helpers/documentChecklist.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 const DocumentChecklistFormSchema = z.object({

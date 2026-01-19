@@ -10,9 +10,9 @@ export const createPool = (url: string, max?: number, ssl?: boolean) =>
         ssl: ssl ? { rejectUnauthorized: false } : undefined,
     });
 
-export const createDb = (pool: Pool) =>
-    drizzle(pool, {
-        schema: { ...schema },
-    });
+export const createDb = (pool: Pool) => drizzle(pool, {
+    schema: { ...schema },
+    // logger: true,
+});
 
 export type DbInstance = NodePgDatabase<typeof schema>;
