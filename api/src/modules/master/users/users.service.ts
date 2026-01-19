@@ -1,32 +1,21 @@
-﻿import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { randomBytes } from 'node:crypto';
-import { hash, verify } from 'argon2';
-import { and, eq, isNull, inArray } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { users, type NewUser, type User } from '@db/schemas/auth/users.schema';
-import { userProfiles } from '@db/schemas/auth/user-profiles.schema';
-import { userRoles } from '@db/schemas/auth/user-roles.schema';
-import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
-import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
-import { roles } from '@db/schemas/auth/roles.schema';
-import { permissions } from '@db/schemas/auth/permissions.schema';
-import { designations } from '@db/schemas/master/designations.schema';
-import { teams } from '@db/schemas/master/teams.schema';
-import { RoleName, DataScope, getDataScope, canSwitchTeams } from '@/common/constants/roles.constant';
+﻿import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
+import { hash, verify } from "argon2";
+import { and, eq, isNull, inArray, asc } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { users, type NewUser, type User } from "@db/schemas/auth/users.schema";
+import { userProfiles } from "@db/schemas/auth/user-profiles.schema";
+import { userRoles } from "@db/schemas/auth/user-roles.schema";
+import { userPermissions } from "@db/schemas/auth/user-permissions.schema";
+import { rolePermissions } from "@db/schemas/auth/role-permissions.schema";
+import { roles } from "@db/schemas/auth/roles.schema";
+import { permissions } from "@db/schemas/auth/permissions.schema";
+import { designations } from "@db/schemas/master/designations.schema";
+import { teams } from "@db/schemas/master/teams.schema";
+import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
 
-export type SafeUser = Pick<
-    User,
-    | 'id'
-    | 'name'
-    | 'email'
-    | 'username'
-    | 'mobile'
-    | 'team'
-    | 'isActive'
-    | 'createdAt'
-    | 'updatedAt'
->;
+export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "team" | "isActive" | "createdAt" | "updatedAt">;
 
 export type UserProfileSummary = {
     id: number;
@@ -65,7 +54,7 @@ export type UserWithRelations = SafeUser & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
     designation: { id: number; name: string | null } | null;
-    role: UserRoleInfo | null;  // NEW
+    role: UserRoleInfo | null; // NEW
 };
 
 // NEW: Type for JWT payload enrichment
@@ -82,7 +71,7 @@ export type UserAuthInfo = {
 
 @Injectable()
 export class UsersService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     // UPDATED: Include role in base query
     private baseUserQuery() {
@@ -133,63 +122,63 @@ export class UsersService {
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
             .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
-            .leftJoin(userRoles, eq(userRoles.userId, users.id))  // NEW
-            .leftJoin(roles, eq(roles.id, userRoles.roleId));     // NEW
+            .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
+            .leftJoin(roles, eq(roles.id, userRoles.roleId)); // NEW
     }
 
     // UPDATED: Include role in mapping
     private mapUserRow(row: any): UserWithRelations {
         const profile = row.profileId
             ? {
-                id: row.profileId,
-                userId: row.profileUserId,
-                firstName: row.profileFirstName,
-                lastName: row.profileLastName,
-                dateOfBirth: row.profileDateOfBirth,
-                gender: row.profileGender,
-                employeeCode: row.profileEmployeeCode,
-                designationId: row.profileDesignationId,
-                primaryTeamId: row.profilePrimaryTeamId,
-                oldTeamId: row.team,
-                altEmail: row.profileAltEmail,
-                emergencyContactName: row.profileEmergencyContactName,
-                emergencyContactPhone: row.profileEmergencyContactPhone,
-                image: row.profileImage,
-                signature: row.profileSignature,
-                dateOfJoining: row.profileDateOfJoining,
-                dateOfExit: row.profileDateOfExit,
-                timezone: row.profileTimezone,
-                locale: row.profileLocale,
-                createdAt: row.profileCreatedAt,
-                updatedAt: row.profileUpdatedAt,
-            }
+                  id: row.profileId,
+                  userId: row.profileUserId,
+                  firstName: row.profileFirstName,
+                  lastName: row.profileLastName,
+                  dateOfBirth: row.profileDateOfBirth,
+                  gender: row.profileGender,
+                  employeeCode: row.profileEmployeeCode,
+                  designationId: row.profileDesignationId,
+                  primaryTeamId: row.profilePrimaryTeamId,
+                  oldTeamId: row.team,
+                  altEmail: row.profileAltEmail,
+                  emergencyContactName: row.profileEmergencyContactName,
+                  emergencyContactPhone: row.profileEmergencyContactPhone,
+                  image: row.profileImage,
+                  signature: row.profileSignature,
+                  dateOfJoining: row.profileDateOfJoining,
+                  dateOfExit: row.profileDateOfExit,
+                  timezone: row.profileTimezone,
+                  locale: row.profileLocale,
+                  createdAt: row.profileCreatedAt,
+                  updatedAt: row.profileUpdatedAt,
+              }
             : null;
 
         const team =
             row.teamId != null
                 ? {
-                    id: row.teamId,
-                    name: row.teamName,
-                }
+                      id: row.teamId,
+                      name: row.teamName,
+                  }
                 : null;
 
         const designation =
             row.designationId != null
                 ? {
-                    id: row.designationId,
-                    name: row.designationName,
-                }
+                      id: row.designationId,
+                      name: row.designationName,
+                  }
                 : null;
 
         // NEW: Map role with computed properties
         const role: UserRoleInfo | null =
             row.roleId != null
                 ? {
-                    id: row.roleId,
-                    name: row.roleName,
-                    dataScope: getDataScope(row.roleName),
-                    canSwitchTeams: canSwitchTeams(row.roleName),
-                }
+                      id: row.roleId,
+                      name: row.roleName,
+                      dataScope: getDataScope(row.roleName),
+                      canSwitchTeams: canSwitchTeams(row.roleName),
+                  }
                 : null;
 
         return {
@@ -204,7 +193,7 @@ export class UsersService {
             profile,
             team: row.primaryTeamId !== null ? row.primaryTeamId : row.oldTeamId,
             designation,
-            role,  // NEW
+            role, // NEW
         };
     }
 
@@ -236,8 +225,8 @@ export class UsersService {
             roleId: row.roleId,
             primaryTeamId: row.primaryTeamId,
             oldTeamId: row.oldTeamId,
-            dataScope: getDataScope(row.roleName ?? ''),
-            canSwitchTeams: canSwitchTeams(row.roleName ?? ''),
+            dataScope: getDataScope(row.roleName ?? ""),
+            canSwitchTeams: canSwitchTeams(row.roleName ?? ""),
         };
     }
 
@@ -250,11 +239,7 @@ export class UsersService {
         }
 
         // Verify role exists
-        const role = await this.db
-            .select()
-            .from(roles)
-            .where(eq(roles.id, roleId))
-            .limit(1);
+        const role = await this.db.select().from(roles).where(eq(roles.id, roleId)).limit(1);
         if (!role[0]) {
             throw new NotFoundException(`Role with ID ${roleId} not found`);
         }
@@ -283,11 +268,7 @@ export class UsersService {
     }
 
     // NEW: Assign permissions to user (bulk)
-    async assignPermissions(
-        userId: number,
-        permissionIds: number[],
-        granted: boolean[],
-    ): Promise<void> {
+    async assignPermissions(userId: number, permissionIds: number[], granted: boolean[]): Promise<void> {
         // Verify user exists
         const user = await this.findById(userId);
         if (!user) {
@@ -295,7 +276,7 @@ export class UsersService {
         }
 
         if (permissionIds.length !== granted.length) {
-            throw new Error('permissionIds and granted arrays must have the same length');
+            throw new Error("permissionIds and granted arrays must have the same length");
         }
 
         if (permissionIds.length === 0) {
@@ -303,24 +284,14 @@ export class UsersService {
         }
 
         // Verify permissions exist
-        const existingPermissions = await this.db
-            .select()
-            .from(permissions)
-            .where(inArray(permissions.id, permissionIds));
+        const existingPermissions = await this.db.select().from(permissions).where(inArray(permissions.id, permissionIds));
 
         if (existingPermissions.length !== permissionIds.length) {
-            throw new NotFoundException('One or more permissions not found');
+            throw new NotFoundException("One or more permissions not found");
         }
 
         // Delete existing user permissions for these permission IDs
-        await this.db
-            .delete(userPermissions)
-            .where(
-                and(
-                    eq(userPermissions.userId, userId),
-                    inArray(userPermissions.permissionId, permissionIds)
-                )
-            );
+        await this.db.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
 
         // Insert new permissions
         const values = permissionIds.map((permissionId, index) => ({
@@ -363,34 +334,23 @@ export class UsersService {
     async removeUserPermission(userId: number, permissionId: number): Promise<void> {
         const result = await this.db
             .delete(userPermissions)
-            .where(
-                and(
-                    eq(userPermissions.userId, userId),
-                    eq(userPermissions.permissionId, permissionId)
-                )
-            )
+            .where(and(eq(userPermissions.userId, userId), eq(userPermissions.permissionId, permissionId)))
             .returning();
 
         if (result.length === 0) {
-            throw new NotFoundException(
-                `User permission override not found for user ${userId} and permission ${permissionId}`
-            );
+            throw new NotFoundException(`User permission override not found for user ${userId} and permission ${permissionId}`);
         }
     }
 
     // NEW: Get role by name
     async getRoleByName(name: string): Promise<{ id: number; name: string } | null> {
-        const result = await this.db
-            .select({ id: roles.id, name: roles.name })
-            .from(roles)
-            .where(eq(roles.name, name))
-            .limit(1);
+        const result = await this.db.select({ id: roles.id, name: roles.name }).from(roles).where(eq(roles.name, name)).limit(1);
         return result[0] ?? null;
     }
 
     async findAllWithRelations(): Promise<UserWithRelations[]> {
         const rows = await this.baseUserQuery().where(isNull(users.deletedAt));
-        return rows.map((row) => this.mapUserRow(row));
+        return rows.map(row => this.mapUserRow(row));
     }
 
     async findAll(): Promise<UserWithRelations[]> {
@@ -432,17 +392,7 @@ export class UsersService {
 
     // Keep original for backward compatibility
     sanitizeUser(user: User): SafeUser {
-        const {
-            id,
-            name,
-            email,
-            username,
-            mobile,
-            team,
-            isActive,
-            createdAt,
-            updatedAt,
-        } = user;
+        const { id, name, email, username, mobile, team, isActive, createdAt, updatedAt } = user;
         return {
             id,
             name,
@@ -458,7 +408,7 @@ export class UsersService {
 
     async create(data: NewUser): Promise<User> {
         if (!data.password) {
-            throw new Error('Password is required');
+            throw new Error("Password is required");
         }
         const hashed = await this.hashPassword(data.password);
         const rows = (await this.db
@@ -468,15 +418,7 @@ export class UsersService {
         return rows[0];
     }
 
-    async update(
-        id: number,
-        data: Partial<
-            Pick<
-                NewUser,
-                'name' | 'username' | 'email' | 'mobile' | 'password' | 'isActive'
-            >
-        >,
-    ): Promise<User> {
+    async update(id: number, data: Partial<Pick<NewUser, "name" | "username" | "email" | "mobile" | "password" | "isActive">>): Promise<User> {
         const updatePayload: Partial<NewUser> = {
             ...data,
             updatedAt: new Date(),
@@ -502,13 +444,13 @@ export class UsersService {
     async delete(id: number, currentUserId: number): Promise<void> {
         // Cannot delete yourself
         if (id === currentUserId) {
-            throw new ForbiddenException('You cannot delete your own account');
+            throw new ForbiddenException("You cannot delete your own account");
         }
 
         // Get user's role to check if Super User
         const userRole = await this.getUserRole(id);
         if (userRole?.name === RoleName.SUPER_USER) {
-            throw new ForbiddenException('Cannot delete Super User account');
+            throw new ForbiddenException("Cannot delete Super User account");
         }
 
         const rows = (await this.db
@@ -556,15 +498,10 @@ export class UsersService {
         }
     }
 
-    async createFromGoogle(payload: {
-        email: string;
-        name?: string | null;
-    }): Promise<User> {
-        const randomPassword = randomBytes(32).toString('hex');
+    async createFromGoogle(payload: { email: string; name?: string | null }): Promise<User> {
+        const randomPassword = randomBytes(32).toString("hex");
         const hashed = await this.hashPassword(randomPassword);
-        const name = payload.name?.trim()?.length
-            ? payload.name
-            : payload.email.split('@')[0];
+        const name = payload.name?.trim()?.length ? payload.name : payload.email.split("@")[0];
         const rows = (await this.db
             .insert(users)
             .values({
@@ -579,7 +516,7 @@ export class UsersService {
 
     async ensureUser(id: number): Promise<User> {
         const user = await this.findById(id);
-        if (!user) throw new NotFoundException('User not found');
+        if (!user) throw new NotFoundException("User not found");
         return user;
     }
 
@@ -606,11 +543,25 @@ export class UsersService {
                 email: users.email,
                 mobile: users.mobile,
                 team: users.team,
-                isActive: users.isActive
+                isActive: users.isActive,
             })
             .from(users)
-            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))
-        ) as User[];
+            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))) as User[];
         return result;
+    }
+
+    async findUsersByRole(roleId: number) {
+        return this.db
+            .select({
+                id: users.id,
+                name: users.name,
+                team: teams.name,
+            })
+            .from(users)
+            .innerJoin(userRoles, eq(userRoles.userId, users.id))
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
+            .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
+            .orderBy(asc(users.name));
     }
 }
