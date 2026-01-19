@@ -64,6 +64,9 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
+import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
+import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
 
 @Module({
     imports: [
@@ -139,6 +142,9 @@ import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        TenderExecutivePerformanceModule,
+        TeamLeaderPerformanceModule,
+        OemDashboardModule,
     ],
     controllers: [AppController],
     providers: [
