@@ -27,6 +27,15 @@ export const useUser = (id: number) => {
     });
 };
 
+export function useUsersByRole(roleId: number) {
+    return useQuery({
+        queryKey: ["users", "role", roleId],
+        queryFn: () => usersService.getUsersByRole(roleId),
+        enabled: !!roleId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+
 export const useCreateUser = () => {
     const queryClient = useQueryClient();
 
