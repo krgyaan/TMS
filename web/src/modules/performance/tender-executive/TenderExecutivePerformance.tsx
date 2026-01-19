@@ -67,7 +67,7 @@ export default function TenderExecutivePerformance() {
     const [userId, setUserId] = useState<number | null>(15);
     const [fromDate, setFromDate] = useState<string | null>("2025-10-01");
     const [toDate, setToDate] = useState<string | null>("2025-10-30");
-    const [selectedMetric, setSelectedMetric] = useState("total");
+    const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
     const { data: users } = useUsersByRole(5);
 
