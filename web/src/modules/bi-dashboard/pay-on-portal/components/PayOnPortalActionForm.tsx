@@ -28,7 +28,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (POP) 1 - Request to Portal' },
+    { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned', label: 'Returned' },
     { value: 'settled', label: 'Settled' },
