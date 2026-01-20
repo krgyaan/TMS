@@ -111,10 +111,7 @@ export class TeamLeaderPerformanceService {
     ---------------------------------------- */
 
         const tenders = await this.db
-            .select({
-                id: tenderInfos.id,
-                dueDate: tenderInfos.dueDate,
-            })
+            .select()
             .from(tenderInfos)
             .where(and(inArray(tenderInfos.teamMember, teamUserIds), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
@@ -170,6 +167,8 @@ export class TeamLeaderPerformanceService {
 
             output.push({
                 tenderId: tender.id,
+                tenderNo: tender.tenderNo,
+                tenderName: tender.tenderName,
                 stageKey: stage.stageKey,
                 applicable: true,
                 completed,
