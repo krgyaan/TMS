@@ -24,6 +24,23 @@ export interface TenderListRow {
     status: TenderOutcomeStatus;
 }
 
+interface StageDrilldownItem {
+    tenderId: number;
+    tenderNo?: string;
+    tenderName?: string;
+
+    // Common
+    stageKey: string;
+
+    // Timing
+    deadline?: Date | null;
+    completedAt?: Date | null;
+    daysOverdue?: number | null;
+
+    // Stage-specific (optional)
+    meta?: Record<string, any>;
+}
+
 function getExecutiveStages() {
     return STAGE_CONFIG.filter(s => !s.tlStage);
 }
@@ -179,12 +196,19 @@ export class TenderExecutiveService {
                     if (timerRow) {
                         startTime = timerRow.startTime;
                         endTime = timerRow.endTime ?? null;
-
-                        completed = timerRow.status === "completed";
-
                         const deadline = stage.resolveDeadline(tender);
-                        if (completed && deadline && endTime) {
-                            onTime = endTime <= deadline;
+                        const now = new Date();
+
+                        if (timerRow.status === "completed" && endTime) {
+                            completed = true;
+                            onTime = deadline ? endTime <= deadline : null;
+                        } else {
+                            completed = false;
+                            if (deadline) {
+                                // not completed, check SLA
+                                onTime = now <= deadline ? null : false;
+                                // null = still pending, false = overdue
+                            }
                         }
                     }
                 }
@@ -209,6 +233,8 @@ export class TenderExecutiveService {
 
                 output.push({
                     tenderId: tender.id,
+                    tenderNo: tender.tenderNo ?? null,
+                    tenderName: tender.tenderName ?? null,
                     stageKey: stage.stageKey,
                     applicable,
                     completed,
@@ -404,7 +430,16 @@ export class TenderExecutiveService {
                 onTime: number;
                 late: number;
                 pending: number;
+                overdue: number;
                 notApplicable: number;
+                drilldown: {
+                    done: any[];
+                    onTime: any[];
+                    late: any[];
+                    pending: any[];
+                    overdue: any[];
+                    notApplicable: any[];
+                };
             }
         >();
 
@@ -414,7 +449,16 @@ export class TenderExecutiveService {
                 onTime: 0,
                 late: 0,
                 pending: 0,
+                overdue: 0,
                 notApplicable: 0,
+                drilldown: {
+                    done: [],
+                    onTime: [],
+                    late: [],
+                    pending: [],
+                    overdue: [],
+                    notApplicable: [],
+                },
             });
         }
 
@@ -424,25 +468,80 @@ export class TenderExecutiveService {
         for (const stage of stages) {
             const counter = counters.get(stage.stageKey)!;
 
+            const tenderMeta: StageDrilldownItem = {
+                tenderId: stage.tenderId,
+                stageKey: stage.stageKey,
+                tenderNo: stage.tenderNo,
+                tenderName: stage.tenderName,
+                deadline: stage.deadline ?? null,
+                completedAt: stage.endTime ?? null,
+                daysOverdue:
+                    !stage.completed && stage.onTime === false && stage.deadline
+                        ? Math.max(0, Math.ceil((Date.now() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
+                        : null,
+                meta: {},
+            };
+
+            switch (stage.stageKey) {
+                case "emd":
+                    tenderMeta.meta = {
+                        emdStatus: stage.completed ? "Paid" : "Pending",
+                    };
+                    break;
+
+                case "ra":
+                    tenderMeta.meta = {
+                        raApplicable: stage.applicable,
+                        raCompleted: stage.completed,
+                    };
+                    break;
+
+                case "tq":
+                    tenderMeta.meta = {
+                        tqRaised: stage.applicable,
+                        tqCompleted: stage.completed,
+                    };
+                    break;
+
+                case "result":
+                    tenderMeta.meta = {
+                        resultStatus: stage.completed ? "Declared" : "Awaited",
+                    };
+                    break;
+
+                default:
+                    tenderMeta.meta = {};
+            }
+
             if (!stage.applicable) {
                 counter.notApplicable++;
+                counter.drilldown.notApplicable.push(tenderMeta);
                 continue;
             }
 
             if (!stage.completed) {
-                counter.pending++;
+                if (stage.onTime === false) {
+                    counter.overdue++;
+                    counter.drilldown.overdue.push(tenderMeta);
+                } else {
+                    counter.pending++;
+                    counter.drilldown.pending.push(tenderMeta);
+                }
                 continue;
             }
 
             // Completed
             counter.done++;
+            counter.drilldown.done.push(tenderMeta);
 
             if (stage.onTime === true) {
                 counter.onTime++;
+                counter.drilldown.onTime.push(tenderMeta);
             }
 
             if (stage.onTime === false) {
                 counter.late++;
+                counter.drilldown.late.push(tenderMeta);
             }
         }
 
@@ -454,26 +553,37 @@ export class TenderExecutiveService {
                 key: "done",
                 label: "Done",
                 data: stageKeys.map(k => counters.get(k)!.done),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.done),
             },
             {
                 key: "onTime",
                 label: "On Time",
                 data: stageKeys.map(k => counters.get(k)!.onTime),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.onTime),
             },
             {
                 key: "late",
                 label: "Late",
                 data: stageKeys.map(k => counters.get(k)!.late),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.late),
             },
             {
                 key: "pending",
                 label: "Pending",
                 data: stageKeys.map(k => counters.get(k)!.pending),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.pending),
+            },
+            {
+                key: "overdue",
+                label: "Overdue",
+                data: stageKeys.map(k => counters.get(k)!.overdue),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.overdue),
             },
             {
                 key: "notApplicable",
                 label: "Not Applicable",
                 data: stageKeys.map(k => counters.get(k)!.notApplicable),
+                drilldown: stageKeys.map(k => counters.get(k)!.drilldown.notApplicable),
             },
         ];
 
