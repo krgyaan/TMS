@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
+import { dateCol, currencyCol, tenderNameCol } from '@/components/data-grid/columns';
 import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
@@ -169,18 +169,11 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            {
-                field: 'tenderNo',
-                headerName: 'Tender Name',
+            tenderNameCol<BankGuaranteeDashboardRow>('tenderNo', {
+                headerName: 'Tender Details',
+                filter: true,
                 width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-                valueGetter: (params) => {
-                    const tenderNo = params.data?.tenderNo || '';
-                    const tenderName = params.data?.tenderName || '';
-                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
-                },
-            },
+            }),
             dateCol<BankGuaranteeDashboardRow>('bidValidity', {
                 headerName: 'Bid Validity',
                 width: 130,

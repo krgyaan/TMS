@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc, ne } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc, desc, ne, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -23,6 +23,43 @@ export class DemandDraftService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
 
+    private buildDdDashboardConditions(tab?: string) {
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'DD'),
+            eq(paymentInstruments.isActive, true),
+        ];
+
+        if (tab === 'pending') {
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 0),
+                    eq(paymentInstruments.status, DD_STATUSES.PENDING)
+                )
+            );
+        } else if (tab === 'created') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+            );
+        } else if (tab === 'rejected') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED)
+            );
+        } else if (tab === 'returned') {
+            conditions.push(
+                inArray(paymentInstruments.action, [3, 4, 5])
+            );
+        } else if (tab === 'cancelled') {
+            conditions.push(
+                inArray(paymentInstruments.action, [6, 7])
+            );
+        }
+
+        return conditions;
+    }
+
+
     async getDashboardData(
         tab?: string,
         options?: {
@@ -37,29 +74,7 @@ export class DemandDraftService {
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions: any[] = [
-            eq(paymentInstruments.instrumentType, 'DD'),
-            eq(paymentInstruments.isActive, true),
-        ];
-
-        // Apply tab-specific filters
-        if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
-        } else if (tab === 'created') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
-            );
-        } else if (tab === 'rejected') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED)
-            );
-        } else if (tab === 'returned') {
-            conditions.push(inArray(paymentInstruments.action, [3, 4, 5]));
-        } else if (tab === 'cancelled') {
-            conditions.push(inArray(paymentInstruments.action, [6, 7]));
-        }
+        const conditions = this.buildDdDashboardConditions(tab);
 
         // Search filter
         if (options?.search) {
@@ -103,9 +118,11 @@ export class DemandDraftService {
                 id: paymentInstruments.id,
                 ddCreationDate: instrumentDdDetails.ddDate,
                 ddNo: instrumentDdDetails.ddNo,
-                beneficiaryName: sql<string | null>`NULL`, // DD doesn't have beneficiaryName in schema
+                beneficiaryName: paymentInstruments.favouring,
                 ddAmount: paymentInstruments.amount,
                 tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
                 tenderNo: tenderInfos.tenderNo,
                 bidValidity: tenderInfos.dueDate,
                 tenderStatus: statuses.name,
@@ -129,7 +146,7 @@ export class DemandDraftService {
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .where(whereClause);
 
@@ -141,8 +158,8 @@ export class DemandDraftService {
             ddNo: row.ddNo,
             beneficiaryName: row.beneficiaryName,
             ddAmount: row.ddAmount ? Number(row.ddAmount) : null,
-            tenderName: row.tenderName,
-            tenderNo: row.tenderNo,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             member: row.member,
@@ -153,73 +170,36 @@ export class DemandDraftService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countDdByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<DemandDraftDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'DD'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const pending = await this.countDdByConditions(
+            this.buildDdDashboardConditions('pending')
+        );
 
-        // Count pending
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(paymentInstruments.action),
-        ];
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...pendingConditions));
-        const pending = Number(pendingResult?.count || 0);
+        const created = await this.countDdByConditions(
+            this.buildDdDashboardConditions('created')
+        );
 
-        // Count created
-        const createdConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED),
-        ];
-        const [createdResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...createdConditions));
-        const created = Number(createdResult?.count || 0);
+        const rejected = await this.countDdByConditions(
+            this.buildDdDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
+        const returned = await this.countDdByConditions(
+            this.buildDdDashboardConditions('returned')
+        );
 
-        // Count returned
-        const returnedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [3, 4, 5]),
-        ];
-        const [returnedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...returnedConditions));
-        const returned = Number(returnedResult?.count || 0);
-
-        // Count cancelled
-        const cancelledConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [6, 7]),
-        ];
-        const [cancelledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...cancelledConditions));
-        const cancelled = Number(cancelledResult?.count || 0);
+        const cancelled = await this.countDdByConditions(
+            this.buildDdDashboardConditions('cancelled')
+        );
 
         return {
             pending,
@@ -230,6 +210,7 @@ export class DemandDraftService {
             total: pending + created + rejected + returned + cancelled,
         };
     }
+
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {

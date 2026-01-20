@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
+import { dateCol, currencyCol, tenderNameCol } from '@/components/data-grid/columns';
 import { DemandDraftActionForm } from './components/DemandDraftActionForm';
 
 const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
@@ -158,18 +158,11 @@ const DemandDraftListPage = () => {
                 colId: 'ddAmount',
                 sortable: true,
             }),
-            {
-                field: 'tenderNo',
-                headerName: 'Tender Name',
+            tenderNameCol<DemandDraftDashboardRow>('tenderNo', {
+                headerName: 'Tender Details',
+                filter: true,
                 width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-                valueGetter: (params) => {
-                    const tenderNo = params.data?.tenderNo || '';
-                    const tenderName = params.data?.tenderName || '';
-                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
-                },
-            },
+            }),
             dateCol<DemandDraftDashboardRow>('bidValidity', {
                 headerName: 'Bid Validity',
                 width: 130,
