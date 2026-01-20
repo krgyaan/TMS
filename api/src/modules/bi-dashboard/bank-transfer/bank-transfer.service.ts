@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -14,6 +14,7 @@ import { teams } from '@db/schemas/master/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
+import { BT_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 
@@ -47,21 +48,40 @@ export class BankTransferService {
 
         // Apply tab-specific filters
         if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 0),
+                    eq(paymentInstruments.status, BT_STATUSES.PENDING)
+                )
+            );
         } else if (tab === 'accepted') {
             conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
+                and(
+                    inArray(paymentInstruments.action, [1, 2]),
+                    eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+                )
             );
         } else if (tab === 'rejected') {
             conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
+                and(
+                    inArray(paymentInstruments.action, [1, 2]),
+                    eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_REJECTED)
+                )
             );
         } else if (tab === 'returned') {
-            conditions.push(eq(paymentInstruments.action, 3));
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 3),
+                    eq(paymentInstruments.status, BT_STATUSES.RETURN_VIA_BANK_TRANSFER)
+                )
+            );
         } else if (tab === 'settled') {
-            conditions.push(eq(paymentInstruments.action, 4));
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 4),
+                    eq(paymentInstruments.status, BT_STATUSES.SETTLED_WITH_PROJECT)
+                )
+            );
         }
 
         // Search filter
@@ -104,10 +124,13 @@ export class BankTransferService {
                 id: paymentInstruments.id,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
+                member: paymentRequests.requestedBy,
                 utrNo: instrumentTransferDetails.utrNum,
                 accountName: instrumentTransferDetails.accountName,
                 tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
                 tenderNo: tenderInfos.tenderNo,
+                projectNo: paymentRequests.tenderNo,
                 bidValidity: tenderInfos.dueDate,
                 tenderStatus: statuses.name,
                 amount: paymentInstruments.amount,
@@ -115,7 +138,7 @@ export class BankTransferService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -129,7 +152,7 @@ export class BankTransferService {
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .where(whereClause);
 
@@ -138,11 +161,11 @@ export class BankTransferService {
         const data: BankTransferDashboardRow[] = rows.map((row) => ({
             id: row.id,
             date: row.date ? new Date(row.date) : null,
-            teamMember: row.teamMember,
+            teamMember: row.teamMember || row.member,
             utrNo: row.utrNo,
             accountName: row.accountName,
-            tenderName: row.tenderName,
-            tenderNo: row.tenderNo,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
@@ -161,7 +184,10 @@ export class BankTransferService {
         // Count pending
         const pendingConditions = [
             ...baseConditions,
-            isNull(paymentInstruments.action),
+            or(
+                eq(paymentInstruments.action, 0),
+                eq(paymentInstruments.status, BT_STATUSES.PENDING)
+            )
         ];
         const [pendingResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -173,8 +199,10 @@ export class BankTransferService {
         // Count accepted
         const acceptedConditions = [
             ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
+            and(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+            ),
         ];
         const [acceptedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -186,8 +214,10 @@ export class BankTransferService {
         // Count rejected
         const rejectedConditions = [
             ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
+            and(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_REJECTED)
+            ),
         ];
         const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -199,7 +229,10 @@ export class BankTransferService {
         // Count returned
         const returnedConditions = [
             ...baseConditions,
-            eq(paymentInstruments.action, 3),
+            or(
+                eq(paymentInstruments.action, 3),
+                eq(paymentInstruments.status, BT_STATUSES.RETURN_VIA_BANK_TRANSFER)
+            )
         ];
         const [returnedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -211,7 +244,10 @@ export class BankTransferService {
         // Count settled
         const settledConditions = [
             ...baseConditions,
-            eq(paymentInstruments.action, 4),
+            or(
+                eq(paymentInstruments.action, 4),
+                eq(paymentInstruments.status, BT_STATUSES.SETTLED_WITH_PROJECT)
+            )
         ];
         const [settledResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -232,7 +268,7 @@ export class BankTransferService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
+            'accounts-form': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -283,14 +319,13 @@ export class BankTransferService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.bt_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = BT_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.bt_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = BT_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            // Store date_time in legacyData for timer stop functionality
             if (body.date_time) {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
@@ -298,11 +333,11 @@ export class BankTransferService {
                 };
             }
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            updateData.status = BT_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned') {
-            updateData.status = 'RETURNED';
+            updateData.status = BT_STATUSES.RETURN_VIA_BANK_TRANSFER;
         } else if (body.action === 'settled') {
-            updateData.status = 'SETTLED';
+            updateData.status = BT_STATUSES.SETTLED_WITH_PROJECT;
         }
 
         await this.db
@@ -312,30 +347,21 @@ export class BankTransferService {
 
         // Handle transfer details update or creation
         const transferDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
-            if (body.account_name) transferDetailsUpdate.accountName = body.account_name;
-            if (body.account_no) transferDetailsUpdate.accountNumber = body.account_no;
-            if (body.ifsc_code) transferDetailsUpdate.ifsc = body.ifsc_code;
-            if (body.amount) transferDetailsUpdate.amount = body.amount;
             if (body.payment_date) transferDetailsUpdate.transactionDate = body.payment_date;
             if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
             if (body.utr_mgs) transferDetailsUpdate.utrMsg = body.utr_mgs;
         } else if (body.action === 'returned') {
             if (body.return_date) transferDetailsUpdate.returnTransferDate = body.return_date;
-            if (body.return_reason) transferDetailsUpdate.reason = body.return_reason;
-            if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
             if (body.utr_num) transferDetailsUpdate.returnUtr = body.utr_num;
         } else if (body.action === 'settled') {
-            if (body.settlement_date) transferDetailsUpdate.transactionDate = body.settlement_date;
-            if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
-            if (body.settlement_reference_no) transferDetailsUpdate.transactionId = body.settlement_reference_no;
+            if (body.action === 'settled') transferDetailsUpdate.action = body.action;
         }
 
         if (Object.keys(transferDetailsUpdate).length > 0) {
             transferDetailsUpdate.updatedAt = new Date();
 
-            // Check if transfer details record exists
             const [existingDetails] = await this.db
                 .select()
                 .from(instrumentTransferDetails)
@@ -348,7 +374,6 @@ export class BankTransferService {
                     .set(transferDetailsUpdate)
                     .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
             } else {
-                // Create new transfer details record
                 await this.db.insert(instrumentTransferDetails).values({
                     instrumentId,
                     ...transferDetailsUpdate,
@@ -357,10 +382,8 @@ export class BankTransferService {
             }
         }
 
-        // Handle followup creation
         if (body.action === 'initiate-followup') {
             try {
-                // Get payment request and tender info
                 const [request] = await this.db
                     .select({
                         requestId: paymentRequests.id,
@@ -381,7 +404,6 @@ export class BankTransferService {
                         .limit(1);
 
                     if (tender) {
-                        // Get team name
                         const [team] = await this.db
                             .select({ name: teams.name })
                             .from(teams)
@@ -390,10 +412,8 @@ export class BankTransferService {
 
                         const area = team?.name === 'AC' ? 'AC Team' : 'DC Team';
 
-                        // Identify proof image from files
                         let proofImagePath: string | null = null;
                         if (files && files.length > 0) {
-                            // Look for proof image by field name or filename pattern
                             const proofImage = files.find(
                                 (f) => f.fieldname === 'proof_image' || f.filename?.includes('proof')
                             );
@@ -402,7 +422,6 @@ export class BankTransferService {
                             }
                         }
 
-                        // Map contacts to ContactPersonDto format and filter out invalid ones
                         const mappedContacts = contacts
                             .filter((contact) => contact.name && contact.name.trim().length > 0)
                             .map((contact) => ({
@@ -416,7 +435,6 @@ export class BankTransferService {
                             throw new BadRequestException('At least one valid contact with name is required');
                         }
 
-                        // Create followup DTO
                         const followUpDto: CreateFollowUpDto = {
                             area,
                             partyName: body.organisation_name || '',
@@ -442,7 +460,6 @@ export class BankTransferService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
             }
         }
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -15,6 +15,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import { PORTAL_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 
 @Injectable()
@@ -47,21 +48,36 @@ export class PayOnPortalService {
 
         // Apply tab-specific filters
         if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
+            conditions.push(
+                or(
+                    isNull(paymentInstruments.action),
+                    eq(paymentInstruments.status, PORTAL_STATUSES.PENDING)
+                )
+            );
         } else if (tab === 'accepted') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
+                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED)
             );
         } else if (tab === 'rejected') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
+                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED)
             );
         } else if (tab === 'returned') {
-            conditions.push(inArray(paymentInstruments.action, [3, 4]));
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 3),
+                    eq(paymentInstruments.status, PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER)
+                )
+            );
         } else if (tab === 'settled') {
-            conditions.push(eq(paymentInstruments.action, 4));
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 4),
+                    eq(paymentInstruments.status, PORTAL_STATUSES.SETTLED_WITH_PROJECT)
+                )
+            );
         }
 
         // Search filter
@@ -174,7 +190,7 @@ export class PayOnPortalService {
         const acceptedConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
+            eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED),
         ];
         const [acceptedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -187,7 +203,7 @@ export class PayOnPortalService {
         const rejectedConditions = [
             ...baseConditions,
             inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
+            eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED),
         ];
         const [rejectedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -199,7 +215,10 @@ export class PayOnPortalService {
         // Count returned
         const returnedConditions = [
             ...baseConditions,
-            inArray(paymentInstruments.action, [3, 4]),
+            or(
+                eq(paymentInstruments.action, 3),
+                eq(paymentInstruments.status, PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER)
+            )
         ];
         const [returnedResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -211,7 +230,10 @@ export class PayOnPortalService {
         // Count settled
         const settledConditions = [
             ...baseConditions,
-            eq(paymentInstruments.action, 4),
+            or(
+                eq(paymentInstruments.action, 4),
+                eq(paymentInstruments.status, PORTAL_STATUSES.SETTLED_WITH_PROJECT)
+            )
         ];
         const [settledResult] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
@@ -285,9 +307,9 @@ export class PayOnPortalService {
 
         if (body.action === 'accounts-form-1') {
             if (body.pop_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.pop_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
             // Store date_time in legacyData for timer stop functionality
@@ -298,11 +320,11 @@ export class PayOnPortalService {
                 };
             }
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            updateData.status = PORTAL_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned') {
-            updateData.status = 'RETURNED';
+            updateData.status = PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER;
         } else if (body.action === 'settled') {
-            updateData.status = 'SETTLED';
+            updateData.status = PORTAL_STATUSES.SETTLED_WITH_PROJECT;
         }
 
         await this.db
@@ -440,7 +462,6 @@ export class PayOnPortalService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
             }
         }
 

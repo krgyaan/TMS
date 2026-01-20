@@ -28,7 +28,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (BT) 1 - Request to Bank' },
+    { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned', label: 'Returned' },
     { value: 'settled', label: 'Settled' },
@@ -120,24 +120,20 @@ export function BankTransferActionForm({
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(_field) => (
-                                <SelectField
-                                    label="Choose What to do"
-                                    control={form.control}
-                                    name="action"
-                                    options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
-                                />
-                            )}
-                        </FieldWrapper>
+                        <SelectField
+                            label="Choose What to do"
+                            control={form.control}
+                            name="action"
+                            options={ACTION_OPTIONS}
+                            placeholder="Select an action"
+                        />
 
                         {/* Accounts Form (BT) 1 */}
                         <ConditionalSection show={action === 'accounts-form-1'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (BT) 1 - Request to Bank</h4>
+                                <h4 className="font-semibold text-base">Accounts Form</h4>
 
-                                <FieldWrapper control={form.control} name="bt_req" label="BT Request">
+                                <FieldWrapper control={form.control} name="bt_req" label="Bank Transfer Request">
                                     {(field) => (
                                         <RadioGroup
                                             value={field.value}
@@ -167,38 +163,29 @@ export function BankTransferActionForm({
                                         )}
                                     </FieldWrapper>
                                 )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="utr_no" label="UTR No.">
-                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="account_name" label="Account Name">
-                                        {(field) => <Input {...field} placeholder="Enter account name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="account_no" label="Account No.">
-                                        {(field) => <Input {...field} placeholder="Enter account number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="ifsc_code" label="IFSC Code">
-                                        {(field) => <Input {...field} placeholder="Enter IFSC code" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="amount" label="Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
+                                {btReq === 'Accepted' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FieldWrapper control={form.control} name="utr_no" label="UTR No.">
+                                            {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="utr_mgs" label="UTR Message">
+                                            {(field) => <Input {...field} placeholder="Enter UTR message" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
+                                            {(field) => (
+                                                <DatePicker
+                                                    date={field.value ? new Date(field.value) : undefined}
+                                                    onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                            {(field) => (
+                                                <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
+                                            )}
+                                        </FieldWrapper>
+                                    </div>
+                                )}
                             </div>
                         </ConditionalSection>
 
@@ -238,13 +225,7 @@ export function BankTransferActionForm({
                         {/* Returned */}
                         <ConditionalSection show={action === 'returned'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Returned</h4>
-
-                                <FieldWrapper control={form.control} name="return_reason" label="Return Reason">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter return reason" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
+                                <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="return_date" label="Return Date">
@@ -259,36 +240,13 @@ export function BankTransferActionForm({
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                 </div>
-
-                                <FieldWrapper control={form.control} name="return_remarks" label="Return Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
                             </div>
                         </ConditionalSection>
 
                         {/* Settled */}
                         <ConditionalSection show={action === 'settled'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Settled</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="settlement_date" label="Settlement Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_amount" label="Settlement Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_reference_no" label="Reference No.">
-                                        {(field) => <Input {...field} placeholder="Enter reference number" />}
-                                    </FieldWrapper>
-                                </div>
+                                <h4 className="font-semibold text-base">Settled with Project</h4>
                             </div>
                         </ConditionalSection>
 

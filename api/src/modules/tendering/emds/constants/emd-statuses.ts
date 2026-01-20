@@ -312,7 +312,7 @@ export const BG_STAGES = {
 // ============================================================================
 
 export const BT_STATUSES = {
-    PENDING: 'BT_REQUESTED',
+    PENDING: 'BT_ACCOUNTS_FORM_PENDING',
     ACCOUNTS_FORM_ACCEPTED: 'BT_ACCOUNTS_FORM_ACCEPTED',
     ACCOUNTS_FORM_REJECTED: 'BT_ACCOUNTS_FORM_REJECTED',
     FOLLOWUP_INITIATED: 'BT_FOLLOWUP_INITIATED',
