@@ -9,9 +9,13 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, useTenderList, usePerformanceTrends, useExecutiveScoring } from "./tender-executive.hooks";
+import { STAGE_HELP_TEXT, ROW_HELP_TEXT } from "./stage-matrix-help";
 
 /* Icons */
 import {
@@ -30,6 +34,7 @@ import {
     Briefcase,
     Eye,
     ArrowRight,
+    Info,
 } from "lucide-react";
 import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
 
@@ -45,11 +50,12 @@ const formatCurrency = (amount: number) => {
 };
 
 const STAGE_ROW_TYPE_MAP: Record<string, string> = {
-    done: "success",
-    onTime: "default",
+    done: "default",
+    onTime: "success",
     late: "warning",
-    pending: "default",
-    notApplicable: "destructive",
+    pending: "info",
+    overdue: "destructive",
+    notApplicable: "default",
 };
 
 const formatLabel = (label: string) => {
@@ -331,7 +337,17 @@ export default function TenderExecutivePerformance() {
                                         <TableHead className="w-[150px] font-bold text-foreground bg-muted/30 sticky left-0 z-10 border-r">Metric / Stage</TableHead>
                                         {STAGES.map((stage, i) => (
                                             <TableHead key={i} className="text-center text-xs uppercase font-semibold text-muted-foreground w-[90px]">
-                                                {formatLabel(stage)}
+                                                <div className="flex items-center justify-center gap-1">
+                                                    {formatLabel(stage)}
+                                                    {/* <Tooltip>
+                                                        <TooltipTrigger>
+                                                            <Info className="h-3 w-3 text-muted-foreground" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p className="text-xs max-w-xs">{STAGE_HELP_TEXT[stage] ?? "No description available"}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip> */}
+                                                </div>
                                             </TableHead>
                                         ))}
                                     </TableRow>
@@ -356,23 +372,82 @@ export default function TenderExecutivePerformance() {
                                                 ${rowType === "destructive" ? "text-destructive" : ""}
                                             `}
                                                 >
-                                                    {row.label}
+                                                    <div className="flex items-center gap-2">
+                                                        {row.label}
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <Info className="h-3 w-3 text-muted-foreground" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="text-xs">{ROW_HELP_TEXT[row.key] ?? ""}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </div>
                                                 </TableCell>
                                                 {row.data.map((val, j) => (
                                                     <TableCell key={j} className="text-center p-2">
                                                         {val !== null ? (
-                                                            <div
-                                                                className={`
-                                                            mx-auto flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium
-                                                            ${rowType === "info" ? "bg-primary/10 text-primary" : ""}
-                                                            ${rowType === "success" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : ""}
-                                                            ${rowType === "warning" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : ""}
-                                                            ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""}
-                                                            ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}
-                                                        `}
-                                                            >
-                                                                {val}
-                                                            </div>
+                                                            (() => {
+                                                                const drilldown = (row as any).drilldown?.[j] ?? [];
+
+                                                                return (
+                                                                    <Popover>
+                                                                        <PopoverTrigger asChild>
+                                                                            <div
+                                                                                className={`
+                                                                                mx-auto flex items-center justify-center w-8 h-8 rounded-full text-sm cursor-pointer font-bold
+                                                                                ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}   // onTime
+                                                                                ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}    // done
+                                                                                ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}      // late
+                                                                                ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}             // pending
+                                                                                ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""} // overdue
+                                                                                ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}   // notApplicable
+                                                                            `}
+                                                                            >
+                                                                                {val}
+                                                                            </div>
+                                                                        </PopoverTrigger>
+
+                                                                        <PopoverContent className="w-80 max-h-72 overflow-auto">
+                                                                            <div className="space-y-2">
+                                                                                <div className="font-semibold text-sm">
+                                                                                    {row.label} — {formatLabel(STAGES[j])}
+                                                                                </div>
+
+                                                                                {drilldown.length === 0 ? (
+                                                                                    <p className="text-xs text-muted-foreground">No tenders</p>
+                                                                                ) : (
+                                                                                    drilldown.map((t: any) => (
+                                                                                        <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1">
+                                                                                            <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
+
+                                                                                            {t.tenderName && <div className="text-muted-foreground truncate">{t.tenderName}</div>}
+
+                                                                                            {t.deadline && (
+                                                                                                <div className="text-muted-foreground">
+                                                                                                    Due: {new Date(t.deadline).toLocaleDateString()}
+                                                                                                </div>
+                                                                                            )}
+
+                                                                                            {t.daysOverdue !== null && (
+                                                                                                <div className="text-red-600 font-medium">{t.daysOverdue} days overdue</div>
+                                                                                            )}
+
+                                                                                            {t.meta && Object.keys(t.meta).length > 0 && (
+                                                                                                <div className="italic text-muted-foreground">
+                                                                                                    {Object.entries(t.meta)
+                                                                                                        .map(([k, v]) => `${k}: ${v}`)
+                                                                                                        .join(", ")}
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ))
+                                                                                )}
+                                                                            </div>
+                                                                        </PopoverContent>
+                                                                    </Popover>
+                                                                );
+                                                            })()
                                                         ) : (
                                                             <span className="text-muted-foreground/20 text-xl">·</span>
                                                         )}
