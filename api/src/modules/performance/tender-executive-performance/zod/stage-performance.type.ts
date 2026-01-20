@@ -3,6 +3,8 @@ import { STAGE_CONFIG } from "../../config/stage-config";
 export type StagePerformance = {
     tenderId: number;
     stageKey: string;
+    tenderName?: string;
+    tenderNo?: string;
 
     applicable: boolean;
 
