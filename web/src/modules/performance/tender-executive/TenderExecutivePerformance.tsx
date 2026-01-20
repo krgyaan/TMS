@@ -299,14 +299,14 @@ export default function TenderExecutivePerformance() {
                 {/* ===== KPI CARDS ===== */}
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid Funnel</h3>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{PRE_BID_KPIS.map(renderKpiCard)}</div>
                     </div>
 
                     <Separator />
 
                     <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Post-Bid Funnel</h3>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Post-Bid</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">{POST_BID_KPIS.map(renderKpiCard)}</div>
                     </div>
                 </div>
