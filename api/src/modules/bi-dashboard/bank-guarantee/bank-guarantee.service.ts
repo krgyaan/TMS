@@ -26,33 +26,18 @@ export class BankGuaranteeService {
         private readonly followUpService: FollowUpService,
     ) { }
 
-    async getDashboardData(
-        tab?: string,
-        options?: {
-            page?: number;
-            limit?: number;
-            sortBy?: string;
-            sortOrder?: 'asc' | 'desc';
-            search?: string;
-        },
-    ): Promise<PaginatedResult<BankGuaranteeDashboardRow>> {
-        const page = options?.page || 1;
-        const limit = options?.limit || 50;
-        const offset = (page - 1) * limit;
-
+    private buildDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'BG'),
             eq(paymentInstruments.isActive, true),
         ];
 
-        // Apply tab-specific filters
         if (tab === 'new-requests') {
             conditions.push(
-                or(
-                    isNull(paymentInstruments.action),
-                    eq(paymentInstruments.action, 1)
-                ),
-                eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED)
+                and(
+                    inArray(paymentInstruments.action, [0, 1]),
+                    inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
+                )
             );
         } else if (tab === 'live-yes') {
             conditions.push(
@@ -75,12 +60,32 @@ export class BankGuaranteeService {
             );
         } else if (tab === 'rejected') {
             conditions.push(
-                or(
-                    eq(paymentInstruments.action, 1),
-                    eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED)
+                and(
+                    inArray(paymentInstruments.action, [1, 2]),
+                    eq(paymentInstruments.status, BG_STATUSES.ACCOUNTS_FORM_REJECTED)
                 )
             );
         }
+
+        return conditions;
+    }
+
+
+    async getDashboardData(
+        tab?: string,
+        options?: {
+            page?: number;
+            limit?: number;
+            sortBy?: string;
+            sortOrder?: 'asc' | 'desc';
+            search?: string;
+        },
+    ): Promise<PaginatedResult<BankGuaranteeDashboardRow>> {
+        const page = options?.page || 1;
+        const limit = options?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const conditions = this.buildDashboardConditions(tab);
 
         // Search filter
         if (options?.search) {
@@ -215,94 +220,45 @@ export class BankGuaranteeService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(
+                instrumentBgDetails,
+                eq(instrumentBgDetails.instrumentId, paymentInstruments.id)
+            )
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<BankGuaranteeDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'BG'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const newRequests = await this.countByConditions(
+            this.buildDashboardConditions('new-requests')
+        );
 
-        // Count new-requests
-        const newRequestsConditions = [
-            ...baseConditions,
-            or(
-                isNull(paymentInstruments.action),
-                eq(paymentInstruments.action, 1)
-            ),
-            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED),
-        ];
-        const [newRequestsResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...newRequestsConditions));
-        const newRequests = Number(newRequestsResult?.count || 0);
+        const liveYes = await this.countByConditions(
+            this.buildDashboardConditions('live-yes')
+        );
 
-        // Count live-yes
-        const liveYesConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
-        ];
-        const [liveYesResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...liveYesConditions));
-        const liveYes = Number(liveYesResult?.count || 0);
+        const livePnb = await this.countByConditions(
+            this.buildDashboardConditions('live-pnb')
+        );
 
-        // Count live-pnb
-        const livePnbConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'PNB_6011'),
-        ];
-        const [livePnbResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...livePnbConditions));
-        const livePnb = Number(livePnbResult?.count || 0);
+        const liveBgLimit = await this.countByConditions(
+            this.buildDashboardConditions('live-bg-limit')
+        );
 
-        // Count live-bg-limit
-        const liveBgLimitConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'BGLIMIT_0771'),
-        ];
-        const [liveBgLimitResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...liveBgLimitConditions));
-        const liveBgLimit = Number(liveBgLimitResult?.count || 0);
+        const cancelled = await this.countByConditions(
+            this.buildDashboardConditions('cancelled')
+        );
 
-        // Count cancelled
-        const cancelledConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [8, 9]),
-        ];
-        const [cancelledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...cancelledConditions));
-        const cancelled = Number(cancelledResult?.count || 0);
+        const rejected = await this.countByConditions(
+            this.buildDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            eq(paymentInstruments.action, 1),
-            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
 
         return {
             'new-requests': newRequests,
