@@ -70,7 +70,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
     requestId: integer('request_id').notNull(), // Links to payment_requests.id
 
     instrumentType: instrumentTypeEnum('instrument_type').notNull(),
-    purpose: paymentPurposeEnum('purpose'),
+    purpose: varchar('purpose', { length: 255 }),
 
     // Common fields with MySQL equivalents
     amount: decimal('amount', { precision: 15, scale: 2 }).notNull(), // emd_fdrs.fdr_amt, emd_demand_drafts.dd_amt, emd_bgs.bg_amt, emd_cheques.cheque_amt, bank_transfers.bt_amount, pay_on_portals.amount
@@ -148,14 +148,10 @@ export const instrumentDdDetails = pgTable('instrument_dd_details', {
     // Direct mappings from MySQL emd_demand_drafts
     ddNo: varchar('dd_no', { length: 100 }), // emd_demand_drafts.dd_no
     ddDate: date('dd_date'), // emd_demand_drafts.dd_date
-    bankName: varchar('bank_name', { length: 300 }), // New field, not in MySQL but needed
     reqNo: varchar('req_no', { length: 100 }), // emd_demand_drafts.req_no
     ddNeeds: varchar('dd_needs', { length: 255 }), // emd_demand_drafts.dd_needs
     ddPurpose: varchar('dd_purpose', { length: 255 }), // emd_demand_drafts.dd_purpose
     ddRemarks: text('dd_remarks'), // emd_demand_drafts.remarks
-
-    // Missing from MySQL but added for completeness
-    courierDeadline: integer('courier_deadline'), // emd_demand_drafts.courier_deadline (moved to common table)
 
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -341,7 +337,6 @@ export const instrumentTransferDetails = pgTable('instrument_transfer_details', 
     accountName: varchar('account_name', { length: 500 }), // bank_transfers.bt_acc_name
     accountNumber: varchar('account_number', { length: 50 }), // bank_transfers.bt_acc
     ifsc: varchar('ifsc', { length: 20 }), // bank_transfers.bt_ifsc
-    transactionId: varchar('transaction_id', { length: 500 }), // New field for better tracking
     transactionDate: timestamp('transaction_date'), // bank_transfers.date_time
     paymentMethod: varchar('payment_method', { length: 50 }), // New field to distinguish types
 
