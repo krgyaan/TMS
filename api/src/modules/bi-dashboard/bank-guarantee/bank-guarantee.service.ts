@@ -490,9 +490,9 @@ export class BankGuaranteeService {
      */
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
+            'accounts-form-1': 1, // Request to Bank
+            'accounts-form-2': 2, // After BG Creation
+            'accounts-form-3': 3, // FDR Details Captured
             'initiate-followup': 4,
             'request-extension': 5,
             'returned-courier': 6,

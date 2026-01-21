@@ -21,11 +21,8 @@ export class ChequeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) {}
+    ) { }
 
-    /**
-     * Get expired cheque IDs (cheques where dueDate + 3 months < CURRENT_DATE)
-     */
     private async getExpiredChequeIds(): Promise<number[]> {
         const expiredCheques = await this.db
             .select({ id: instrumentChequeDetails.id })
@@ -356,16 +353,12 @@ export class ChequeService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
+            'accounts-form': 1,
             'initiate-followup': 2,
             'stop-cheque': 3,
             'paid-via-bank-transfer': 4,
             'deposited-in-bank': 5,
             'cancelled-torn': 6,
-            'returned-courier': 5,
-            'request-cancellation': 6,
         };
         return actionMap[action] || 1;
     }

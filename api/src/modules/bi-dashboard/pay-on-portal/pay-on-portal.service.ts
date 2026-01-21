@@ -27,30 +27,16 @@ export class PayOnPortalService {
         private readonly followUpService: FollowUpService,
     ) { }
 
-    async getDashboardData(
-        tab?: string,
-        options?: {
-            page?: number;
-            limit?: number;
-            sortBy?: string;
-            sortOrder?: 'asc' | 'desc';
-            search?: string;
-        },
-    ): Promise<PaginatedResult<PayOnPortalDashboardRow>> {
-        const page = options?.page || 1;
-        const limit = options?.limit || 50;
-        const offset = (page - 1) * limit;
-
+    private buildPopDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Portal Payment'),
             eq(paymentInstruments.isActive, true),
         ];
 
-        // Apply tab-specific filters
         if (tab === 'pending') {
             conditions.push(
                 or(
-                    isNull(paymentInstruments.action),
+                    eq(paymentInstruments.action, 0),
                     eq(paymentInstruments.status, PORTAL_STATUSES.PENDING)
                 )
             );
@@ -66,19 +52,32 @@ export class PayOnPortalService {
             );
         } else if (tab === 'returned') {
             conditions.push(
-                or(
-                    eq(paymentInstruments.action, 3),
-                    eq(paymentInstruments.status, PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER)
-                )
+                inArray(paymentInstruments.action, [3, 4, 5])
             );
         } else if (tab === 'settled') {
             conditions.push(
-                or(
-                    eq(paymentInstruments.action, 4),
-                    eq(paymentInstruments.status, PORTAL_STATUSES.SETTLED_WITH_PROJECT)
-                )
+                inArray(paymentInstruments.action, [6, 7])
             );
         }
+
+        return conditions;
+    }
+
+    async getDashboardData(
+        tab?: string,
+        options?: {
+            page?: number;
+            limit?: number;
+            sortBy?: string;
+            sortOrder?: 'asc' | 'desc';
+            search?: string;
+        },
+    ): Promise<PaginatedResult<PayOnPortalDashboardRow>> {
+        const page = options?.page || 1;
+        const limit = options?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const conditions = this.buildPopDashboardConditions(tab);
 
         // Search filter
         if (options?.search) {
@@ -168,79 +167,36 @@ export class PayOnPortalService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countPopByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<PayOnPortalDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'Portal Payment'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const pending = await this.countPopByConditions(
+            this.buildPopDashboardConditions('pending')
+        );
 
-        // Count pending
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(paymentInstruments.action),
-        ];
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...pendingConditions));
-        const pending = Number(pendingResult?.count || 0);
+        const accepted = await this.countPopByConditions(
+            this.buildPopDashboardConditions('accepted')
+        );
 
-        // Count accepted
-        const acceptedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED),
-        ];
-        const [acceptedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...acceptedConditions));
-        const accepted = Number(acceptedResult?.count || 0);
+        const rejected = await this.countPopByConditions(
+            this.buildPopDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
+        const returned = await this.countPopByConditions(
+            this.buildPopDashboardConditions('returned')
+        );
 
-        // Count returned
-        const returnedConditions = [
-            ...baseConditions,
-            or(
-                eq(paymentInstruments.action, 3),
-                eq(paymentInstruments.status, PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER)
-            )
-        ];
-        const [returnedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...returnedConditions));
-        const returned = Number(returnedResult?.count || 0);
-
-        // Count settled
-        const settledConditions = [
-            ...baseConditions,
-            or(
-                eq(paymentInstruments.action, 4),
-                eq(paymentInstruments.status, PORTAL_STATUSES.SETTLED_WITH_PROJECT)
-            )
-        ];
-        const [settledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...settledConditions));
-        const settled = Number(settledResult?.count || 0);
+        const settled = await this.countPopByConditions(
+            this.buildPopDashboardConditions('settled')
+        );
 
         return {
             pending,
@@ -254,7 +210,7 @@ export class PayOnPortalService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
+            'accounts-form': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,

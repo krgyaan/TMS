@@ -59,7 +59,6 @@ export class DemandDraftService {
         return conditions;
     }
 
-
     async getDashboardData(
         tab?: string,
         options?: {
@@ -211,18 +210,15 @@ export class DemandDraftService {
         };
     }
 
-
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
+            'accounts-form': 1,
             'initiate-followup': 2,
-            'request-extension': 5,
             'returned-courier': 3,
             'returned-bank-transfer': 4,
-            'request-cancellation': 7,
-            'dd-cancellation-confirmation': 7,
+            'settled-with-project': 5,
+            'request-cancellation': 6,
+            'cancelled-at-branch': 7,
         };
         return actionMap[action] || 1;
     }
