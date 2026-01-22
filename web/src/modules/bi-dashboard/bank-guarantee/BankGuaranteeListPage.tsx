@@ -11,9 +11,12 @@ import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, Edit } fro
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
-import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
-import { dateCol, currencyCol, tenderNameCol } from '@/components/data-grid/columns';
+import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import BankStatsCards from './components/BankStatsCards';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -104,19 +107,6 @@ const BankGuaranteeListPage = () => {
     const bgData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    // Bank name mappings
-    const bankNameMap: Record<string, string> = {
-        'YESBANK_2011': 'Yes Bank 2011',
-        'YESBANK_0771': 'Yes Bank 0771',
-        'PNB_6011': 'Punjab National Bank',
-        'BGLIMIT_0771': 'BG Limit',
-    };
-
-    const formatCurrency = (amount: number | null | undefined): string => {
-        if (!amount) return '₹ 0.00';
-        return `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
     const handleViewDetails = useCallback((row: BankGuaranteeDashboardRow) => {
         // TODO: Implement navigation to detail page
         console.log('View details:', row);
@@ -145,16 +135,18 @@ const BankGuaranteeListPage = () => {
 
     const colDefs = useMemo<ColDef<BankGuaranteeDashboardRow>[]>(
         () => [
-            dateCol<BankGuaranteeDashboardRow>('bgDate', {
+            {
+                field: 'bgDate',
                 headerName: 'BG Date',
-                width: 120,
+                width: 110,
                 colId: 'bgDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'bgNo',
                 headerName: 'BG No.',
-                width: 150,
+                width: 130,
                 colId: 'bgNo',
                 valueGetter: (params) => params.data?.bgNo || '—',
                 sortable: true,
@@ -174,24 +166,30 @@ const BankGuaranteeListPage = () => {
                 filter: true,
                 width: 200,
             }),
-            dateCol<BankGuaranteeDashboardRow>('bidValidity', {
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 110,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('amount', {}, {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 110,
                 colId: 'amount',
                 sortable: true,
-            }),
-            dateCol<BankGuaranteeDashboardRow>('bgExpiryDate', {
-                headerName: 'BG Expiry Date',
-                width: 140,
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bgExpiryDate',
+                headerName: 'Expiry Date',
+                width: 110,
                 colId: 'bgExpiryDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'bgClaimPeriod',
                 headerName: 'BG Claim Period',
@@ -204,39 +202,39 @@ const BankGuaranteeListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            dateCol<BankGuaranteeDashboardRow>('expiryDate', {
-                headerName: 'Expiry Date',
-                width: 130,
-                colId: 'expiryDate',
-                sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesPaid', {}, {
+            {
+                field: 'bgChargesPaid',
                 headerName: 'BG Charges paid',
-                width: 150,
+                width: 100,
                 colId: 'bgChargesPaid',
                 sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesCalculated', {}, {
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bgChargesCalculated',
                 headerName: 'BG Charges Calculated',
-                width: 180,
+                width: 110,
                 colId: 'bgChargesCalculated',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             {
                 field: 'fdrNo',
                 headerName: 'FDR No',
-                width: 120,
+                width: 100,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
                 filter: true,
             },
-            currencyCol<BankGuaranteeDashboardRow>('fdrValue', {}, {
+            {
+                field: 'fdrValue',
                 headerName: 'FDR Value',
-                width: 130,
+                width: 100,
                 colId: 'fdrValue',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
@@ -341,30 +339,8 @@ const BankGuaranteeListPage = () => {
     return (
         <>
             {/* Bank Statistics Cards */}
-            {cardStats && cardStats.bankStats && Object.keys(cardStats.bankStats).length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                    {Object.entries(cardStats.bankStats).map(([bankName, stats]) => (
-                        <Card key={bankName} className="gap-2">
-                            <CardHeader>
-                                <CardTitle>{bankNameMap[bankName] || bankName}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm font-medium text-green-600">BG: {formatCurrency(stats.amount)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (10%): {formatCurrency(stats.fdrAmount10)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (15%): {formatCurrency(stats.fdrAmount15)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (100%): {formatCurrency(stats.fdrAmount100)}</p>
-                                <div>
-                                    <Badge variant="outline" className="justify-center">
-                                        {stats.count} BGs Created
-                                    </Badge>
-                                    <Badge variant="outline" className="justify-center">
-                                        {stats.percentage.toFixed(2)}% of BGs
-                                    </Badge>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+            {cardStats && (
+                <BankStatsCards cardStats={cardStats as BankGuaranteeCardStats} />
             )}
 
             <Card>

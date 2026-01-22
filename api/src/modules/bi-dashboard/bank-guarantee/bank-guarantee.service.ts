@@ -26,6 +26,22 @@ export class BankGuaranteeService {
         private readonly followUpService: FollowUpService,
     ) { }
 
+    private statusMap() {
+        return {
+            [BG_STATUSES.PENDING]: 'Pending',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [BG_STATUSES.BG_CREATED]: 'Created',
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
+            [BG_STATUSES.COURIER_RETURN_RECEIVED]: 'Courier Returned',
+            [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+        };
+    }
+
     private buildDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'BG'),
@@ -69,7 +85,6 @@ export class BankGuaranteeService {
 
         return conditions;
     }
-
 
     async getDashboardData(
         tab?: string,
@@ -131,16 +146,16 @@ export class BankGuaranteeService {
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
-                // Get tender info from payment_requests table
-                tenderName: paymentRequests.projectName,
-                tenderNo: paymentRequests.tenderNo,
-                bidValidity: paymentRequests.dueDate,
-                tenderId: paymentRequests.tenderId,
-                tenderType: paymentRequests.type,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                tenderDueDate: tenderInfos.dueDate,
+                requestDueDate: paymentRequests.dueDate,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
-                bgExpiryDate: instrumentBgDetails.validityDate,
-                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
-                // Raw charge fields for calculation
+                bgExpiryDate: paymentInstruments.expiryDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -149,7 +164,6 @@ export class BankGuaranteeService {
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrValue: instrumentBgDetails.fdrAmt,
-                // Conditional tender status from tenderInfos if tender_id != 0
                 tenderStatusFromTender: statuses.name,
                 bgStatus: paymentInstruments.status,
             })
@@ -188,13 +202,11 @@ export class BankGuaranteeService {
                 bgDate,
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
-                tenderName: row.tenderName,
-                tenderNo: row.tenderNo,
-                bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+                tenderName: row.tenderName || row.projectName,
+                tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
                 bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
-                expiryDate: claimExpiryDate,
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -210,10 +222,11 @@ export class BankGuaranteeService {
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
-                tenderStatus: row.tenderId && row.tenderId !== 0 ? row.tenderStatusFromTender : row.tenderType,
-                expiry: bgExpiryDate,
+                tenderStatus: row.tenderStatusFromTender,
+                bidValidity: row.tenderDueDate || row.requestDueDate,
+                bgStatus: this.statusMap()[row.bgStatus],
                 expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                bgStatus: row.bgStatus,
+                expiryDate: claimExpiryDate,
             };
         });
 
@@ -330,22 +343,25 @@ export class BankGuaranteeService {
             // Count BGs with bg_no not null
             const bankCount = bgs.filter(bg => bg.bgNo !== null && bg.bgNo !== '').length;
 
-            // Sum of bg_amt where bg_no is not null
+            // 👉 Skip banks with 0 count
+            if (bankCount === 0) {
+                continue;
+            }
+
             const bankAmount = bgs
                 .filter(bg => bg.bgNo !== null && bg.bgNo !== '')
                 .reduce((sum, bg) => sum + (bg.amount ? Number(bg.amount) : 0), 0);
 
-            // FDR amounts by percentage
             const fdrAmount10 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 10)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 10)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const fdrAmount15 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 15)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 15)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const fdrAmount100 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 100)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 100)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const percentage = totalBgCount > 0 ? (bankCount / totalBgCount) * 100 : 0;
@@ -360,8 +376,13 @@ export class BankGuaranteeService {
             };
         }
 
+        // 👉 Filter out banks with 0 count
+        const filteredBankStats = Object.fromEntries(
+            Object.entries(bankStats).filter(([_, stats]) => stats.count > 0)
+        );
+
         return {
-            bankStats,
+            bankStats: filteredBankStats,
             totalBgCount,
             totalBgAmount,
         };
@@ -428,7 +449,7 @@ export class BankGuaranteeService {
         claimExpiryDate: Date | null
     ): string | null {
         if (!bgExpiryDate || !claimExpiryDate) {
-            return 'N/A';
+            return '-';
         }
 
         const now = new Date();
