@@ -64,6 +64,9 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
+import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
+import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { BankGuaranteeModule } from "@/modules/bi-dashboard/bank-guarantee/bank-guarantee.module";
 import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-draft.module";
@@ -146,6 +149,9 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        TenderExecutivePerformanceModule,
+        TeamLeaderPerformanceModule,
+        OemDashboardModule,
         PayOnPortalModule,
         BankGuaranteeModule,
         DemandDraftModule,
