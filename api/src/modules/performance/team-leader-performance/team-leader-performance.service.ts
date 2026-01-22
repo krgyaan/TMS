@@ -378,7 +378,7 @@ export class TeamLeaderPerformanceService {
     }
 
     async getTenderList(query: TenderListQuery) {
-        const { userId, fromDate, toDate, outcome } = query;
+        const { userId, fromDate, toDate, kpi } = query;
 
         const from = new Date(`${fromDate}T00:00:00.000Z`);
         const to = new Date(`${toDate}T23:59:59.999Z`);
@@ -443,23 +443,23 @@ export class TeamLeaderPerformanceService {
         STEP 5: Outcome Filter
     ===================================================== */
 
-        if (!outcome) return rows;
+        if (!kpi) return rows;
 
-        return rows.filter(r => {
-            switch (outcome) {
-                case "resultAwaited":
-                    return r.status === "Result Awaited";
-                case "won":
-                    return r.status === "Won";
-                case "lost":
-                    return r.status === "Lost";
-                case "missed":
-                    return r.status === "Missed";
-                case "notBid":
-                    return r.status === "Not Bid";
-                default:
-                    return true;
-            }
-        });
+        // return rows.filter(r => {
+        //     switch (kpi) {
+        //         case "resultAwaited":
+        //             return r.status === "Result Awaited";
+        //         case "won":
+        //             return r.status === "Won";
+        //         case "lost":
+        //             return r.status === "Lost";
+        //         case "missed":
+        //             return r.status === "Missed";
+        //         case "notBid":
+        //             return r.status === "Not Bid";
+        //         default:
+        //             return true;
+        //     }
+        // });
     }
 }
