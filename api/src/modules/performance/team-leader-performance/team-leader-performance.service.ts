@@ -11,6 +11,9 @@ import { TenderListQuery } from "../tender-executive-performance/zod/tender.dto"
 import { TenderOutcomeStatus } from "../tender-executive-performance/zod/stage-performance.type";
 import { users } from "@db/schemas/auth/users.schema";
 import { StagePerformance } from "../tender-executive-performance/zod/stage-performance.type";
+import { mapStatusToKpi } from "../config/stage-status";
+import type { TenderKpiBucket } from "../tender-executive-performance/zod/tender-buckets.type";
+import { TenderMeta } from "../tender-executive-performance/zod/tender.types";
 
 export interface TLStagePerformance {
     tenderId: number;
@@ -27,10 +30,14 @@ const TL_STAGES = [
     {
         stageKey: "tender_approval",
         timerName: "tender_approval",
+        resolveDeadline: tender => tender.dueDate,
+        tlStage: true,
     },
     {
         stageKey: "costing_sheet_approval",
         timerName: "costing_sheet_approval",
+        resolveDeadline: tender => tender.dueDate,
+        tlStage: true,
     },
 ] as const;
 
@@ -100,11 +107,11 @@ export class TeamLeaderPerformanceService {
         const teamId = leader[0]?.teamId;
         if (!teamId) return [];
 
-        const teamMembers = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
+        const members = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
 
-        if (teamMembers.length === 0) return [];
+        if (members.length === 0) return [];
 
-        const teamUserIds = teamMembers.map(u => u.id);
+        const memberIds = members.map(m => m.id);
 
         /* ----------------------------------------
        2. Fetch Team Tenders
@@ -113,7 +120,7 @@ export class TeamLeaderPerformanceService {
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(inArray(tenderInfos.teamMember, teamUserIds), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+            .where(and(inArray(tenderInfos.teamMember, memberIds), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
         if (tenders.length === 0) return [];
 
@@ -121,7 +128,7 @@ export class TeamLeaderPerformanceService {
         const tenderMap = new Map(tenders.map(t => [t.id, t]));
 
         /* ----------------------------------------
-       3. Fetch ONLY TL Approval Timers
+       3. Fetch TL Approval Timers
     ---------------------------------------- */
 
         const timers = await this.db
@@ -137,46 +144,55 @@ export class TeamLeaderPerformanceService {
                 )
             );
 
-        if (timers.length === 0) return [];
+        const timerMap = new Map<string, (typeof timers)[number]>();
+        for (const t of timers) {
+            timerMap.set(`${t.entityId}:${t.timerName}`, t);
+        }
 
         /* ----------------------------------------
-       4. Normalize (Timer = Source of Truth)
+       4. Normalize (EXECUTIVE-ALIGNED LOGIC)
     ---------------------------------------- */
 
         const output: StagePerformance[] = [];
         const now = new Date();
 
-        for (const t of timers) {
-            const tender = tenderMap.get(t.entityId);
-            if (!tender) continue;
+        for (const tender of tenders) {
+            for (const stage of TL_STAGES) {
+                const timerRow = timerMap.get(`${tender.id}:${stage.timerName}`);
 
-            const stage = TL_STAGES.find(s => s.timerName === t.timerName);
-            if (!stage) continue;
+                const deadline = tender.dueDate ?? null;
 
-            const deadline = tender.dueDate ?? null;
+                let completed = false;
+                let onTime: boolean | null = null;
+                let startTime: Date | null = null;
+                let endTime: Date | null = null;
 
-            let completed = t.status === "completed";
-            let onTime: boolean | null = null;
+                if (timerRow) {
+                    startTime = timerRow.startTime ?? null;
+                    endTime = timerRow.endTime ?? null;
 
-            if (completed && t.endTime && deadline) {
-                onTime = t.endTime <= deadline;
-            } else if (!completed && deadline && now > deadline) {
-                completed = true;
-                onTime = false;
+                    if (timerRow.status === "completed" && endTime) {
+                        completed = true;
+                        onTime = deadline ? endTime <= deadline : null;
+                    } else if (deadline) {
+                        // Not completed → check SLA
+                        onTime = now <= deadline ? null : false;
+                    }
+                }
+
+                output.push({
+                    tenderId: tender.id,
+                    tenderNo: tender.tenderNo ?? null,
+                    tenderName: tender.tenderName ?? null,
+                    stageKey: stage.stageKey,
+                    applicable: true,
+                    completed,
+                    onTime,
+                    startTime,
+                    endTime,
+                    deadline,
+                });
             }
-
-            output.push({
-                tenderId: tender.id,
-                tenderNo: tender.tenderNo,
-                tenderName: tender.tenderName,
-                stageKey: stage.stageKey,
-                applicable: true,
-                completed,
-                onTime,
-                startTime: t.startTime ?? null,
-                endTime: t.endTime ?? null,
-                deadline,
-            });
         }
 
         return output;
@@ -185,94 +201,339 @@ export class TeamLeaderPerformanceService {
     async getStageMatrix(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
+        /* ----------------------------------------
+       Resolve stage order
+    ---------------------------------------- */
+
         const stageKeys = TL_STAGES.map(s => s.stageKey);
 
-        const counters = new Map<TLStageKey, any>();
-        stageKeys.forEach(k => counters.set(k, { done: 0, onTime: 0, late: 0, pending: 0, notApplicable: 0 }));
+        /* ----------------------------------------
+       Initialize counters + drilldowns
+    ---------------------------------------- */
 
-        for (const s of stages) {
-            const c = counters.get(s.stageKey as TLStageKey)!;
+        const counters = new Map<
+            string,
+            {
+                done: number;
+                onTime: number;
+                late: number;
+                pending: number;
+                overdue: number;
+                notApplicable: number;
+                drilldown: {
+                    done: any[];
+                    onTime: any[];
+                    late: any[];
+                    pending: any[];
+                    overdue: any[];
+                    notApplicable: any[];
+                };
+            }
+        >();
 
-            if (!s.completed) {
-                c.pending++;
+        for (const key of stageKeys) {
+            counters.set(key, {
+                done: 0,
+                onTime: 0,
+                late: 0,
+                pending: 0,
+                overdue: 0,
+                notApplicable: 0,
+                drilldown: {
+                    done: [],
+                    onTime: [],
+                    late: [],
+                    pending: [],
+                    overdue: [],
+                    notApplicable: [],
+                },
+            });
+        }
+
+        /* ----------------------------------------
+       Populate counters + drilldowns
+    ---------------------------------------- */
+
+        for (const stage of stages) {
+            const counter = counters.get(stage.stageKey);
+            if (!counter) continue;
+
+            const tenderMeta = {
+                tenderId: stage.tenderId,
+                tenderNo: stage.tenderNo,
+                tenderName: stage.tenderName,
+                stageKey: stage.stageKey,
+                deadline: stage.deadline ?? null,
+                completedAt: stage.endTime ?? null,
+                daysOverdue:
+                    !stage.completed && stage.onTime === false && stage.deadline
+                        ? Math.max(0, Math.ceil((Date.now() - new Date(stage.deadline).getTime()) / (1000 * 60 * 60 * 24)))
+                        : null,
+                meta:
+                    stage.stageKey === "tender_approval"
+                        ? { approvalType: "Tender Approval" }
+                        : stage.stageKey === "costing_sheet_approval"
+                          ? { approvalType: "Costing Sheet Approval" }
+                          : {},
+            };
+
+            /* ---------- NOT APPLICABLE ---------- */
+            if (!stage.applicable) {
+                counter.notApplicable++;
+                counter.drilldown.notApplicable.push(tenderMeta);
                 continue;
             }
 
-            c.done++;
-            if (s.onTime === true) c.onTime++;
-            if (s.onTime === false) c.late++;
+            /* ---------- NOT COMPLETED ---------- */
+            if (!stage.completed) {
+                if (stage.onTime === false) {
+                    counter.overdue++;
+                    counter.drilldown.overdue.push(tenderMeta);
+                } else {
+                    counter.pending++;
+                    counter.drilldown.pending.push(tenderMeta);
+                }
+                continue;
+            }
+
+            /* ---------- COMPLETED ---------- */
+            counter.done++;
+            counter.drilldown.done.push(tenderMeta);
+
+            if (stage.onTime === true) {
+                counter.onTime++;
+                counter.drilldown.onTime.push(tenderMeta);
+            }
+
+            if (stage.onTime === false) {
+                counter.late++;
+                counter.drilldown.late.push(tenderMeta);
+            }
         }
+
+        /* ----------------------------------------
+       Build matrix rows (TE-compatible)
+    ---------------------------------------- */
 
         return {
             stages: stageKeys,
             rows: [
-                { key: "done", label: "Done", data: stageKeys.map(k => counters.get(k)!.done) },
-                { key: "onTime", label: "On Time", data: stageKeys.map(k => counters.get(k)!.onTime) },
-                { key: "late", label: "Late", data: stageKeys.map(k => counters.get(k)!.late) },
-                { key: "pending", label: "Pending", data: stageKeys.map(k => counters.get(k)!.pending) },
-                { key: "notApplicable", label: "Not Applicable", data: stageKeys.map(k => counters.get(k)!.notApplicable) },
+                {
+                    key: "done",
+                    label: "Done",
+                    data: stageKeys.map(k => counters.get(k)!.done),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.done),
+                },
+                {
+                    key: "onTime",
+                    label: "On Time",
+                    data: stageKeys.map(k => counters.get(k)!.onTime),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.onTime),
+                },
+                {
+                    key: "late",
+                    label: "Late",
+                    data: stageKeys.map(k => counters.get(k)!.late),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.late),
+                },
+                {
+                    key: "pending",
+                    label: "Pending",
+                    data: stageKeys.map(k => counters.get(k)!.pending),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.pending),
+                },
+                {
+                    key: "overdue",
+                    label: "Overdue",
+                    data: stageKeys.map(k => counters.get(k)!.overdue),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.overdue),
+                },
+                {
+                    key: "notApplicable",
+                    label: "Not Applicable",
+                    data: stageKeys.map(k => counters.get(k)!.notApplicable),
+                    drilldown: stageKeys.map(k => counters.get(k)!.drilldown.notApplicable),
+                },
             ],
         };
     }
-
     /* =====================================================
        OUTCOMES (ONLY TL-APPROVED TENDERS)
     ===================================================== */
 
     async getOutcomes(query: PerformanceQueryDto) {
-        const { userId, fromDate, toDate } = query;
+        const { fromDate, toDate } = query;
 
-        const empty = { resultAwaited: 0, missed: 0, won: 0, lost: 0, notBid: 0 };
+        /* ----------------------------------------
+       STEP 1: Resolve TL stage performance
+       (source of truth for TL involvement)
+    ---------------------------------------- */
 
-        const leader = await this.db.select({ teamId: users.team }).from(users).where(eq(users.id, userId)).limit(1);
+        const stages = await this.getStagePerformance(query);
 
-        const teamId = leader[0]?.teamId;
-        if (!teamId) return empty;
+        const empty: {
+            allocated: number;
 
-        const members = await this.db.select({ id: users.id }).from(users).where(eq(users.team, teamId));
+            pending: number;
+            approved: number;
+            rejected: number;
 
-        if (members.length === 0) return empty;
+            bid: number;
+            missed: number;
 
-        const memberIds = members.map(m => m.id);
+            resultAwaited: number;
+            won: number;
+            lost: number;
+            disqualified: number;
+
+            tendersByKpi: Record<TenderKpiBucket, TenderMeta[]>;
+        } = {
+            allocated: 0,
+
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+
+            bid: 0,
+            missed: 0,
+
+            resultAwaited: 0,
+            won: 0,
+            lost: 0,
+            disqualified: 0,
+
+            tendersByKpi: {
+                ALLOCATED: [],
+                PENDING: [],
+                APPROVED: [],
+                REJECTED: [],
+                BID: [],
+                MISSED: [],
+                DISQUALIFIED: [],
+                RESULT_AWAITED: [],
+                LOST: [],
+                WON: [],
+            },
+        };
+
+        if (stages.length === 0) return empty;
+
+        /* ----------------------------------------
+       STEP 2: Resolve TL-touched tenders
+    ---------------------------------------- */
+
+        const tenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
+
+        /* ----------------------------------------
+       STEP 3: Fetch tender data (meta)
+    ---------------------------------------- */
 
         const tenders = await this.db
             .select({
                 id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                organization: tenderInfos.organization,
+                dueDate: tenderInfos.dueDate,
+                value: tenderInfos.gstValues,
                 statusCode: tenderInfos.status,
             })
             .from(tenderInfos)
-            .where(and(inArray(tenderInfos.teamMember, memberIds), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+            .where(and(inArray(tenderInfos.id, tenderIds), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
         if (tenders.length === 0) return empty;
 
-        let resultAwaited = 0,
-            missed = 0,
-            won = 0,
-            lost = 0,
-            notBid = 0;
+        /* ----------------------------------------
+       STEP 4: Populate counters + tendersByKpi
+       (EXECUTIVE-ALIGNED LOGIC)
+    ---------------------------------------- */
 
         for (const t of tenders) {
-            const outcome = mapTenderOutcome(Number(t.statusCode));
-            switch (outcome) {
-                case "Result Awaited":
-                    resultAwaited++;
-                    break;
-                case "Missed":
-                    missed++;
-                    break;
-                case "Won":
-                    won++;
-                    break;
-                case "Lost":
-                    lost++;
-                    break;
-                case "Not Bid":
-                    notBid++;
-                    break;
+            const bucket = mapStatusToKpi(Number(t.statusCode));
+
+            const meta = {
+                id: t.id,
+                tenderNo: t.tenderNo ?? null,
+                tenderName: t.tenderName ?? null,
+                organizationName: String(t.organization) ?? null,
+                dueDate: t.dueDate,
+                value: Number(t.value ?? 0),
+                statusBucket: bucket,
+            };
+
+            /* ----------------------------------
+           ALLOCATED (all TL-touched tenders)
+        ---------------------------------- */
+
+            empty.allocated++;
+            empty.tendersByKpi.ALLOCATED.push(meta);
+
+            /* ----------------------------------
+           PRE-BID
+        ---------------------------------- */
+
+            if (bucket === "PENDING" || bucket === "ALLOCATED") {
+                empty.pending++;
+                empty.tendersByKpi.PENDING.push(meta);
+                continue;
+            }
+
+            if (bucket === "REJECTED") {
+                empty.rejected++;
+                empty.tendersByKpi.REJECTED.push(meta);
+                continue;
+            }
+
+            /* ----------------------------------
+           APPROVED
+        ---------------------------------- */
+
+            empty.approved++;
+            empty.tendersByKpi.APPROVED.push(meta);
+
+            /* ----------------------------------
+           POST-BID
+        ---------------------------------- */
+
+            if (bucket === "MISSED") {
+                empty.missed++;
+                empty.tendersByKpi.MISSED.push(meta);
+                continue;
+            }
+
+            empty.bid++;
+            empty.tendersByKpi.BID.push(meta);
+
+            /* ----------------------------------
+           OUTCOMES
+        ---------------------------------- */
+
+            if (bucket === "RESULT_AWAITED") {
+                empty.resultAwaited++;
+                empty.tendersByKpi.RESULT_AWAITED.push(meta);
+                continue;
+            }
+
+            if (bucket === "WON") {
+                empty.won++;
+                empty.tendersByKpi.WON.push(meta);
+                continue;
+            }
+
+            if (bucket === "LOST") {
+                empty.lost++;
+                empty.tendersByKpi.LOST.push(meta);
+                continue;
+            }
+
+            if (bucket === "DISQUALIFIED") {
+                empty.disqualified++;
+                empty.tendersByKpi.DISQUALIFIED.push(meta);
+                continue;
             }
         }
 
-        return { resultAwaited, missed, won, lost, notBid };
+        return empty;
     }
 
     /* =====================================================
@@ -282,37 +543,64 @@ export class TeamLeaderPerformanceService {
     async getSummary(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
+        /* ----------------------------------------
+       Unique tenders handled
+    ---------------------------------------- */
+
         const tenderSet = new Set<number>();
-        stages.forEach(s => tenderSet.add(s.tenderId));
+        for (const stage of stages) {
+            tenderSet.add(stage.tenderId);
+        }
 
-        let applicableStages = 0;
-        let completedStages = 0;
-        let pendingStages = 0;
-        let onTimeStages = 0;
-        let lateStages = 0;
+        let stagesApplicable = 0;
+        let stagesCompleted = 0;
+        let stagesPending = 0;
+        let stagesOnTime = 0;
+        let stagesLate = 0;
 
-        for (const s of stages) {
-            applicableStages++;
-            if (s.completed) {
-                completedStages++;
-                if (s.onTime === true) onTimeStages++;
-                if (s.onTime === false) lateStages++;
+        /* ----------------------------------------
+       Aggregate using EXECUTIVE semantics
+    ---------------------------------------- */
+
+        for (const stage of stages) {
+            if (!stage.applicable) continue;
+
+            stagesApplicable++;
+
+            if (stage.completed) {
+                stagesCompleted++;
+
+                if (stage.onTime === true) {
+                    stagesOnTime++;
+                }
+
+                if (stage.onTime === false) {
+                    stagesLate++;
+                }
             } else {
-                pendingStages++;
+                // Includes overdue + pending
+                stagesPending++;
             }
         }
 
-        const completionRate = applicableStages ? Math.round((completedStages / applicableStages) * 100) : 0;
+        /* ----------------------------------------
+       Safe rate calculations
+    ---------------------------------------- */
 
-        const onTimeRate = completedStages ? Math.round((onTimeStages / completedStages) * 100) : 0;
+        const completionRate = stagesApplicable > 0 ? Math.round((stagesCompleted / stagesApplicable) * 100) : 0;
+
+        const onTimeRate = stagesCompleted > 0 ? Math.round((stagesOnTime / stagesCompleted) * 100) : 0;
 
         return {
             tendersHandled: tenderSet.size,
-            stagesApplicable: applicableStages,
-            stagesCompleted: completedStages,
-            stagesPending: pendingStages,
-            stagesOnTime: onTimeStages,
-            stagesLate: lateStages,
+
+            stagesApplicable,
+            stagesCompleted,
+            stagesPending,
+
+            stagesOnTime,
+            stagesLate,
+
             completionRate,
             onTimeRate,
         };
@@ -323,30 +611,90 @@ export class TeamLeaderPerformanceService {
     ===================================================== */
 
     async getTrends(query: PerformanceQueryDto & { bucket?: "week" | "month" }) {
-        const { bucket = "week" } = query;
+        const { userId, fromDate, toDate, bucket = "week" } = query;
 
-        const stages = await this.getStagePerformance(query);
+        /* ----------------------------------------
+       1️⃣ Fetch TL stage performance ONCE
+    ---------------------------------------- */
 
-        const buckets = new Map<string, { applicable: number; completed: number; onTime: number }>();
+        const stageData = await this.getStagePerformance(query);
+        if (stageData.length === 0) return [];
 
-        for (const s of stages) {
-            const date = s.endTime ?? s.startTime;
-            if (!date) continue;
+        /* ----------------------------------------
+       2️⃣ Group stages by tenderId
+    ---------------------------------------- */
 
+        const stagesByTender = new Map<number, StagePerformance[]>();
+        for (const s of stageData) {
+            if (!stagesByTender.has(s.tenderId)) {
+                stagesByTender.set(s.tenderId, []);
+            }
+            stagesByTender.get(s.tenderId)!.push(s);
+        }
+
+        /* ----------------------------------------
+       3️⃣ Fetch tender createdAt (same as TE)
+    ---------------------------------------- */
+
+        const tenders = await this.db
+            .select({
+                id: tenderInfos.id,
+                createdAt: tenderInfos.createdAt,
+            })
+            .from(tenderInfos)
+            .where(
+                and(
+                    inArray(tenderInfos.id, Array.from(stagesByTender.keys())),
+                    eq(tenderInfos.deleteStatus, 0),
+                    between(tenderInfos.createdAt, new Date(fromDate), new Date(toDate))
+                )
+            );
+
+        /* ----------------------------------------
+       4️⃣ Bucket aggregation (EXECUTIVE-ALIGNED)
+    ---------------------------------------- */
+
+        const buckets = new Map<
+            string,
+            {
+                applicable: number;
+                completed: number;
+                onTime: number;
+            }
+        >();
+
+        for (const tender of tenders) {
+            const date = tender.createdAt;
             const label = bucket === "month" ? `${date.getFullYear()}-${date.getMonth() + 1}` : `Week ${getWeekNumber(date)}`;
 
             if (!buckets.has(label)) {
-                buckets.set(label, { applicable: 0, completed: 0, onTime: 0 });
+                buckets.set(label, {
+                    applicable: 0,
+                    completed: 0,
+                    onTime: 0,
+                });
             }
 
-            const b = buckets.get(label)!;
-            b.applicable++;
+            const stats = buckets.get(label)!;
+            const stages = stagesByTender.get(tender.id) ?? [];
 
-            if (s.completed) {
-                b.completed++;
-                if (s.onTime === true) b.onTime++;
+            for (const stage of stages) {
+                if (!stage.applicable) continue;
+
+                stats.applicable++;
+
+                if (stage.completed) {
+                    stats.completed++;
+                    if (stage.onTime === true) {
+                        stats.onTime++;
+                    }
+                }
             }
         }
+
+        /* ----------------------------------------
+       5️⃣ Normalize to chart data
+    ---------------------------------------- */
 
         return Array.from(buckets.entries()).map(([label, stats]) => ({
             label,
@@ -363,9 +711,23 @@ export class TeamLeaderPerformanceService {
         const summary = await this.getSummary(query);
         const outcomes = await this.getOutcomes(query);
 
+        /* ----------------------------------------
+       Velocity & Accuracy (approval-based)
+    ---------------------------------------- */
+
         const velocityScore = summary.completionRate;
         const accuracyScore = summary.onTimeRate;
-        const outcomeScore = outcomes.resultAwaited ? Math.round((outcomes.won / outcomes.resultAwaited) * 100) : 0;
+
+        /* ----------------------------------------
+       Outcome score (TE-aligned semantics)
+       Only TL-touched tenders are considered
+    ---------------------------------------- */
+
+        const outcomeScore = outcomes.resultAwaited > 0 ? Math.round((outcomes.won / outcomes.resultAwaited) * 100) : 0;
+
+        /* ----------------------------------------
+       Weighted total (same as TE)
+    ---------------------------------------- */
 
         const total = Math.round(velocityScore * 0.4 + accuracyScore * 0.4 + outcomeScore * 0.2);
 
