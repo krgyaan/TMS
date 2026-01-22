@@ -23,6 +23,20 @@ export class FdrService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
 
+    private statusMap() {
+        return {
+            [FDR_STATUSES.PENDING]: 'Pending',
+            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [FDR_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [FDR_STATUSES.COURIER_RETURN_RECEIVED]: 'Courier Return',
+            [FDR_STATUSES.BANK_RETURN_COMPLETED]: 'Bank Return',
+            [FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: 'Project Settlement',
+            [FDR_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
+            [FDR_STATUSES.CANCELLED_AT_BRANCH]: 'Cancelled',
+        };
+    }
+
     private buildFdrDashboardConditions(tab?: string): { conditions: any[], needsFdrDetails: boolean } {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'FDR'),
@@ -169,8 +183,6 @@ export class FdrService {
 
         const total = Number(countResult?.count || 0);
 
-        console.log(rows);
-
         const data: FdrDashboardRow[] = rows.map((row) => ({
             id: row.id,
             fdrCreationDate: row.fdrCreationDate ? new Date(row.fdrCreationDate) : null,
@@ -182,7 +194,7 @@ export class FdrService {
             tenderStatus: row.tenderStatus || row.tenderStatus,
             member: row.member || row.requestedBy,
             expiry: row.expiry ? new Date(row.expiry) : null,
-            fdrStatus: row.fdrStatus,
+            fdrStatus: this.statusMap()[row.fdrStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
