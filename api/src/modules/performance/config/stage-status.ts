@@ -1,6 +1,6 @@
 export type TenderKpiBucket = "ALLOCATED" | "APPROVED" | "REJECTED" | "PENDING" | "BID" | "MISSED" | "DISQUALIFIED" | "RESULT_AWAITED" | "LOST" | "WON";
 
-function mapStatusToKpi(statusCode: number): TenderKpiBucket {
+export function mapStatusToKpi(statusCode: number): TenderKpiBucket {
     // WON
     if ([25, 26, 27, 28].includes(statusCode)) return "WON";
 
