@@ -14,8 +14,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, useTenderList, usePerformanceTrends, useExecutiveScoring } from "./tender-executive.hooks";
-import { STAGE_HELP_TEXT, ROW_HELP_TEXT } from "./stage-matrix-help";
+import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, usePerformanceTrends, useExecutiveScoring } from "./tender-executive.hooks";
+import type { TenderKpiKey } from "./tender-executive.types";
+import { ROW_HELP_TEXT } from "./stage-matrix-help";
 
 /* Icons */
 import {
@@ -73,7 +74,7 @@ export default function TenderExecutivePerformance() {
     const [userId, setUserId] = useState<number | null>(15);
     const [fromDate, setFromDate] = useState<string | null>("2025-10-01");
     const [toDate, setToDate] = useState<string | null>("2025-10-30");
-    const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+    const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
 
     const { data: users } = useUsersByRole(5);
 
@@ -88,12 +89,9 @@ export default function TenderExecutivePerformance() {
     const STAGES = stageMatrix?.stages ?? [];
     const STAGE_MATRIX = stageMatrix?.rows ?? [];
 
-    const { data: tenders = [] } = useTenderList({
-        ...query,
-        outcome: selectedMetric,
-    });
+    console.log({ "kpi data": outcomes });
 
-    console.log("TENDERS:", tenders);
+    // console.log("TENDERS:", tenders);
 
     const SCORING_COLORS: Record<ScoringKey, string> = {
         "Work Completion": "#6366F1",
@@ -119,7 +117,7 @@ export default function TenderExecutivePerformance() {
 
         return [
             {
-                key: "allocated",
+                key: "ALLOCATED",
                 label: "Allocated",
                 count: outcomes.allocated,
                 icon: Briefcase,
@@ -127,7 +125,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-indigo-50",
             },
             {
-                key: "approved",
+                key: "APPROVED",
                 label: "Approved",
                 count: outcomes.approved,
                 icon: CheckCircle2,
@@ -135,7 +133,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-emerald-50",
             },
             {
-                key: "rejected",
+                key: "REJECTED",
                 label: "Rejected",
                 count: outcomes.rejected,
                 icon: XCircle,
@@ -143,7 +141,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-red-50",
             },
             {
-                key: "pending",
+                key: "PENDING",
                 label: "Pending",
                 count: outcomes.pending,
                 icon: Clock,
@@ -158,7 +156,7 @@ export default function TenderExecutivePerformance() {
 
         return [
             {
-                key: "bid",
+                key: "BID",
                 label: "Bid",
                 count: outcomes.bid,
                 icon: FileText,
@@ -166,7 +164,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-sky-50",
             },
             {
-                key: "missed",
+                key: "MISSED",
                 label: "Missed",
                 count: outcomes.missed,
                 icon: AlertTriangle,
@@ -174,7 +172,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-rose-50",
             },
             {
-                key: "disqualified",
+                key: "DISQUALIFIED",
                 label: "Disqualified",
                 count: outcomes.disqualified,
                 icon: AlertTriangle,
@@ -182,7 +180,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-orange-50",
             },
             {
-                key: "resultAwaited",
+                key: "RESULT_AWAITED",
                 label: "Result Awaited",
                 count: outcomes.resultAwaited,
                 icon: FileText,
@@ -190,7 +188,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-blue-50",
             },
             {
-                key: "lost",
+                key: "LOST",
                 label: "Lost",
                 count: outcomes.lost,
                 icon: XCircle,
@@ -198,7 +196,7 @@ export default function TenderExecutivePerformance() {
                 bg: "bg-red-50",
             },
             {
-                key: "won",
+                key: "WON",
                 label: "Won",
                 count: outcomes.won,
                 icon: Trophy,
@@ -207,6 +205,29 @@ export default function TenderExecutivePerformance() {
             },
         ];
     }, [outcomes]);
+
+    const tenders = useMemo(() => {
+        const tendersByKpi = outcomes?.tendersByKpi;
+
+        if (!tendersByKpi) return [];
+
+        // ALL view → deduplicated
+        if (!selectedMetric) {
+            const map = new Map<number, (typeof tendersByKpi)[TenderKpiKey][number]>();
+
+            Object.values(tendersByKpi).forEach(list => {
+                list.forEach(tender => {
+                    if (!map.has(tender.id)) {
+                        map.set(tender.id, tender);
+                    }
+                });
+            });
+
+            return Array.from(map.values());
+        }
+
+        return tendersByKpi[selectedMetric] ?? [];
+    }, [outcomes, selectedMetric]);
 
     const renderKpiCard = kpi => {
         const isSelected = selectedMetric === kpi.key;
