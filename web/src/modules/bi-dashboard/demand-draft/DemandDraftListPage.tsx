@@ -12,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
-import { dateCol, currencyCol, tenderNameCol } from '@/components/data-grid/columns';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { DemandDraftActionForm } from './components/DemandDraftActionForm';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -128,45 +130,27 @@ const DemandDraftListPage = () => {
 
     const colDefs = useMemo<ColDef<DemandDraftDashboardRow>[]>(
         () => [
-            dateCol<DemandDraftDashboardRow>('ddCreationDate', {
-                headerName: 'DD Creation Date',
-                width: 150,
+            {
+                field: 'ddCreationDate',
+                headerName: 'DD Date',
+                width: 110,
                 colId: 'ddCreationDate',
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
                 sortable: true,
-            }),
+            },
             {
                 field: 'ddNo',
                 headerName: 'DD No',
-                width: 120,
+                width: 100,
                 colId: 'ddNo',
                 valueGetter: (params) => params.data?.ddNo || '—',
                 sortable: true,
                 filter: true,
             },
-            {
-                field: 'beneficiaryName',
-                headerName: 'Beneficiary name',
-                width: 180,
-                colId: 'beneficiaryName',
-                valueGetter: (params) => params.data?.beneficiaryName || '—',
-                sortable: true,
-                filter: true,
-            },
-            currencyCol<DemandDraftDashboardRow>('ddAmount', {}, {
-                headerName: 'DD Amount',
-                width: 130,
-                colId: 'ddAmount',
-                sortable: true,
-            }),
             tenderNameCol<DemandDraftDashboardRow>('tenderNo', {
                 headerName: 'Tender Details',
                 filter: true,
                 width: 200,
-            }),
-            dateCol<DemandDraftDashboardRow>('bidValidity', {
-                headerName: 'Bid Validity',
-                width: 130,
-                colId: 'bidValidity',
                 sortable: true,
             }),
             {
@@ -179,6 +163,32 @@ const DemandDraftListPage = () => {
                 filter: true,
             },
             {
+                field: 'beneficiaryName',
+                headerName: 'Beneficiary name',
+                maxWidth: 200,
+                colId: 'beneficiaryName',
+                valueGetter: (params) => params.data?.beneficiaryName || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'ddAmount',
+                headerName: 'DD Amount',
+                width: 120,
+                colId: 'ddAmount',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bidValidity',
+                headerName: 'Bid Validity',
+                width: 110,
+                colId: 'bidValidity',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                filter: true,
+            },
+            {
                 field: 'member',
                 headerName: 'Member',
                 width: 120,
@@ -187,12 +197,19 @@ const DemandDraftListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            dateCol<DemandDraftDashboardRow>('expiry', {
+            {
+                field: 'expiry',
                 headerName: 'Expiry',
-                width: 120,
+                width: 90,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                valueGetter: (params) => params.data?.expiry || '—',
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return '—';
+                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                },
+            },
             {
                 field: 'ddStatus',
                 headerName: 'DD Status',

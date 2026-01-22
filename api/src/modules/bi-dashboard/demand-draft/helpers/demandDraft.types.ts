@@ -9,7 +9,7 @@ export interface DemandDraftDashboardRow {
     bidValidity: Date | null;
     tenderStatus: string | null;
     member: string | null;
-    expiry: Date | null;
+    expiry: string | null;
     ddStatus: string | null;
 }
 

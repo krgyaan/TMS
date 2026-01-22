@@ -23,6 +23,20 @@ export class DemandDraftService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
 
+    private statusMap() {
+        return {
+            [DD_STATUSES.PENDING]: 'Pending',
+            [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [DD_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [DD_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [DD_STATUSES.COURIER_RETURN_RECEIVED]: 'Returned',
+            [DD_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Requested',
+            [DD_STATUSES.CANCELLED_AT_BRANCH]: 'Cancelled at Branch',
+            [DD_STATUSES.BANK_RETURN_COMPLETED]: 'Returned',
+            [DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: 'Settled with Project',
+        };
+    }
+
     private buildDdDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'DD'),
@@ -126,7 +140,6 @@ export class DemandDraftService {
                 bidValidity: tenderInfos.dueDate,
                 tenderStatus: statuses.name,
                 member: users.name,
-                expiry: sql<Date | null>`NULL`, // DD doesn't have validityDate in schema
                 ddStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
@@ -151,6 +164,10 @@ export class DemandDraftService {
 
         const total = Number(countResult?.count || 0);
 
+        function isExpired(dueDate: Date): boolean {
+            return dueDate && new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000) < new Date(Date.now());
+        }
+
         const data: DemandDraftDashboardRow[] = rows.map((row) => ({
             id: row.id,
             ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
@@ -162,8 +179,8 @@ export class DemandDraftService {
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             member: row.member,
-            expiry: row.expiry ? new Date(row.expiry) : null,
-            ddStatus: row.ddStatus,
+            expiry: row.ddCreationDate ? (isExpired(new Date(row.ddCreationDate)) ? 'Expired' : 'Valid') : null,
+            ddStatus: this.statusMap()[row.ddStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
