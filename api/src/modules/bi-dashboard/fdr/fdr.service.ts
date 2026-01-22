@@ -23,19 +23,15 @@ export class FdrService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) { }
 
-    private buildFdrDashboardConditions(tab?: string) {
+    private buildFdrDashboardConditions(tab?: string): { conditions: any[], needsFdrDetails: boolean } {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'FDR'),
             eq(paymentInstruments.isActive, true),
         ];
+        let needsFdrDetails = false;
 
         if (tab === 'pending') {
             conditions.push(eq(paymentInstruments.action, 0), eq(paymentInstruments.status, FDR_STATUSES.PENDING));
-        } else if (tab === 'created') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED)
-            );
         } else if (tab === 'rejected') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
@@ -46,37 +42,52 @@ export class FdrService {
         } else if (tab === 'cancelled') {
             conditions.push(inArray(paymentInstruments.action, [6, 7]));
         } else if (tab === 'pnb-bg-linked') {
+            needsFdrDetails = true;
             conditions.push(
-                inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7]),
+                inArray(paymentInstruments.action, [1, 2]),
                 like(instrumentFdrDetails.fdrSource, 'BG_%'),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    INNER JOIN payment_instruments bg_instrument ON bg.instrument_id = bg_instrument.id
-                    WHERE bg_instrument.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
                     AND bg.bank_name = 'PNB_6011'
                 )`
             );
         } else if (tab === 'ybl-bg-linked') {
+            needsFdrDetails = true;
             conditions.push(
-                inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7]),
+                inArray(paymentInstruments.action, [1, 2]),
                 like(instrumentFdrDetails.fdrSource, 'BG_%'),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    INNER JOIN payment_instruments bg_instrument ON bg.instrument_id = bg_instrument.id
-                    WHERE bg_instrument.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
                     AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
                 )`
             );
         } else if (tab === 'security-deposit') {
+            needsFdrDetails = true;
             conditions.push(
-                inArray(paymentInstruments.action, [1, 2, 3, 4, 5, 6, 7]),
+                inArray(paymentInstruments.action, [1, 2]),
                 eq(instrumentFdrDetails.fdrPurpose, 'deposit')
             );
         } else if (tab === 'bond-linked') {
             conditions.push(eq(paymentInstruments.action, 8));
         }
 
-        return conditions;
+        return { conditions, needsFdrDetails };
+    }
+
+    private async countFdrByConditions(conditions: any[], needsFdrDetails: boolean) {
+        const query = this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId));
+
+        if (needsFdrDetails) {
+            query.leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id));
+        }
+
+        const [result] = await query.where(and(...conditions));
+        return Number(result?.count || 0);
     }
 
     async getDashboardData(
@@ -93,7 +104,7 @@ export class FdrService {
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions = this.buildFdrDashboardConditions(tab);
+        const { conditions } = this.buildFdrDashboardConditions(tab);
 
         // Build order clause
         let orderClause: any = desc(paymentInstruments.createdAt);
@@ -123,19 +134,23 @@ export class FdrService {
                 id: paymentInstruments.id,
                 fdrCreationDate: instrumentFdrDetails.fdrDate,
                 fdrNo: instrumentFdrDetails.fdrNo,
-                beneficiaryName: sql<string | null>`NULL`, // FDR doesn't have beneficiaryName in schema
+                beneficiaryName: paymentInstruments.favouring,
                 fdrAmount: paymentInstruments.amount,
                 tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
                 tenderNo: tenderInfos.tenderNo,
                 tenderStatus: statuses.name,
                 member: users.name,
+                source: instrumentFdrDetails.fdrSource,
+                requestedBy: paymentRequests.requestedBy,
                 expiry: instrumentFdrDetails.fdrExpiryDate,
                 fdrStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(and(...conditions))
@@ -148,11 +163,13 @@ export class FdrService {
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
             .where(and(...conditions));
 
         const total = Number(countResult?.count || 0);
+
+        console.log(rows);
 
         const data: FdrDashboardRow[] = rows.map((row) => ({
             id: row.id,
@@ -160,10 +177,10 @@ export class FdrService {
             fdrNo: row.fdrNo,
             beneficiaryName: row.beneficiaryName,
             fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
-            tenderName: row.tenderName,
-            tenderNo: row.tenderNo,
-            tenderStatus: row.tenderStatus,
-            member: row.member,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
+            tenderStatus: row.tenderStatus || row.tenderStatus,
+            member: row.member || row.requestedBy,
             expiry: row.expiry ? new Date(row.expiry) : null,
             fdrStatus: row.fdrStatus,
         }));
@@ -171,56 +188,49 @@ export class FdrService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    private async countFdrByConditions(conditions: any[]) {
-        const [result] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...conditions));
-
-        return Number(result?.count || 0);
-    }
-
     async getDashboardCounts(): Promise<FdrDashboardCounts> {
         const pending = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('pending')
-        );
-
-        const created = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('created')
+            this.buildFdrDashboardConditions('pending').conditions,
+            this.buildFdrDashboardConditions('pending').needsFdrDetails
         );
 
         const rejected = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('rejected')
+            this.buildFdrDashboardConditions('rejected').conditions,
+            this.buildFdrDashboardConditions('rejected').needsFdrDetails
         );
 
         const returned = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('returned')
+            this.buildFdrDashboardConditions('returned').conditions,
+            this.buildFdrDashboardConditions('returned').needsFdrDetails
         );
 
         const cancelled = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('cancelled')
+            this.buildFdrDashboardConditions('cancelled').conditions,
+            this.buildFdrDashboardConditions('cancelled').needsFdrDetails
         );
 
         const pnbBgLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('pnb-bg-linked')
+            this.buildFdrDashboardConditions('pnb-bg-linked').conditions,
+            this.buildFdrDashboardConditions('pnb-bg-linked').needsFdrDetails
         );
 
         const yblBgLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('ybl-bg-linked')
+            this.buildFdrDashboardConditions('ybl-bg-linked').conditions,
+            this.buildFdrDashboardConditions('ybl-bg-linked').needsFdrDetails
         );
 
         const securityDeposit = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('security-deposit')
+            this.buildFdrDashboardConditions('security-deposit').conditions,
+            this.buildFdrDashboardConditions('security-deposit').needsFdrDetails
         );
 
         const bondLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions('bond-linked')
+            this.buildFdrDashboardConditions('bond-linked').conditions,
+            this.buildFdrDashboardConditions('bond-linked').needsFdrDetails
         );
 
         return {
             pending,
-            created,
             rejected,
             returned,
             cancelled,
@@ -228,7 +238,7 @@ export class FdrService {
             'ybl-bg-linked': yblBgLinked,
             'security-deposit': securityDeposit,
             'bond-linked': bondLinked,
-            total: pending + created + rejected + returned + cancelled +
+            total: pending + rejected + returned + cancelled +
                 pnbBgLinked + yblBgLinked + securityDeposit + bondLinked,
         };
     }

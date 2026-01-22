@@ -14,7 +14,6 @@ export interface FdrDashboardRow {
 
 export interface FdrDashboardCounts {
     pending: number;
-    created: number;
     rejected: number;
     returned: number;
     cancelled: number;
