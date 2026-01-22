@@ -13,12 +13,13 @@ import { TenderListQuery } from "./zod/tender.dto";
 import { TenderOutcomeStatus } from "./zod/stage-performance.type";
 import { fa } from "zod/v4/locales";
 import { reverseAuctions, tenderQueries } from "@/db/schemas";
+import type { TenderKpiBucket } from "./zod/tender-buckets.type";
 
 export interface TenderListRow {
     id: number;
     tenderNo: string;
     tenderName: string;
-    organizationName: string | null;
+    organizationName?: string | null;
     value: number;
     dueDate: Date;
     status: TenderOutcomeStatus;
@@ -41,6 +42,16 @@ interface StageDrilldownItem {
     meta?: Record<string, any>;
 }
 
+export interface TenderMeta {
+    id: number;
+    tenderNo: string | null;
+    tenderName: string | null;
+    organizationName: string | null;
+    dueDate: Date;
+    value: number;
+    statusBucket: TenderKpiBucket;
+}
+
 function getExecutiveStages() {
     return STAGE_CONFIG.filter(s => !s.tlStage);
 }
@@ -52,8 +63,6 @@ function getWeekNumber(date: Date): number {
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil(((+d - +yearStart) / 86400000 + 1) / 7);
 }
-
-export type TenderKpiBucket = "ALLOCATED" | "APPROVED" | "REJECTED" | "PENDING" | "BID" | "MISSED" | "DISQUALIFIED" | "RESULT_AWAITED" | "LOST" | "WON";
 
 function mapStatusToKpi(statusCode: number): TenderKpiBucket {
     // WON
@@ -180,7 +189,9 @@ export class TenderExecutiveService {
         for (const tender of tenders) {
             for (const stage of activeStages) {
                 const hasTq = tqMap.has(tender.id);
-                const hasBid = tender.status >= 17; // adjust if field differs
+                const bucket = mapStatusToKpi(Number(tender.status));
+
+                const hasBid = ["RESULT_AWAITED", "WON", "LOST", "DISQUALIFIED"].includes(bucket);
 
                 const applicable = stage.stageKey === "tq" ? hasTq : stage.stageKey === "result" ? hasBid : stage.isApplicable(tender);
 
@@ -319,97 +330,227 @@ export class TenderExecutiveService {
     /**
      * Outcome & bid health
      */
+    // async getOutcomes(query: PerformanceQueryDto) {
+    //     const { userId, fromDate, toDate } = query;
+
+    //     /* =====================================================
+    //    STEP 1: Fetch tenders handled by user
+    // ===================================================== */
+
+    //     const tenders = await this.db
+    //         .select({
+    //             id: tenderInfos.id,
+    //             statusCode: tenderInfos.status,
+    //         })
+    //         .from(tenderInfos)
+    //         .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
+
+    //     const counters = {
+    //         allocated: 0,
+    //         approved: 0,
+    //         rejected: 0,
+    //         pending: 0,
+
+    //         bid: 0,
+    //         missed: 0,
+    //         disqualified: 0,
+    //         resultAwaited: 0,
+    //         lost: 0,
+    //         won: 0,
+    //     };
+
+    //     if (tenders.length === 0) return counters;
+
+    //     /* =====================================================
+    //    STEP 2: Classify using mapStatusToKpi
+    // ===================================================== */
+
+    //     for (const tender of tenders) {
+    //         const bucket = mapStatusToKpi(Number(tender.statusCode));
+
+    //         // Every tender is allocated by definition
+    //         counters.allocated++;
+
+    //         /* ---------------- PRE-BID KPIs ---------------- */
+
+    //         switch (bucket) {
+    //             case "PENDING":
+    //                 counters.pending++;
+    //                 break;
+
+    //             case "REJECTED":
+    //                 counters.rejected++;
+    //                 break;
+
+    //             default:
+    //                 break;
+    //         }
+
+    //         // Approved = price bid approved OR anything beyond bidding
+    //         if (["RESULT_AWAITED", "LOST", "WON", "DISQUALIFIED"].includes(bucket)) {
+    //             counters.approved++;
+    //         }
+
+    //         /* ---------------- POST-BID KPIs ---------------- */
+
+    //         switch (bucket) {
+    //             case "RESULT_AWAITED":
+    //                 counters.bid++;
+    //                 counters.resultAwaited++;
+    //                 break;
+
+    //             case "WON":
+    //                 counters.bid++;
+    //                 counters.won++;
+    //                 break;
+
+    //             case "LOST":
+    //                 counters.bid++;
+    //                 counters.lost++;
+    //                 break;
+
+    //             case "DISQUALIFIED":
+    //                 counters.bid++;
+    //                 counters.disqualified++;
+    //                 break;
+
+    //             case "MISSED":
+    //                 counters.missed++;
+    //                 break;
+
+    //             default:
+    //                 break;
+    //         }
+    //     }
+
+    //     return counters;
+    // }
+
     async getOutcomes(query: PerformanceQueryDto) {
         const { userId, fromDate, toDate } = query;
 
-        /* =====================================================
-       STEP 1: Fetch tenders handled by user
-    ===================================================== */
-
         const tenders = await this.db
-            .select({
-                id: tenderInfos.id,
-                statusCode: tenderInfos.status, // <-- important
-            })
+            .select()
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, fromDate, toDate)));
 
         const counters = {
             allocated: 0,
+
+            // PRE-BID
+            pending: 0,
             approved: 0,
             rejected: 0,
-            pending: 0,
 
+            // POST-BID
             bid: 0,
             missed: 0,
-            disqualified: 0,
+
+            // BID OUTCOMES
             resultAwaited: 0,
-            lost: 0,
             won: 0,
+            lost: 0,
+
+            // CROSS-CUTTING
+            disqualified: 0,
+        };
+
+        const tendersByKpi: Record<TenderKpiBucket, TenderMeta[]> = {
+            ALLOCATED: [],
+            PENDING: [],
+            APPROVED: [],
+            REJECTED: [],
+            BID: [],
+            MISSED: [],
+            DISQUALIFIED: [],
+            RESULT_AWAITED: [],
+            LOST: [],
+            WON: [],
         };
 
         if (tenders.length === 0) return counters;
 
-        /* =====================================================
-       STEP 2: Classify each tender by workflow status
-    ===================================================== */
+        for (const t of tenders) {
+            const bucket = mapStatusToKpi(Number(t.status));
 
-        for (const tender of tenders) {
-            const code = Number(tender.statusCode);
+            const meta: TenderMeta = {
+                id: t.id,
+                tenderNo: t.tenderNo ?? null,
+                tenderName: t.tenderName ?? null,
+                organizationName: String(t.organization) ?? null,
+                dueDate: t.dueDate,
+                value: Number(t.gstValues ?? 0),
+                statusBucket: bucket,
+            };
 
+            // ----------------------------------
+            // ALLOCATED (all tenders)
+            // ----------------------------------
             counters.allocated++;
+            tendersByKpi.ALLOCATED.push(meta);
 
-            // ---------------- PRE-BID ----------------
-
-            // Approved for bidding (Price Bid Approved and beyond)
-            if (code === 7 || code >= 17) {
-                counters.approved++;
-            }
-
-            // Rejected before bidding (DNB reasons)
-            if ([9, 10, 11, 12, 13, 14, 15, 31, 32, 34, 35].includes(code)) {
-                counters.rejected++;
-            }
-
-            // Pending in preparation
-            if ([1, 2, 3, 4, 5, 6, 29, 30].includes(code)) {
+            // ----------------------------------
+            // PRE-BID PHASE
+            // ----------------------------------
+            if (bucket === "PENDING" || bucket === "ALLOCATED") {
                 counters.pending++;
+                tendersByKpi.PENDING.push(meta);
+                continue;
             }
 
-            // ---------------- POST-BID ----------------
-
-            // Bid submitted / competed
-            if ([17, 19, 20, 23, 37, 40, 18, 21, 22, 24, 25, 26, 27, 28, 33, 38, 39, 41].includes(code)) {
-                counters.bid++;
+            if (bucket === "REJECTED") {
+                counters.rejected++;
+                tendersByKpi.REJECTED.push(meta);
+                continue;
             }
 
-            // Missed
-            if ([8, 16, 36].includes(code)) {
+            // If we reach here, tender was APPROVED
+            counters.approved++;
+            tendersByKpi.APPROVED.push(meta);
+
+            // ----------------------------------
+            // POST-BID PHASE (only approved)
+            // ----------------------------------
+
+            if (bucket === "MISSED") {
                 counters.missed++;
+                tendersByKpi.MISSED.push(meta);
+                continue;
             }
 
-            // Disqualified
-            if ([33, 38, 39, 41].includes(code)) {
-                counters.disqualified++;
-            }
+            // If we reach here, bid was submitted
+            counters.bid++;
+            tendersByKpi.BID.push(meta);
 
-            // Result awaited
-            if ([17, 19, 20, 23, 37, 40].includes(code)) {
+            // ----------------------------------
+            // BID OUTCOMES
+            // ----------------------------------
+            if (bucket === "RESULT_AWAITED") {
                 counters.resultAwaited++;
+                tendersByKpi.RESULT_AWAITED.push(meta);
+                continue;
             }
 
-            // Lost
-            if ([18, 21, 22, 24].includes(code)) {
-                counters.lost++;
-            }
-
-            // Won
-            if ([25, 26, 27, 28].includes(code)) {
+            if (bucket === "WON") {
                 counters.won++;
+                tendersByKpi.WON.push(meta);
+                continue;
+            }
+
+            if (bucket === "LOST") {
+                counters.lost++;
+                tendersByKpi.LOST.push(meta);
+                continue;
+            }
+
+            if (bucket === "DISQUALIFIED") {
+                counters.disqualified++;
+                tendersByKpi.DISQUALIFIED.push(meta);
+                continue;
             }
         }
 
-        return counters;
+        return { ...counters, tendersByKpi };
     }
 
     async getStageMatrix(query: PerformanceQueryDto) {
@@ -592,15 +733,14 @@ export class TenderExecutiveService {
             rows,
         };
     }
-
     async getTenderList(query: TenderListQuery) {
-        const { userId, fromDate, toDate, outcome } = query;
+        const { userId, fromDate, toDate, kpi } = query;
 
         const from = new Date(`${fromDate}T00:00:00.000Z`);
         const to = new Date(`${toDate}T23:59:59.999Z`);
 
         /* ----------------------------------------
-       Step 1: Base tender fetch
+       Step 1: Fetch tenders
     ---------------------------------------- */
 
         const tenders = await this.db
@@ -609,77 +749,37 @@ export class TenderExecutiveService {
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 dueDate: tenderInfos.dueDate,
-                value: tenderInfos.emd, // or final value logic later
+                value: tenderInfos.emd,
                 organization: tenderInfos.organization,
+                statusCode: tenderInfos.status,
             })
             .from(tenderInfos)
             .where(and(eq(tenderInfos.teamMember, userId), eq(tenderInfos.deleteStatus, 0), between(tenderInfos.createdAt, from, to)));
 
         if (tenders.length === 0) return [];
 
-        const tenderIds = tenders.map(t => t.id);
-
         /* ----------------------------------------
-       Step 2: Fetch bid submissions
+       Step 2: Normalize + filter by KPI bucket
     ---------------------------------------- */
 
-        const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
+        return tenders
+            .map(t => {
+                const bucket = mapStatusToKpi(Number(t.statusCode));
 
-        const bidMap = new Map<number, (typeof bids)[number]>();
-        bids.forEach(b => bidMap.set(Number(b.tenderId), b));
-
-        /* ----------------------------------------
-       Step 3: Fetch tender results
-    ---------------------------------------- */
-
-        const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
-
-        const resultMap = new Map<number, (typeof results)[number]>();
-        results.forEach(r => resultMap.set(Number(r.tenderId), r));
-
-        /* ----------------------------------------
-       Step 4: Normalize outcome per tender
-    ---------------------------------------- */
-
-        const rows = tenders.map(t => {
-            const bid = bidMap.get(t.id);
-            const result = resultMap.get(t.id);
-
-            let status: TenderListRow["status"] = "Not Bid";
-
-            if (bid?.status === "Tender Missed") {
-                status = "Missed";
-            } else if (bid?.status === "Bid Submitted") {
-                if (result?.status === "Won") status = "Won";
-                else if (result?.status === "Lost" || result?.status === "Disqualified") status = "Lost";
-                else status = "Result Awaited";
-            }
-
-            return {
-                id: t.id,
-                tenderNo: t.tenderNo,
-                tenderName: t.tenderName,
-                organizationName: null, // join later if needed
-                value: Number(t.value ?? 0),
-                dueDate: t.dueDate,
-                status,
-            };
-        });
-
-        /* ----------------------------------------
-       Step 5: Outcome filter (optional)
-    ---------------------------------------- */
-
-        if (!outcome) return rows;
-
-        return rows.filter(r => {
-            if (outcome === "resultAwaited") return r.status === "Result Awaited";
-            if (outcome === "won") return r.status === "Won";
-            if (outcome === "lost") return r.status === "Lost";
-            if (outcome === "missed") return r.status === "Missed";
-            if (outcome === "notBid") return r.status === "Not Bid";
-            return true;
-        });
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    organizationName: t.organization ?? null,
+                    value: Number(t.value ?? 0),
+                    dueDate: t.dueDate,
+                    statusBucket: bucket,
+                };
+            })
+            .filter(row => {
+                if (!kpi) return true;
+                return row.statusBucket === kpi;
+            });
     }
 
     async getTrends(query: PerformanceQueryDto & { bucket?: "week" | "month" }) {
