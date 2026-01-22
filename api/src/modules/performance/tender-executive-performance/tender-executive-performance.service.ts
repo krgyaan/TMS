@@ -14,6 +14,7 @@ import { TenderOutcomeStatus } from "./zod/stage-performance.type";
 import { fa } from "zod/v4/locales";
 import { reverseAuctions, tenderQueries } from "@/db/schemas";
 import type { TenderKpiBucket } from "./zod/tender-buckets.type";
+import { TenderMeta } from "./zod/tender.types";
 
 export interface TenderListRow {
     id: number;
@@ -40,16 +41,6 @@ interface StageDrilldownItem {
 
     // Stage-specific (optional)
     meta?: Record<string, any>;
-}
-
-export interface TenderMeta {
-    id: number;
-    tenderNo: string | null;
-    tenderName: string | null;
-    organizationName: string | null;
-    dueDate: Date;
-    value: number;
-    statusBucket: TenderKpiBucket;
 }
 
 function getExecutiveStages() {
@@ -733,6 +724,7 @@ export class TenderExecutiveService {
             rows,
         };
     }
+
     async getTenderList(query: TenderListQuery) {
         const { userId, fromDate, toDate, kpi } = query;
 
