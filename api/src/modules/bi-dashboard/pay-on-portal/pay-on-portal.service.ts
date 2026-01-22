@@ -27,6 +27,16 @@ export class PayOnPortalService {
         private readonly followUpService: FollowUpService,
     ) { }
 
+    private statusMap() {
+        return {
+            [PORTAL_STATUSES.PENDING]: 'Pending',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
+            [PORTAL_STATUSES.SETTLED_WITH_PROJECT]: 'Settled',
+        };
+    }
+
     private buildPopDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Portal Payment'),
@@ -161,7 +171,7 @@ export class PayOnPortalService {
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
-            popStatus: row.popStatus,
+            popStatus: this.statusMap()[row.popStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);

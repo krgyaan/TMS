@@ -27,6 +27,17 @@ export class BankTransferService {
         private readonly followUpService: FollowUpService,
     ) { }
 
+    private statusMap() {
+        return {
+            [BT_STATUSES.PENDING]: 'Pending',
+            [BT_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BT_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [BT_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [BT_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
+            [BT_STATUSES.SETTLED_WITH_PROJECT]: 'Settled',
+        };
+    }
+
     private buildBtDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Bank Transfer'),
@@ -164,7 +175,7 @@ export class BankTransferService {
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
-            btStatus: row.btStatus,
+            btStatus: this.statusMap()[row.btStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);

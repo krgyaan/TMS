@@ -12,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -129,10 +131,18 @@ const PayOnPortalListPage = () => {
 
     const colDefs = useMemo<ColDef<PayOnPortalDashboardRow>[]>(
         () => [
-            dateCol<PayOnPortalDashboardRow>('date', {
+            {
+                field: 'date',
                 headerName: 'Date',
-                width: 120,
+                width: 110,
                 colId: 'date',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            tenderNameCol<PayOnPortalDashboardRow>('tenderNo', {
+                headerName: 'Tender Name',
+                width: 200,
+                colId: 'tenderNo',
                 sortable: true,
             }),
             {
@@ -141,6 +151,15 @@ const PayOnPortalListPage = () => {
                 width: 140,
                 colId: 'teamMember',
                 valueGetter: (params) => params.data?.teamMember || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'tenderStatus',
+                headerName: 'Tender Status',
+                width: 140,
+                colId: 'tenderStatus',
+                valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
             },
@@ -156,43 +175,32 @@ const PayOnPortalListPage = () => {
             {
                 field: 'portalName',
                 headerName: 'Portal Name',
-                width: 150,
+                maxWidth: 120,
                 colId: 'portalName',
                 valueGetter: (params) => params.data?.portalName || '—',
                 sortable: true,
                 filter: true,
             },
-            tenderNameCol<PayOnPortalDashboardRow>('tenderNo', {
-                headerName: 'Tender Name',
-                width: 200,
-                colId: 'tenderNo',
+            {
+                field: 'amount',
+                headerName: 'Amount',
+                width: 110,
+                colId: 'amount',
                 sortable: true,
-            }),
-            dateCol<PayOnPortalDashboardRow>('bidValidity', {
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
                 width: 130,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
-            {
-                field: 'tenderStatus',
-                headerName: 'Tender Status',
-                width: 140,
-                colId: 'tenderStatus',
-                valueGetter: (params) => params.data?.tenderStatus || '—',
-                sortable: true,
-                filter: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
             },
-            currencyCol<PayOnPortalDashboardRow>('amount', {
-                headerName: 'Amount',
-                width: 130,
-                colId: 'amount',
-                sortable: true,
-            }),
             {
                 field: 'popStatus',
                 headerName: 'POP Status',
-                width: 130,
+                width: 110,
                 colId: 'popStatus',
                 sortable: true,
                 filter: true,
