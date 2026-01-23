@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,7 +34,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(BiOtherThanEmdRequestSchema),
+        resolver: zodResolver(BiOtherThanEmdRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', emd: { mode: undefined, details: {} } },
     });
 
@@ -77,7 +77,12 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                 console.error(error);
             }
         } else {
-            const payload: any = {};
+            const payload: any = {
+                type: 'Other Than Tender',
+                tenderNo: values.tenderNo || '',
+                tenderName: values.tenderName || '',
+                dueDate: values.tenderDueDate || '',
+            };
 
             if (values.emd?.mode) {
                 payload.emd = {
@@ -93,7 +98,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
             try {
                 await createRequest.mutateAsync({
-                    tenderId: Number(tenderId),
+                    tenderId: Number(tenderId) || 0,
                     data: payload,
                 });
                 toast.success('Payment request created successfully');

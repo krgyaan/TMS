@@ -124,7 +124,12 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                 console.error(error);
             }
         } else {
-            const payload: any = {};
+            const payload: any = {
+                type: 'Old Entries',
+                tenderNo: values.tenderNo || '',
+                tenderName: values.tenderName || '',
+                dueDate: values.tenderDueDate || '',
+            };
 
             if (values.emd?.mode) {
                 payload.emd = {
@@ -154,7 +159,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
 
             try {
                 await createRequest.mutateAsync({
-                    tenderId: Number(tenderId),
+                    tenderId: Number(tenderId) || 0,
                     data: payload,
                 });
                 toast.success('Payment request created successfully');
