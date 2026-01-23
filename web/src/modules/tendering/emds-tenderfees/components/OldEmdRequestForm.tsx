@@ -6,18 +6,13 @@ import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useTender } from '@/hooks/api/useTenders';
 import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/useEmds';
 import { EmdSection } from './EmdSection';
 import { TenderFeeSection } from './TenderFeeSection';
 import { ProcessingFeeSection } from './ProcessingFeeSection';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { Button } from '@/components/ui/button';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { toast } from 'sonner';
-import { formatINR } from '@/hooks/useINRFormatter';
-import { parseAllowedModes, DELIVERY_OPTIONS } from '../constants';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DELIVERY_OPTIONS } from '../constants';
 
 const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
 
@@ -86,7 +81,7 @@ const PaymentDetailsSchema = z.object({
     chequeAccount: z.string().optional(),
 });
 
-const EmdRequestSchema = z.object({
+const OldEmdRequestSchema = z.object({
     // EMD
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
@@ -106,9 +101,9 @@ const EmdRequestSchema = z.object({
     }).optional(),
 });
 
-type FormValues = z.infer<typeof EmdRequestSchema>;
+type FormValues = z.infer<typeof OldEmdRequestSchema>;
 
-interface EmdTenderFeeRequestFormProps {
+interface OldEmdRequestFormProps {
     tenderId?: number;
     requestIds?: {
         emd?: number;
@@ -127,16 +122,14 @@ function transformModeForBackend(mode: string): string {
     return mapping[mode] || mode;
 }
 
-export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mode = 'create' }: EmdTenderFeeRequestFormProps) {
+export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'create' }: OldEmdRequestFormProps) {
     const navigate = useNavigate();
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId ? Number(tenderId) : null);
-    const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId ? Number(tenderId) : null);
     const createRequest = useCreatePaymentRequest();
     const updateRequest = useUpdatePaymentRequest();
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(EmdRequestSchema) as any,
+        resolver: zodResolver(OldEmdRequestSchema) as any,
         defaultValues: initialData || {
             emd: { mode: undefined, details: {} },
             tenderFee: { mode: undefined, details: {} },
@@ -255,61 +248,20 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
         }
     };
 
-    if (isTenderLoading || isInfoSheetLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-96 mt-2" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-64 w-full" />
-                </CardContent>
-            </Card>
-        );
+    if (tenderId === 0 || !tenderId) {
+        <Alert variant="warning">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Be Sure! The Request you are raising is not associated with any tender on TMS</AlertDescription>
+        </Alert>
     }
 
-    if (!tender) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Tender not found</AlertDescription>
-            </Alert>
-        );
-    }
+    const allowedEmdModes = ['DD', 'FDR', 'CHEQUE', 'BG', 'BT', 'POP'];;
+    const allowedTenderFeeModes = ['POP', 'BT', 'DD'];
+    const allowedProcessingFeeModes = ['POP', 'BT', 'DD'];
 
-    const emdAmount = Number(tender.emd) || 0;
-    const tenderFeeAmount = Number(tender.tenderFees) || 0;
-    const processingFeeAmount = Number(infoSheet?.processingFeeAmount) || 0;
-
-    const hasEmd = emdAmount > 0;
-    const hasTenderFee = tenderFeeAmount > 0;
-    const hasProcessingFee = processingFeeAmount > 0;
-
-    if (!hasEmd && !hasTenderFee && !hasProcessingFee) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>No Payment Required</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            No EMD, Tender Fee, or Processing Fee is required for this tender.
-                        </AlertDescription>
-                    </Alert>
-                    <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
-                    </Button>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const allowedEmdModes = parseAllowedModes(tender.emdMode);
-    const allowedTenderFeeModes = parseAllowedModes(tender.tenderFeeMode);
-    const allowedProcessingFeeModes = parseAllowedModes(infoSheet?.processingFeeMode);
+    const hasEmd = true;
+    const hasTenderFee = true;
+    const hasProcessingFee = true;
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -322,24 +274,10 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                 <CardDescription>
                     <div className="space-y-1">
                         <p>
-                            <span className="text-muted-foreground">Tender:</span>{' '}
-                            <strong>{tender.tenderNo}</strong> - {tender.tenderName}
+                            <span className="text-muted-foreground">You are filling this request for old EMD.</span>
                         </p>
                         <p>
-                            <span className="text-muted-foreground">Assigned to:</span>{' '}
-                            <strong>{tender.teamMemberName || 'Unassigned'}</strong>
-                            {tender.dueDate && (
-                                <>
-                                    {' | '}
-                                    <span className="text-muted-foreground">Due:</span>{' '}
-                                    <strong>{formatDateTime(tender.dueDate)}</strong>
-                                </>
-                            )}
-                        </p>
-                        <p className="text-sm">
-                            {hasEmd && <span className="mr-4">EMD: <strong>{formatINR(emdAmount)}</strong></span>}
-                            {hasTenderFee && <span className="mr-4">Tender Fee: <strong>{formatINR(tenderFeeAmount)}</strong></span>}
-                            {hasProcessingFee && <span>Processing Fee: <strong>{formatINR(processingFeeAmount)}</strong></span>}
+                            <span className="text-muted-foreground">Please fill the details below.</span>
                         </p>
                     </div>
                 </CardDescription>
@@ -358,9 +296,10 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                         {hasEmd && (
                             <EmdSection
                                 allowedModes={allowedEmdModes}
-                                amount={emdAmount}
+                                amount={0}
                                 defaultPurpose="EMD"
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                type="OLD_EMD"
+                                courierAddress={''}
                             />
                         )}
 
@@ -369,17 +308,19 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 prefix="tenderFee"
                                 title="Tender Fee"
                                 allowedModes={allowedTenderFeeModes}
-                                amount={tenderFeeAmount}
+                                amount={0}
                                 defaultPurpose="TENDER_FEES"
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                type="OLD_EMD"
+                                courierAddress={''}
                             />
                         )}
 
                         {hasProcessingFee && (
                             <ProcessingFeeSection
-                                amount={processingFeeAmount}
+                                amount={0}
                                 allowedModes={allowedProcessingFeeModes}
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                type="OLD_EMD"
+                                courierAddress={''}
                             />
                         )}
 
