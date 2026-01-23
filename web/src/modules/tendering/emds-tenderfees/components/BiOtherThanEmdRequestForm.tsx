@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -10,74 +9,12 @@ import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/us
 import { EmdSection } from './EmdSection';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { DELIVERY_OPTIONS } from '../constants';
+import DateInput from '@/components/form/DateInput';
+import FieldWrapper from '@/components/form/FieldWrapper';
+import { Input } from '@/components/ui/input';
+import { BiOtherThanEmdRequestSchema, type BiOtherThanEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
 
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
-
-const deliveryEnumField = () =>
-    z.preprocess(
-        (val) => {
-            if (val === '' || val === null || val === undefined) {
-                return undefined;
-            }
-            if (typeof val === 'number') {
-                return String(val);
-            }
-            return val;
-        },
-        z.enum(DELIVERY_OPTION_VALUES).optional()
-    );
-
-const PaymentDetailsSchema = z.object({
-    ddFavouring: z.string().optional(),
-    ddPayableAt: z.string().optional(),
-    ddDeliverBy: deliveryEnumField(),
-    ddPurpose: z.string().optional(),
-    ddCourierAddress: z.string().optional(),
-    ddCourierHours: z.coerce.number().optional(),
-    ddDate: z.string().optional(),
-    ddRemarks: z.string().optional(),
-
-    fdrFavouring: z.string().optional(),
-    fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumField(),
-    fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
-    fdrCourierHours: z.coerce.number().optional(),
-    fdrDate: z.string().optional(),
-
-    bgNeededIn: z.string().optional(),
-    bgPurpose: z.string().optional(),
-    bgFavouring: z.string().optional(),
-    bgAddress: z.string().optional(),
-    bgExpiryDate: z.string().optional(),
-    bgClaimPeriod: z.string().optional(),
-    bgStampValue: z.coerce.number().optional(),
-    bgFormatFiles: z.array(z.string()).optional(),
-    bgPoFiles: z.array(z.string()).optional(),
-    bgClientUserEmail: z.string().email().optional().or(z.literal('')),
-    bgClientCpEmail: z.string().email().optional().or(z.literal('')),
-    bgClientFinanceEmail: z.string().email().optional().or(z.literal('')),
-    bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
-    bgBank: z.string().optional(),
-
-    chequeFavouring: z.string().optional(),
-    chequeDate: z.string().optional(),
-    chequeNeededIn: deliveryEnumField(),
-    chequePurpose: z.string().optional(),
-    chequeAccount: z.string().optional(),
-});
-
-const BiOtherThanEmdRequestSchema = z.object({
-    // EMD
-    emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-});
-
-type FormValues = z.infer<typeof BiOtherThanEmdRequestSchema>;
+type FormValues = BiOtherThanEmdRequestFormValues;
 
 interface BiOtherThanEmdRequestFormProps {
     tenderId?: number;
@@ -97,8 +34,8 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(BiOtherThanEmdRequestSchema) as any,
-        defaultValues: initialData || { emd: { mode: undefined, details: {} } },
+        resolver: zodResolver(BiOtherThanEmdRequestSchema),
+        defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', emd: { mode: undefined, details: {} } },
     });
 
     useEffect(() => {
@@ -177,6 +114,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
     const allowedEmdModes = ['DD', 'FDR', 'CHEQUE', 'BG'];
     const hasEmd = true;
+    const type = 'BI_OTHER_THAN_EMD';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -187,14 +125,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                     {isEditMode ? 'Edit Payment Request' : 'Create Payment Request'}
                 </CardTitle>
                 <CardDescription>
-                    <div className="space-y-1">
-                        <p>
-                            <span className="text-muted-foreground">You are filling this request for BI other than EMD.</span>
-                        </p>
-                        <p>
-                            <span className="text-muted-foreground">Please fill the details below.</span>
-                        </p>
-                    </div>
+                    <p className="text-muted-foreground">You are filling this request for BI other than EMD.</p>
                 </CardDescription>
                 <CardAction>
                     <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -207,13 +138,29 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
             <CardContent>
                 <FormProvider {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                        {/* Tender Details */}
+                        {
+                            (type === 'BI_OTHER_THAN_EMD') && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
+                                    <FieldWrapper control={form.control} name="tenderName" label="Tender/Project Name">
+                                        {(field) => <Input {...field} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="tenderNo" label="Tender/Work Order No.">
+                                        {(field) => <Input {...field} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="tenderDueDate" label="Tender/Work Order Due Date">
+                                        {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                    </FieldWrapper>
+                                </div>
+                            )
+                        }
 
                         {hasEmd && (
                             <EmdSection
                                 allowedModes={allowedEmdModes}
                                 amount={0}
                                 defaultPurpose="EMD"
-                                type="BI_OTHER_THAN_EMD"
+                                type={type}
                                 courierAddress={''}
                             />
                         )}

@@ -8,18 +8,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { Badge } from '@/components/ui/badge';
 import { formatINR } from '@/hooks/useINRFormatter';
-import {
-    EMD_MODES,
-    PURPOSE_OPTIONS,
-    BG_PURPOSE_OPTIONS,
-    DELIVERY_OPTIONS,
-    BG_NEEDED_IN_OPTIONS,
-    BANKS,
-    YES_NO_OPTIONS,
-    MODE_LABELS,
-} from '../constants';
+import { EMD_MODES, PURPOSE_OPTIONS, BG_PURPOSE_OPTIONS, DELIVERY_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS, YES_NO_OPTIONS, MODE_LABELS, } from '../constants';
 import DateInput from '@/components/form/DateInput';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 
@@ -74,10 +64,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
         return (
             <div className="border rounded-lg p-6 bg-muted/20">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">EMD (Earnest Money Deposit)</h3>
-                    {amount > 0 && (
-                        <Badge variant="secondary">{formatINR(amount)}</Badge>
-                    )}
+                    <h3 className="text-lg font-semibold">EMD (Earnest Money Deposit) {amount > 0 ? `of ${formatINR(amount)}` : ''}</h3>
                 </div>
                 <p className="text-muted-foreground text-sm">No EMD modes configured for this tender.</p>
             </div>
@@ -87,10 +74,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
     return (
         <div className="border rounded-lg p-6 bg-muted/20">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">EMD (Earnest Money Deposit)</h3>
-                {amount > 0 && (
-                    <Badge variant="secondary">{formatINR(amount)}</Badge>
-                )}
+                <h3 className="text-lg font-semibold">EMD (Earnest Money Deposit) {amount > 0 ? `of ${formatINR(amount)}` : ''}</h3>
             </div>
 
             {/* Mode Selection */}
@@ -133,7 +117,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                             options={PURPOSE_OPTIONS}
                                             placeholder="Select Purpose"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
+                                        <FieldWrapper control={control} name="emd.details.portalAmount" label="Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
@@ -172,17 +156,17 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                             options={[{ value: 'EMD', label: 'EMD' }]}
                                             placeholder="EMD"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
+                                        <FieldWrapper control={control} name="emd.details.btAmount" label="Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
                             <FieldWrapper control={control} name="emd.details.btAccountName" label="Account Name *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.btAccountNo" label="Account Number *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.btIfsc" label="IFSC Code *">
                                 {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
@@ -195,27 +179,25 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                             {
                                 (type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD') && (
-                                    <SelectField
-                                        control={control}
-                                        name="emd.details.ddPurpose"
-                                        label="Purpose *"
-                                        options={PURPOSE_OPTIONS}
-                                        placeholder="Select Purpose"
-                                    />
+                                    <>
+                                        <SelectField
+                                            control={control}
+                                            name="emd.details.ddPurpose"
+                                            label="Purpose *"
+                                            options={PURPOSE_OPTIONS}
+                                            placeholder="Select Purpose"
+                                        />
+                                        <FieldWrapper control={control} name="emd.details.ddAmount" label="Amount *">
+                                            {(field) => <NumberInput {...field} />}
+                                        </FieldWrapper>
+                                    </>
                                 )
                             }
                             <FieldWrapper control={control} name="emd.details.ddFavouring" label="DD in Favour of *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
-                            {
-                                (type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD') && (
-                                    <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
-                                        {(field) => <NumberInput {...field} />}
-                                    </FieldWrapper>
-                                )
-                            }
                             <FieldWrapper control={control} name="emd.details.ddPayableAt" label="Payable At *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., Bank Name or Address" />}
                             </FieldWrapper>
                             <SelectField
                                 control={control}
@@ -253,6 +235,9 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                                 options={BG_PURPOSE_OPTIONS}
                                                 placeholder="Select Purpose"
                                             />
+                                            <FieldWrapper control={control} name="emd.details.bgAmount" label="Amount *">
+                                                {(field) => <NumberInput {...field} />}
+                                            </FieldWrapper>
                                         </>
                                     )
                                 }
@@ -264,10 +249,10 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                     placeholder="Select"
                                 />
                                 <FieldWrapper control={control} name="emd.details.bgFavouring" label="BG in Favour of *">
-                                    {(field) => <Input {...field} />}
+                                    {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgAddress" label="BG Address *">
-                                    {(field) => <Textarea rows={2} {...field} />}
+                                    {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgExpiryDate" label="BG Expiry Date *">
                                     {(field) => <DatePicker {...field} />}
@@ -280,7 +265,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 </FieldWrapper>
                                 <SelectField control={control} name="emd.details.bgBank" label="Bank *" options={BANKS} placeholder="Select Bank" />
                                 <FieldWrapper control={control} name="emd.details.bgCourierAddress" label="Courier Address *">
-                                    {(field) => <Textarea rows={2} {...field} />}
+                                    {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgCourierDays" label="Courier Time (Days)" description="Enter the number of days required for the courier to deliver the BG.">
                                     {(field) => <NumberInput min={1} max={10} {...field} />}
@@ -340,14 +325,14 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                             options={PURPOSE_OPTIONS}
                                             placeholder="Select Purpose"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.fdrAmount" label="Amount *">
+                                        <FieldWrapper control={control} name="emd.details.fdrAmount" label="FDR Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
                             <FieldWrapper control={control} name="emd.details.fdrFavouring" label="FDR in Favour of *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.fdrExpiryDate" label="FDR Expiry Date *">
                                 {(field) => <DatePicker {...field} />}
@@ -360,7 +345,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 placeholder="Select"
                             />
                             <FieldWrapper control={control} name="emd.details.fdrCourierAddress" label="Courier Address">
-                                {(field) => <Textarea rows={2} {...field} />}
+                                {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.fdrCourierHours" label="Courier Time (Hours)" description="Enter the number of hours required for the courier to deliver the FDR.">
                                 {(field) => <NumberInput min={1} {...field} />}
@@ -384,14 +369,14 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                             options={PURPOSE_OPTIONS}
                                             placeholder="Select Purpose"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.chequeAmount" label="Amount *">
+                                        <FieldWrapper control={control} name="emd.details.chequeAmount" label="Cheque Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
                             <FieldWrapper control={control} name="emd.details.chequeFavouring" label="Cheque in Favour of *">
-                                {(field) => <Input {...field} />}
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.chequeDate" label="Cheque Date *">
                                 {(field) => <DatePicker {...field} />}

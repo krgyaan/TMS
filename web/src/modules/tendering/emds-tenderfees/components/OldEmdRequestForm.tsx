@@ -1,6 +1,5 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,96 +11,12 @@ import { TenderFeeSection } from './TenderFeeSection';
 import { ProcessingFeeSection } from './ProcessingFeeSection';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { DELIVERY_OPTIONS } from '../constants';
+import { DateInput } from '@/components/form/DateInput';
+import FieldWrapper from '@/components/form/FieldWrapper';
+import { Input } from '@/components/ui/input';
+import { OldEmdRequestSchema, type OldEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
 
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
-
-const deliveryEnumField = () =>
-    z.preprocess(
-        (val) => {
-            if (val === '' || val === null || val === undefined) {
-                return undefined;
-            }
-            if (typeof val === 'number') {
-                return String(val);
-            }
-            return val;
-        },
-        z.enum(DELIVERY_OPTION_VALUES).optional()
-    );
-
-const PaymentDetailsSchema = z.object({
-    ddFavouring: z.string().optional(),
-    ddPayableAt: z.string().optional(),
-    ddDeliverBy: deliveryEnumField(),
-    ddPurpose: z.string().optional(),
-    ddCourierAddress: z.string().optional(),
-    ddCourierHours: z.coerce.number().optional(),
-    ddDate: z.string().optional(),
-    ddRemarks: z.string().optional(),
-
-    fdrFavouring: z.string().optional(),
-    fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumField(),
-    fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
-    fdrCourierHours: z.coerce.number().optional(),
-    fdrDate: z.string().optional(),
-
-    bgNeededIn: z.string().optional(),
-    bgPurpose: z.string().optional(),
-    bgFavouring: z.string().optional(),
-    bgAddress: z.string().optional(),
-    bgExpiryDate: z.string().optional(),
-    bgClaimPeriod: z.string().optional(),
-    bgStampValue: z.coerce.number().optional(),
-    bgFormatFiles: z.array(z.string()).optional(),
-    bgPoFiles: z.array(z.string()).optional(),
-    bgClientUserEmail: z.string().email().optional().or(z.literal('')),
-    bgClientCpEmail: z.string().email().optional().or(z.literal('')),
-    bgClientFinanceEmail: z.string().email().optional().or(z.literal('')),
-    bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
-    bgBank: z.string().optional(),
-
-    btPurpose: z.string().optional(),
-    btAccountName: z.string().optional(),
-    btAccountNo: z.string().optional(),
-    btIfsc: z.string().optional(),
-
-    portalPurpose: z.string().optional(),
-    portalName: z.string().optional(),
-    portalNetBanking: z.enum(['YES', 'NO']).optional(),
-    portalDebitCard: z.enum(['YES', 'NO']).optional(),
-
-    chequeFavouring: z.string().optional(),
-    chequeDate: z.string().optional(),
-    chequeNeededIn: deliveryEnumField(),
-    chequePurpose: z.string().optional(),
-    chequeAccount: z.string().optional(),
-});
-
-const OldEmdRequestSchema = z.object({
-    // EMD
-    emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Tender Fee
-    tenderFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Processing Fee
-    processingFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-});
-
-type FormValues = z.infer<typeof OldEmdRequestSchema>;
+type FormValues = OldEmdRequestFormValues;
 
 interface OldEmdRequestFormProps {
     tenderId?: number;
@@ -129,8 +44,11 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(OldEmdRequestSchema) as any,
+        resolver: zodResolver(OldEmdRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
+            tenderName: '',
+            tenderNo: '',
+            tenderDueDate: '',
             emd: { mode: undefined, details: {} },
             tenderFee: { mode: undefined, details: {} },
             processingFee: { mode: undefined, details: {} },
@@ -262,6 +180,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
     const hasEmd = true;
     const hasTenderFee = true;
     const hasProcessingFee = true;
+    const type = 'OLD_EMD';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -272,14 +191,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                     {isEditMode ? 'Edit Payment Request' : 'Create Payment Request'}
                 </CardTitle>
                 <CardDescription>
-                    <div className="space-y-1">
-                        <p>
-                            <span className="text-muted-foreground">You are filling this request for old EMD.</span>
-                        </p>
-                        <p>
-                            <span className="text-muted-foreground">Please fill the details below.</span>
-                        </p>
-                    </div>
+                    <p className="text-muted-foreground">You are filling this request for old EMD.</p>
                 </CardDescription>
                 <CardAction>
                     <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -292,13 +204,29 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
             <CardContent>
                 <FormProvider {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                        {/* Tender Details */}
+                        {
+                            (type === 'OLD_EMD') && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
+                                    <FieldWrapper control={form.control} name="tenderName" label="Tender/Project Name">
+                                        {(field) => <Input {...field} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="tenderNo" label="Tender/Work Order No.">
+                                        {(field) => <Input {...field} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="tenderDueDate" label="Tender/Work Order Due Date">
+                                        {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+                                    </FieldWrapper>
+                                </div>
+                            )
+                        }
 
                         {hasEmd && (
                             <EmdSection
                                 allowedModes={allowedEmdModes}
                                 amount={0}
                                 defaultPurpose="EMD"
-                                type="OLD_EMD"
+                                type={type}
                                 courierAddress={''}
                             />
                         )}
@@ -310,7 +238,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                                 allowedModes={allowedTenderFeeModes}
                                 amount={0}
                                 defaultPurpose="TENDER_FEES"
-                                type="OLD_EMD"
+                                type={type}
                                 courierAddress={''}
                             />
                         )}
@@ -319,7 +247,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                             <ProcessingFeeSection
                                 amount={0}
                                 allowedModes={allowedProcessingFeeModes}
-                                type="OLD_EMD"
+                                type={type}
                                 courierAddress={''}
                             />
                         )}

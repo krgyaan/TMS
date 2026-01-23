@@ -7,7 +7,6 @@ import { NumberInput } from '@/components/form/NumberInput';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useFormContext } from 'react-hook-form';
-import { Badge } from '@/components/ui/badge';
 import { formatINR } from '@/hooks/useINRFormatter';
 import {
     TENDER_FEE_MODES,
@@ -70,14 +69,9 @@ export function TenderFeeSection({
         return (
             <div className="border rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">{title}</h3>
-                    {
-                        amount > 0 && (
-                            <Badge variant="secondary">{formatINR(amount)}</Badge>
-                        )
-                    }
+                    <h3 className="text-lg font-semibold">{title} {amount > 0 ? `of ${formatINR(amount)}` : ''}</h3>
                 </div>
-                <p className="text-muted-foreground text-sm">No payment modes configured for {title.toLowerCase()}.</p>
+                <p className="text-muted-foreground text-sm">No payment modes configured for {title.toLowerCase()} {amount > 0 ? `of ${formatINR(amount)}` : ''}.</p>
             </div>
         );
     }
@@ -85,12 +79,7 @@ export function TenderFeeSection({
     return (
         <div className="border rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{title}</h3>
-                {
-                    amount > 0 && (
-                        <Badge variant="secondary">{formatINR(amount)}</Badge>
-                    )
-                }
+                <h3 className="text-lg font-semibold">{title} {amount > 0 ? `of ${formatINR(amount)}` : ''}</h3>
             </div>
 
             {/* Mode Selection */}
@@ -128,30 +117,30 @@ export function TenderFeeSection({
                                     <>
                                         <SelectField
                                             control={control}
-                                            name="emd.details.portalPurpose"
+                                            name={`${prefix}.details.portalPurpose`}
                                             label="Purpose *"
                                             options={PURPOSE_OPTIONS}
                                             placeholder="Select Purpose"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
+                                        <FieldWrapper control={control} name={`${prefix}.details.amount`} label="Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
-                            <FieldWrapper control={control} name="emd.details.portalName" label="Portal/Website Name *">
+                            <FieldWrapper control={control} name={`${prefix}.details.portalName`} label="Portal/Website Name *">
                                 {(field) => <Input placeholder="e.g., gem.gov.in" {...field} />}
                             </FieldWrapper>
                             <SelectField
                                 control={control}
-                                name="emd.details.portalNetBanking"
+                                name={`${prefix}.details.portalNetBanking`}
                                 label="Net Banking Available *"
                                 options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
                             <SelectField
                                 control={control}
-                                name="emd.details.portalDebitCard"
+                                name={`${prefix}.details.portalDebitCard`}
                                 label="Debit Card Allowed *"
                                 options={YES_NO_OPTIONS}
                                 placeholder="Select"
@@ -167,24 +156,24 @@ export function TenderFeeSection({
                                     <>
                                         <SelectField
                                             control={control}
-                                            name="emd.details.btPurpose"
+                                            name={`${prefix}.details.btPurpose`}
                                             label="Purpose *"
                                             options={PURPOSE_OPTIONS}
                                             placeholder="EMD"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
+                                        <FieldWrapper control={control} name={`${prefix}.details.amount`} label="Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
-                            <FieldWrapper control={control} name="emd.details.btAccountName" label="Account Name *">
-                                {(field) => <Input {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.btAccountName`} label="Account Name *">
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.btAccountNo" label="Account Number *">
-                                {(field) => <Input {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.btAccountNo`} label="Account Number *">
+                                {(field) => <Input {...field} placeholder="e.g., 1234567890" />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.btIfsc" label="IFSC Code *">
+                            <FieldWrapper control={control} name={`${prefix}.details.btIfsc`} label="IFSC Code *">
                                 {(field) => <Input {...field} placeholder="e.g., SBIN0001234" />}
                             </FieldWrapper>
                         </div>
@@ -198,41 +187,41 @@ export function TenderFeeSection({
                                     <>
                                         <SelectField
                                             control={control}
-                                            name="emd.details.ddPurpose"
+                                            name={`${prefix}.details.ddPurpose`}
                                             label="Purpose *"
                                             options={PURPOSE_OPTIONS}
                                             placeholder="Select Purpose"
                                         />
-                                        <FieldWrapper control={control} name="emd.details.amount" label="Amount *">
+                                        <FieldWrapper control={control} name={`${prefix}.details.amount`} label="Amount *">
                                             {(field) => <NumberInput {...field} />}
                                         </FieldWrapper>
                                     </>
                                 )
                             }
-                            <FieldWrapper control={control} name="emd.details.ddFavouring" label="DD in Favour of *">
-                                {(field) => <Input {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.ddFavouring`} label="DD in Favour of *">
+                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.ddPayableAt" label="Payable At *">
-                                {(field) => <Input {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.ddPayableAt`} label="Payable At *">
+                                {(field) => <Input {...field} placeholder="e.g., Bank Name or Address" />}
                             </FieldWrapper>
                             <SelectField
                                 control={control}
-                                name="emd.details.ddDeliverBy"
+                                name={`${prefix}.details.ddDeliverBy`}
                                 label="Deliver By *"
                                 options={DELIVERY_OPTIONS}
                                 placeholder="Select"
                             />
-                            <FieldWrapper control={control} name="emd.details.ddCourierAddress" label="Courier Address">
-                                {(field) => <Textarea rows={2} {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.ddCourierAddress`} label="Courier Address">
+                                {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.ddCourierHours" label="Courier Time (Hours)" description="Enter the number of hours required for the courier to deliver the DD.">
+                            <FieldWrapper control={control} name={`${prefix}.details.ddCourierHours`} label="Courier Time (Hours)" description="Enter the number of hours required for the courier to deliver the DD.">
                                 {(field) => <NumberInput min={1} {...field} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.ddDate" label="DD Date">
+                            <FieldWrapper control={control} name={`${prefix}.details.ddDate`} label="DD Date">
                                 {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                             </FieldWrapper>
-                            <FieldWrapper control={control} name="emd.details.ddRemarks" label="Remarks">
-                                {(field) => <Textarea rows={2} {...field} />}
+                            <FieldWrapper control={control} name={`${prefix}.details.ddRemarks`} label="Remarks">
+                                {(field) => <Textarea rows={2} {...field} placeholder="e.g., Remarks" />}
                             </FieldWrapper>
                         </div>
                     )}

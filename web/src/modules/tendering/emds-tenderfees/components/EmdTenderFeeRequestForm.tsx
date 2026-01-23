@@ -1,6 +1,5 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,97 +15,11 @@ import { Button } from '@/components/ui/button';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { toast } from 'sonner';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { parseAllowedModes, DELIVERY_OPTIONS } from '../constants';
+import { parseAllowedModes } from '../constants';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmdRequestSchema, type EmdRequestFormValues } from '../helpers/emdTenderFee.schema';
 
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
-
-const deliveryEnumField = () =>
-    z.preprocess(
-        (val) => {
-            if (val === '' || val === null || val === undefined) {
-                return undefined;
-            }
-            if (typeof val === 'number') {
-                return String(val);
-            }
-            return val;
-        },
-        z.enum(DELIVERY_OPTION_VALUES).optional()
-    );
-
-const PaymentDetailsSchema = z.object({
-    ddFavouring: z.string().optional(),
-    ddPayableAt: z.string().optional(),
-    ddDeliverBy: deliveryEnumField(),
-    ddPurpose: z.string().optional(),
-    ddCourierAddress: z.string().optional(),
-    ddCourierHours: z.coerce.number().optional(),
-    ddDate: z.string().optional(),
-    ddRemarks: z.string().optional(),
-
-    fdrFavouring: z.string().optional(),
-    fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumField(),
-    fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
-    fdrCourierHours: z.coerce.number().optional(),
-    fdrDate: z.string().optional(),
-
-    bgNeededIn: z.string().optional(),
-    bgPurpose: z.string().optional(),
-    bgFavouring: z.string().optional(),
-    bgAddress: z.string().optional(),
-    bgExpiryDate: z.string().optional(),
-    bgClaimPeriod: z.string().optional(),
-    bgStampValue: z.coerce.number().optional(),
-    bgFormatFiles: z.array(z.string()).optional(),
-    bgPoFiles: z.array(z.string()).optional(),
-    bgClientUserEmail: z.string().email().optional().or(z.literal('')),
-    bgClientCpEmail: z.string().email().optional().or(z.literal('')),
-    bgClientFinanceEmail: z.string().email().optional().or(z.literal('')),
-    bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
-    bgBank: z.string().optional(),
-
-    btPurpose: z.string().optional(),
-    btAccountName: z.string().optional(),
-    btAccountNo: z.string().optional(),
-    btIfsc: z.string().optional(),
-
-    portalPurpose: z.string().optional(),
-    portalName: z.string().optional(),
-    portalNetBanking: z.enum(['YES', 'NO']).optional(),
-    portalDebitCard: z.enum(['YES', 'NO']).optional(),
-
-    chequeFavouring: z.string().optional(),
-    chequeDate: z.string().optional(),
-    chequeNeededIn: deliveryEnumField(),
-    chequePurpose: z.string().optional(),
-    chequeAccount: z.string().optional(),
-});
-
-const EmdRequestSchema = z.object({
-    // EMD
-    emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Tender Fee
-    tenderFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Processing Fee
-    processingFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-});
-
-type FormValues = z.infer<typeof EmdRequestSchema>;
+type FormValues = EmdRequestFormValues;
 
 interface EmdTenderFeeRequestFormProps {
     tenderId?: number;
@@ -136,7 +49,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(EmdRequestSchema) as any,
+        resolver: zodResolver(EmdRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
             emd: { mode: undefined, details: {} },
             tenderFee: { mode: undefined, details: {} },
@@ -276,6 +189,8 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                 <AlertDescription>Tender not found</AlertDescription>
             </Alert>
         );
+    } else {
+        console.log(tender);
     }
 
     const emdAmount = Number(tender.emd) || 0;
