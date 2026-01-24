@@ -1,132 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Guarantee Undertaking</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Times New Roman', serif;
-            font-size: 12pt;
-            line-height: 1.6;
-            color: #000;
-            padding: 20mm 15mm;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 15px;
-        }
-        .header h1 {
-            font-size: 18pt;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .content {
-            margin: 20px 0;
-        }
-        .section {
-            margin-bottom: 20px;
-        }
-        .section-title {
-            font-weight: bold;
-            font-size: 13pt;
-            margin-bottom: 10px;
-            text-decoration: underline;
-        }
-        .undertaking-text {
-            text-align: justify;
-            margin: 15px 0;
-            line-height: 1.8;
-        }
-        .signature-section {
-            margin-top: 50px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .signature-box {
-            width: 45%;
-            border-top: 1px solid #000;
-            padding-top: 10px;
-            text-align: center;
-        }
-        .signature-label {
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .footer {
-            margin-top: 30px;
-            font-size: 10pt;
-            text-align: center;
-            color: #666;
-        }
-        @media print {
-            body {
-                padding: 0;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>UNDERTAKING FOR BANK GUARANTEE</h1>
+<div style="padding: 0 50px;">
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;">
     </div>
+    <div style="padding: 10px 0; font-family: sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+            <tr>
+                <!-- Left: Logo -->
+                <td style="width: 50%; padding-left: 20px;">
+                    <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                        alt="Volks Energie Logo" style="height: 60px;">
+                </td>
 
-    <div class="content">
-        <div class="section">
-            <p class="undertaking-text">
-                I/We hereby undertake to indemnify and keep indemnified the bank against all losses, damages, costs, charges, and expenses that the bank may incur or sustain by reason of or in connection with the Bank Guarantee issued in favor of <strong>{{instrument.favouring}}</strong> for an amount of <strong>{{formatCurrency instrument.amount}}</strong>.
-            </p>
-        </div>
-
-        <div class="section">
-            <div class="section-title">Bank Guarantee Details</div>
-            <p><strong>Amount:</strong> {{formatCurrency instrument.amount}}</p>
-            <p><strong>Favouring:</strong> {{instrument.favouring}}</p>
-            {{#if tender}}
-            <p><strong>Tender No:</strong> {{tender.tenderNo}}</p>
-            {{#if tender.tenderName}}
-            <p><strong>Project Name:</strong> {{tender.tenderName}}</p>
-            {{/if}}
-            {{/if}}
-        </div>
-
-        <div class="section">
-            <p class="undertaking-text">
-                I/We further undertake to pay to the bank on demand all amounts that may become due and payable by the bank under the said Bank Guarantee, together with interest, costs, charges, and expenses.
-            </p>
-        </div>
-
-        <div class="section">
-            <p class="undertaking-text">
-                This undertaking shall remain in full force and effect until the Bank Guarantee is discharged or cancelled, and all amounts due to the bank are fully paid.
-            </p>
-        </div>
+                <!-- Right: Contact Info -->
+                <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                    <div>
+                        B-1/D8, 2nd floor,<br>
+                        Mohan Cooperative Industrial Estate,<br>
+                        New Delhi 110044
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                            alt="Phone" style="height: 12px; vertical-align: middle;">
+                        +91 9650393636, +91 9654551781<br>
+                        Accounts: +91 8882591733
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_email_base64 }}"
+                            alt="Email" style="height: 12px; vertical-align: middle;">
+                        contact@volksenergie.in
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_web_base64 }}"
+                            alt="Website" style="height: 12px; vertical-align: middle;">
+                        www.volksenergie.in
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <hr />
     </div>
-
-    <div class="signature-section">
-        <div class="signature-box">
-            <div class="signature-label">Authorized Signatory</div>
-            {{#if user}}
-            <div style="margin-top: 40px;">{{user.name}}</div>
-            {{/if}}
-            <div style="margin-top: 10px;">Date: {{formatDate generatedAt}}</div>
+    <div>
+        <div style="text-align: center">
+            <h3>Undertaking for Open Ended BGs</h3>
         </div>
-        <div class="signature-box">
-            <div class="signature-label">Witness</div>
-            <div style="margin-top: 40px;">_________________</div>
-            <div style="margin-top: 10px;">Date: _______________</div>
-        </div>
-    </div>
 
-    <div class="footer">
-        <p>Generated on {{formatDateTime generatedAt}}</p>
+        <div style="margin-top: 20px">
+            To,<br>
+            Yes Bank Limited<br>
+            Ground Floor, G1,G2,G3, Chiranjiv Tower-43,<br>
+            Nehru Place, New Delhi-110019.
+        </div>
+
+        <p style="margin-top: 20px">
+            We, <b>M/s Volks Energie Private Limited</b>, a company incorporated under the Companies Act, 1956 and
+            having
+            Registered Office at B1/D8 2nd Floor, Mohan Cooperative Industrial Estate, New Delhi-110044 (hereinafter
+            referred to as
+            "Company") in consideration of your issuing/ having issued Bank Guarantee No. _________________________ for
+            Rs
+            {{ bg_amt }} (Rupees Only) in favor of <b>{{ bg_favour }}</b> ("said Deed")
+            pursuant to Bank Guarantee Facilities sanctioned to us vide your facility ref. no
+            BB/2307200147/10082023/002932 dated 10/08/2023 ("Facility Letter").
+        </p>
+
+        <p>
+            We confirm that we are fully aware of the risks associated with issuance of the bank guarantee/indemnity as
+            per attached format attached and the request for its issuance had been made after fully appreciating and
+            understanding the risks and the open-ended nature of the same. We also understand that the liability and the
+            validity period of the Bank Guarantee/Indemnity issued in favor of <b>{{ bg_favour }}</b> as per
+            the format enclosed is not specific and hence, our liability is open ended.
+        </p>
+
+        <p>
+            In view of the aforementioned, we hereby irrevocably and unconditionally agree and undertake as follows:
+        </p>
+
+        <ol style="margin-left: 20px">
+            <li>To return the said Deed on <b>{{ bg_claim }}</b> to the Bank for
+                cancellation.</li>
+            <li>In the event of our failing to return the said Deed on
+                <b>{{ bg_claim }}</b>, we hereby undertake to deposit with
+                you cash equivalent to 100% of the amount mentioned in the said Deed.
+            </li>
+            <li>We hereby agree and confirm that it shall be your sole discretion whether to renew/ extend the said
+                Deed.
+            </li>
+            <li>Request for renewal/ extension of said Deed shall be submitted at least 30 days prior to the expiry of
+                the
+                said Deed.</li>
+            <li>We hereby further agree and undertake to pay you guarantee commission for the period for which the said
+                Deed remain in force.</li>
+            <li>To pay all amounts claimed by the beneficiary of the Bank Guarantee/Indemnity together with charges,
+                costs,
+                expenses etc if any claimed by the bank on invocation of the Bank guarantee/Indemnity.</li>
+            <li>To honour all claims made under the Bank Guarantee/Indemnity even after validity period if any since we
+                understand that claim under an indemnity can be made at any time unless the same is expressly revoked by
+                the
+                beneficiary.</li>
+        </ol>
+
+        <p>
+            We hereby further agree and confirm that the provisions of this undertaking may be enforced against us by
+            specific performance notwithstanding any other right or remedy available to you under any law.
+        </p>
+
+        <p>
+            This Undertaking shall be governed by laws of India and courts of <b>Delhi</b> shall have the non-exclusive
+            jurisdiction.
+        </p>
+
+        <p>
+            In witness whereof the Company has affixed its common seal hereunto on
+            <b>{{ witness_date_formatted }}</b>, at
+            <b>Nehru Place, New Delhi-110019</b>.
+        </p>
+
+        <p style="font-weight: bold;">
+            The Common Seal of <b>Volks Energie Private Limited</b> has pursuant to the Resolution of its Board of
+            Directors passed in that behalf on the
+            <b>{{ witness_date_formatted }}</b>
+            hereunto been affixed in the presence of Mr. Piyush Goyal authorized officer who has signed these presents
+            in token thereof.
+        </p>
     </div>
-</body>
-</html>
+</div>

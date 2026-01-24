@@ -1,187 +1,122 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFMS Confirmation - Bank Guarantee</title>
+<div style="padding: 0 50px;">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        .no-border {
+            border: none;
         }
-        body {
-            font-family: 'Times New Roman', serif;
-            font-size: 12pt;
-            line-height: 1.6;
-            color: #000;
-            padding: 20mm 15mm;
+
+        .full-width {
+            width: 100%;
         }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 15px;
+
+        .border-collapse {
+            border-collapse: collapse;
         }
-        .header h1 {
-            font-size: 18pt;
-            font-weight: bold;
-            margin-bottom: 5px;
+
+        .bordered {
+            border: 1px solid;
         }
-        .content {
-            margin: 20px 0;
+
+        .text-left {
+            text-align: left;
         }
-        .section {
-            margin-bottom: 20px;
-        }
-        .section-title {
-            font-weight: bold;
-            font-size: 13pt;
-            margin-bottom: 10px;
-            text-decoration: underline;
-        }
-        .field-row {
-            margin-bottom: 8px;
-            display: flex;
-        }
-        .field-label {
-            font-weight: bold;
-            min-width: 180px;
-        }
-        .field-value {
-            flex: 1;
-        }
-        .confirmation-box {
-            border: 2px solid #000;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .signature-section {
-            margin-top: 50px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .signature-box {
-            width: 45%;
-            border-top: 1px solid #000;
-            padding-top: 10px;
-            text-align: center;
-        }
-        .signature-label {
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .footer {
-            margin-top: 30px;
-            font-size: 10pt;
-            text-align: center;
-            color: #666;
-        }
-        @media print {
-            body {
-                padding: 0;
-            }
+
+        .padding-8 {
+            padding: 8px;
         }
     </style>
-</head>
-<body>
-    <div class="header">
-        <h1>SFMS CONFIRMATION</h1>
-        <p>Structured Financial Messaging System</p>
+
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;">
+    </div>
+    <div style="padding: 10px 0; font-family: sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+            <tr>
+                <!-- Left: Logo -->
+                <td style="width: 50%; padding-left: 20px;">
+                    <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                        alt="Volks Energie Logo" style="height: 60px;">
+                </td>
+
+                <!-- Right: Contact Info -->
+                <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                    <div>
+                        B-1/D8, 2nd floor,<br>
+                        Mohan Cooperative Industrial Estate,<br>
+                        New Delhi 110044
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                            alt="Phone" style="height: 12px; vertical-align: middle;">
+                        +91 9650393636, +91 9654551781<br>
+                        Accounts: +91 8882591733
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_email_base64 }}"
+                            alt="Email" style="height: 12px; vertical-align: middle;">
+                        contact@volksenergie.in
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_web_base64 }}"
+                            alt="Website" style="height: 12px; vertical-align: middle;">
+                        www.volksenergie.in
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <hr />
     </div>
 
-    <div class="content">
-        <div class="section">
-            <div class="confirmation-box">
-                <p style="font-size: 14pt; font-weight: bold; margin-bottom: 10px;">CONFIRMATION</p>
-                <p>This document confirms the Bank Guarantee request through SFMS.</p>
-            </div>
-        </div>
 
-        <div class="section">
-            <div class="section-title">Bank Guarantee Details</div>
-            <div class="field-row">
-                <span class="field-label">Request ID:</span>
-                <span class="field-value">{{request.id}}</span>
-            </div>
-            <div class="field-row">
-                <span class="field-label">Instrument ID:</span>
-                <span class="field-value">{{instrument.id}}</span>
-            </div>
-            <div class="field-row">
-                <span class="field-label">Amount:</span>
-                <span class="field-value">{{formatCurrency instrument.amount}}</span>
-            </div>
-            <div class="field-row">
-                <span class="field-label">Favouring:</span>
-                <span class="field-value">{{instrument.favouring}}</span>
-            </div>
-        </div>
+    <table class="no-border full-width">
+        <tbody class="no-border">
+            <tr>
+                <td class="no-border" style="text-align: left;">
+                    To,<br>
+                    {{ bg_favour }}<br>
+                    {{!-- Using triple stash to render <br> tags from backend formatting --}}
+                    {{{ bg_address_formatted }}}
+                </td>
+                <td class="no-border" style="text-align: right;">
+                    Date: {{ current_date }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
 
-        {{#if bgDetails}}
-        <div class="section">
-            <div class="section-title">Bank Details</div>
-            {{#if bgDetails.bankName}}
-            <div class="field-row">
-                <span class="field-label">Bank Name:</span>
-                <span class="field-value">{{bgDetails.bankName}}</span>
-            </div>
-            {{/if}}
-            {{#if bgDetails.bgBankAcc}}
-            <div class="field-row">
-                <span class="field-label">Account Number:</span>
-                <span class="field-value">{{bgDetails.bgBankAcc}}</span>
-            </div>
-            {{/if}}
-            {{#if bgDetails.bgBankIfsc}}
-            <div class="field-row">
-                <span class="field-label">IFSC Code:</span>
-                <span class="field-value">{{bgDetails.bgBankIfsc}}</span>
-            </div>
-            {{/if}}
-        </div>
-        {{/if}}
+    <p>
+        Tender No: {{ tender_no }}<br>
+        Subject: Confirmation Regarding Submitted Bank Guarantee via SFMS against {{ tender_name }}
+    </p>
 
-        {{#if tender}}
-        <div class="section">
-            <div class="section-title">Tender Information</div>
-            <div class="field-row">
-                <span class="field-label">Tender No:</span>
-                <span class="field-value">{{tender.tenderNo}}</span>
-            </div>
-            {{#if tender.tenderName}}
-            <div class="field-row">
-                <span class="field-label">Project Name:</span>
-                <span class="field-value">{{tender.tenderName}}</span>
-            </div>
-            {{/if}}
-        </div>
-        {{/if}}
+    <p>Dear Sir/Madam,</p>
+    <p>With reference to Tender No: {{ tender_no }} dated {{ due_date_formatted }} for
+        {{ tender_name }},</p>
+    <p>
+        The Bank Guarantee (BG) submitted against {{ bg_purpose_text }},
+        we would like to bring to your attention that the Structured Financial Messaging System (SFMS) serves as the
+        official confirmation of the Bank Guarantee (BG) issued to you. Since SFMS is directly issued by the bank, it
+        already acts as a verification mechanism supported by the Reserve Bank of India (RBI), ensuring the authenticity
+        and validity of the BG.
+    </p>
+    <p>
+        Therefore, an additional bank confirmation letter is not required. However, if you still require a separate
+        confirmation letter from the bank, you may contact or reach out to the following mentioned Yes Bank
+        representatives further:
+    </p>
+    <p>Yes Bank Ltd - Nehru Place, New Delhi</p>
+    <ol>
+        <li>Dhiraj.kumar3@yesbank.in</li>
+        <li>Divya.khurana1@yesbank.in</li>
+        <li>dtcorpdesknehruplace@yesbank.in</li>
+        <li>yesbgconfirmation@yesbank.in</li>
+    </ol>
+    <p>Phone No: +91-9643467407 (Divya Khurana(CSD))</p>
+    <p>Please let us know if you need any further clarification.</p>
 
-        <div class="section">
-            <p><strong>SFMS Reference:</strong> To be filled by bank</p>
-            <p><strong>Status:</strong> Pending</p>
-        </div>
-    </div>
-
-    <div class="signature-section">
-        <div class="signature-box">
-            <div class="signature-label">Authorized Signatory</div>
-            {{#if user}}
-            <div style="margin-top: 40px;">{{user.name}}</div>
-            {{/if}}
-            <div style="margin-top: 10px;">Date: {{formatDate generatedAt}}</div>
-        </div>
-        <div class="signature-box">
-            <div class="signature-label">Bank Official</div>
-            <div style="margin-top: 40px;">_________________</div>
-            <div style="margin-top: 10px;">Date: _______________</div>
-        </div>
-    </div>
-
-    <div class="footer">
-        <p>Generated on {{formatDateTime generatedAt}}</p>
-    </div>
-</body>
-</html>
+    <br>
+    Thanks & Regards,<br>
+    Piyush Goyal (Director)<br>
+    Volks Energie Pvt Ltd<br>
+    B-1/D-8, 2nd floor, Mohan Cooperative<br>
+    Industrial Estate, New Delhi -110044
+</div>
