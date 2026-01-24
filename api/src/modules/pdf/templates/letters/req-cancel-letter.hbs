@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Cancellation Letter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+            padding: 20mm 15mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .field-row {
+            margin-bottom: 8px;
+            display: flex;
+        }
+        .field-label {
+            font-weight: bold;
+            min-width: 180px;
+        }
+        .field-value {
+            flex: 1;
+        }
+        .letter-text {
+            text-align: justify;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 45%;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+        .signature-label {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 10pt;
+            text-align: center;
+            color: #666;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>REQUEST FOR CANCELLATION</h1>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <p class="letter-text">
+                To,<br>
+                The Bank Manager<br>
+                {{#if data.bankName}}{{data.bankName}}{{else}}[Bank Name]{{/if}}
+            </p>
+        </div>
+
+        <div class="section">
+            <p class="letter-text">
+                <strong>Subject: Request for Cancellation of {{#if (eq data.instrument.instrumentType 'BG')}}Bank Guarantee{{else}}Fixed Deposit Receipt{{/if}}</strong>
+            </p>
+        </div>
+
+        <div class="section">
+            <p class="letter-text">
+                Dear Sir/Madam,
+            </p>
+            <p class="letter-text" style="margin-top: 15px;">
+                We request you to kindly cancel the following {{#if (eq data.instrument.instrumentType 'BG')}}Bank Guarantee{{else}}Fixed Deposit Receipt{{/if}}:
+            </p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Instrument Details</div>
+            {{#if data.instrument}}
+            <div class="field-row">
+                <span class="field-label">Instrument ID:</span>
+                <span class="field-value">{{data.instrument.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Amount:</span>
+                <span class="field-value">{{formatCurrency data.instrument.amount}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Favouring:</span>
+                <span class="field-value">{{data.instrument.favouring}}</span>
+            </div>
+            {{#if data.instrument.expiryDate}}
+            <div class="field-row">
+                <span class="field-label">Expiry Date:</span>
+                <span class="field-value">{{formatDate data.instrument.expiryDate}}</span>
+            </div>
+            {{/if}}
+            {{/if}}
+        </div>
+
+        {{#if data.tender}}
+        <div class="section">
+            <div class="section-title">Tender Information</div>
+            <div class="field-row">
+                <span class="field-label">Tender No:</span>
+                <span class="field-value">{{data.tender.tenderNo}}</span>
+            </div>
+            {{#if data.tender.tenderName}}
+            <div class="field-row">
+                <span class="field-label">Project Name:</span>
+                <span class="field-value">{{data.tender.tenderName}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if data.cancellationReason}}
+        <div class="section">
+            <div class="section-title">Reason for Cancellation</div>
+            <p class="letter-text">{{data.cancellationReason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <p class="letter-text">
+                We request you to kindly process this cancellation request and release the funds/guarantee at the earliest convenience.
+            </p>
+            <p class="letter-text" style="margin-top: 15px;">
+                Thanking you,
+            </p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-label">Authorized Signatory</div>
+            {{#if data.user}}
+            <div style="margin-top: 40px;">{{data.user.name}}</div>
+            {{/if}}
+            <div style="margin-top: 10px;">Date: {{formatDate data.generatedAt}}</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-label">Company Seal</div>
+            <div style="margin-top: 40px;">_________________</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated on {{formatDateTime data.generatedAt}}</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YES Bank Authorization - Bank Guarantee</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+            padding: 20mm 15mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .field-row {
+            margin-bottom: 8px;
+            display: flex;
+        }
+        .field-label {
+            font-weight: bold;
+            min-width: 180px;
+        }
+        .field-value {
+            flex: 1;
+        }
+        .authorization-text {
+            text-align: justify;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 45%;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+        .signature-label {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 10pt;
+            text-align: center;
+            color: #666;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>YES BANK AUTHORIZATION</h1>
+        <p>Bank Guarantee Authorization Document</p>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <p class="authorization-text">
+                I/We hereby authorize YES Bank to issue a Bank Guarantee in favor of <strong>{{instrument.favouring}}</strong> for an amount of <strong>{{formatCurrency instrument.amount}}</strong> as per the details mentioned below.
+            </p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Authorization Details</div>
+            <div class="field-row">
+                <span class="field-label">Request ID:</span>
+                <span class="field-value">{{request.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Instrument ID:</span>
+                <span class="field-value">{{instrument.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Amount:</span>
+                <span class="field-value">{{formatCurrency instrument.amount}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Favouring:</span>
+                <span class="field-value">{{instrument.favouring}}</span>
+            </div>
+        </div>
+
+        {{#if bgDetails}}
+        <div class="section">
+            <div class="section-title">Beneficiary Details</div>
+            {{#if bgDetails.beneficiaryName}}
+            <div class="field-row">
+                <span class="field-label">Beneficiary Name:</span>
+                <span class="field-value">{{bgDetails.beneficiaryName}}</span>
+            </div>
+            {{/if}}
+            {{#if bgDetails.beneficiaryAddress}}
+            <div class="field-row">
+                <span class="field-label">Beneficiary Address:</span>
+                <span class="field-value">{{bgDetails.beneficiaryAddress}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if tender}}
+        <div class="section">
+            <div class="section-title">Tender Information</div>
+            <div class="field-row">
+                <span class="field-label">Tender No:</span>
+                <span class="field-value">{{tender.tenderNo}}</span>
+            </div>
+            {{#if tender.tenderName}}
+            <div class="field-row">
+                <span class="field-label">Project Name:</span>
+                <span class="field-value">{{tender.tenderName}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <p class="authorization-text">
+                I/We confirm that all the information provided is correct and authorize YES Bank to proceed with the issuance of the Bank Guarantee as per the terms and conditions agreed upon.
+            </p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-label">Authorized Signatory</div>
+            {{#if user}}
+            <div style="margin-top: 40px;">{{user.name}}</div>
+            {{/if}}
+            <div style="margin-top: 10px;">Date: {{formatDate generatedAt}}</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-label">YES Bank Official</div>
+            <div style="margin-top: 40px;">_________________</div>
+            <div style="margin-top: 10px;">Date: _______________</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated on {{formatDateTime generatedAt}}</p>
+    </div>
+</body>
+</html>

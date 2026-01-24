@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFMS Confirmation - Bank Guarantee</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+            padding: 20mm 15mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .field-row {
+            margin-bottom: 8px;
+            display: flex;
+        }
+        .field-label {
+            font-weight: bold;
+            min-width: 180px;
+        }
+        .field-value {
+            flex: 1;
+        }
+        .confirmation-box {
+            border: 2px solid #000;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 45%;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+        .signature-label {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 10pt;
+            text-align: center;
+            color: #666;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SFMS CONFIRMATION</h1>
+        <p>Structured Financial Messaging System</p>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <div class="confirmation-box">
+                <p style="font-size: 14pt; font-weight: bold; margin-bottom: 10px;">CONFIRMATION</p>
+                <p>This document confirms the Bank Guarantee request through SFMS.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Bank Guarantee Details</div>
+            <div class="field-row">
+                <span class="field-label">Request ID:</span>
+                <span class="field-value">{{request.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Instrument ID:</span>
+                <span class="field-value">{{instrument.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Amount:</span>
+                <span class="field-value">{{formatCurrency instrument.amount}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Favouring:</span>
+                <span class="field-value">{{instrument.favouring}}</span>
+            </div>
+        </div>
+
+        {{#if bgDetails}}
+        <div class="section">
+            <div class="section-title">Bank Details</div>
+            {{#if bgDetails.bankName}}
+            <div class="field-row">
+                <span class="field-label">Bank Name:</span>
+                <span class="field-value">{{bgDetails.bankName}}</span>
+            </div>
+            {{/if}}
+            {{#if bgDetails.bgBankAcc}}
+            <div class="field-row">
+                <span class="field-label">Account Number:</span>
+                <span class="field-value">{{bgDetails.bgBankAcc}}</span>
+            </div>
+            {{/if}}
+            {{#if bgDetails.bgBankIfsc}}
+            <div class="field-row">
+                <span class="field-label">IFSC Code:</span>
+                <span class="field-value">{{bgDetails.bgBankIfsc}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if tender}}
+        <div class="section">
+            <div class="section-title">Tender Information</div>
+            <div class="field-row">
+                <span class="field-label">Tender No:</span>
+                <span class="field-value">{{tender.tenderNo}}</span>
+            </div>
+            {{#if tender.tenderName}}
+            <div class="field-row">
+                <span class="field-label">Project Name:</span>
+                <span class="field-value">{{tender.tenderName}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <p><strong>SFMS Reference:</strong> To be filled by bank</p>
+            <p><strong>Status:</strong> Pending</p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-label">Authorized Signatory</div>
+            {{#if user}}
+            <div style="margin-top: 40px;">{{user.name}}</div>
+            {{/if}}
+            <div style="margin-top: 10px;">Date: {{formatDate generatedAt}}</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-label">Bank Official</div>
+            <div style="margin-top: 40px;">_________________</div>
+            <div style="margin-top: 10px;">Date: _______________</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated on {{formatDateTime generatedAt}}</p>
+    </div>
+</body>
+</html>

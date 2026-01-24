@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Deposit Receipt Receiving Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+            padding: 20mm 15mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .field-row {
+            margin-bottom: 8px;
+            display: flex;
+        }
+        .field-label {
+            font-weight: bold;
+            min-width: 150px;
+        }
+        .field-value {
+            flex: 1;
+        }
+        .receiving-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .receiving-table th,
+        .receiving-table td {
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: left;
+        }
+        .receiving-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 45%;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+        .signature-label {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 10pt;
+            text-align: center;
+            color: #666;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FIXED DEPOSIT RECEIPT RECEIVING DOCUMENT</h1>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <div class="section-title">Instrument Details</div>
+            {{#if data.request}}
+            <div class="field-row">
+                <span class="field-label">Request ID:</span>
+                <span class="field-value">{{data.request.id}}</span>
+            </div>
+            {{/if}}
+            {{#if data.instrument}}
+            <div class="field-row">
+                <span class="field-label">Instrument ID:</span>
+                <span class="field-value">{{data.instrument.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Amount:</span>
+                <span class="field-value">{{formatCurrency data.instrument.amount}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Favouring:</span>
+                <span class="field-value">{{data.instrument.favouring}}</span>
+            </div>
+            {{#if data.instrument.issueDate}}
+            <div class="field-row">
+                <span class="field-label">Issue Date:</span>
+                <span class="field-value">{{formatDate data.instrument.issueDate}}</span>
+            </div>
+            {{/if}}
+            {{#if data.instrument.expiryDate}}
+            <div class="field-row">
+                <span class="field-label">Expiry Date:</span>
+                <span class="field-value">{{formatDate data.instrument.expiryDate}}</span>
+            </div>
+            {{/if}}
+            {{/if}}
+        </div>
+
+        {{#if data.fdrDetails}}
+        <div class="section">
+            <div class="section-title">FDR Details</div>
+            {{#if data.fdrDetails.fdrPurpose}}
+            <div class="field-row">
+                <span class="field-label">Purpose:</span>
+                <span class="field-value">{{data.fdrDetails.fdrPurpose}}</span>
+            </div>
+            {{/if}}
+            {{#if data.fdrDetails.fdrNeeds}}
+            <div class="field-row">
+                <span class="field-label">Required In:</span>
+                <span class="field-value">{{data.fdrDetails.fdrNeeds}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if data.tender}}
+        <div class="section">
+            <div class="section-title">Tender Information</div>
+            <div class="field-row">
+                <span class="field-label">Tender No:</span>
+                <span class="field-value">{{data.tender.tenderNo}}</span>
+            </div>
+            {{#if data.tender.tenderName}}
+            <div class="field-row">
+                <span class="field-label">Project Name:</span>
+                <span class="field-value">{{data.tender.tenderName}}</span>
+            </div>
+            {{/if}}
+            {{#if data.tender.dueDate}}
+            <div class="field-row">
+                <span class="field-label">Due Date:</span>
+                <span class="field-value">{{formatDate data.tender.dueDate}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if data.instrument.courierAddress}}
+        <div class="section">
+            <div class="section-title">Courier Details</div>
+            <div class="field-row">
+                <span class="field-label">Courier Address:</span>
+                <span class="field-value">{{data.instrument.courierAddress}}</span>
+            </div>
+            {{#if data.instrument.courierDeadline}}
+            <div class="field-row">
+                <span class="field-label">Deadline (Hours):</span>
+                <span class="field-value">{{data.instrument.courierDeadline}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <div class="section-title">Receiving Details</div>
+            <table class="receiving-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Document Type</td>
+                        <td>Fixed Deposit Receipt</td>
+                    </tr>
+                    <tr>
+                        <td>Amount</td>
+                        <td>{{formatCurrency data.instrument.amount}}</td>
+                    </tr>
+                    <tr>
+                        <td>Favouring</td>
+                        <td>{{data.instrument.favouring}}</td>
+                    </tr>
+                    {{#if data.instrument.issueDate}}
+                    <tr>
+                        <td>Issue Date</td>
+                        <td>{{formatDate data.instrument.issueDate}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if data.instrument.expiryDate}}
+                    <tr>
+                        <td>Expiry Date</td>
+                        <td>{{formatDate data.instrument.expiryDate}}</td>
+                    </tr>
+                    {{/if}}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <p><strong>I hereby acknowledge receipt of the above-mentioned Fixed Deposit Receipt document.</strong></p>
+            <p style="margin-top: 15px;">The document has been received in good condition and all details have been verified.</p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-label">Handed Over By</div>
+            {{#if data.user}}
+            <div style="margin-top: 40px;">{{data.user.name}}</div>
+            {{/if}}
+            <div style="margin-top: 10px;">Date: {{formatDate data.generatedAt}}</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-label">Received By</div>
+            <div style="margin-top: 40px;">_________________</div>
+            <div style="margin-top: 10px;">Date: _______________</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>This is a system-generated receiving document.</p>
+        <p>Generated on {{formatDateTime data.generatedAt}}</p>
+    </div>
+</body>
+</html>

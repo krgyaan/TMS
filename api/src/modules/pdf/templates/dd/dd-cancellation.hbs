@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demand Draft Cancellation Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+            padding: 20mm 15mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .field-row {
+            margin-bottom: 8px;
+            display: flex;
+        }
+        .field-label {
+            font-weight: bold;
+            min-width: 180px;
+        }
+        .field-value {
+            flex: 1;
+        }
+        .cancellation-text {
+            text-align: justify;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            width: 45%;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+        .signature-label {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 10pt;
+            text-align: center;
+            color: #666;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>DEMAND DRAFT CANCELLATION</h1>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <p class="cancellation-text">
+                This document confirms the cancellation of the Demand Draft as per the details mentioned below.
+            </p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Demand Draft Details</div>
+            {{#if data.request}}
+            <div class="field-row">
+                <span class="field-label">Request ID:</span>
+                <span class="field-value">{{data.request.id}}</span>
+            </div>
+            {{/if}}
+            {{#if data.instrument}}
+            <div class="field-row">
+                <span class="field-label">Instrument ID:</span>
+                <span class="field-value">{{data.instrument.id}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Amount:</span>
+                <span class="field-value">{{formatCurrency data.instrument.amount}}</span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Favouring:</span>
+                <span class="field-value">{{data.instrument.favouring}}</span>
+            </div>
+            {{#if data.ddDetails.ddNo}}
+            <div class="field-row">
+                <span class="field-label">DD Number:</span>
+                <span class="field-value">{{data.ddDetails.ddNo}}</span>
+            </div>
+            {{/if}}
+            {{#if data.instrument.issueDate}}
+            <div class="field-row">
+                <span class="field-label">Issue Date:</span>
+                <span class="field-value">{{formatDate data.instrument.issueDate}}</span>
+            </div>
+            {{/if}}
+            {{/if}}
+        </div>
+
+        {{#if data.tender}}
+        <div class="section">
+            <div class="section-title">Tender Information</div>
+            <div class="field-row">
+                <span class="field-label">Tender No:</span>
+                <span class="field-value">{{data.tender.tenderNo}}</span>
+            </div>
+            {{#if data.tender.tenderName}}
+            <div class="field-row">
+                <span class="field-label">Project Name:</span>
+                <span class="field-value">{{data.tender.tenderName}}</span>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if data.cancellationReason}}
+        <div class="section">
+            <div class="section-title">Cancellation Reason</div>
+            <p class="cancellation-text">{{data.cancellationReason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <p class="cancellation-text">
+                <strong>The above-mentioned Demand Draft has been cancelled as per the request.</strong>
+            </p>
+            <p class="cancellation-text" style="margin-top: 15px;">
+                All necessary procedures have been completed and the cancellation is confirmed.
+            </p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-label">Authorized Signatory</div>
+            {{#if data.user}}
+            <div style="margin-top: 40px;">{{data.user.name}}</div>
+            {{/if}}
+            <div style="margin-top: 10px;">Date: {{formatDate data.generatedAt}}</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-label">Bank Official</div>
+            <div style="margin-top: 40px;">_________________</div>
+            <div style="margin-top: 10px;">Date: _______________</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated on {{formatDateTime data.generatedAt}}</p>
+    </div>
+</body>
+</html>
