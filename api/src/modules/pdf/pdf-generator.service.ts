@@ -60,7 +60,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
                 const relativePath = await this.generateSinglePdf(
                     templateType,
                     templateName,
-                    data, // data is already wrapped in { data: ... } from caller
+                    data, 
                     instrumentId,
                     templateDir
                 );

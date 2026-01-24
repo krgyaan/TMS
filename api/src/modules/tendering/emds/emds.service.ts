@@ -18,6 +18,7 @@ import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto,
 import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 
@@ -208,6 +209,7 @@ export class EmdsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly pdfGenerator: PdfGeneratorService,
     ) { }
 
     async getDashboardData(
@@ -867,6 +869,26 @@ export class EmdsService {
                 );
             }
         });
+
+        // Generate PDFs for DD, FDR, and BG instruments (after transaction commits)
+        for (const instrumentInfo of createdInstruments) {
+            if (instrumentInfo.mode === 'DD' || instrumentInfo.mode === 'FDR' || instrumentInfo.mode === 'BG') {
+                try {
+                    await this.generatePdfsForInstrument(
+                        instrumentInfo.instrumentId,
+                        instrumentInfo.mode,
+                        instrumentInfo.requestId,
+                        tender,
+                        userId
+                    );
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to generate PDFs for instrument ${instrumentInfo.instrumentId} (${instrumentInfo.mode}): ${error instanceof Error ? error.message : String(error)}`
+                    );
+                    // Continue with other instruments even if PDF generation fails
+                }
+            }
+        }
 
         // Send email notifications for each created instrument
         // Only if we have a valid tender object
@@ -1674,6 +1696,116 @@ export class EmdsService {
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
             // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Generate PDFs for DD, FDR, or BG instrument
+     */
+    private async generatePdfsForInstrument(
+        instrumentId: number,
+        mode: string,
+        requestId: number,
+        tender: any,
+        userId?: number
+    ): Promise<void> {
+        try {
+            // Fetch instrument and details
+            const [instrument] = await this.db
+                .select()
+                .from(paymentInstruments)
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!instrument) {
+                this.logger.warn(`Instrument ${instrumentId} not found for PDF generation`);
+                return;
+            }
+
+            // Fetch request
+            const [request] = await this.db
+                .select()
+                .from(paymentRequests)
+                .where(eq(paymentRequests.id, requestId))
+                .limit(1);
+
+            if (!request) {
+                this.logger.warn(`Request ${requestId} not found for PDF generation`);
+                return;
+            }
+
+            // Fetch user info if userId provided
+            let user: any = null;
+            if (userId) {
+                user = await this.recipientResolver.getUserById(userId);
+            }
+
+            // Prepare PDF data based on instrument type
+            let pdfData: Record<string, any> = {
+                instrument,
+                request,
+                tender: tender || {},
+                user: user || {},
+                generatedAt: new Date(),
+            };
+
+            // Fetch instrument-specific details
+            if (mode === 'DD') {
+                const [ddDetails] = await this.db
+                    .select()
+                    .from(instrumentDdDetails)
+                    .where(eq(instrumentDdDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.ddDetails = ddDetails || {};
+            } else if (mode === 'FDR') {
+                const [fdrDetails] = await this.db
+                    .select()
+                    .from(instrumentFdrDetails)
+                    .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.fdrDetails = fdrDetails || {};
+            } else if (mode === 'BG') {
+                const [bgDetails] = await this.db
+                    .select()
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.bgDetails = bgDetails || {};
+            }
+
+            // Generate PDFs
+            const templateType = mode === 'DD' || mode === 'FDR' ? 'chqCret' : 'bg';
+            // Wrap pdfData in 'data' object to match template expectations
+            const pdfPaths = await this.pdfGenerator.generatePdfs(
+                templateType,
+                { data: pdfData },
+                instrumentId,
+                mode
+            );
+
+            // Update instrument with PDF paths
+            if (pdfPaths.length > 0) {
+                const updateData: any = {
+                    generatedPdf: pdfPaths[0],
+                };
+
+                // Store additional PDFs in extraPdfPaths
+                if (pdfPaths.length > 1) {
+                    updateData.extraPdfPaths = JSON.stringify(pdfPaths.slice(1));
+                }
+
+                await this.db
+                    .update(paymentInstruments)
+                    .set(updateData)
+                    .where(eq(paymentInstruments.id, instrumentId));
+
+                this.logger.log(`Generated ${pdfPaths.length} PDF(s) for instrument ${instrumentId} (${mode})`);
+            }
+        } catch (error) {
+            this.logger.error(
+                `Error generating PDFs for instrument ${instrumentId} (${mode}): ${error instanceof Error ? error.message : String(error)}`
+            );
+            throw error; // Re-throw to be caught by caller
         }
     }
 
