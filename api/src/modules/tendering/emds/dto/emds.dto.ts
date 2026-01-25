@@ -267,8 +267,7 @@ export interface PaymentRequestRow {
     purpose: PaymentPurpose;
     amountRequired: string;
     dueDate: Date | null;
-    teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;

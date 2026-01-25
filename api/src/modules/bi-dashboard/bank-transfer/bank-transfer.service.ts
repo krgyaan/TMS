@@ -130,7 +130,6 @@ export class BankTransferService {
                 id: paymentInstruments.id,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
-                member: paymentRequests.requestedBy,
                 utrNo: instrumentTransferDetails.utrNum,
                 accountName: instrumentTransferDetails.accountName,
                 tenderName: tenderInfos.tenderName,
@@ -146,7 +145,7 @@ export class BankTransferService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
@@ -167,7 +166,8 @@ export class BankTransferService {
         const data: BankTransferDashboardRow[] = rows.map((row) => ({
             id: row.id,
             date: row.date ? new Date(row.date) : null,
-            teamMember: row.teamMember || row.member,
+            teamMember: row.teamMember?.toString() ?? null,
+            member: row.teamMember?.toString() ?? null,
             utrNo: row.utrNo,
             accountName: row.accountName,
             tenderName: row.tenderName || row.projectName,

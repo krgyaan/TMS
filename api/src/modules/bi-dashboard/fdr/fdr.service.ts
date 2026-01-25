@@ -155,9 +155,8 @@ export class FdrService {
                 projectNo: paymentRequests.tenderNo,
                 tenderNo: tenderInfos.tenderNo,
                 tenderStatus: statuses.name,
-                member: users.name,
+                teamMember: users.name,
                 source: instrumentFdrDetails.fdrSource,
-                requestedBy: paymentRequests.requestedBy,
                 expiry: instrumentFdrDetails.fdrExpiryDate,
                 fdrStatus: paymentInstruments.status,
             })
@@ -165,7 +164,7 @@ export class FdrService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(and(...conditions))
             .orderBy(orderClause)
@@ -192,7 +191,7 @@ export class FdrService {
             tenderName: row.tenderName || row.projectName,
             tenderNo: row.tenderNo || row.projectNo,
             tenderStatus: row.tenderStatus || row.tenderStatus,
-            member: row.member || row.requestedBy,
+            member: row.teamMember?.toString() ?? null,
             expiry: row.expiry ? new Date(row.expiry) : null,
             fdrStatus: this.statusMap()[row.fdrStatus],
         }));

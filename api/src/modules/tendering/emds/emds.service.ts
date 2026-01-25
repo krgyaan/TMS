@@ -48,8 +48,7 @@ export interface PaymentRequestRow {
     purpose: PaymentPurpose;
     amountRequired: string;
     dueDate: Date | null;
-    teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;
@@ -270,7 +269,7 @@ export class EmdsService {
 
     private async countRequestsByStatus(userId?: number): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
         const userCondition = userId
-            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
             : undefined;
 
         // Uses SQL Aggregation for performance
@@ -310,7 +309,7 @@ export class EmdsService {
         counts?: DashboardCounts
     ): Promise<RequestTabResponse> {
         const userCondition = userId
-            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
             : undefined;
 
         const page = pagination?.page || 1;
@@ -334,9 +333,9 @@ export class EmdsService {
         // Shared Where Clause
         // Critical: This matches countRequestsByStatus exactly
         const whereClause = and(
-            this.getTabSqlCondition(tab), // Use helper
+            this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
-            or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
+            or(eq(paymentRequests.tenderId, 0)),
             userCondition
         );
 
@@ -356,14 +355,14 @@ export class EmdsService {
             .select({
                 id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
-                tenderNo: sql<string>`COALESCE(${tenderInfos.tenderNo}, ${paymentRequests.tenderNo})`.as('tenderNo'),
-                // Fallback for name to show users what this is
-                tenderName: sql<string>`COALESCE(${tenderInfos.tenderName}, ${paymentRequests.projectName}, 'N/A')`.as('tenderName'),
+                tenderNo: tenderInfos.tenderNo,
+                projectNo: paymentRequests.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
-                teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
+                teamMember: users.name,
                 instrumentId: paymentInstruments.id,
                 instrumentType: paymentInstruments.instrumentType,
                 instrumentStatus: paymentInstruments.status,
@@ -371,7 +370,7 @@ export class EmdsService {
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
@@ -390,8 +389,7 @@ export class EmdsService {
             purpose: row.purpose as PaymentPurpose,
             amountRequired: row.amountRequired || '0',
             dueDate: row.dueDate,
-            teamMemberId: row.teamMemberId,
-            teamMemberName: row.teamMemberName,
+            teamMember: row.teamMember?.toString() ?? null,
             instrumentId: row.instrumentId,
             instrumentType: row.instrumentType as InstrumentType | null,
             instrumentStatus: row.instrumentStatus,
@@ -407,12 +405,6 @@ export class EmdsService {
 
     private async countPendingTenders(userId?: number): Promise<number> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
-
-        // Subquery: tenders that have payment requests
-        const tendersWithRequests = this.db
-            .select({ tenderId: paymentRequests.tenderId })
-            .from(paymentRequests)
-            .groupBy(paymentRequests.tenderId);
 
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
@@ -938,7 +930,7 @@ export class EmdsService {
                 tenderNo: requestTenderNo,
                 projectName: requestProjectName,
                 status: 'Pending',
-                requestedBy: userId?.toString() || null,
+                requestedBy: userId || null,
             })
             .returning();
 

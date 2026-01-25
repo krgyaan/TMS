@@ -41,7 +41,7 @@ export const paymentRequests = pgTable('payment_requests', {
     tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // emds.tender_no (equal to tender.tenderNo)
     projectName: varchar('project_name', { length: 500 }), // emds.project_name (equal to tender.tenderName)
     dueDate: timestamp('due_date'), // emds.due_date (equal to tender.dueDate)
-    requestedBy: varchar('requested_by', { length: 200 }), // emds.requested_by (equal to user.name)
+    requestedBy: integer('requested_by'), // emds.requested_by (stores user.id, looked up by user.name)
 
     // New fields with MySQL equivalents
     purpose: paymentPurposeEnum('purpose').notNull(), // Replaces emds.purpose with more specific values

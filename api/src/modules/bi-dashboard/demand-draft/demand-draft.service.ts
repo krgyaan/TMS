@@ -139,15 +139,15 @@ export class DemandDraftService {
                 tenderNo: tenderInfos.tenderNo,
                 bidValidity: tenderInfos.dueDate,
                 tenderStatus: statuses.name,
-                member: users.name,
+                teamMember: users.name,
                 ddStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
@@ -178,7 +178,7 @@ export class DemandDraftService {
             tenderNo: row.tenderNo || row.projectNo,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
-            member: row.member,
+            teamMember: row.teamMember?.toString() ?? null,
             expiry: row.ddCreationDate ? (isExpired(new Date(row.ddCreationDate)) ? 'Expired' : 'Valid') : null,
             ddStatus: this.statusMap()[row.ddStatus],
         }));
