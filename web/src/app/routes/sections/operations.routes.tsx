@@ -8,6 +8,7 @@ const Operations_ContractAgreement = lazy(() => import("@/modules/operations/con
 
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
 const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
+const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPoPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -45,10 +46,18 @@ export default function OperationsRoutes() {
                 }
             />
             <Route
-                path="project-dashboard/raise-po"
+                path="project-dashboard/purchase-order/create"
                 element={
                     <RouteWrapper>
                         <Operations_RaisePoFormPage />
+                    </RouteWrapper>
+                }
+            />
+            <Route
+                path="project-dashboard/purchase-order/view"
+                element={
+                    <RouteWrapper>
+                        <Operations_ViewPoPage />
                     </RouteWrapper>
                 }
             />
