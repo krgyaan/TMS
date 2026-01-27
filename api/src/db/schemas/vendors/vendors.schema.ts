@@ -1,27 +1,17 @@
-import {
-  pgTable,
-  bigserial,
-  varchar,
-  boolean,
-  timestamp,
-  text,
-  bigint,
-} from 'drizzle-orm/pg-core';
-import { vendorOrganizations } from './vendor-organizations.schema';
+import { pgTable, bigint, varchar, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
-export const vendors = pgTable('vendors', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  organizationId: bigint('organization_id', { mode: 'number' }),
-  name: varchar('name', { length: 255 }).notNull(),
-  email: varchar('email', { length: 255 }),
-  address: text('address'),
-  status: boolean('status').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+export const vendors = pgTable("vendors", {
+    id: bigint("id", { mode: "number" })
+        .primaryKey()
+        .default(sql`nextval('vendors_id_seq')`),
+    orgId: bigint("org_id", { mode: "number" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    mobile: varchar("mobile", { length: 22 }).notNull(),
+    address: varchar("address", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
 export type Vendor = typeof vendors.$inferSelect;

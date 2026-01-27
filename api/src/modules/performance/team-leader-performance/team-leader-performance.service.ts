@@ -7,6 +7,7 @@ import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { timer } from "@db/schemas/workflow/timer.schema";
 import { tenderResults } from "@/db/schemas/tendering/tender-result.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
+import { stepInstances } from "@db/schemas/workflow/workflows.schema";
 import { TenderListQuery } from "../tender-executive-performance/zod/tender.dto";
 import { TenderOutcomeStatus } from "../tender-executive-performance/zod/stage-performance.type";
 import { users } from "@db/schemas/auth/users.schema";
@@ -133,12 +134,12 @@ export class TeamLeaderPerformanceService {
 
         const timers = await this.db
             .select()
-            .from(timer)
+            .from(stepInstances)
             .where(
                 and(
-                    inArray(timer.entityId, tenderIds),
+                    inArray(stepInstances.entityId, tenderIds),
                     inArray(
-                        timer.timerName,
+                        stepInstances.stepKey,
                         TL_STAGES.map(s => s.timerName)
                     )
                 )
@@ -146,7 +147,7 @@ export class TeamLeaderPerformanceService {
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
-            timerMap.set(`${t.entityId}:${t.timerName}`, t);
+            timerMap.set(`${t.entityId}:${t.stepKey}`, t);
         }
 
         /* ----------------------------------------
@@ -168,10 +169,10 @@ export class TeamLeaderPerformanceService {
                 let endTime: Date | null = null;
 
                 if (timerRow) {
-                    startTime = timerRow.startTime ?? null;
-                    endTime = timerRow.endTime ?? null;
+                    startTime = timerRow.actualStartAt ?? null;
+                    endTime = timerRow.actualEndAt ?? null;
 
-                    if (timerRow.status === "completed" && endTime) {
+                    if (timerRow.status === "COMPLETED" && endTime) {
                         completed = true;
                         onTime = deadline ? endTime <= deadline : null;
                     } else if (deadline) {
