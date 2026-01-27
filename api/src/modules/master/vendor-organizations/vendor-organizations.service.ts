@@ -1,42 +1,33 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, inArray } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import {
-    vendorOrganizations,
-    type VendorOrganization,
-    type NewVendorOrganization,
-} from '@db/schemas/vendors/vendor-organizations.schema';
-import { vendors, type NewVendor } from '@db/schemas/vendors/vendors.schema';
-import { vendorGsts, type NewVendorGst } from '@db/schemas/vendors/vendor-gsts.schema';
-import { vendorAccs, type NewVendorAcc } from '@db/schemas/vendors/vendor-banks.schema';
-import { vendorFiles, type NewVendorFile } from '@db/schemas/vendors/vendor-files.schema';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, inArray, asc } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { vendorOrganizations, type VendorOrganization, type NewVendorOrganization } from "@db/schemas/vendors/vendor-organizations.schema";
+import { vendors, type NewVendor } from "@db/schemas/vendors/vendors.schema";
+import { vendorGsts, type NewVendorGst } from "@db/schemas/vendors/vendor-gsts.schema";
+import { vendorAccs, type NewVendorAcc } from "@db/schemas/vendors/vendor-banks.schema";
+import { vendorFiles, type NewVendorFile } from "@db/schemas/vendors/vendor-files.schema";
 
 @Injectable()
 export class VendorOrganizationsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     /**
      * Get all vendor organizations (flat list)
      */
     async findAll(): Promise<VendorOrganization[]> {
-        return this.db.select().from(vendorOrganizations);
+        const res = await this.db.select().from(vendorOrganizations).orderBy(asc(vendorOrganizations.name));
+        return res;
     }
 
     /**
      * Get single vendor organization
      */
     async findById(id: number): Promise<VendorOrganization> {
-        const result = await this.db
-            .select()
-            .from(vendorOrganizations)
-            .where(eq(vendorOrganizations.id, id))
-            .limit(1);
+        const result = await this.db.select().from(vendorOrganizations).where(eq(vendorOrganizations.id, id)).limit(1);
 
         if (!result[0]) {
-            throw new NotFoundException(
-                `Vendor Organization with ID ${id} not found`,
-            );
+            throw new NotFoundException(`Vendor Organization with ID ${id} not found`);
         }
 
         return result[0];
@@ -51,31 +42,19 @@ export class VendorOrganizationsService {
         const organization = await this.findById(id);
 
         // Get all vendors (persons) in this organization
-        const persons = await this.db
-            .select()
-            .from(vendors)
-            .where(eq(vendors.organizationId, id));
+        const persons = await this.db.select().from(vendors).where(eq(vendors.orgId, id));
 
         // Get all GST numbers for this organization
-        const gsts = await this.db
-            .select()
-            .from(vendorGsts)
-            .where(eq(vendorGsts.org, id));
+        const gsts = await this.db.select().from(vendorGsts).where(eq(vendorGsts.orgId, id));
 
         // Get all bank accounts for this organization
-        const accounts = await this.db
-            .select()
-            .from(vendorAccs)
-            .where(eq(vendorAccs.org, id));
+        const accounts = await this.db.select().from(vendorAccs).where(eq(vendorAccs.orgId, id));
 
         // Get all files from all persons in this organization
-        const personIds = persons.map((p) => p.id);
-        let files: typeof vendorFiles.$inferSelect[] = [];
+        const personIds = persons.map(p => p.id);
+        let files: (typeof vendorFiles.$inferSelect)[] = [];
         if (personIds.length > 0) {
-            files = await this.db
-                .select()
-                .from(vendorFiles)
-                .where(inArray(vendorFiles.vendorId, personIds));
+            files = await this.db.select().from(vendorFiles).where(inArray(vendorFiles.vendorId, personIds));
         }
 
         return {
@@ -103,21 +82,12 @@ export class VendorOrganizationsService {
 
         // Fetch related data for all organizations
         const orgsWithRelations = await Promise.all(
-            orgs.map(async (org) => {
-                const persons = await this.db
-                    .select()
-                    .from(vendors)
-                    .where(eq(vendors.organizationId, org.id));
+            orgs.map(async org => {
+                const persons = await this.db.select().from(vendors).where(eq(vendors.orgId, org.id));
 
-                const gsts = await this.db
-                    .select()
-                    .from(vendorGsts)
-                    .where(eq(vendorGsts.org, org.id));
+                const gsts = await this.db.select().from(vendorGsts).where(eq(vendorGsts.orgId, org.id));
 
-                const accounts = await this.db
-                    .select()
-                    .from(vendorAccs)
-                    .where(eq(vendorAccs.org, org.id));
+                const accounts = await this.db.select().from(vendorAccs).where(eq(vendorAccs.orgId, org.id));
 
                 return {
                     ...org,
@@ -130,24 +100,18 @@ export class VendorOrganizationsService {
                         accounts: accounts.length,
                     },
                 };
-            }),
+            })
         );
 
         return orgsWithRelations;
     }
 
     async create(data: NewVendorOrganization): Promise<VendorOrganization> {
-        const rows = await this.db
-            .insert(vendorOrganizations)
-            .values(data)
-            .returning();
+        const rows = await this.db.insert(vendorOrganizations).values(data).returning();
         return rows[0];
     }
 
-    async update(
-        id: number,
-        data: Partial<NewVendorOrganization>,
-    ): Promise<VendorOrganization> {
+    async update(id: number, data: Partial<NewVendorOrganization>): Promise<VendorOrganization> {
         const rows = await this.db
             .update(vendorOrganizations)
             .set({ ...data, updatedAt: new Date() })
@@ -155,23 +119,16 @@ export class VendorOrganizationsService {
             .returning();
 
         if (!rows[0]) {
-            throw new NotFoundException(
-                `Vendor Organization with ID ${id} not found`,
-            );
+            throw new NotFoundException(`Vendor Organization with ID ${id} not found`);
         }
         return rows[0];
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db
-            .delete(vendorOrganizations)
-            .where(eq(vendorOrganizations.id, id))
-            .returning();
+        const result = await this.db.delete(vendorOrganizations).where(eq(vendorOrganizations.id, id)).returning();
 
         if (!result[0]) {
-            throw new NotFoundException(
-                `Vendor Organization with ID ${id} not found`,
-            );
+            throw new NotFoundException(`Vendor Organization with ID ${id} not found`);
         }
     }
 
@@ -180,11 +137,11 @@ export class VendorOrganizationsService {
      */
     async createWithRelations(data: {
         organization: NewVendorOrganization;
-        gsts?: Omit<NewVendorGst, 'org'>[];
-        accounts?: Omit<NewVendorAcc, 'org'>[];
+        gsts?: Omit<NewVendorGst, "org">[];
+        accounts?: Omit<NewVendorAcc, "org">[];
         persons?: Array<
-            Omit<NewVendor, 'organizationId'> & {
-                files?: Omit<NewVendorFile, 'vendorId'>[];
+            Omit<NewVendor, "organizationId"> & {
+                files?: Omit<NewVendorFile, "vendorId">[];
             }
         >;
     }) {
@@ -194,20 +151,20 @@ export class VendorOrganizationsService {
         // Create GSTs
         if (data.gsts && data.gsts.length > 0) {
             await this.db.insert(vendorGsts).values(
-                data.gsts.map((gst) => ({
+                data.gsts.map(gst => ({
                     ...gst,
                     org: organization.id,
-                })),
+                }))
             );
         }
 
         // Create accounts
         if (data.accounts && data.accounts.length > 0) {
             await this.db.insert(vendorAccs).values(
-                data.accounts.map((acc) => ({
+                data.accounts.map(acc => ({
                     ...acc,
                     org: organization.id,
-                })),
+                }))
             );
         }
 
@@ -219,17 +176,17 @@ export class VendorOrganizationsService {
                     .insert(vendors)
                     .values({
                         ...personFields,
-                        organizationId: organization.id,
+                        orgId: organization.id,
                     })
                     .returning();
 
                 // Create files for this person
                 if (files && files.length > 0 && person[0]) {
                     await this.db.insert(vendorFiles).values(
-                        files.map((file) => ({
+                        files.map(file => ({
                             ...file,
                             vendorId: person[0].id,
-                        })),
+                        }))
                     );
                 }
             }
@@ -247,25 +204,25 @@ export class VendorOrganizationsService {
         data: {
             organization?: Partial<NewVendorOrganization>;
             gsts?: {
-                create?: Omit<NewVendorGst, 'org'>[];
-                update?: Array<{ id: number; data: Partial<Omit<NewVendorGst, 'org'>> }>;
+                create?: Omit<NewVendorGst, "org">[];
+                update?: Array<{ id: number; data: Partial<Omit<NewVendorGst, "org">> }>;
                 delete?: number[];
             };
             accounts?: {
-                create?: Omit<NewVendorAcc, 'org'>[];
-                update?: Array<{ id: number; data: Partial<Omit<NewVendorAcc, 'org'>> }>;
+                create?: Omit<NewVendorAcc, "org">[];
+                update?: Array<{ id: number; data: Partial<Omit<NewVendorAcc, "org">> }>;
                 delete?: number[];
             };
             persons?: {
                 create?: Array<
-                    Omit<NewVendor, 'organizationId'> & {
-                        files?: Omit<NewVendorFile, 'vendorId'>[];
+                    Omit<NewVendor, "organizationId"> & {
+                        files?: Omit<NewVendorFile, "vendorId">[];
                     }
                 >;
-                update?: Array<{ id: number; data: Partial<Omit<NewVendor, 'organizationId'>> }>;
+                update?: Array<{ id: number; data: Partial<Omit<NewVendor, "organizationId">> }>;
                 delete?: number[];
             };
-        },
+        }
     ) {
         // Update organization
         if (data.organization) {
@@ -276,10 +233,10 @@ export class VendorOrganizationsService {
         if (data.gsts) {
             if (data.gsts.create && data.gsts.create.length > 0) {
                 await this.db.insert(vendorGsts).values(
-                    data.gsts.create.map((gst) => ({
+                    data.gsts.create.map(gst => ({
                         ...gst,
                         org: id,
-                    })),
+                    }))
                 );
             }
             if (data.gsts.update) {
@@ -301,10 +258,10 @@ export class VendorOrganizationsService {
         if (data.accounts) {
             if (data.accounts.create && data.accounts.create.length > 0) {
                 await this.db.insert(vendorAccs).values(
-                    data.accounts.create.map((acc) => ({
+                    data.accounts.create.map(acc => ({
                         ...acc,
                         org: id,
-                    })),
+                    }))
                 );
             }
             if (data.accounts.update) {
@@ -331,16 +288,16 @@ export class VendorOrganizationsService {
                         .insert(vendors)
                         .values({
                             ...personFields,
-                            organizationId: id,
+                            orgId: id,
                         })
                         .returning();
 
                     if (files && files.length > 0 && person[0]) {
                         await this.db.insert(vendorFiles).values(
-                            files.map((file) => ({
+                            files.map(file => ({
                                 ...file,
                                 vendorId: person[0].id,
-                            })),
+                            }))
                         );
                     }
                 }
