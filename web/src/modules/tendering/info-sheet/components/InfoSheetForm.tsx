@@ -266,6 +266,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select recommendation"
                                 />
+                                {getIncompleteFieldComment('teRecommendation') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('teRecommendation')!} />
+                                )}
                                 {teRecommendation === 'NO' && (
                                     <>
                                         <SelectField
@@ -278,6 +281,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select rejection reason"
                                         />
+                                        {getIncompleteFieldComment('teRejectionReason') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('teRejectionReason')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="teRejectionRemarks"
@@ -292,6 +298,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('teRejectionRemarks') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('teRejectionRemarks')!} />
+                                        )}
                                     </>
                                 )}
                                 <SelectField
@@ -301,6 +310,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('processingFeeRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeRequired')!} />
+                                )}
                                 {processingFeeRequired === 'YES' && (
                                     <>
                                         <MultiSelectField
@@ -313,6 +325,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select payment modes"
                                         />
+                                        {getIncompleteFieldComment('processingFeeModes') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeModes')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="processingFeeAmount"
@@ -327,6 +342,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('processingFeeAmount') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeAmount')!} />
+                                        )}
                                     </>
                                 )}
                                 <SelectField
@@ -336,6 +354,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('tenderFeeRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeRequired')!} />
+                                )}
                                 {tenderFeeRequired === 'YES' && (
                                     <>
                                         <MultiSelectField
@@ -348,6 +369,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select payment modes"
                                         />
+                                        {getIncompleteFieldComment('tenderFeeModes') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeModes')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="tenderFeeAmount"
@@ -362,6 +386,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('tenderFeeAmount') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeAmount')!} />
+                                        )}
                                     </>
                                 )}
                                 <SelectField
@@ -371,6 +398,9 @@ export function TenderInformationForm({
                                     options={emdRequiredOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('emdRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('emdRequired')!} />
+                                )}
                                 {emdRequired === 'YES' && (
                                     <>
                                         <MultiSelectField
@@ -383,6 +413,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select payment modes"
                                         />
+                                        {getIncompleteFieldComment('emdModes') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('emdModes')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="emdAmount"
@@ -397,6 +430,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('emdAmount') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('emdAmount')!} />
+                                        )}
                                     </>
                                 )}
                                 <FieldWrapper
@@ -413,6 +449,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('tenderValue') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderValue')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="bidValidityDays"
@@ -423,6 +462,9 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select days"
                                 />
+                                {getIncompleteFieldComment('bidValidityDays') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('bidValidityDays')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="mafRequired"
@@ -433,6 +475,9 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('mafRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('mafRequired')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="pbgRequired"
@@ -440,6 +485,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('pbgRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgRequired')!} />
+                                )}
                                 {pbgRequired === 'YES' && (
                                     <>
                                         <MultiSelectField
@@ -452,6 +500,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select forms"
                                         />
+                                        {getIncompleteFieldComment('pbgForm') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgForm')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="pbgPercentage"
@@ -468,6 +519,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('pbgPercentage') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgPercentage')!} />
+                                        )}
                                         <SelectField
                                             control={form.control}
                                             name="pbgDurationMonths"
@@ -478,6 +532,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select duration"
                                         />
+                                        {getIncompleteFieldComment('pbgDurationMonths') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgDurationMonths')!} />
+                                        )}
                                     </>
                                 )}
                                 <SelectField
@@ -487,6 +544,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('sdRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('sdRequired')!} />
+                                )}
                                 {sdRequired === 'YES' && (
                                     <>
                                         <MultiSelectField
@@ -499,6 +559,9 @@ export function TenderInformationForm({
                                             }))}
                                             placeholder="Select forms"
                                         />
+                                        {getIncompleteFieldComment('sdForm') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('sdForm')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="securityDepositPercentage"
@@ -515,6 +578,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('securityDepositPercentage') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('securityDepositPercentage')!} />
+                                        )}
                                         <FieldWrapper
                                             control={form.control}
                                             name="sdDurationMonths"
@@ -532,6 +598,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('sdDurationMonths') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('sdDurationMonths')!} />
+                                        )}
                                     </>
                                 )}
                                 <SelectField
@@ -544,6 +613,9 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select evaluation type"
                                 />
+                                {getIncompleteFieldComment('commercialEvaluation') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialEvaluation')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="reverseAuctionApplicable"
@@ -551,6 +623,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('reverseAuctionApplicable') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('reverseAuctionApplicable')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="paymentTermsSupply"
@@ -567,6 +642,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('paymentTermsSupply') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('paymentTermsSupply')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="paymentTermsInstallation"
@@ -583,6 +661,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('paymentTermsInstallation') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('paymentTermsInstallation')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="deliveryTimeSupply"
@@ -600,6 +681,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('deliveryTimeSupply') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeSupply')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="deliveryTimeInstallationInclusive"
@@ -621,24 +705,32 @@ export function TenderInformationForm({
                                         </div>
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('deliveryTimeInstallationInclusive') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeInstallationInclusive')!} />
+                                )}
                                 {!deliveryTimeInstallationInclusive && (
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="deliveryTimeInstallation"
-                                        label="Installation Days (if not inclusive)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={1}
-                                                placeholder="Enter number of days"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={(value) => {
-                                                    // Convert 0 to null before setting
-                                                    field.onChange(value === 0 ? null : value);
-                                                }}
-                                            />
+                                    <>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="deliveryTimeInstallation"
+                                            label="Installation Days (if not inclusive)"
+                                        >
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={1}
+                                                    placeholder="Enter number of days"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={(value) => {
+                                                        // Convert 0 to null before setting
+                                                        field.onChange(value === 0 ? null : value);
+                                                    }}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('deliveryTimeInstallation') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeInstallation')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
                                 <SelectField
                                     control={form.control}
@@ -647,6 +739,9 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('ldRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('ldRequired')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="ldPercentagePerWeek"
@@ -663,6 +758,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('ldPercentagePerWeek') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('ldPercentagePerWeek')!} />
+                                )}
                                 <FieldWrapper
                                     control={form.control}
                                     name="maxLdPercentage"
@@ -679,6 +777,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('maxLdPercentage') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('maxLdPercentage')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="physicalDocsRequired"
@@ -686,20 +787,28 @@ export function TenderInformationForm({
                                     options={yesNoOptions}
                                     placeholder="Select option"
                                 />
+                                {getIncompleteFieldComment('physicalDocsRequired') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocsRequired')!} />
+                                )}
                                 {physicalDocsRequired === 'YES' && (
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="physicalDocsDeadline"
-                                        label="Physical Docs Submission Deadline"
-                                    >
-                                        {(field) => (
-                                            <DateTimeInput
-                                                value={typeof field.value === "string" ? field.value : null}
-                                                onChange={field.onChange}
-                                                className="bg-background"
-                                            />
+                                    <>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="physicalDocsDeadline"
+                                            label="Physical Docs Submission Deadline"
+                                        >
+                                            {(field) => (
+                                                <DateTimeInput
+                                                    value={typeof field.value === "string" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                    className="bg-background"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('physicalDocsDeadline') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocsDeadline')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
 
                                 <FieldWrapper
@@ -716,6 +825,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('techEligibilityAgeYears') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('techEligibilityAgeYears')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="oemExperience"
@@ -726,6 +838,9 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select type"
                                 />
+                                {getIncompleteFieldComment('oemExperience') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('oemExperience')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="workValueType"
@@ -736,6 +851,9 @@ export function TenderInformationForm({
                                     }))}
                                     placeholder="Select type"
                                 />
+                                {getIncompleteFieldComment('workValueType') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('workValueType')!} />
+                                )}
 
                                 {/* Work Values */}
                                 {workValueType === 'WORKS_VALUES' && (
@@ -750,6 +868,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('orderValue1') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue1')!} />
+                                        )}
                                         <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
                                             {(field) => (
                                                 <NumberInput
@@ -760,6 +881,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('orderValue2') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue2')!} />
+                                        )}
                                         <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
                                             {(field) => (
                                                 <NumberInput
@@ -770,6 +894,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('orderValue3') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue3')!} />
+                                        )}
                                     </>
                                 )}
 
@@ -790,6 +917,9 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
+                                        {getIncompleteFieldComment('customEligibilityCriteria') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('customEligibilityCriteria')!} />
+                                        )}
                                     </>
                                 )}
 
@@ -800,6 +930,9 @@ export function TenderInformationForm({
                                     options={dummyTechnicalDocuments}
                                     placeholder="Select documents"
                                 />
+                                {getIncompleteFieldComment('technicalWorkOrders') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('technicalWorkOrders')!} />
+                                )}
                                 <MultiSelectField
                                     control={form.control}
                                     name="commercialDocuments"
@@ -807,6 +940,9 @@ export function TenderInformationForm({
                                     options={dummyFinancialDocuments}
                                     placeholder="Select documents"
                                 />
+                                {getIncompleteFieldComment('commercialDocuments') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialDocuments')!} />
+                                )}
                                 <SelectField
                                     control={form.control}
                                     name="avgAnnualTurnoverCriteria"
@@ -814,17 +950,25 @@ export function TenderInformationForm({
                                     options={aatOptions}
                                     placeholder="Select criteria"
                                 />
+                                {getIncompleteFieldComment('avgAnnualTurnoverCriteria') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('avgAnnualTurnoverCriteria')!} />
+                                )}
                                 {avgAnnualTurnoverCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
+                                    <>
+                                        <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('avgAnnualTurnoverValue') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('avgAnnualTurnoverValue')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
 
                                 <SelectField
@@ -834,17 +978,25 @@ export function TenderInformationForm({
                                     options={wcOptions}
                                     placeholder="Select criteria"
                                 />
+                                {getIncompleteFieldComment('workingCapitalCriteria') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('workingCapitalCriteria')!} />
+                                )}
                                 {workingCapitalCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
+                                    <>
+                                        <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('workingCapitalValue') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('workingCapitalValue')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
                                 <SelectField
                                     control={form.control}
@@ -853,17 +1005,25 @@ export function TenderInformationForm({
                                     options={scOptions}
                                     placeholder="Select criteria"
                                 />
+                                {getIncompleteFieldComment('solvencyCertificateCriteria') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('solvencyCertificateCriteria')!} />
+                                )}
                                 {solvencyCertificateCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="solvencyCertificateValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
+                                    <>
+                                        <FieldWrapper control={form.control} name="solvencyCertificateValue" label="Amount">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('solvencyCertificateValue') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('solvencyCertificateValue')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
                                 <SelectField
                                     control={form.control}
@@ -872,17 +1032,25 @@ export function TenderInformationForm({
                                     options={nwOptions}
                                     placeholder="Select criteria"
                                 />
+                                {getIncompleteFieldComment('netWorthCriteria') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('netWorthCriteria')!} />
+                                )}
                                 {netWorthCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
+                                    <>
+                                        <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
+                                            {(field) => (
+                                                <NumberInput
+                                                    step={0.01}
+                                                    placeholder="0.00"
+                                                    value={typeof field.value === "number" ? field.value : null}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('netWorthValue') && (
+                                            <IncompleteFieldAlert comment={getIncompleteFieldComment('netWorthValue')!} />
                                         )}
-                                    </FieldWrapper>
+                                    </>
                                 )}
                             </div>
 
@@ -924,34 +1092,54 @@ export function TenderInformationForm({
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name={`clients.${index}.clientName`}
-                                                label="Name"
-                                            >
-                                                {(field) => <Input placeholder="Enter name" {...field} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name={`clients.${index}.clientDesignation`}
-                                                label="Designation"
-                                            >
-                                                {(field) => <Input placeholder="Enter designation" {...field} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name={`clients.${index}.clientEmail`}
-                                                label="Email"
-                                            >
-                                                {(field) => <Input type="email" placeholder="Enter email" {...field} />}
-                                            </FieldWrapper>
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name={`clients.${index}.clientMobile`}
-                                                label="Number"
-                                            >
-                                                {(field) => <Input placeholder="Enter number" {...field} />}
-                                            </FieldWrapper>
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name={`clients.${index}.clientName`}
+                                                    label="Name"
+                                                >
+                                                    {(field) => <Input placeholder="Enter name" {...field} />}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment(`clients.${index}.clientName`) && (
+                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientName`)!} />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name={`clients.${index}.clientDesignation`}
+                                                    label="Designation"
+                                                >
+                                                    {(field) => <Input placeholder="Enter designation" {...field} />}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment(`clients.${index}.clientDesignation`) && (
+                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientDesignation`)!} />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name={`clients.${index}.clientEmail`}
+                                                    label="Email"
+                                                >
+                                                    {(field) => <Input type="email" placeholder="Enter email" {...field} />}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment(`clients.${index}.clientEmail`) && (
+                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientEmail`)!} />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name={`clients.${index}.clientMobile`}
+                                                    label="Number"
+                                                >
+                                                    {(field) => <Input placeholder="Enter number" {...field} />}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment(`clients.${index}.clientMobile`) && (
+                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientMobile`)!} />
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -969,6 +1157,9 @@ export function TenderInformationForm({
                                         />
                                     )}
                                 </FieldWrapper>
+                                {getIncompleteFieldComment('courierAddress') && (
+                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
+                                )}
                                 <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
                                     {(field) => (
                                         <textarea
@@ -981,9 +1172,6 @@ export function TenderInformationForm({
                                 </FieldWrapper>
                                 {getIncompleteFieldComment('teRemark') && (
                                     <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
-                                )}
-                                {getIncompleteFieldComment('courierAddress') && (
-                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
                                 )}
                             </div>
                         </div>
