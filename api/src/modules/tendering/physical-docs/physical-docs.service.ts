@@ -233,8 +233,6 @@ export class PhysicalDocsService {
             .offset(offset)
             .orderBy(orderByClause);
 
-        console.log("PhysicalDocDashboard", rows);
-
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
