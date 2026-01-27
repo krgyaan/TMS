@@ -85,6 +85,9 @@ export const paths = {
         workOrder: "/operations/work-order",
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
+
+        projectDashboard: "/operations/project-dashboard",
+        raisePoForm: "/operations/project-dashboard/raise-po",
     },
 
     // ==================== SERVICES ====================
