@@ -41,6 +41,8 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 /* ================================
    TYPES
@@ -348,7 +350,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, subValue, icon, trend
 ================================ */
 export default function ProjectDashboardPage() {
     const [selectedProjectId, setSelectedProjectId] = useState<number | null>(1);
-
+    const navigate = useNavigate();
     const selectedProject = useMemo(() => {
         return PROJECTS.find(p => p.id === selectedProjectId);
     }, [selectedProjectId]);
