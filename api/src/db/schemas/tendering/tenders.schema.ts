@@ -1,13 +1,4 @@
-import {
-    pgTable,
-    serial,
-    varchar,
-    text,
-    bigint,
-    decimal,
-    timestamp,
-    integer,
-} from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, bigint, decimal, timestamp, integer } from "drizzle-orm/pg-core";
 
 export const tenderInfos = pgTable("tender_infos", {
     id: serial("id").primaryKey(),

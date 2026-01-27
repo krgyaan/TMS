@@ -31,7 +31,7 @@ export interface PendingTenderRow {
     statusName: string | null;
     dueDate: Date | null;
     teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     emd: string | null;
     emdMode: string | null;
     tenderFee: string | null;
@@ -49,6 +49,7 @@ export interface PaymentRequestRow {
     amountRequired: string;
     dueDate: Date | null;
     teamMember: string | null;
+    teamMemberId: number | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;
@@ -330,8 +331,6 @@ export class EmdsService {
             }
         }
 
-        // Shared Where Clause
-        // Critical: This matches countRequestsByStatus exactly
         const whereClause = and(
             this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
@@ -363,6 +362,7 @@ export class EmdsService {
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
                 teamMember: users.name,
+                teamMemberId: users.id,
                 instrumentId: paymentInstruments.id,
                 instrumentType: paymentInstruments.instrumentType,
                 instrumentStatus: paymentInstruments.status,
@@ -384,11 +384,12 @@ export class EmdsService {
         const data: PaymentRequestRow[] = rows.map((row) => ({
             id: row.id,
             tenderId: row.tenderId,
-            tenderNo: row.tenderNo || '',
-            tenderName: row.tenderName || '',
+            tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
+            tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
             purpose: row.purpose as PaymentPurpose,
             amountRequired: row.amountRequired || '0',
             dueDate: row.dueDate,
+            teamMemberId: row.teamMemberId,
             teamMember: row.teamMember?.toString() ?? null,
             instrumentId: row.instrumentId,
             instrumentType: row.instrumentType as InstrumentType | null,
@@ -459,7 +460,7 @@ export class EmdsService {
                 case 'dueDate':
                     orderClause = direction(tenderInfos.dueDate);
                     break;
-                case 'teamMemberName':
+                case 'teamMember':
                     orderClause = direction(users.name);
                     break;
                 case 'emdRequired':
@@ -481,7 +482,7 @@ export class EmdsService {
                 tenderName: tenderInfos.tenderName,
                 dueDate: tenderInfos.dueDate,
                 teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
+                teamMember: users.name,
                 emd: tenderInfos.emd,
                 emdMode: tenderInfos.emdMode,
                 tenderFee: tenderInfos.tenderFees,
@@ -577,7 +578,7 @@ export class EmdsService {
                 case 'dueDate':
                     orderClause = direction(tenderInfos.dueDate);
                     break;
-                case 'teamMemberName':
+                case 'teamMember':
                     orderClause = direction(users.name);
                     break;
                 case 'emdRequired':
@@ -599,7 +600,7 @@ export class EmdsService {
                 tenderName: tenderInfos.tenderName,
                 dueDate: tenderInfos.dueDate,
                 teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
+                teamMember: users.name,
                 emd: tenderInfos.emd,
                 emdMode: tenderInfos.emdMode,
                 tenderFee: tenderInfos.tenderFees,
