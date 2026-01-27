@@ -5,7 +5,9 @@ import { RouteWrapper } from "../components/RouteWrapper";
 const Operations_WorkOrder = lazy(() => import("@/modules/operations/work-order"));
 const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off"));
 const Operations_ContractAgreement = lazy(() => import("@/modules/operations/contract-agreement"));
+
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
+const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -39,6 +41,14 @@ export default function OperationsRoutes() {
                 element={
                     <RouteWrapper>
                         <Operations_ProjectDashboard />
+                    </RouteWrapper>
+                }
+            />
+            <Route
+                path="project-dashboard/raise-po"
+                element={
+                    <RouteWrapper>
+                        <Operations_RaisePoFormPage />
                     </RouteWrapper>
                 }
             />
