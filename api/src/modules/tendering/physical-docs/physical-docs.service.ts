@@ -196,7 +196,7 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause);
@@ -225,7 +225,7 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause)
@@ -233,67 +233,7 @@ export class PhysicalDocsService {
             .offset(offset)
             .orderBy(orderByClause);
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            const enrichedRows = rows.map((row) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    dueDate: row.dueDate,
-                    courierAddress: row.courierAddress || '',
-                    physicalDocsRequired: row.physicalDocsRequired || '',
-                    physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
-                    teamMemberName: row.teamMemberName || '',
-                    status: row.status,
-                    statusName: row.statusName || '',
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    physicalDocs: row.physicalDocs,
-                    courierNo: row.courierNo || null,
-                    courierDate: row.courierDate || null,
-                };
-            });
-
-            return wrapPaginatedResponse(enrichedRows, total, page, limit);
-        }
+        console.log("PhysicalDocDashboard", rows);
 
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
@@ -353,7 +293,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...pendingConditions))
@@ -363,7 +303,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...sentConditions))
@@ -373,7 +313,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...tenderDnbConditions))

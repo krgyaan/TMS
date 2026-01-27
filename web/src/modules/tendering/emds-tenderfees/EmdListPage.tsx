@@ -158,11 +158,11 @@ const EmdsAndTenderFeesPage = () => {
             },
         },
         {
-            field: 'teamMemberName',
-            headerName: 'Assigned To',
+            field: 'teamMember',
+            headerName: 'Member',
             width: 150,
             cellRenderer: (params: any) =>
-                params.value || <span className="text-gray-400">Unassigned</span>,
+                params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
         },
         {
             field: 'dueDate',
@@ -308,11 +308,11 @@ const EmdsAndTenderFeesPage = () => {
             },
         },
         {
-            field: 'teamMemberName',
-            headerName: 'Assigned To',
+            field: 'teamMember',
+            headerName: 'Member',
             width: 140,
             cellRenderer: (params: any) =>
-                params.value || <span className="text-gray-400">Unassigned</span>,
+                params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
         },
         {
             field: 'createdAt',

@@ -1,0 +1,68 @@
+[
+  {
+    "table": "FDR",
+    "originalId": 13,
+    "message": "Parent EMD ID 287 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:15.802Z"
+  },
+  {
+    "table": "FDR",
+    "originalId": 15,
+    "message": "Parent EMD ID 250 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:15.808Z"
+  },
+  {
+    "table": "FDR",
+    "originalId": 16,
+    "message": "Parent EMD ID 249 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:15.809Z"
+  },
+  {
+    "table": "FDR",
+    "originalId": 17,
+    "message": "Parent EMD ID 243 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:15.811Z"
+  },
+  {
+    "table": "FDR",
+    "originalId": 20,
+    "message": "Parent EMD ID 236 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:15.821Z"
+  },
+  {
+    "table": "FDR",
+    "originalId": 120,
+    "message": "Parent EMD ID 458 not found in Postgres.",
+    "timestamp": "2026-01-27T06:47:16.193Z"
+  },
+  {
+    "table": "BG",
+    "originalId": 34,
+    "message": "Failed query: insert into \"instrument_bg_details\" (\"id\", \"instrument_id\", \"bg_no\", \"bg_date\", \"validity_date\", \"claim_expiry_date\", \"beneficiary_name\", \"beneficiary_address\", \"bank_name\", \"cash_margin_percent\", \"fdr_margin_percent\", \"stamp_charges\", \"sfms_charges\", \"stamp_charges_deducted\", \"sfms_charges_deducted\", \"other_charges_deducted\", \"extended_amount\", \"extended_validity_date\", \"extended_claim_expiry_date\", \"extended_bank_name\", \"extension_letter_path\", \"cancellation_letter_path\", \"prefilled_signed_bg\", \"bg_needs\", \"bg_purpose\", \"bg_soft_copy\", \"bg_po\", \"bg_client_user\", \"bg_client_cp\", \"bg_client_fin\", \"bg_bank_acc\", \"bg_bank_ifsc\", \"courier_no\", \"stamp_charge\", \"extension_letter\", \"new_bg_claim\", \"approve_bg\", \"bg_format_te\", \"bg_format_tl\", \"sfms_conf\", \"fdr_amt\", \"fdr_per\", \"fdr_copy\", \"fdr_no\", \"fdr_validity\", \"fdr_roi\", \"bg_charge_deducted\", \"new_stamp_charge_deducted\", \"stamp_covering_letter\", \"cancel_remark\", \"cancell_confirm\", \"bg_fdr_cancel_date\", \"bg_fdr_cancel_amount\", \"bg_fdr_cancel_ref_no\", \"bg2_remark\", \"reason_req\", \"created_at\", \"updated_at\") values (default, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, default, $12, $13, $14, $15, default, default, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, default, default)\nparams: 289,235BG01250440001,2025-02-13,,,Regional Director Department of Energy,Regional Purchase Unit, Manuguru, HWGF, Building, ECIL Road, ECIL Post Hyderabad-500062,BGLIMIT_0771,,,300.00,300.00,590.00,,154315.00,Regional Director Department of Energy,reqext_req_ext_letter_1765430764.pdf,,,,performance,1757136154_soft_copy.pdf,1757400614_po_.pdf,,,,,,,300.00,1765430764_bg_ext_letter_34.jpeg,2027.00,,,,,15432.00,10.00,1744319352_fdr.pdf,023540600057074,2027-02-04,7.75,3641.83,300.00,,,,,,,,",
+    "timestamp": "2026-01-27T06:47:16.848Z"
+  },
+  {
+    "table": "BG",
+    "originalId": 85,
+    "message": "Failed query: insert into \"instrument_bg_details\" (\"id\", \"instrument_id\", \"bg_no\", \"bg_date\", \"validity_date\", \"claim_expiry_date\", \"beneficiary_name\", \"beneficiary_address\", \"bank_name\", \"cash_margin_percent\", \"fdr_margin_percent\", \"stamp_charges\", \"sfms_charges\", \"stamp_charges_deducted\", \"sfms_charges_deducted\", \"other_charges_deducted\", \"extended_amount\", \"extended_validity_date\", \"extended_claim_expiry_date\", \"extended_bank_name\", \"extension_letter_path\", \"cancellation_letter_path\", \"prefilled_signed_bg\", \"bg_needs\", \"bg_purpose\", \"bg_soft_copy\", \"bg_po\", \"bg_client_user\", \"bg_client_cp\", \"bg_client_fin\", \"bg_bank_acc\", \"bg_bank_ifsc\", \"courier_no\", \"stamp_charge\", \"extension_letter\", \"new_bg_claim\", \"approve_bg\", \"bg_format_te\", \"bg_format_tl\", \"sfms_conf\", \"fdr_amt\", \"fdr_per\", \"fdr_copy\", \"fdr_no\", \"fdr_validity\", \"fdr_roi\", \"bg_charge_deducted\", \"new_stamp_charge_deducted\", \"stamp_covering_letter\", \"cancel_remark\", \"cancell_confirm\", \"bg_fdr_cancel_date\", \"bg_fdr_cancel_amount\", \"bg_fdr_cancel_ref_no\", \"bg2_remark\", \"reason_req\", \"created_at\", \"updated_at\") values (default, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, default, $12, $13, $14, $15, default, default, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, default, default)\nparams: 339,235BG01233330002,2023-11-29,,,Gail India Limited, Noida,Jubilee Tower, B 35-36, Sector-1, Noida-201301,BGLIMIT_0771,,,300.00,300.00,590.00,,18022827.00,Gail India Limited, Noida,reqext_req_ext_letter_1768906878.pdf,,,,,1757139375_soft_copy.pdf,1757404591_po_.pdf,,,,,,,300.00,1768906878_bg_ext_letter_85.jpeg,2028.00,,,,,1802282.70,10.00,1744463488_fdr.pdf,023540600050721,2025-07-20,7.75,354448.93,300.00,,,,,,,,",
+    "timestamp": "2026-01-27T06:47:17.045Z"
+  },
+  {
+    "table": "BG",
+    "originalId": 88,
+    "message": "Failed query: insert into \"instrument_bg_details\" (\"id\", \"instrument_id\", \"bg_no\", \"bg_date\", \"validity_date\", \"claim_expiry_date\", \"beneficiary_name\", \"beneficiary_address\", \"bank_name\", \"cash_margin_percent\", \"fdr_margin_percent\", \"stamp_charges\", \"sfms_charges\", \"stamp_charges_deducted\", \"sfms_charges_deducted\", \"other_charges_deducted\", \"extended_amount\", \"extended_validity_date\", \"extended_claim_expiry_date\", \"extended_bank_name\", \"extension_letter_path\", \"cancellation_letter_path\", \"prefilled_signed_bg\", \"bg_needs\", \"bg_purpose\", \"bg_soft_copy\", \"bg_po\", \"bg_client_user\", \"bg_client_cp\", \"bg_client_fin\", \"bg_bank_acc\", \"bg_bank_ifsc\", \"courier_no\", \"stamp_charge\", \"extension_letter\", \"new_bg_claim\", \"approve_bg\", \"bg_format_te\", \"bg_format_tl\", \"sfms_conf\", \"fdr_amt\", \"fdr_per\", \"fdr_copy\", \"fdr_no\", \"fdr_validity\", \"fdr_roi\", \"bg_charge_deducted\", \"new_stamp_charge_deducted\", \"stamp_covering_letter\", \"cancel_remark\", \"cancell_confirm\", \"bg_fdr_cancel_date\", \"bg_fdr_cancel_amount\", \"bg_fdr_cancel_ref_no\", \"bg2_remark\", \"reason_req\", \"created_at\", \"updated_at\") values (default, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, default, $12, $13, $14, $15, default, default, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, default, default)\nparams: 342,235BG01250830003,2025-03-24,,,Gail India Limited, Jaipur,Gail Bhawan, Sector-6, Vidhyadhar Nagar Jaipur-302039,BGLIMIT_0771,,,300.00,300.00,590.00,,744000.00,Gail India Limited, Jaipur,reqext_req_ext_letter_1762173187.pdf,,,,,1757161732_soft_copy.pdf,1744721930_po.pdf,,,,,,,300.00,1762173187_bg_ext_letter_88.pdf,2025.00,,,,,74400.00,10.00,1744721930_fdr.pdf,023540600057483,2025-10-24,6.25,5852.80,300.00,,,,,,,,",
+    "timestamp": "2026-01-27T06:47:17.058Z"
+  },
+  {
+    "table": "BG",
+    "originalId": 169,
+    "message": "Failed query: insert into \"instrument_bg_details\" (\"id\", \"instrument_id\", \"bg_no\", \"bg_date\", \"validity_date\", \"claim_expiry_date\", \"beneficiary_name\", \"beneficiary_address\", \"bank_name\", \"cash_margin_percent\", \"fdr_margin_percent\", \"stamp_charges\", \"sfms_charges\", \"stamp_charges_deducted\", \"sfms_charges_deducted\", \"other_charges_deducted\", \"extended_amount\", \"extended_validity_date\", \"extended_claim_expiry_date\", \"extended_bank_name\", \"extension_letter_path\", \"cancellation_letter_path\", \"prefilled_signed_bg\", \"bg_needs\", \"bg_purpose\", \"bg_soft_copy\", \"bg_po\", \"bg_client_user\", \"bg_client_cp\", \"bg_client_fin\", \"bg_bank_acc\", \"bg_bank_ifsc\", \"courier_no\", \"stamp_charge\", \"extension_letter\", \"new_bg_claim\", \"approve_bg\", \"bg_format_te\", \"bg_format_tl\", \"sfms_conf\", \"fdr_amt\", \"fdr_per\", \"fdr_copy\", \"fdr_no\", \"fdr_validity\", \"fdr_roi\", \"bg_charge_deducted\", \"new_stamp_charge_deducted\", \"stamp_covering_letter\", \"cancel_remark\", \"cancell_confirm\", \"bg_fdr_cancel_date\", \"bg_fdr_cancel_amount\", \"bg_fdr_cancel_ref_no\", \"bg2_remark\", \"reason_req\", \"created_at\", \"updated_at\") values (default, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, default, $12, $13, $14, $15, default, default, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, default, default)\nparams: 375,235BG01251090001,2025-04-19,,,SR Manager Material-PL,PHQ, OIL India Limited, Duliajan, Dibrugarh, Assam-786602,BGLIMIT_0771,,,300.00,300.00,590.00,,98840.00,Sr. Manager Materials-PL, PHQ, OIL India Limited,reqext_req_ext_letter_1750224429.pdf,reqcancel_req_cancel_letter_1754544846.pdf,,,performance,1750143948_soft_copy.pdf,1750143948_po.pdf,,,,,,146,300.00,1750224428_bg_ext_letter_169.pdf,2026.00,,1750746857_te_.pdf,,,9884.00,10.00,1750144128_fdr.pdf,023540600057802,2026-08-31,7.75,10062.51,300.00,1754544846_bg_stamp_covering_letter_169.pdf,,1762513134_bg_cancell_confirm_169.docx,,,,,",
+    "timestamp": "2026-01-27T06:47:17.192Z"
+  },
+  {
+    "table": "BG",
+    "originalId": 217,
+    "message": "Failed query: insert into \"instrument_bg_details\" (\"id\", \"instrument_id\", \"bg_no\", \"bg_date\", \"validity_date\", \"claim_expiry_date\", \"beneficiary_name\", \"beneficiary_address\", \"bank_name\", \"cash_margin_percent\", \"fdr_margin_percent\", \"stamp_charges\", \"sfms_charges\", \"stamp_charges_deducted\", \"sfms_charges_deducted\", \"other_charges_deducted\", \"extended_amount\", \"extended_validity_date\", \"extended_claim_expiry_date\", \"extended_bank_name\", \"extension_letter_path\", \"cancellation_letter_path\", \"prefilled_signed_bg\", \"bg_needs\", \"bg_purpose\", \"bg_soft_copy\", \"bg_po\", \"bg_client_user\", \"bg_client_cp\", \"bg_client_fin\", \"bg_bank_acc\", \"bg_bank_ifsc\", \"courier_no\", \"stamp_charge\", \"extension_letter\", \"new_bg_claim\", \"approve_bg\", \"bg_format_te\", \"bg_format_tl\", \"sfms_conf\", \"fdr_amt\", \"fdr_per\", \"fdr_copy\", \"fdr_no\", \"fdr_validity\", \"fdr_roi\", \"bg_charge_deducted\", \"new_stamp_charge_deducted\", \"stamp_covering_letter\", \"cancel_remark\", \"cancell_confirm\", \"bg_fdr_cancel_date\", \"bg_fdr_cancel_amount\", \"bg_fdr_cancel_ref_no\", \"bg2_remark\", \"reason_req\", \"created_at\", \"updated_at\") values (default, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, default, $12, $13, $14, $15, default, default, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, default, default)\nparams: 421,235BG01253530001,2025-12-19,2027-05-24,2027-08-24,GAIL (India) Limited, RANCHI,GAIL (INDIA) LIMITED \r\n5TH Floor, North Wing of Eastern Block,\r\nMecon Head Office Complex,\r\nDoranda, Ranchi-834002 Jharkhand, India,BGLIMIT_0771,,,0.00,,,,607636.00,STATE BANK OF INDIA,reqext_req_ext_letter_1768993093.pdf,,1765964348_prefilled_signed_0.pdf,24,performance,,1765523826_po.pdf,mayank.nirbhay@gail.co.in,,,37824038627,SBIN0009620,588,0.00,1768993093_bg_ext_letter_217.jpeg,2027.00,1,1765523826_bg_format_upload.docx,,1765523826_bg_format_upload.docx,,,,,,,,,,,,,,,,",
+    "timestamp": "2026-01-27T06:47:17.378Z"
+  }
+]

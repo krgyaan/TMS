@@ -228,7 +228,7 @@ export interface DashboardRow {
     tenderName: string;
     dueDate: Date | null;
     teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     requestedBy: string | null;
 }
 
@@ -250,7 +250,7 @@ export interface PendingTenderRow {
     statusName: string | null;
     dueDate: Date | null;
     teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     emd: string | null;
     emdMode: string | null;
     tenderFee: string | null;

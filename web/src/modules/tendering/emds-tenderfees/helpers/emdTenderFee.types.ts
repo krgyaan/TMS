@@ -124,7 +124,7 @@ export interface PendingTenderRow {
     status: number;
     statusName: string | null;
     teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     emd: string | null;
     emdMode: string | null;
     tenderFee: string | null;
@@ -150,7 +150,7 @@ export interface PaymentRequestRow {
     amountRequired: string;
     dueDate: string | null;
     teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     instrumentId: number | null;
     instrumentType: string | null;
     instrumentStatus: string | null;

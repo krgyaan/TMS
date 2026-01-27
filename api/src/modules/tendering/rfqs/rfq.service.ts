@@ -632,7 +632,7 @@ export class RfqsService {
                 name: vendorOrganizations.name,
             })
             .from(vendorOrganizations)
-            .where(sql`${vendorOrganizations.id} = ANY(${vendorOrgIds})`);
+            .where(inArray(vendorOrganizations.id, vendorOrgIds));
 
         if (vendorOrgs.length === 0) return;
 
