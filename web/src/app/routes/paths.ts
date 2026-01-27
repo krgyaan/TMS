@@ -87,7 +87,8 @@ export const paths = {
         contractAgreement: "/operations/contract-agreement",
 
         projectDashboard: "/operations/project-dashboard",
-        raisePoForm: "/operations/project-dashboard/raise-po",
+        raisePoForm: "/operations/project-dashboard/purchase-order/create",
+        viewPoPage: "/operations/project-dashboard/purchase-order/view",
     },
 
     // ==================== SERVICES ====================
