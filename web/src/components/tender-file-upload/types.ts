@@ -1,5 +1,7 @@
 export type TenderFileContext =
     | 'tender-documents'
+    | 'bg-format-files'
+    | 'bg-po-files'
     | 'emds'
     | 'tender-fees'
     | 'physical-docs'

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -189,6 +189,29 @@ const EmdsAndTenderFeesPage = () => {
             },
         },
         {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 110,
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const timer = data?.timer;
+
+                if (!timer) {
+                    return <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="NOT_STARTED"
+                    />;
+                }
+
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                    />
+                );
+            },
+        },
+        {
             headerName: '',
             filter: false,
             sortable: false,
@@ -213,29 +236,6 @@ const EmdsAndTenderFeesPage = () => {
                 return <ActionRenderer data={params.data!} />;
             },
             pinned: 'right',
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 110,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
-
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
-            },
         },
     ], [navigate, activeTab]);
 
@@ -465,35 +465,49 @@ const EmdsAndTenderFeesPage = () => {
                             )}
                         </CardDescription>
                     </div>
+                    <CardAction className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsTenderFeesCreate())}>
+                            <Plus className="w-4 h-4" />
+                            Add Old Entries
+                        </Button>
+                        <Button variant="outline" onClick={() => navigate(paths.tendering.biOtherThanEmdsCreate())}>
+                            <Plus className="w-4 h-4" />
+                            BI Other Than EMDs
+                        </Button>
+                    </CardAction>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="mt-4">
-                    <TabsList>
-                        {TABS.map(renderTabTrigger)}
-                    </TabsList>
-                </Tabs>
             </CardHeader>
 
-            <CardContent className="px-0">
-                <DataTable
-                    data={tableData}
-                    loading={isLoading}
-                    columnDefs={columnDefs as ColDef[]}
-                    manualPagination={true}
-                    rowCount={totalRows}
-                    paginationState={pagination}
-                    onPaginationChange={setPagination}
-                    gridOptions={{
-                        defaultColDef: {
-                            filter: true,
-                            resizable: true,
-                            sortable: true,
-                        },
-                        onSortChanged: handleSortChanged,
-                        suppressRowClickSelection: true,
-                        overlayNoRowsTemplate: `<span style="padding: 10px; text-align: center;">No ${activeTab} items found</span>`,
-                    }}
-                />
+            <CardContent className="flex-1 px-0">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="flex flex-col w-full">
+                    <div className="flex-none m-auto">
+                        <TabsList>
+                            {TABS.map(renderTabTrigger)}
+                        </TabsList>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                        <DataTable
+                            data={tableData}
+                            loading={isLoading}
+                            columnDefs={columnDefs as ColDef[]}
+                            manualPagination={true}
+                            rowCount={totalRows}
+                            paginationState={pagination}
+                            onPaginationChange={setPagination}
+                            gridOptions={{
+                                defaultColDef: {
+                                    filter: true,
+                                    resizable: true,
+                                    sortable: true,
+                                },
+                                onSortChanged: handleSortChanged,
+                                suppressRowClickSelection: true,
+                                overlayNoRowsTemplate: `<span style="padding: 10px; text-align: center;">No ${activeTab} items found</span>`,
+                            }}
+                        />
+                    </div>
+                </Tabs>
             </CardContent>
         </Card>
     );

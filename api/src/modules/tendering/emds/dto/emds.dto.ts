@@ -28,6 +28,7 @@ const optionalNumber = (
 // ============================================================================
 
 const ddDetails = z.object({
+    ddAmount: optionalNumber(z.coerce.number().min(0)),
     ddFavouring: optionalString,
     ddPayableAt: optionalString,
     ddDeliverBy: optionalString,
@@ -39,6 +40,7 @@ const ddDetails = z.object({
 });
 
 const fdrDetails = z.object({
+    fdrAmount: optionalNumber(z.coerce.number().min(0)),
     fdrFavouring: optionalString,
     fdrExpiryDate: optionalString,
     fdrDeliverBy: optionalString,
@@ -49,6 +51,7 @@ const fdrDetails = z.object({
 });
 
 const bgDetails = z.object({
+    bgAmount: optionalNumber(z.coerce.number().min(0)),
     bgNeededIn: optionalString,
     bgPurpose: optionalString,
     bgFavouring: optionalString,
@@ -64,9 +67,22 @@ const bgDetails = z.object({
     bgCourierAddress: optionalString,
     bgCourierDays: optionalNumber(z.coerce.number().min(1).max(10)),
     bgBank: optionalString,
+    bgBankAccountName: optionalString,
+    bgBankAccountNo: optionalString,
+    bgBankIfsc: optionalString,
+});
+
+const chequeDetails = z.object({
+    chequeAmount: optionalNumber(z.coerce.number().min(0)),
+    chequeFavouring: optionalString,
+    chequeDate: optionalString,
+    chequeNeededIn: optionalString,
+    chequePurpose: optionalString,
+    chequeAccount: optionalString,
 });
 
 const bankTransferDetails = z.object({
+    btAmount: optionalNumber(z.coerce.number().min(0)),
     btPurpose: optionalString,
     btAccountName: optionalString,
     btAccountNo: optionalString,
@@ -74,6 +90,7 @@ const bankTransferDetails = z.object({
 });
 
 const portalDetails = z.object({
+    portalAmount: optionalNumber(z.coerce.number().min(0)),
     portalPurpose: optionalString,
     portalName: optionalString,
     portalNetBanking: z.enum(["YES", "NO"]).optional(),
@@ -88,7 +105,7 @@ const emdSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("DD"), details: ddDetails }),
     z.object({ mode: z.literal("FDR"), details: fdrDetails }),
     z.object({ mode: z.literal("BG"), details: bgDetails }),
-    z.object({ mode: z.literal("CHEQUE"), details: ddDetails }),
+    z.object({ mode: z.literal("CHEQUE"), details: chequeDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
     z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
@@ -116,6 +133,11 @@ const processingFeeSection = z.discriminatedUnion("mode", [
 // ============================================================================
 
 export const CreatePaymentRequestSchema = z.object({
+    type: z.enum(["TMS", "Other Than TMS", "Old Entries", "Other Than Tender"]).optional(),
+    tenderNo: z.string().optional(),
+    tenderName: z.string().optional(),
+    dueDate: z.string().optional(),
+
     emd: emdSection,
     tenderFee: tenderFeeSection,
     processingFee: processingFeeSection,
@@ -245,8 +267,7 @@ export interface PaymentRequestRow {
     purpose: PaymentPurpose;
     amountRequired: string;
     dueDate: Date | null;
-    teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;

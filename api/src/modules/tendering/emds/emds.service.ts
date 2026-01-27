@@ -1,22 +1,8 @@
-import {
-    Inject,
-    Injectable,
-    NotFoundException,
-    BadRequestException,
-} from '@nestjs/common';
-import { eq, and, inArray, or, gt, asc, desc, isNull, sql, ne, notInArray, isNotNull, not } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, BadRequestException, } from '@nestjs/common';
+import { eq, and, inArray, or, gt, asc, desc, isNull, sql, isNotNull, not } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import {
-    paymentRequests,
-    paymentInstruments,
-    instrumentDdDetails,
-    instrumentFdrDetails,
-    instrumentBgDetails,
-    instrumentTransferDetails,
-    type PaymentRequest,
-    type PaymentInstrument,
-} from '@db/schemas/tendering/emds.schema';
+import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, type PaymentRequest, type PaymentInstrument, } from '@db/schemas/tendering/emds.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -28,23 +14,11 @@ import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/service
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { StatusCache } from '@/utils/status-cache';
-import type {
-    CreatePaymentRequestDto,
-    UpdatePaymentRequestDto,
-    UpdateStatusDto,
-    PaymentPurpose,
-    InstrumentType,
-} from '@/modules/tendering/emds/dto/emds.dto';
-import {
-    DD_STATUSES,
-    FDR_STATUSES,
-    BG_STATUSES,
-    CHEQUE_STATUSES,
-    BT_STATUSES,
-    PORTAL_STATUSES,
-} from '@/modules/tendering/emds/constants/emd-statuses';
+import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose, InstrumentType, } from '@/modules/tendering/emds/dto/emds.dto';
+import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 
@@ -74,8 +48,7 @@ export interface PaymentRequestRow {
     purpose: PaymentPurpose;
     amountRequired: string;
     dueDate: Date | null;
-    teamMemberId: number | null;
-    teamMemberName: string | null;
+    teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;
@@ -169,6 +142,31 @@ const mapInstrumentType = (mode: string): InstrumentType => {
     return mapping[mode] || 'DD';
 };
 
+/**
+ * Extract amount from details based on mode
+ * Used for non-TMS requests where amounts come from form fields
+ */
+const extractAmountFromDetails = (mode: string, details: any): number => {
+    switch (mode) {
+        case 'DD':
+            return Number(details.ddAmount) || 0;
+        case 'CHEQUE':
+            return Number(details.chequeAmount) || 0;
+        case 'FDR':
+            return Number(details.fdrAmount) || 0;
+        case 'BG':
+            return Number(details.bgAmount) || 0;
+        case 'BT':
+        case 'BANK_TRANSFER':
+            return Number(details.btAmount) || 0;
+        case 'POP':
+        case 'PORTAL':
+            return Number(details.portalAmount) || 0;
+        default:
+            return 0;
+    }
+};
+
 const getInitialInstrumentStatus = (instrumentType: InstrumentType): string => {
     switch (instrumentType) {
         case 'DD':
@@ -198,16 +196,6 @@ const deriveDisplayStatus = (instrumentStatus: string | null): string => {
     return 'Sent';
 };
 
-const getDisplayTab = (instrumentStatus: string | null): DashboardTab => {
-    if (!instrumentStatus) return 'sent';
-
-    if (instrumentStatus.includes(REJECTED_STATUS_PATTERN)) return 'rejected';
-    if (RETURNED_STATUSES.includes(instrumentStatus as any)) return 'returned';
-    if (APPROVED_STATUSES.includes(instrumentStatus as any)) return 'approved';
-
-    return 'sent';
-};
-
 @Injectable()
 export class EmdsService {
     private readonly logger = new Logger(EmdsService.name);
@@ -220,11 +208,9 @@ export class EmdsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly pdfGenerator: PdfGeneratorService,
     ) { }
 
-    /**
-     * Get dashboard data based on tab
-     */
     async getDashboardData(
         tab: DashboardTab = 'pending',
         userId?: number,
@@ -239,9 +225,6 @@ export class EmdsService {
         return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
     }
 
-    /**
-     * Get counts for all tabs
-     */
     async getDashboardCounts(userId?: number): Promise<DashboardCounts> {
         // STRICT: Only show active, approved, valid tenders for "To Do"
         const pendingCount = await this.countPendingTenders(userId);
@@ -263,9 +246,6 @@ export class EmdsService {
         };
     }
 
-    /**
-     * Single source of truth for Tab Status logic
-     */
     private getTabSqlCondition(tab: DashboardTab) {
         // Status matching logic
         const isRejected = sql`${paymentInstruments.status} LIKE ${'%' + REJECTED_STATUS_PATTERN}`;
@@ -287,12 +267,9 @@ export class EmdsService {
         }
     }
 
-    /**
-     * Optimized Count Query (Matches Database "True" Count)
-     */
     private async countRequestsByStatus(userId?: number): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
         const userCondition = userId
-            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
             : undefined;
 
         // Uses SQL Aggregation for performance
@@ -324,9 +301,6 @@ export class EmdsService {
         };
     }
 
-    /**
-     * Optimized List Query (Shows Ghost/Messy Records)
-     */
     private async getPaymentRequestsByTab(
         tab: DashboardTab,
         userId?: number,
@@ -335,7 +309,7 @@ export class EmdsService {
         counts?: DashboardCounts
     ): Promise<RequestTabResponse> {
         const userCondition = userId
-            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId.toString()))
+            ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
             : undefined;
 
         const page = pagination?.page || 1;
@@ -359,9 +333,9 @@ export class EmdsService {
         // Shared Where Clause
         // Critical: This matches countRequestsByStatus exactly
         const whereClause = and(
-            this.getTabSqlCondition(tab), // Use helper
+            this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
-            or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
+            or(eq(paymentRequests.tenderId, 0)),
             userCondition
         );
 
@@ -381,14 +355,14 @@ export class EmdsService {
             .select({
                 id: paymentRequests.id,
                 tenderId: paymentRequests.tenderId,
-                tenderNo: sql<string>`COALESCE(${tenderInfos.tenderNo}, ${paymentRequests.tenderNo})`.as('tenderNo'),
-                // Fallback for name to show users what this is
-                tenderName: sql<string>`COALESCE(${tenderInfos.tenderName}, ${paymentRequests.projectName}, 'N/A')`.as('tenderName'),
+                tenderNo: tenderInfos.tenderNo,
+                projectNo: paymentRequests.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
-                teamMemberId: tenderInfos.teamMember,
-                teamMemberName: users.name,
+                teamMember: users.name,
                 instrumentId: paymentInstruments.id,
                 instrumentType: paymentInstruments.instrumentType,
                 instrumentStatus: paymentInstruments.status,
@@ -396,7 +370,7 @@ export class EmdsService {
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
@@ -415,8 +389,7 @@ export class EmdsService {
             purpose: row.purpose as PaymentPurpose,
             amountRequired: row.amountRequired || '0',
             dueDate: row.dueDate,
-            teamMemberId: row.teamMemberId,
-            teamMemberName: row.teamMemberName,
+            teamMember: row.teamMember?.toString() ?? null,
             instrumentId: row.instrumentId,
             instrumentType: row.instrumentType as InstrumentType | null,
             instrumentStatus: row.instrumentStatus,
@@ -430,17 +403,8 @@ export class EmdsService {
         };
     }
 
-    /**
-     * Count pending tenders (tenders with requirements but no payment requests)
-     */
     private async countPendingTenders(userId?: number): Promise<number> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
-
-        // Subquery: tenders that have payment requests
-        const tendersWithRequests = this.db
-            .select({ tenderId: paymentRequests.tenderId })
-            .from(paymentRequests)
-            .groupBy(paymentRequests.tenderId);
 
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
@@ -470,9 +434,6 @@ export class EmdsService {
         return Number(result?.count || 0);
     }
 
-    /**
-     * Get pending tenders (1 row per tender)
-     */
     private async getPendingTenders(
         userId?: number,
         pagination?: { page?: number; limit?: number },
@@ -565,9 +526,6 @@ export class EmdsService {
         };
     }
 
-    /**
-     * Count tender-dnb tenders
-     */
     private async countTenderDnb(userId?: number): Promise<number> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
         const dnbStatusIds = StatusCache.getIds('dnb');
@@ -593,9 +551,6 @@ export class EmdsService {
         return Number(result?.count || 0);
     }
 
-    /**
-     * Get tender-dnb tenders (1 row per tender)
-     */
     private async getTenderDnbTenders(
         userId?: number,
         pagination?: { page?: number; limit?: number },
@@ -688,17 +643,37 @@ export class EmdsService {
         payload: CreatePaymentRequestDto,
         userId?: number
     ) {
-        const tender = await this.tenderInfosService.getTenderForPayment(tenderId);
+        // Check if this is a non-TMS request (Old Entries or Other Than Tender)
+        const isNonTmsRequest = payload.type === 'Old Entries' || payload.type === 'Other Than Tender';
 
-        // Get current tender status before update
-        const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+        let tender: any = null;
+        let currentTender: any = null;
+        let prevStatus: number | null = null;
+        let infoSheet: any = null;
 
-        const [infoSheet] = await this.db
-            .select()
-            .from(tenderInformation)
-            .where(eq(tenderInformation.tenderId, tenderId))
-            .limit(1);
+        // Only fetch tender data for TMS requests
+        if (!isNonTmsRequest && tenderId > 0) {
+            tender = await this.tenderInfosService.getTenderForPayment(tenderId);
+            currentTender = await this.tenderInfosService.findById(tenderId);
+            prevStatus = currentTender?.status ?? null;
+
+            [infoSheet] = await this.db
+                .select()
+                .from(tenderInformation)
+                .where(eq(tenderInformation.tenderId, tenderId))
+                .limit(1);
+        }
+
+        // For non-TMS requests, create a minimal tender object from payload
+        if (isNonTmsRequest) {
+            tender = {
+                tenderNo: payload.tenderNo || 'NA',
+                tenderName: payload.tenderName || null,
+                dueDate: payload.dueDate ? new Date(payload.dueDate) : null,
+                emd: null,
+                tenderFees: null,
+            };
+        }
 
         const createdRequests: PaymentRequest[] = [];
         const createdInstruments: Array<{ requestId: number; instrumentId: number; mode: string; purpose: PaymentPurpose; amount: number; details: any }> = [];
@@ -707,7 +682,11 @@ export class EmdsService {
         await this.db.transaction(async (tx) => {
             // Create EMD request if mode is provided
             if (payload.emd?.mode && payload.emd?.details) {
-                const emdAmount = Number(tender.emd) || 0;
+                // Use mode-specific amount for non-TMS requests, otherwise use tender amount
+                const emdAmount = isNonTmsRequest
+                    ? extractAmountFromDetails(payload.emd.mode, payload.emd.details)
+                    : Number(tender?.emd) || 0;
+
                 if (emdAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
@@ -715,7 +694,11 @@ export class EmdsService {
                         'EMD',
                         emdAmount,
                         tender,
-                        userId
+                        userId,
+                        payload.type,
+                        payload.tenderNo,
+                        payload.tenderName,
+                        payload.dueDate
                     );
                     createdRequests.push(request);
                     emdRequested = true;
@@ -736,12 +719,54 @@ export class EmdsService {
                         amount: emdAmount,
                         details: payload.emd.details,
                     });
+
+                    // For DD/FDR, create linked Cheque request
+                    if (payload.emd.mode === 'DD' || payload.emd.mode === 'FDR') {
+                        // Get the detail record ID that was just created
+                        const detailId = await this.getDetailIdForInstrument(
+                            tx,
+                            instrument.id,
+                            payload.emd.mode
+                        );
+
+                        if (detailId) {
+                            const chequeRequest = await this.createLinkedChequeRequest(
+                                tx,
+                                request.id,
+                                instrument.id,
+                                detailId,
+                                payload.emd.mode,
+                                payload.emd.details,
+                                emdAmount,
+                                tenderId,
+                                tender,
+                                userId,
+                                payload.type,
+                                payload.tenderNo,
+                                payload.tenderName,
+                                payload.dueDate
+                            );
+
+                            createdInstruments.push({
+                                requestId: chequeRequest.requestId,
+                                instrumentId: chequeRequest.instrumentId,
+                                mode: 'CHEQUE',
+                                purpose: 'EMD',
+                                amount: emdAmount,
+                                details: chequeRequest.details,
+                            });
+                        }
+                    }
                 }
             }
 
             // Create Tender Fee request if mode is provided
             if (payload.tenderFee?.mode && payload.tenderFee?.details) {
-                const tenderFeeAmount = Number(tender.tenderFees) || 0;
+                // Use mode-specific amount for non-TMS requests, otherwise use tender amount
+                const tenderFeeAmount = isNonTmsRequest
+                    ? extractAmountFromDetails(payload.tenderFee.mode, payload.tenderFee.details)
+                    : Number(tender?.tenderFees) || 0;
+
                 if (tenderFeeAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
@@ -749,7 +774,11 @@ export class EmdsService {
                         'Tender Fee',
                         tenderFeeAmount,
                         tender,
-                        userId
+                        userId,
+                        payload.type,
+                        payload.tenderNo,
+                        payload.tenderName,
+                        payload.dueDate
                     );
                     createdRequests.push(request);
 
@@ -773,14 +802,12 @@ export class EmdsService {
             }
 
             // Create Processing Fee request if mode is provided
-            if (
-                payload.processingFee?.mode &&
-                payload.processingFee?.details &&
-                infoSheet
-            ) {
-                const processingFeeAmount = infoSheet.processingFeeAmount
-                    ? Number(infoSheet.processingFeeAmount)
-                    : 0;
+            if (payload.processingFee?.mode && payload.processingFee?.details) {
+                // Use mode-specific amount for non-TMS requests, otherwise use infoSheet amount
+                const processingFeeAmount = isNonTmsRequest
+                    ? extractAmountFromDetails(payload.processingFee.mode, payload.processingFee.details)
+                    : (infoSheet?.processingFeeAmount ? Number(infoSheet.processingFeeAmount) : 0);
+
                 if (processingFeeAmount > 0) {
                     const request = await this.createPaymentRequest(
                         tx,
@@ -788,7 +815,11 @@ export class EmdsService {
                         'Processing Fee',
                         processingFeeAmount,
                         tender,
-                        userId
+                        userId,
+                        payload.type,
+                        payload.tenderNo,
+                        payload.tenderName,
+                        payload.dueDate
                     );
                     createdRequests.push(request);
 
@@ -812,7 +843,8 @@ export class EmdsService {
             }
 
             // AUTO STATUS CHANGE: Update tender status to 5 (EMD Requested) if EMD was requested
-            if (emdRequested && userId) {
+            // Only for TMS requests with valid tenderId
+            if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
                 const newStatus = 5; // Status ID for "EMD Requested"
                 await tx
                     .update(tenderInfos)
@@ -830,9 +862,32 @@ export class EmdsService {
             }
         });
 
-        // Send email notifications for each created instrument
+        // Generate PDFs for DD, FDR, and BG instruments (after transaction commits)
         for (const instrumentInfo of createdInstruments) {
-            await this.sendPaymentRequestEmail(tenderId, instrumentInfo, tender, userId || 0);
+            if (instrumentInfo.mode === 'DD' || instrumentInfo.mode === 'FDR' || instrumentInfo.mode === 'BG') {
+                try {
+                    await this.generatePdfsForInstrument(
+                        instrumentInfo.instrumentId,
+                        instrumentInfo.mode,
+                        instrumentInfo.requestId,
+                        tender,
+                        userId
+                    );
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to generate PDFs for instrument ${instrumentInfo.instrumentId} (${instrumentInfo.mode}): ${error instanceof Error ? error.message : String(error)}`
+                    );
+                    // Continue with other instruments even if PDF generation fails
+                }
+            }
+        }
+
+        // Send email notifications for each created instrument
+        // Only if we have a valid tender object
+        if (tender) {
+            for (const instrumentInfo of createdInstruments) {
+                await this.sendPaymentRequestEmail(tenderId || 0, instrumentInfo, tender, userId || 0);
+            }
         }
 
         return createdRequests;
@@ -844,18 +899,38 @@ export class EmdsService {
         purpose: PaymentPurpose,
         amount: number,
         tender: any,
-        userId?: number
+        userId?: number,
+        type?: string,
+        tenderNo?: string,
+        tenderName?: string,
+        dueDate?: string
     ): Promise<PaymentRequest> {
+        // Use payload values if provided, otherwise fall back to tender object
+        // For Old Entries or Other Than Tender, default to 'NA' if tender info is not available
+        const isNonTmsRequest = type === 'Old Entries' || type === 'Other Than Tender' || type === 'Other Than TMS';
+        const requestTenderNo = tenderNo || tender?.tenderNo || (isNonTmsRequest && tenderId === 0 ? 'NA' : 'NA');
+        const requestProjectName = tenderName || tender?.tenderName || (isNonTmsRequest && tenderId === 0 ? 'NA' : null);
+        const requestDueDate = dueDate
+            ? new Date(dueDate)
+            : (tender?.dueDate ? new Date(tender.dueDate) : null);
+
+        const requestType: 'TMS' | 'Other Than TMS' | 'Old Entries' | 'Other Than Tender' =
+            (type === 'Old Entries' || type === 'Other Than Tender' || type === 'Other Than TMS')
+                ? type
+                : 'TMS';
+
         const [request] = await tx
             .insert(paymentRequests)
             .values({
-                tenderId,
+                tenderId: tenderId || 0,
+                type: requestType,
                 purpose,
                 amountRequired: amount.toString(),
-                dueDate: tender.dueDate,
-                tenderNo: tender.tenderNo,
+                dueDate: requestDueDate,
+                tenderNo: requestTenderNo,
+                projectName: requestProjectName,
                 status: 'Pending',
-                requestedBy: userId?.toString() || null,
+                requestedBy: userId || null,
             })
             .returning();
 
@@ -878,8 +953,7 @@ export class EmdsService {
             instrumentType,
             amount: amount.toString(),
             status: initialStatus,
-            action: 1,
-            currentStage: 1,
+            action: 0,
             isActive: true,
         };
 
@@ -887,6 +961,7 @@ export class EmdsService {
         if (mode === 'DD' && details.ddFavouring) {
             instrumentData.favouring = details.ddFavouring;
             instrumentData.payableAt = details.ddPayableAt;
+            instrumentData.ddDeliverBy = details.ddDeliverBy;
             instrumentData.courierAddress = details.ddCourierAddress;
             instrumentData.courierDeadline = details.ddCourierHours
                 ? parseInt(details.ddCourierHours)
@@ -895,11 +970,18 @@ export class EmdsService {
                 ? new Date(details.ddDate).toISOString().split('T')[0]
                 : null;
             instrumentData.remarks = details.ddRemarks;
+        } else if (mode === 'CHEQUE' && details.chequeFavouring) {
+            instrumentData.favouring = details.chequeFavouring;
+            instrumentData.issueDate = details.chequeDate
+                ? new Date(details.chequeDate).toISOString().split('T')[0]
+                : null;
         } else if (mode === 'FDR' && details.fdrFavouring) {
             instrumentData.favouring = details.fdrFavouring;
             instrumentData.expiryDate = details.fdrExpiryDate
                 ? new Date(details.fdrExpiryDate).toISOString().split('T')[0]
                 : null;
+            instrumentData.fdrNeeds = details.fdrDeliverBy;
+            instrumentData.fdrPurpose = details.fdrPurpose;
             instrumentData.courierAddress = details.fdrCourierAddress;
             instrumentData.courierDeadline = details.fdrCourierHours
                 ? parseInt(details.fdrCourierHours)
@@ -928,8 +1010,8 @@ export class EmdsService {
             .values(instrumentData)
             .returning();
 
-        // Create detail record
-        await this.createInstrumentDetails(tx, instrument.id, mode, details);
+        // Create detail record and get detail ID (for DD/FDR linking)
+        const detailId = await this.createInstrumentDetails(tx, instrument.id, mode, details);
 
         // Record initial status in history
         await this.historyService.recordStatusChange(
@@ -952,9 +1034,9 @@ export class EmdsService {
         instrumentId: number,
         mode: string,
         details: any
-    ) {
-        if (mode === 'DD' || mode === 'CHEQUE') {
-            await tx.insert(instrumentDdDetails).values({
+    ): Promise<number | null> {
+        if (mode === 'DD') {
+            const [ddDetail] = await tx.insert(instrumentDdDetails).values({
                 instrumentId,
                 ddDate: details.ddDate
                     ? new Date(details.ddDate).toISOString().split('T')[0]
@@ -962,9 +1044,22 @@ export class EmdsService {
                 ddPurpose: details.ddPurpose,
                 ddNeeds: details.ddDeliverBy,
                 ddRemarks: details.ddRemarks,
+            }).returning();
+            return ddDetail?.id || null;
+        } else if (mode === 'CHEQUE') {
+            await tx.insert(instrumentChequeDetails).values({
+                instrumentId,
+                chequeDate: details.chequeDate
+                    ? new Date(details.chequeDate).toISOString().split('T')[0]
+                    : null,
+                chequeReason: details.chequePurpose,
+                chequeNeeds: details.chequeNeededIn,
+                bankName: details.chequeAccount,
+                linkedDdId: details.linkedDdId || null,
+                linkedFdrId: details.linkedFdrId || null,
             });
         } else if (mode === 'FDR') {
-            await tx.insert(instrumentFdrDetails).values({
+            const [fdrDetail] = await tx.insert(instrumentFdrDetails).values({
                 instrumentId,
                 fdrDate: details.fdrDate
                     ? new Date(details.fdrDate).toISOString().split('T')[0]
@@ -974,7 +1069,8 @@ export class EmdsService {
                     : null,
                 fdrPurpose: details.fdrPurpose,
                 fdrNeeds: details.fdrDeliverBy,
-            });
+            }).returning();
+            return fdrDetail?.id || null;
         } else if (mode === 'BG') {
             await tx.insert(instrumentBgDetails).values({
                 instrumentId,
@@ -990,12 +1086,17 @@ export class EmdsService {
                 beneficiaryName: details.bgFavouring,
                 beneficiaryAddress: details.bgAddress,
                 bankName: details.bgBank,
-                stampCharges: details.bgStampValue?.toString() || null,
+                stampCharges: details.bgStampValue != null ? String(details.bgStampValue) : null,
                 bgNeeds: details.bgNeededIn,
                 bgPurpose: details.bgPurpose,
                 bgClientUser: details.bgClientUserEmail,
                 bgClientCp: details.bgClientCpEmail,
                 bgClientFin: details.bgClientFinanceEmail,
+                bgBankAcc: details.bgBankAccountNo,
+                bgBankIfsc: details.bgBankIfsc,
+                bgPo: Array.isArray(details.bgPoFiles) && details.bgPoFiles.length > 0
+                    ? details.bgPoFiles[0]
+                    : details.bgPoFiles,
             });
         } else if (mode === 'BANK_TRANSFER' || mode === 'BT') {
             await tx.insert(instrumentTransferDetails).values({
@@ -1003,6 +1104,7 @@ export class EmdsService {
                 accountName: details.btAccountName,
                 accountNumber: details.btAccountNo,
                 ifsc: details.btIfsc,
+                reason: details.btPurpose,
             });
         } else if (mode === 'PORTAL' || mode === 'POP') {
             await tx.insert(instrumentTransferDetails).values({
@@ -1016,8 +1118,100 @@ export class EmdsService {
                             : null,
                 isNetbanking: details.portalNetBanking,
                 isDebit: details.portalDebitCard,
+                reason: details.portalPurpose,
             });
         }
+
+        return null;
+    }
+
+    private async getDetailIdForInstrument(
+        tx: DbInstance,
+        instrumentId: number,
+        mode: string
+    ): Promise<number | null> {
+        if (mode === 'DD') {
+            const [ddDetail] = await tx
+                .select({ id: instrumentDdDetails.id })
+                .from(instrumentDdDetails)
+                .where(eq(instrumentDdDetails.instrumentId, instrumentId))
+                .limit(1);
+            return ddDetail?.id || null;
+        } else if (mode === 'FDR') {
+            const [fdrDetail] = await tx
+                .select({ id: instrumentFdrDetails.id })
+                .from(instrumentFdrDetails)
+                .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                .limit(1);
+            return fdrDetail?.id || null;
+        }
+        return null;
+    }
+
+    private async createLinkedChequeRequest(
+        tx: DbInstance,
+        originalRequestId: number,
+        originalInstrumentId: number,
+        detailId: number | null,
+        mode: 'DD' | 'FDR',
+        originalDetails: any,
+        amount: number,
+        tenderId: number,
+        tender: any,
+        userId?: number,
+        type?: string,
+        tenderNo?: string,
+        tenderName?: string,
+        dueDate?: string
+    ): Promise<{ requestId: number; instrumentId: number; details: any }> {
+        // Create payment request (same tender details as original)
+        const chequeRequest = await this.createPaymentRequest(
+            tx,
+            tenderId,
+            'EMD',
+            amount,
+            tender,
+            userId,
+            type,
+            tenderNo,
+            tenderName,
+            dueDate
+        );
+
+        // Prepare cheque details from DD/FDR details
+        const chequeDetails: any = {
+            chequeFavouring: mode === 'DD' ? originalDetails.ddFavouring : originalDetails.fdrFavouring,
+            chequeAmount: amount,
+            chequeDate: new Date().toISOString().split('T')[0], // today
+            chequeNeededIn: mode === 'DD' ? originalDetails.ddDeliverBy : originalDetails.fdrDeliverBy,
+            chequePurpose: mode, // "DD" or "FDR"
+            chequeAccount: '', // Not required for linked cheque
+        };
+
+        // Set linked ID in details for createInstrumentDetails to use
+        if (detailId) {
+            if (mode === 'DD') {
+                chequeDetails.linkedDdId = detailId;
+            } else if (mode === 'FDR') {
+                chequeDetails.linkedFdrId = detailId;
+            }
+        }
+
+        // Create cheque instrument
+        const chequeInstrument = await this.createInstrumentWithDetails(
+            tx,
+            chequeRequest.id,
+            'CHEQUE',
+            chequeDetails,
+            amount,
+            userId
+        );
+
+        return {
+            requestId: chequeRequest.id,
+            instrumentId: chequeInstrument.id,
+            details: chequeDetails,
+        };
     }
 
     async findByTenderId(tenderId: number) {
@@ -1130,13 +1324,19 @@ export class EmdsService {
     ) {
         switch (instrumentType) {
             case 'DD':
-            case 'Cheque':
                 const [dd] = await this.db
                     .select()
                     .from(instrumentDdDetails)
                     .where(eq(instrumentDdDetails.instrumentId, instrumentId))
                     .limit(1);
                 return dd || null;
+            case 'Cheque':
+                const [cheque] = await this.db
+                    .select()
+                    .from(instrumentChequeDetails)
+                    .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+                    .limit(1);
+                return cheque || null;
             case 'FDR':
                 const [fdr] = await this.db
                     .select()
@@ -1254,6 +1454,11 @@ export class EmdsService {
                 ? new Date(details.ddDate).toISOString().split('T')[0]
                 : null;
             instrumentData.remarks = details.ddRemarks;
+        } else if (mode === 'CHEQUE' && details.chequeFavouring) {
+            instrumentData.favouring = details.chequeFavouring;
+            instrumentData.issueDate = details.chequeDate
+                ? new Date(details.chequeDate).toISOString().split('T')[0]
+                : null;
         } else if (mode === 'FDR' && details.fdrFavouring) {
             instrumentData.favouring = details.fdrFavouring;
             instrumentData.expiryDate = details.fdrExpiryDate
@@ -1291,7 +1496,7 @@ export class EmdsService {
         mode: string,
         details: any
     ): Promise<void> {
-        if (mode === 'DD' || mode === 'CHEQUE') {
+        if (mode === 'DD') {
             await this.db
                 .update(instrumentDdDetails)
                 .set({
@@ -1303,6 +1508,18 @@ export class EmdsService {
                     ddRemarks: details.ddRemarks,
                 })
                 .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+        } else if (mode === 'CHEQUE') {
+            await this.db
+                .update(instrumentChequeDetails)
+                .set({
+                    chequeDate: details.chequeDate
+                        ? new Date(details.chequeDate).toISOString().split('T')[0]
+                        : null,
+                    chequeReason: details.chequePurpose,
+                    chequeNeeds: details.chequeNeededIn,
+                    bankName: details.chequeAccount,
+                })
+                .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
         } else if (mode === 'FDR') {
             await this.db
                 .update(instrumentFdrDetails)
@@ -1333,9 +1550,17 @@ export class EmdsService {
                     beneficiaryName: details.bgFavouring,
                     beneficiaryAddress: details.bgAddress,
                     bankName: details.bgBank,
-                    stampCharges: details.bgStampValue?.toString() || null,
+                    stampCharges: details.bgStampValue ? details.bgStampValue.toString() : null,
                     bgNeeds: details.bgNeededIn,
                     bgPurpose: details.bgPurpose,
+                    bgClientUser: details.bgClientUserEmail,
+                    bgClientCp: details.bgClientCpEmail,
+                    bgClientFin: details.bgClientFinanceEmail,
+                    bgBankAcc: details.bgBankAccountNo,
+                    bgBankIfsc: details.bgBankIfsc,
+                    bgPo: Array.isArray(details.bgPoFiles) && details.bgPoFiles.length > 0
+                        ? details.bgPoFiles[0]
+                        : details.bgPoFiles,
                 })
                 .where(eq(instrumentBgDetails.instrumentId, instrumentId));
         } else if (mode === 'BANK_TRANSFER' || mode === 'BT') {
@@ -1345,6 +1570,7 @@ export class EmdsService {
                     accountName: details.btAccountName,
                     accountNumber: details.btAccountNo,
                     ifsc: details.btIfsc,
+                    reason: details.btPurpose,
                 })
                 .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
         } else if (mode === 'PORTAL' || mode === 'POP') {
@@ -1360,6 +1586,7 @@ export class EmdsService {
                                 : null,
                     isNetbanking: details.portalNetBanking,
                     isDebit: details.portalDebitCard,
+                    reason: details.portalPurpose,
                 })
                 .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
         }
@@ -1461,6 +1688,116 @@ export class EmdsService {
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
             // Don't throw - email failure shouldn't break main operation
+        }
+    }
+
+    /**
+     * Generate PDFs for DD, FDR, or BG instrument
+     */
+    private async generatePdfsForInstrument(
+        instrumentId: number,
+        mode: string,
+        requestId: number,
+        tender: any,
+        userId?: number
+    ): Promise<void> {
+        try {
+            // Fetch instrument and details
+            const [instrument] = await this.db
+                .select()
+                .from(paymentInstruments)
+                .where(eq(paymentInstruments.id, instrumentId))
+                .limit(1);
+
+            if (!instrument) {
+                this.logger.warn(`Instrument ${instrumentId} not found for PDF generation`);
+                return;
+            }
+
+            // Fetch request
+            const [request] = await this.db
+                .select()
+                .from(paymentRequests)
+                .where(eq(paymentRequests.id, requestId))
+                .limit(1);
+
+            if (!request) {
+                this.logger.warn(`Request ${requestId} not found for PDF generation`);
+                return;
+            }
+
+            // Fetch user info if userId provided
+            let user: any = null;
+            if (userId) {
+                user = await this.recipientResolver.getUserById(userId);
+            }
+
+            // Prepare PDF data based on instrument type
+            let pdfData: Record<string, any> = {
+                instrument,
+                request,
+                tender: tender || {},
+                user: user || {},
+                generatedAt: new Date(),
+            };
+
+            // Fetch instrument-specific details
+            if (mode === 'DD') {
+                const [ddDetails] = await this.db
+                    .select()
+                    .from(instrumentDdDetails)
+                    .where(eq(instrumentDdDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.ddDetails = ddDetails || {};
+            } else if (mode === 'FDR') {
+                const [fdrDetails] = await this.db
+                    .select()
+                    .from(instrumentFdrDetails)
+                    .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.fdrDetails = fdrDetails || {};
+            } else if (mode === 'BG') {
+                const [bgDetails] = await this.db
+                    .select()
+                    .from(instrumentBgDetails)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                    .limit(1);
+                pdfData.bgDetails = bgDetails || {};
+            }
+
+            // Generate PDFs
+            const templateType = mode === 'DD' || mode === 'FDR' ? 'chqCret' : 'bg';
+            // Wrap pdfData in 'data' object to match template expectations
+            const pdfPaths = await this.pdfGenerator.generatePdfs(
+                templateType,
+                { data: pdfData },
+                instrumentId,
+                mode
+            );
+
+            // Update instrument with PDF paths
+            if (pdfPaths.length > 0) {
+                const updateData: any = {
+                    generatedPdf: pdfPaths[0],
+                };
+
+                // Store additional PDFs in extraPdfPaths
+                if (pdfPaths.length > 1) {
+                    updateData.extraPdfPaths = JSON.stringify(pdfPaths.slice(1));
+                }
+
+                await this.db
+                    .update(paymentInstruments)
+                    .set(updateData)
+                    .where(eq(paymentInstruments.id, instrumentId));
+
+                this.logger.log(`Generated ${pdfPaths.length} PDF(s) for instrument ${instrumentId} (${mode})`);
+            }
+        } catch (error) {
+            this.logger.error(
+                `Error generating PDFs for instrument ${instrumentId} (${mode}): ${error instanceof Error ? error.message : String(error)}`
+            );
+            throw error; // Re-throw to be caught by caller
         }
     }
 

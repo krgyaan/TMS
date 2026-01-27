@@ -37,6 +37,8 @@ export const paths = {
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
         emdsTenderFees: "/tendering/emds-tenderfees",
         emdsTenderFeesCreate: (tenderId: number | string) => `/tendering/emds-tenderfees/create/${tenderId}`,
+        oldEmdsTenderFeesCreate: () => `/tendering/emds-tenderfees/old-entries/create`,
+        biOtherThanEmdsCreate: () => `/tendering/emds-tenderfees/bi-other-than-emds/create`,
         emdsTenderFeesEdit: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}/edit`,
         emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
         checklists: "/tendering/document-checklists",
