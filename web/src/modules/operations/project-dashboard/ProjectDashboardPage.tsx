@@ -1,6 +1,6 @@
 // src/pages/project-dashboard/ProjectDashboard.tsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Download, Eye, Plus, CheckCircle2, Clock, AlertCircle, MoreHorizontal, CreditCard } from "lucide-react";
 
 /* UI Components */
@@ -13,177 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import { useProjectsMaster } from "@/hooks/api/useProjects";
+import { useProjectDashboardDetails } from "./project-dashboard.hooks";
+import { FormProvider, useForm } from "react-hook-form";
+import SelectField from "@/components/form/SelectField";
 
-/* ================================
-   TYPES
-================================ */
-interface Project {
-    id: number;
-    project_name: string;
-    tender_id: number;
-}
-
-interface TenderDetails {
-    id: number;
-    number: string;
-    name: string;
-    par_gst: number;
-    par_amt: number;
-    wo_budget: number;
-    po_raised: number;
-    wo_raised: number;
-    expenses_done: number;
-    planned_gp: number;
-    planned_gp_percent: number;
-    actual_gp: number;
-    actual_gp_percent: number;
-    status: string;
-}
-
-interface PODetail {
-    id: number;
-    po_number: string;
-    created_at: string;
-    seller_name: string;
-    amount: number;
-    amount_paid: number;
-    status: "paid" | "partial" | "pending";
-}
-
-interface WODetail {
-    id: number;
-    wo_number: string;
-    wo_value: number;
-    ld_start_date: string;
-    max_ld_date: string;
-    pbg_applicable: boolean;
-    contract_agreement: boolean;
-}
-
-interface ImprestRecord {
-    id: number;
-    employee_name: string;
-    party_name: string;
-    project_name: string;
-    amount: number;
-    category: string;
-    remark: string;
-    status: "approved" | "pending" | "rejected";
-    approved_date: string | null;
-    proofs: string[];
-}
-
-/* ================================
-   DUMMY DATA
-================================ */
-const PROJECTS: Project[] = [
-    { id: 1, project_name: "Smart City Infrastructure - Phase 1", tender_id: 101 },
-    { id: 2, project_name: "Highway Development NH-44", tender_id: 102 },
-    { id: 3, project_name: "Metro Rail Extension - Blue Line", tender_id: 103 },
-    { id: 4, project_name: "Solar Power Plant Installation", tender_id: 104 },
-    { id: 5, project_name: "Water Treatment Facility Upgrade", tender_id: 105 },
-];
-
-const TENDER_DETAILS: TenderDetails = {
-    id: 101,
-    number: "TND-2024-00145",
-    name: "Smart City Infrastructure Development Project - Phase 1",
-    par_gst: 38135593,
-    par_amt: 6864407,
-    wo_budget: 35000000,
-    po_raised: 12500000,
-    wo_raised: 8750000,
-    expenses_done: 15250000,
-    planned_gp: 7627118,
-    planned_gp_percent: 20,
-    actual_gp: 6103390,
-    actual_gp_percent: 16,
-    status: "In Progress",
-};
-
-const PO_DETAILS: PODetail[] = [
-    { id: 1, po_number: "PO-2024-0145-001", created_at: "2024-11-15", seller_name: "ABC Steel Suppliers Pvt Ltd", amount: 4500000, amount_paid: 4500000, status: "paid" },
-    { id: 2, po_number: "PO-2024-0145-002", created_at: "2024-11-20", seller_name: "XYZ Cement Corporation", amount: 3200000, amount_paid: 1600000, status: "partial" },
-    { id: 3, po_number: "PO-2024-0145-003", created_at: "2024-11-25", seller_name: "Tech Solutions India", amount: 2800000, amount_paid: 0, status: "pending" },
-    { id: 4, po_number: "PO-2024-0145-004", created_at: "2024-12-01", seller_name: "Heavy Machinery Ltd", amount: 2000000, amount_paid: 2000000, status: "paid" },
-];
-
-const WO_DETAILS: WODetail = {
-    id: 1,
-    wo_number: "WO-2024-0145",
-    wo_value: 38135593,
-    ld_start_date: "2025-06-15",
-    max_ld_date: "2025-07-15",
-    pbg_applicable: true,
-    contract_agreement: true,
-};
-
-const IMPREST_RECORDS: ImprestRecord[] = [
-    {
-        id: 1,
-        employee_name: "Rajesh Kumar",
-        party_name: "Local Hardware Store",
-        project_name: "Smart City Infrastructure",
-        amount: 25000,
-        category: "Materials",
-        remark: "Emergency pipe fittings",
-        status: "approved",
-        approved_date: "2024-12-01",
-        proofs: ["receipt1.pdf"],
-    },
-    {
-        id: 2,
-        employee_name: "Priya Sharma",
-        party_name: "Transport Services",
-        project_name: "Smart City Infrastructure",
-        amount: 15000,
-        category: "Transport",
-        remark: "Site equipment transport",
-        status: "approved",
-        approved_date: "2024-12-03",
-        proofs: ["bill1.pdf", "bill2.pdf"],
-    },
-    {
-        id: 3,
-        employee_name: "Amit Patel",
-        party_name: "Electrical Supplies",
-        project_name: "Smart City Infrastructure",
-        amount: 35000,
-        category: "Electrical",
-        remark: "Cable and switches",
-        status: "pending",
-        approved_date: null,
-        proofs: [],
-    },
-    {
-        id: 4,
-        employee_name: "Sneha Gupta",
-        party_name: "Safety Equipment Co",
-        project_name: "Smart City Infrastructure",
-        amount: 18500,
-        category: "Safety",
-        remark: "PPE for workers",
-        status: "approved",
-        approved_date: "2024-12-05",
-        proofs: ["invoice.pdf"],
-    },
-    {
-        id: 5,
-        employee_name: "Vikram Singh",
-        party_name: "Office Supplies",
-        project_name: "Smart City Infrastructure",
-        amount: 8500,
-        category: "Miscellaneous",
-        remark: "Site office supplies",
-        status: "rejected",
-        approved_date: null,
-        proofs: [],
-    },
-];
-
-/* ================================
-   HELPERS
-================================ */
 const formatCurrency = (amount: number) => {
     return "₹ " + new Intl.NumberFormat("en-IN").format(amount);
 };
@@ -204,19 +38,35 @@ const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destr
         partial: "secondary",
         rejected: "destructive",
     };
-    return variants[status.toLowerCase()] || "secondary";
+    return status == "1" ? "default" : variants[status] || "outline";
 };
 
 /* ================================
    MAIN COMPONENT
 ================================ */
 export default function ProjectDashboardPage() {
-    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(1);
-    const navigate = useNavigate();
+    const form = useForm<{ projectId: number | null }>({
+        defaultValues: { projectId: null },
+    });
 
-    const imprestSum = useMemo(() => {
-        return IMPREST_RECORDS.filter(i => i.status === "approved").reduce((sum, i) => sum + i.amount, 0);
-    }, []);
+    const projectId = form.watch("projectId");
+
+    const navigate = useNavigate();
+    const { data: projects = [] } = useProjectsMaster();
+    // console.log("Projects Data:", projects);
+    const { data: projectDetails, isLoading } = useProjectDashboardDetails(projectId);
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center">Loading project details...</div>;
+    }
+    // const { tender = [], woBasicDetail = [], woDetail = [], imprests = [], purchaseOrders = [] } = projectDetails;
+
+    const tender = projectDetails?.tender ?? [];
+    const woBasicDetail = projectDetails?.woBasicDetail ?? {};
+    const woDetail = projectDetails?.woDetail ?? [];
+    const imprests = projectDetails?.imprests ?? [];
+    const purchaseOrders = projectDetails?.purchaseOrders ?? [];
+    console.log("Project Details Data:", projectDetails);
 
     return (
         <div className="min-h-screen bg-background py-6">
@@ -229,25 +79,26 @@ export default function ProjectDashboardPage() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 ">
                             <div>
-                                <label className="text-sm font-medium mb-2 block">Select Project</label>
-                                <Select value={selectedProjectId?.toString()} onValueChange={v => setSelectedProjectId(Number(v))}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="-- Select Project --" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {PROJECTS.map(project => (
-                                            <SelectItem key={project.id} value={project.id.toString()}>
-                                                {project.project_name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <FormProvider {...form}>
+                                    <SelectField
+                                        control={form.control}
+                                        name="projectId"
+                                        label="Select Project"
+                                        placeholder="-- Select Project --"
+                                        options={projects.map(p => ({
+                                            id: String(p.id),
+                                            name: p.projectName,
+                                        }))}
+                                    />
+                                </FormProvider>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                {selectedProjectId && (
+                {projectId && isLoading && <div className="min-h-screen flex items-center justify-center">Loading project details...</div>}
+
+                {projectId && projectDetails && (
                     <>
                         {/* Project Details Table */}
                         <Card>
@@ -278,19 +129,19 @@ export default function ProjectDashboardPage() {
                                     </TableHeader>
                                     <TableBody>
                                         <TableRow className="px-2">
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.par_gst)}</TableCell>
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.par_amt)}</TableCell>
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.wo_budget)}</TableCell>
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.po_raised)}</TableCell>
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.wo_raised)}</TableCell>
-                                            <TableCell>{formatCurrency(TENDER_DETAILS.expenses_done)}</TableCell>
+                                            <TableCell>{woBasicDetail.parGst ? formatCurrency(Number(woBasicDetail.parGst)) : "-"}</TableCell>
+                                            <TableCell>{woBasicDetail.parAmt ? formatCurrency(Number(woBasicDetail.parAmt)) : "-"}</TableCell>
+                                            <TableCell>{woBasicDetail.budget ? formatCurrency(Number(woBasicDetail.budget)) : "-"}</TableCell>
+                                            <TableCell>{woBasicDetail.poRaised ? formatCurrency(Number(woBasicDetail.poRaised)) : "-"}</TableCell>
+                                            <TableCell>{woBasicDetail.woRaised ? formatCurrency(Number(woBasicDetail.woRaised)) : "-"}</TableCell>
+                                            <TableCell>{woBasicDetail.expenses_done ? formatCurrency(Number(woBasicDetail.expenses_done)) : "-"}</TableCell>
                                             <TableCell>
-                                                {formatCurrency(TENDER_DETAILS.planned_gp)}
-                                                <span className="text-muted-foreground text-xs ml-1">({TENDER_DETAILS.planned_gp_percent}%)</span>
+                                                {"-"}
+                                                {/* <span className="text-muted-foreground text-xs ml-1">("-")</span> */}
                                             </TableCell>
                                             <TableCell>
-                                                {formatCurrency(TENDER_DETAILS.actual_gp)}
-                                                <span className="text-muted-foreground text-xs ml-1">({TENDER_DETAILS.actual_gp_percent}%)</span>
+                                                {"-"}
+                                                {/* <span className="text-muted-foreground text-xs ml-1">("-")</span> */}
                                             </TableCell>
                                         </TableRow>
                                     </TableBody>
@@ -316,20 +167,20 @@ export default function ProjectDashboardPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {PO_DETAILS.length > 0 ? (
-                                            PO_DETAILS.map(po => (
+                                        {purchaseOrders.length > 0 ? (
+                                            purchaseOrders.map(po => (
                                                 <TableRow key={po.id}>
-                                                    <TableCell className="font-mono text-sm">{po.po_number}</TableCell>
-                                                    <TableCell>{formatDate(po.created_at)}</TableCell>
-                                                    <TableCell>{po.seller_name}</TableCell>
+                                                    <TableCell className="font-mono text-sm">{po.poNumber}</TableCell>
+                                                    <TableCell>{formatDate(po.createdAt)}</TableCell>
+                                                    <TableCell>{po.sellerName}</TableCell>
                                                     <TableCell>{formatCurrency(po.amount)}</TableCell>
-                                                    <TableCell>{formatCurrency(po.amount_paid)}</TableCell>
+                                                    <TableCell>{formatCurrency(po.amountPaid)}</TableCell>
                                                     <TableCell>
                                                         <div className="flex gap-1">
                                                             <Button size="sm" variant="outline">
                                                                 Raise Payment
                                                             </Button>
-                                                            <Button size="sm" variant="outline" onClick={() => navigate(paths.operations.viewPoPage)}>
+                                                            <Button size="sm" variant="outline" onClick={() => navigate(paths.operations.viewPoPage(po.id))}>
                                                                 View
                                                             </Button>
                                                             <Button size="sm" variant="outline">
@@ -371,12 +222,12 @@ export default function ProjectDashboardPage() {
                                     </TableHeader>
                                     <TableBody>
                                         <TableRow>
-                                            <TableCell className="font-mono text-sm">{WO_DETAILS.wo_number}</TableCell>
-                                            <TableCell>{formatCurrency(WO_DETAILS.wo_value)}</TableCell>
-                                            <TableCell>{formatDate(WO_DETAILS.ld_start_date)}</TableCell>
-                                            <TableCell>{formatDate(WO_DETAILS.max_ld_date)}</TableCell>
-                                            <TableCell>{WO_DETAILS.pbg_applicable ? "Yes" : "No"}</TableCell>
-                                            <TableCell>{WO_DETAILS.contract_agreement ? "Yes" : "No"}</TableCell>
+                                            <TableCell className="font-mono text-sm">{woBasicDetail.number}</TableCell>
+                                            <TableCell>{formatCurrency(woBasicDetail.parGst)}</TableCell>
+                                            <TableCell>{formatDate(woBasicDetail.ldStartDate)}</TableCell>
+                                            <TableCell>{formatDate(woBasicDetail.maxLdDate)}</TableCell>
+                                            <TableCell>{woBasicDetail.pbgApplicable ? "Yes" : "No"}</TableCell>
+                                            <TableCell>{woBasicDetail.contractAgreement ? "Yes" : "No"}</TableCell>
                                             <TableCell>
                                                 <div className="flex gap-1">
                                                     <Button size="sm" variant="outline">
@@ -397,11 +248,11 @@ export default function ProjectDashboardPage() {
                         </Card>
 
                         {/* Imprest Total */}
-                        {IMPREST_RECORDS.length > 0 && (
+                        {imprests.length > 0 && (
                             <div className="flex justify-end">
                                 <div className="bg-muted/50 border rounded-md px-4 py-3 flex items-center gap-4">
                                     <span className="text-sm text-muted-foreground">Imprest Total Amount</span>
-                                    <span className="text-lg font-bold">{formatCurrency(imprestSum)}</span>
+                                    <span className="text-lg font-bold">{formatCurrency(Number(projectDetails.imprestSum))}</span>
                                 </div>
                             </div>
                         )}
@@ -427,24 +278,22 @@ export default function ProjectDashboardPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {IMPREST_RECORDS.length > 0 ? (
-                                            IMPREST_RECORDS.map(imprest => (
+                                        {imprests.length > 0 ? (
+                                            imprests.map(imprest => (
                                                 <TableRow key={imprest.id}>
-                                                    <TableCell>{imprest.employee_name}</TableCell>
-                                                    <TableCell>{imprest.party_name}</TableCell>
-                                                    <TableCell>{imprest.project_name}</TableCell>
+                                                    <TableCell>{imprest.userId}</TableCell>
+                                                    <TableCell>{imprest.partyName}</TableCell>
+                                                    <TableCell>{imprest.projectName}</TableCell>
                                                     <TableCell>{formatCurrency(imprest.amount)}</TableCell>
                                                     <TableCell>{imprest.category}</TableCell>
                                                     <TableCell>{imprest.remark}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant={getStatusBadgeVariant(imprest.status)}>
-                                                            {imprest.status.charAt(0).toUpperCase() + imprest.status.slice(1)}
-                                                        </Badge>
+                                                        <Badge variant={getStatusBadgeVariant(imprest.status)}>{imprest.status == "1" ? "Approved" : "Pending"}</Badge>
                                                     </TableCell>
-                                                    <TableCell>{imprest.approved_date ? formatDate(imprest.approved_date) : "-"}</TableCell>
+                                                    <TableCell>{imprest.approvedDate ? formatDate(imprest.approvedDate) : "-"}</TableCell>
                                                     <TableCell>
-                                                        {imprest.proofs.length > 0 ? (
-                                                            imprest.proofs.map((proof, idx) => (
+                                                        {imprest.invoiceProof.length > 0 ? (
+                                                            imprest.invoiceProof.map((proof, idx) => (
                                                                 <Button key={idx} size="sm" variant="outline" className="mr-1">
                                                                     View
                                                                 </Button>
@@ -467,13 +316,6 @@ export default function ProjectDashboardPage() {
                             </CardContent>
                         </Card>
                     </>
-                )}
-
-                {/* Empty State */}
-                {!selectedProjectId && (
-                    <Card>
-                        <CardContent className="py-12 text-center text-muted-foreground">Please select a project to view details.</CardContent>
-                    </Card>
                 )}
             </div>
         </div>

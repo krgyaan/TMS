@@ -54,7 +54,7 @@ export default function OperationsRoutes() {
                 }
             />
             <Route
-                path="project-dashboard/purchase-order/view"
+                path="project-dashboard/purchase-order/:id/view"
                 element={
                     <RouteWrapper>
                         <Operations_ViewPoPage />
