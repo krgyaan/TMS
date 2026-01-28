@@ -149,7 +149,9 @@ export default function ViewPoPage() {
     const navigate = useNavigate();
     const { id } = useParams();
 
-    const po = DUMMY_PO;
+    const poId = Number(id);
+
+    // const { data: poData } = {}; //Hook to be implemented
 
     const handlePrint = () => {
         window.print();
