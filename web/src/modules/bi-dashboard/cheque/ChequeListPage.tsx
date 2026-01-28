@@ -12,37 +12,38 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
 import { ChequeActionForm } from './components/ChequeActionForm';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { formatDate } from '@/hooks/useFormatedDate';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
         key: 'cheque-pending',
-        name: 'Cheque Pending',
+        name: 'Pending',
         icon: <Clock className="h-4 w-4" />,
         description: 'Pending cheques',
     },
     {
         key: 'cheque-payable',
-        name: 'Cheque Payable',
+        name: 'Payable',
         icon: <CheckCircle className="h-4 w-4" />,
         description: 'Payable cheques',
     },
     {
         key: 'cheque-paid-stop',
-        name: 'Cheque Paid/stop',
+        name: 'Paid/stop',
         icon: <CheckCircle className="h-4 w-4" />,
         description: 'Paid or stopped cheques',
     },
     {
         key: 'cheque-for-security',
-        name: 'Cheque for Security',
+        name: 'For Security',
         icon: <Shield className="h-4 w-4" />,
         description: 'Cheques for security deposits',
     },
     {
         key: 'cheque-for-dd-fdr',
-        name: 'Cheque for DD/FDR',
+        name: 'For DD/FDR',
         icon: <Link className="h-4 w-4" />,
         description: 'Cheques for DD/FDR',
     },
@@ -69,10 +70,10 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('payable') || statusLower.includes('paid')) {
+    if (statusLower.includes('accepted')) {
         return 'default';
     }
-    if (statusLower.includes('cancelled') || statusLower.includes('rejected') || statusLower.includes('expired')) {
+    if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
     }
     return 'secondary';
@@ -143,16 +144,18 @@ const ChequeListPage = () => {
 
     const colDefs = useMemo<ColDef<ChequeDashboardRow>[]>(
         () => [
-            dateCol<ChequeDashboardRow>('date', {
-                headerName: 'Date',
-                width: 120,
-                colId: 'date',
+            {
+                field: 'cheque',
+                headerName: 'Cheque Date',
+                width: 130,
+                colId: 'cheque',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'chequeNo',
                 headerName: 'Cheque No',
-                width: 130,
+                width: 120,
                 colId: 'chequeNo',
                 valueGetter: (params) => params.data?.chequeNo || '—',
                 sortable: true,
@@ -161,58 +164,67 @@ const ChequeListPage = () => {
             {
                 field: 'payeeName',
                 headerName: 'Payee name',
-                width: 180,
+                maxWidth: 230,
                 colId: 'payeeName',
                 valueGetter: (params) => params.data?.payeeName || '—',
                 sortable: true,
                 filter: true,
             },
-            dateCol<ChequeDashboardRow>('bidValidity', {
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 90,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
-            currencyCol<ChequeDashboardRow>('amount', {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 100,
                 colId: 'amount',
                 sortable: true,
-            }),
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const amount = params.data?.amount;
+                    if (!amount) return '—';
+                    return <span className="text-right">{formatINR(parseFloat(amount.toString()))}</span>;
+                },
+            },
             {
                 field: 'type',
                 headerName: 'Type',
-                width: 120,
+                width: 80,
                 colId: 'type',
                 valueGetter: (params) => params.data?.type || '—',
                 sortable: true,
                 filter: true,
             },
             {
-                field: 'cheque',
-                headerName: 'Cheque',
-                width: 120,
-                colId: 'cheque',
-                valueGetter: (params) => params.data?.cheque || '—',
-                sortable: true,
-                filter: true,
-            },
-            dateCol<ChequeDashboardRow>('dueDate', {
+                field: 'dueDate',
                 headerName: 'Due Date',
                 width: 130,
                 colId: 'dueDate',
                 sortable: true,
-            }),
-            dateCol<ChequeDashboardRow>('expiry', {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            {
+                field: 'expiry',
                 headerName: 'Expiry',
-                width: 120,
+                width: 90,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return '—';
+                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                },
+            },
             {
                 field: 'chequeStatus',
                 headerName: 'Cheque Status',
-                width: 150,
+                width: 130,
                 colId: 'chequeStatus',
                 sortable: true,
                 filter: true,
@@ -386,8 +398,6 @@ const ChequeListPage = () => {
                         chequeNo: selectedInstrument.chequeNo || undefined,
                         chequeDate: selectedInstrument.date || undefined,
                         amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
                     }}
                 />
             )}

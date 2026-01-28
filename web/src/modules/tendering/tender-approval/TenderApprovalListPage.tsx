@@ -218,7 +218,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data.timer;

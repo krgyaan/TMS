@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>DD Cancellation Request</title>
+    <style>
+        * {
+            padding: 0px;
+            margin: 0px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .subject {
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .content {
+            margin-bottom: 20px;
+        }
+
+        .signature {
+            margin-top: 30px;
+        }
+
+        .no-border {
+            border: none;
+        }
+
+        .full-width {
+            width: 100%;
+        }
+
+        .border-collapse {
+            border-collapse: collapse;
+        }
+
+        .bordered {
+            border: 1px solid;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .padding-8 {
+            padding: 8px;
+        }
+
+        /* === Footer Styles === */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #fff;
+        }
+
+        .footer-line {
+            width: 100%;
+            height: 2px;
+            background: #000;
+        }
+
+        .footer-content {
+            padding: 8px 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="border-top: 10px solid #333; border-bottom: 5px solid #f04e23;"></div>
+    <div style="padding: 12px 0; font-family: sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="width: 100%;">
+            <tr>
+                <!-- Left: Logo -->
+                <td style="width: 50%; padding-left: 20px;">
+                    <img src="data:image/png;base64,{{ img_logo_base64 }}"
+                        alt="Volks Energie Logo" style="height: 60px;">
+                </td>
+
+                <!-- Right: Contact Info -->
+                <td style="width: 50%; text-align: right; font-size: 10px; color: #333; padding-right: 20px;">
+                    <div>
+                        B-1/D8, 2nd floor,<br>
+                        Mohan Cooperative Industrial Estate,<br>
+                        New Delhi 110044
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_phone_base64 }}"
+                            alt="Phone" style="height: 12px; vertical-align: middle;">
+                        +91 9650393636, +91 9654551781<br>
+                        Accounts: +91 8882591733
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_email_base64 }}"
+                            alt="Email" style="height: 12px; vertical-align: middle;">
+                        contact@volksenergie.in
+                    </div>
+                    <div>
+                        <img src="data:image/png;base64,{{ img_web_base64 }}"
+                            alt="Website" style="height: 12px; vertical-align: middle;">
+                        www.volksenergie.in
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <hr />
+    </div>
+    <div class="wrapper" style="padding:0 12px 0 48px">
+        <div class="header">
+            <p>
+                To,<br>
+                Yes Bank<br>
+                The Branch Manager<br>
+                Nehru Place<br>
+                New Delhi, 110019
+            </p>
+
+            <p>Date: {{ current_date }}</p>
+        </div>
+
+        <div class="subject">
+            Subject: Request for DD Cancellation
+        </div>
+
+        <div class="content">
+            <p>Dear Sir,</p>
+
+            <p>You are hereby requested to cancel the mentioned Demand Draft with no. <b>{{ dd_no }}</b>,
+                which was issued by your bank on {{ dd_date }} for <b>Rs.
+                    {{ amount }}</b>, in favour of
+                <b>{{ beneficiary_name_upper }}</b>. The DD has not been used as the tender was
+                lost.
+            </p>
+
+            <p>
+                Please cancel and credit the amount to our:<br>
+                Account No.: 003084600002011<br>
+                IFSC Code: YESB0000030
+            </p>
+
+            <p>If any charges are incurred, please debit our account.</p>
+
+            <p>Thank you.</p>
+        </div>
+
+        <div class="signature">
+            <p>
+                Best Regards,<br>
+                Piyush Goyal<br>
+                (CEO)<br>
+                Volks Energie Pvt Ltd
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-content">
+            <table width="100%" style="font-size: 12px; color: #555;">
+                <tr>
+                    <td style="text-align: left;"><b>CIN: </b>U40100DL2011PTC228907</td>
+                    <td style="text-align: center;"><b>PAN: </b>AADCV9386C</td>
+                    <td style="text-align: right;"><b>MSME: </b>UDYAM-DL-0900000465</td>
+                </tr>
+            </table>
+        </div>
+        <div class="footer-line"></div>
+    </div>
+</body>
+
+</html>

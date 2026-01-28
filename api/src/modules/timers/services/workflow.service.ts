@@ -905,7 +905,7 @@ export class WorkflowService {
                 .limit(1);
 
             if (!step) {
-                this.logger.debug(`No step found for ${entityType} ${entityId} with stepKey ${stepKey}`);
+                // this.logger.debug(`No step found for ${entityType} ${entityId} with stepKey ${stepKey}`);
                 return {
                     hasTimer: false,
                     remainingSeconds: 0,

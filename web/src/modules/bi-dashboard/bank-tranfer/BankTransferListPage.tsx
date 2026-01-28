@@ -12,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
 import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { BankTransferActionForm } from './components/BankTransferActionForm';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const TABS_CONFIG: Array<{ key: BankTransferDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -128,10 +130,18 @@ const BankTransferListPage = () => {
 
     const colDefs = useMemo<ColDef<BankTransferDashboardRow>[]>(
         () => [
-            dateCol<BankTransferDashboardRow>('date', {
+            {
+                field: 'date',
                 headerName: 'Date',
-                width: 120,
+                width: 110,
                 colId: 'date',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            tenderNameCol<BankTransferDashboardRow>('tenderNo', {
+                headerName: 'Tender Name',
+                width: 200,
+                colId: 'tenderNo',
                 sortable: true,
             }),
             {
@@ -161,18 +171,14 @@ const BankTransferListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            tenderNameCol<BankTransferDashboardRow>('tenderNo', {
-                headerName: 'Tender Name',
-                width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-            }),
-            dateCol<BankTransferDashboardRow>('bidValidity', {
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 100,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
@@ -182,16 +188,18 @@ const BankTransferListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            currencyCol<BankTransferDashboardRow>('amount', {
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 100,
                 colId: 'amount',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             {
                 field: 'btStatus',
                 headerName: 'BT Status',
-                width: 130,
+                width: 100,
                 colId: 'btStatus',
                 sortable: true,
                 filter: true,

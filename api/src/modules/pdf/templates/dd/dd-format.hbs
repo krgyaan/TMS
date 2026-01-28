@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demand Draft Format</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #000;
+            padding: 10mm;
+            width: 900px;
+            height: 500px;
+        }
+        .dd-container {
+            border: 2px solid #000;
+            padding: 15px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .dd-header {
+            text-align: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .dd-header h1 {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .dd-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .dd-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .dd-label {
+            font-weight: bold;
+            min-width: 120px;
+        }
+        .dd-value {
+            flex: 1;
+            border-bottom: 1px dotted #000;
+            min-height: 20px;
+        }
+        .dd-amount-section {
+            border: 1px solid #000;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        .dd-amount-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .dd-footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .dd-signature {
+            text-align: center;
+            width: 200px;
+        }
+        .dd-signature-line {
+            border-top: 1px solid #000;
+            margin-top: 40px;
+            padding-top: 5px;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dd-container">
+        <div class="dd-header">
+            <h1>DEMAND DRAFT</h1>
+        </div>
+
+        <div class="dd-body">
+            <div>
+                <div class="dd-row">
+                    <span class="dd-label">DD No:</span>
+                    <span class="dd-value">{{#if data.ddDetails.ddNo}}{{data.ddDetails.ddNo}}{{else}}_________________{{/if}}</span>
+                </div>
+                <div class="dd-row">
+                    <span class="dd-label">Date:</span>
+                    <span class="dd-value">{{#if data.instrument.issueDate}}{{formatDate data.instrument.issueDate}}{{else}}_________________{{/if}}</span>
+                </div>
+                <div class="dd-row">
+                    <span class="dd-label">Pay:</span>
+                    <span class="dd-value">{{#if data.instrument.favouring}}{{data.instrument.favouring}}{{else}}_________________{{/if}}</span>
+                </div>
+                {{#if data.instrument.payableAt}}
+                <div class="dd-row">
+                    <span class="dd-label">Payable At:</span>
+                    <span class="dd-value">{{data.instrument.payableAt}}</span>
+                </div>
+                {{/if}}
+            </div>
+
+            <div class="dd-amount-section">
+                <div class="dd-amount-row">
+                    <span><strong>Amount:</strong></span>
+                    <span><strong>{{formatCurrency data.instrument.amount}}</strong></span>
+                </div>
+                {{#if data.tender}}
+                <div class="dd-amount-row">
+                    <span>Tender No:</span>
+                    <span>{{data.tender.tenderNo}}</span>
+                </div>
+                {{/if}}
+            </div>
+
+            {{#if data.ddDetails.ddPurpose}}
+            <div class="dd-row">
+                <span class="dd-label">Purpose:</span>
+                <span class="dd-value">{{data.ddDetails.ddPurpose}}</span>
+            </div>
+            {{/if}}
+        </div>
+
+        <div class="dd-footer">
+            <div class="dd-signature">
+                <div class="dd-signature-line">
+                    Authorized Signatory
+                </div>
+            </div>
+            <div class="dd-signature">
+                <div class="dd-signature-line">
+                    Bank Official
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

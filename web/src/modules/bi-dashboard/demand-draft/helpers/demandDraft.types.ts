@@ -15,12 +15,12 @@ export interface DemandDraftDashboardRow {
     ddNo: string | null;
     beneficiaryName: string | null;
     ddAmount: number | null;
-    tenderName: string | null;
     tenderNo: string | null;
+    tenderName: string | null;
     bidValidity: Date | null;
     tenderStatus: string | null;
-    member: string | null;
-    expiry: Date | null;
+    teamMember: string | null;
+    expiry: string | null;
     ddStatus: string | null;
 }
 

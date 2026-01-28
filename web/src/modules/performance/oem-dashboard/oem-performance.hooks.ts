@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchOemSummary, fetchOemTenders, fetchOemNotAllowed, fetchOemRfqs, fetchOemTrends, fetchOemScoring } from "./oem-performance.api";
+import { fetchOemSummary, fetchOemTenders, fetchOemNotAllowed, fetchOemRfqs, fetchOemTrends, fetchOemScoring, fetchOemOutcomes } from "./oem-performance.api";
 
 interface Params {
     oemId: number;
@@ -53,5 +53,13 @@ export function useOemScoring(params: Params, enabled: boolean) {
         queryKey: ["oem-scoring", params],
         queryFn: () => fetchOemScoring(params),
         enabled,
+    });
+}
+
+export function useOemOutcomes(params: Params | null) {
+    return useQuery({
+        queryKey: ["oem-outcomes", params],
+        queryFn: () => fetchOemOutcomes(params!),
+        enabled: !!params,
     });
 }

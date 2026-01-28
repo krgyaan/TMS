@@ -460,6 +460,21 @@ export class TenderApprovalService {
             updateData.status = 3; // Tender Info approved
             newStatus = 3;
             statusComment = 'Tender info approved';
+
+            // Update tender values from info sheet
+            const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+            if (infoSheet) {
+                // Convert numeric values to string for decimal fields
+                if (infoSheet.tenderValue !== null && infoSheet.tenderValue !== undefined) {
+                    updateData.gstValues = String(infoSheet.tenderValue);
+                }
+                if (infoSheet.tenderFeeAmount !== null && infoSheet.tenderFeeAmount !== undefined) {
+                    updateData.tenderFees = String(infoSheet.tenderFeeAmount);
+                }
+                if (infoSheet.emdAmount !== null && infoSheet.emdAmount !== undefined) {
+                    updateData.emd = String(infoSheet.emdAmount);
+                }
+            }
         } else if (payload.tlStatus === '2') {
             // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
             updateData.tlRejectionRemarks = payload.tlRejectionRemarks;

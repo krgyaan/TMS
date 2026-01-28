@@ -37,6 +37,8 @@ export const paths = {
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
         emdsTenderFees: "/tendering/emds-tenderfees",
         emdsTenderFeesCreate: (tenderId: number | string) => `/tendering/emds-tenderfees/create/${tenderId}`,
+        oldEmdsTenderFeesCreate: () => `/tendering/emds-tenderfees/old-entries/create`,
+        biOtherThanEmdsCreate: () => `/tendering/emds-tenderfees/bi-other-than-emds/create`,
         emdsTenderFeesEdit: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}/edit`,
         emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
         checklists: "/tendering/document-checklists",
@@ -85,6 +87,10 @@ export const paths = {
         workOrder: "/operations/work-order",
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
+
+        projectDashboard: "/operations/project-dashboard",
+        raisePoForm: "/operations/project-dashboard/purchase-order/create",
+        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
     },
 
     // ==================== SERVICES ====================

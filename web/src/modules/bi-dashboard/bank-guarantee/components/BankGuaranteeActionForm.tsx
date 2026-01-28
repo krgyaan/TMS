@@ -155,7 +155,7 @@ export function BankGuaranteeActionForm({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="!max-w-1/2 w-full max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Bank Guarantee Action Form</DialogTitle>
                     <DialogDescription>
@@ -168,17 +168,13 @@ export function BankGuaranteeActionForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         {/* Action Selection */}
-                        <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(_field) => (
-                                <SelectField
-                                    label="Choose What to do"
-                                    control={form.control}
-                                    name="action"
-                                    options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
-                                />
-                            )}
-                        </FieldWrapper>
+                        <SelectField
+                            label="Choose What to do"
+                            control={form.control}
+                            name="action"
+                            options={ACTION_OPTIONS}
+                            placeholder="Select an action"
+                        />
 
                         {/* Accounts Form (BG) 1 - Request to Bank */}
                         <ConditionalSection show={action === 'accounts-form-1'}>

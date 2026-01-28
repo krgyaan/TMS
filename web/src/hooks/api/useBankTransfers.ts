@@ -56,6 +56,7 @@ export const useBankTransferDashboardCounts = () => {
 
 export const useUpdateBankTransferAction = () => {
     const queryClient = useQueryClient();
+    console.log('Action Form called');
 
     return useMutation({
         mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
@@ -63,6 +64,10 @@ export const useUpdateBankTransferAction = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.all });
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.counts() });
+            console.log('useUpdateBankTransferAction onSuccess called');
+        },
+        onError: (error: any) => {
+            console.log('useUpdateBankTransferAction onError called', error);
         },
     });
 };

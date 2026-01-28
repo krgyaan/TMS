@@ -69,6 +69,7 @@ const navMain: NavGroup[] = [
             { title: "Work Order", url: paths.operations.workOrder, permission: "work-orders" },
             { title: "Kick Off", url: paths.operations.kickOff, permission: "kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "contract-agreement" },
+            { title: "Project Dashboard", url: paths.operations.projectDashboard, permission: "project-dashboard" },
         ],
     },
     {

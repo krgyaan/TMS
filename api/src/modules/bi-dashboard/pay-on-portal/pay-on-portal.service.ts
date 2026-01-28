@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -15,6 +15,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import { PORTAL_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 
 @Injectable()
@@ -25,6 +26,52 @@ export class PayOnPortalService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
     ) { }
+
+    private statusMap() {
+        return {
+            [PORTAL_STATUSES.PENDING]: 'Pending',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
+            [PORTAL_STATUSES.SETTLED_WITH_PROJECT]: 'Settled',
+        };
+    }
+
+    private buildPopDashboardConditions(tab?: string) {
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'Portal Payment'),
+            eq(paymentInstruments.isActive, true),
+        ];
+
+        if (tab === 'pending') {
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 0),
+                    eq(paymentInstruments.status, PORTAL_STATUSES.PENDING)
+                )
+            );
+        } else if (tab === 'accepted') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+            );
+        } else if (tab === 'rejected') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED)
+            );
+        } else if (tab === 'returned') {
+            conditions.push(
+                inArray(paymentInstruments.action, [3, 4, 5])
+            );
+        } else if (tab === 'settled') {
+            conditions.push(
+                inArray(paymentInstruments.action, [6, 7])
+            );
+        }
+
+        return conditions;
+    }
 
     async getDashboardData(
         tab?: string,
@@ -40,29 +87,7 @@ export class PayOnPortalService {
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions: any[] = [
-            eq(paymentInstruments.instrumentType, 'Portal Payment'),
-            eq(paymentInstruments.isActive, true),
-        ];
-
-        // Apply tab-specific filters
-        if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
-        } else if (tab === 'accepted') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
-            );
-        } else if (tab === 'rejected') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
-            );
-        } else if (tab === 'returned') {
-            conditions.push(inArray(paymentInstruments.action, [3, 4]));
-        } else if (tab === 'settled') {
-            conditions.push(eq(paymentInstruments.action, 4));
-        }
+        const conditions = this.buildPopDashboardConditions(tab);
 
         // Search filter
         if (options?.search) {
@@ -146,79 +171,42 @@ export class PayOnPortalService {
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
-            popStatus: row.popStatus,
+            popStatus: this.statusMap()[row.popStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countPopByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<PayOnPortalDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'Portal Payment'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const pending = await this.countPopByConditions(
+            this.buildPopDashboardConditions('pending')
+        );
 
-        // Count pending
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(paymentInstruments.action),
-        ];
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...pendingConditions));
-        const pending = Number(pendingResult?.count || 0);
+        const accepted = await this.countPopByConditions(
+            this.buildPopDashboardConditions('accepted')
+        );
 
-        // Count accepted
-        const acceptedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
-        ];
-        const [acceptedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...acceptedConditions));
-        const accepted = Number(acceptedResult?.count || 0);
+        const rejected = await this.countPopByConditions(
+            this.buildPopDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
+        const returned = await this.countPopByConditions(
+            this.buildPopDashboardConditions('returned')
+        );
 
-        // Count returned
-        const returnedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [3, 4]),
-        ];
-        const [returnedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...returnedConditions));
-        const returned = Number(returnedResult?.count || 0);
-
-        // Count settled
-        const settledConditions = [
-            ...baseConditions,
-            eq(paymentInstruments.action, 4),
-        ];
-        const [settledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...settledConditions));
-        const settled = Number(settledResult?.count || 0);
+        const settled = await this.countPopByConditions(
+            this.buildPopDashboardConditions('settled')
+        );
 
         return {
             pending,
@@ -232,7 +220,7 @@ export class PayOnPortalService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
+            'accounts-form': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -285,9 +273,9 @@ export class PayOnPortalService {
 
         if (body.action === 'accounts-form-1') {
             if (body.pop_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.pop_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
             // Store date_time in legacyData for timer stop functionality
@@ -298,11 +286,11 @@ export class PayOnPortalService {
                 };
             }
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            updateData.status = PORTAL_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned') {
-            updateData.status = 'RETURNED';
+            updateData.status = PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER;
         } else if (body.action === 'settled') {
-            updateData.status = 'SETTLED';
+            updateData.status = PORTAL_STATUSES.SETTLED_WITH_PROJECT;
         }
 
         await this.db
@@ -440,7 +428,6 @@ export class PayOnPortalService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
             }
         }
 

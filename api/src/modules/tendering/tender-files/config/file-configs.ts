@@ -1,5 +1,7 @@
 export type TenderFileContext =
     | 'tender-documents'
+    | 'bg-format-files'
+    | 'bg-po-files'
     | 'emds'
     | 'tender-fees'
     | 'physical-docs'
@@ -54,10 +56,30 @@ const ARCHIVES = [MIME.ZIP, MIME.RAR];
 
 export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     'tender-documents': {
-        maxFiles: 10,
+        maxFiles: 5,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-format-files': {
+        maxFiles: 5,
+        maxSizeBytes: MB(20),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.doc', '.docx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-po-files': {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.doc', '.docx'],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,
