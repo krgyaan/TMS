@@ -90,7 +90,7 @@ export const paths = {
 
         projectDashboard: "/operations/project-dashboard",
         raisePoForm: "/operations/project-dashboard/purchase-order/create",
-        viewPoPage: "/operations/project-dashboard/purchase-order/view",
+        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
     },
 
     // ==================== SERVICES ====================
