@@ -118,11 +118,29 @@ export function PhysicalDocsView({
                                 Submitted Documents
                             </TableCell>
                             <TableCell className="text-sm">
-                                {physicalDoc.submittedDocs ? (
-                                    <div className="bg-muted/30 p-3 rounded-md">
-                                        {physicalDoc.submittedDocs}
-                                    </div>
-                                ) : (
+                                {physicalDoc.submittedDocs ? (() => {
+                                    let docIds: string[] = [];
+                                    try {
+                                        const parsed = JSON.parse(physicalDoc.submittedDocs);
+                                        if (Array.isArray(parsed)) {
+                                            docIds = parsed.filter(Boolean);
+                                        } else {
+                                            docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
+                                        }
+                                    } catch {
+                                        docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
+                                    }
+
+                                    return docIds.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {docIds.map((docId, idx) => (
+                                                <Badge key={idx} variant="outline">
+                                                    {docId}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    ) : '—';
+                                })() : (
                                     '—'
                                 )}
                             </TableCell>
