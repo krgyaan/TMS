@@ -15,17 +15,11 @@ import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, MapPin }
 import { paths } from '@/app/routes/paths';
 import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-
 // Import from helpers
 import { PhysicalDocsFormSchema } from '../helpers/physicalDocs.schema';
 import type { PhysicalDocsFormValues, PhysicalDocsResponse } from '../helpers/physicalDocs.types';
-import { courierOptions, submittedDocsOptions } from '../helpers/physicalDocs.types';
-import {
-    buildDefaultValues,
-    mapResponseToForm,
-    mapFormToCreatePayload,
-    mapFormToUpdatePayload
-} from '../helpers/physicalDocs.mappers';
+import { useDocumentSubmittedOptions, useCourierOptions } from '../helpers/physicalDocs.types';
+import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from '../helpers/physicalDocs.mappers';
 
 interface PhysicalDocsFormProps {
     tenderId: number;
@@ -48,6 +42,8 @@ const FormLoadingSkeleton = () => (
 export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsFormProps) {
     const navigate = useNavigate();
 
+    const documentSubmittedOptions = useDocumentSubmittedOptions();
+    const courierOptions = useCourierOptions();
     // Fetch info sheet to pre-fill clients
     const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId);
 
@@ -78,11 +74,6 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
     });
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
-
-    // Check if clients were pre-filled from info sheet
-    const hasPrefilledClients = useMemo(() => {
-        return infoSheet?.clients && infoSheet.clients.length > 0;
-    }, [infoSheet]);
 
     const handleAddPerson = () => {
         append({ name: '', email: '', phone: '' });
@@ -149,7 +140,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                                     control={form.control}
                                     name="submittedDocs"
                                     label="Submitted Documents"
-                                    options={submittedDocsOptions}
+                                    options={documentSubmittedOptions}
                                     placeholder="Select documents"
                                 />
                                 {/* Courier Address from Info Sheet */}
