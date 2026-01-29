@@ -255,10 +255,10 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                     {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgExpiryDate" label="BG Expiry Date *">
-                                    {(field) => <DatePicker {...field} />}
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgClaimPeriod" label="BG Claim Period *">
-                                    {(field) => <DatePicker {...field} />}
+                                    {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                                 </FieldWrapper>
                                 <FieldWrapper control={control} name="emd.details.bgStampValue" label="Stamp Paper Value">
                                     {(field) => <NumberInput min={0} {...field} />}
@@ -335,7 +335,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.fdrExpiryDate" label="FDR Expiry Date *">
-                                {(field) => <DatePicker {...field} />}
+                                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                             </FieldWrapper>
                             <SelectField
                                 control={control}
@@ -351,7 +351,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 {(field) => <NumberInput min={1} {...field} />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.fdrDate" label="FDR Date">
-                                {(field) => <DatePicker {...field} />}
+                                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                             </FieldWrapper>
                         </div>
                     )}
@@ -379,7 +379,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.chequeDate" label="Cheque Date *">
-                                {(field) => <DatePicker {...field} />}
+                                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
                             </FieldWrapper>
                             <SelectField
                                 control={control}
