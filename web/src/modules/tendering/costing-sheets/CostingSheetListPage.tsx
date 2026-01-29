@@ -20,6 +20,7 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import axiosInstance from "@/lib/axios";
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
@@ -35,6 +36,7 @@ const CostingSheets = () => {
         suggestedName?: string;
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [isConnectingDrive, setIsConnectingDrive] = useState(false);
 
     const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
@@ -122,11 +124,39 @@ const CostingSheets = () => {
         }
     }, [duplicateInfo, createSheetWithNameMutation]);
 
-    const handleConnectDrive = useCallback(() => {
-        // Redirect to Google OAuth with Drive scopes
-        const authUrl = `${import.meta.env.VITE_API_URL}/integrations/google/drive-auth-url`;
-        window.location.href = authUrl;
-    }, []);
+    const handleConnectDrive = useCallback(async () => {
+        if (isConnectingDrive) return;
+
+        setIsConnectingDrive(true);
+        try {
+            // Fetch the OAuth URL from the API
+            const response = await axiosInstance.get('/integrations/google/drive-auth-url');
+            const data = response.data;
+
+            // Check if user already has scopes
+            if (data.hasScopes) {
+                toast.success('Google Drive is already connected');
+                setConnectDriveOpen(false);
+                return;
+            }
+
+            // Extract the OAuth URL from the response
+            if (data.url && typeof data.url === 'string') {
+                // Redirect to Google OAuth
+                window.location.href = data.url;
+            } else {
+                throw new Error('Invalid response from server: missing OAuth URL');
+            }
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.message ||
+                error?.message ||
+                'Failed to connect Google Drive. Please try again.';
+            toast.error(errorMessage);
+            console.error('Failed to get Google Drive auth URL:', error);
+        } finally {
+            setIsConnectingDrive(false);
+        }
+    }, [isConnectingDrive]);
 
     const costingSheetActions: ActionItem<CostingSheetDashboardRowWithTimer>[] = useMemo(() => [
         {
@@ -456,11 +486,15 @@ const CostingSheets = () => {
                         </ul>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConnectDriveOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConnectDriveOpen(false)}
+                            disabled={isConnectingDrive}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleConnectDrive}>
-                            Connect Google Drive
+                        <Button onClick={handleConnectDrive} disabled={isConnectingDrive}>
+                            {isConnectingDrive ? 'Connecting...' : 'Connect Google Drive'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
