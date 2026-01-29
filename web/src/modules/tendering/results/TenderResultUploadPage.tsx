@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import UploadResultFormPage from './components/UploadResultFormPage';
 import { useTender } from '@/hooks/api/useTenders';
 import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
-import { useTenderResult } from '@/hooks/api/useTenderResults';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -16,7 +15,6 @@ export default function TenderResultUploadPage() {
     const navigate = useNavigate();
     const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tenderId));
     const { data: bidSubmission, isLoading: bidLoading } = useBidSubmissionByTender(Number(tenderId));
-    const { data: result, isLoading: resultLoading } = useTenderResult(0); // Will fetch by tenderId below
 
     // Fetch or create result entry
     const [resultId, setResultId] = React.useState<number | null>(null);

@@ -112,8 +112,8 @@ const TenderResultListPage = () => {
     }, [navigate]);
 
     const handleUploadResult = useCallback((row: ResultDashboardRow) => {
-        if (row.id) return navigate(paths.tendering.resultsUpload(row.tenderId));
-        return navigate(paths.tendering.resultsEdit(row.tenderId));
+        if (row.id) return navigate(paths.tendering.resultsEdit(row.id));
+        else return navigate(paths.tendering.resultsUpload(row.tenderId));
     }, [navigate]);
 
     const handleViewRa = useCallback((row: ResultDashboardRow) => {
@@ -292,15 +292,6 @@ const TenderResultListPage = () => {
             };
         });
     }, [counts]);
-
-    // Additional debug logging for derived values
-    useEffect(() => {
-        console.log('=== Derived Values Debug ===');
-        console.log('resultData length:', resultData.length);
-        console.log('resultData:', resultData);
-        console.log('totalRows:', totalRows);
-        console.log('tabsWithData:', tabsWithData);
-    }, [resultData, totalRows, tabsWithData]);
 
     if (isLoading) {
         return (

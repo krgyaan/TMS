@@ -78,12 +78,6 @@ const RA_STATUS = {
     LOST_H1: 'Lost - H1 Elimination',
 } as const;
 
-const STATUS_GROUPS = {
-    underEvaluation: [RA_STATUS.UNDER_EVALUATION],
-    scheduled: [RA_STATUS.RA_SCHEDULED, RA_STATUS.RA_STARTED, RA_STATUS.RA_ENDED],
-    completed: [RA_STATUS.WON, RA_STATUS.LOST, RA_STATUS.LOST_H1, RA_STATUS.DISQUALIFIED],
-};
-
 @Injectable()
 export class ReverseAuctionService {
     private readonly logger = new Logger(ReverseAuctionService.name);
@@ -114,7 +108,7 @@ export class ReverseAuctionService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             eq(bidSubmissions.status, 'Bid Submitted'),
-            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
+            inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
         ];
 
         // TODO: Add role-based team filtering middleware/guard
@@ -321,7 +315,7 @@ export class ReverseAuctionService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
+            inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
         ];
 
         // Under-evaluation: No RA OR (RA exists but no result AND no schedule times)
@@ -433,7 +427,7 @@ export class ReverseAuctionService {
                 tenderInformation,
                 and(
                     eq(tenderInformation.tenderId, tenderInfos.id),
-                    eq(tenderInformation.reverseAuctionApplicable, '1')
+                    inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES'])
                 )
             )
             .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
@@ -445,8 +439,7 @@ export class ReverseAuctionService {
                     TenderInfosService.getActiveCondition(),
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-                    eq(tenderInfos.status, 17), // Entry condition: Status 17
-                    eq(tenderInformation.reverseAuctionApplicable, 'Yes') // Entry condition: RA applicable
+                    eq(bidSubmissions.status, 'Bid Submitted'),
                 )
             )
             .orderBy(asc(bidSubmissions.submissionDatetime));
@@ -922,147 +915,6 @@ export class ReverseAuctionService {
                     reverseAuctionId: raId,
                 });
         }
-    }
-
-    /**
-     * Get RA Dashboard data - Updated implementation per requirements
-     * Type: 'pending' = raResult IS NULL, 'completed' = raResult IS NOT NULL
-     */
-    async getRaData(
-        type?: 'pending' | 'completed',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-    ): Promise<PaginatedResult<RaDashboardRow>> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 50;
-        const offset = (page - 1) * limit;
-
-        // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
-            eq(tenderInformation.reverseAuctionApplicable, 'Yes'),
-        ];
-
-        // Add type filter
-        if (type === 'pending') {
-            baseConditions.push(
-                or(
-                    isNull(reverseAuctions.raResult),
-                    isNull(reverseAuctions.id)
-                )!
-            );
-        } else if (type === 'completed') {
-            baseConditions.push(isNotNull(reverseAuctions.raResult));
-        }
-
-        const whereClause = and(...baseConditions);
-
-        // Build orderBy clause
-        let orderByClause: any = asc(bidSubmissions.submissionDatetime); // Default
-        if (filters?.sortBy) {
-            const sortOrder = filters.sortOrder === 'desc' ? desc : asc;
-            switch (filters.sortBy) {
-                case 'tenderNo':
-                    orderByClause = sortOrder(tenderInfos.tenderNo);
-                    break;
-                case 'tenderName':
-                    orderByClause = sortOrder(tenderInfos.tenderName);
-                    break;
-                case 'teamMemberName':
-                    orderByClause = sortOrder(users.name);
-                    break;
-                case 'bidSubmissionDate':
-                    orderByClause = sortOrder(bidSubmissions.submissionDatetime);
-                    break;
-                case 'tenderValue':
-                    orderByClause = sortOrder(tenderInfos.gstValues);
-                    break;
-                case 'raStatus':
-                    orderByClause = sortOrder(reverseAuctions.status);
-                    break;
-                default:
-                    orderByClause = asc(bidSubmissions.submissionDatetime);
-            }
-        }
-
-        // Get total count
-        const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, and(
-                eq(tenderInformation.tenderId, tenderInfos.id),
-                eq(tenderInformation.reverseAuctionApplicable, 'Yes')
-            ))
-            .innerJoin(bidSubmissions, and(
-                eq(bidSubmissions.tenderId, tenderInfos.id),
-                eq(bidSubmissions.status, 'Bid Submitted')
-            ))
-            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-            .where(whereClause);
-        const total = Number(countResult?.count || 0);
-
-        // Get paginated data
-        const rows = await this.db
-            .select({
-                tenderId: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                gstValues: tenderInfos.gstValues,
-                teamMemberName: users.name,
-                itemName: items.name,
-                tenderStatus: statuses.name,
-                bidSubmissionDate: bidSubmissions.submissionDatetime,
-                raId: reverseAuctions.id,
-                raStatus: reverseAuctions.status,
-                raStartTime: reverseAuctions.raStartTime,
-                raEndTime: reverseAuctions.raEndTime,
-                raResult: reverseAuctions.raResult,
-            })
-            .from(tenderInfos)
-            .innerJoin(tenderInformation, and(
-                eq(tenderInformation.tenderId, tenderInfos.id),
-                eq(tenderInformation.reverseAuctionApplicable, 'Yes')
-            ))
-            .innerJoin(bidSubmissions, and(
-                eq(bidSubmissions.tenderId, tenderInfos.id),
-                eq(bidSubmissions.status, 'Bid Submitted')
-            ))
-            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
-            .where(whereClause)
-            .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
-
-        const data: RaDashboardRow[] = rows.map((row) => ({
-            id: row.raId,
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: `${row.tenderName} - ${row.tenderNo}`,
-            teamMemberName: row.teamMemberName,
-            bidSubmissionDate: row.bidSubmissionDate,
-            tenderValue: this.formatINR(row.gstValues),
-            itemName: row.itemName,
-            tenderStatus: row.tenderStatus,
-            raStatus: this.calculateRaStatus({
-                raId: row.raId,
-                raStatus: row.raStatus,
-                technicallyQualified: null,
-                raStartTime: row.raStartTime,
-                raEndTime: row.raEndTime,
-                raResult: row.raResult,
-            }),
-            raStartTime: row.raStartTime,
-            raEndTime: row.raEndTime,
-            technicallyQualified: null,
-            result: row.raResult,
-            hasRaEntry: row.raId !== null,
-        }));
-
-        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     /**

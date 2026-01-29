@@ -186,7 +186,6 @@ export class TenderResultService {
         try {
             const sqlQuery = query.toSQL();
             dataQuerySql = JSON.stringify(sqlQuery);
-            this.logger.debug(`[TenderResult] SQL Query: ${dataQuerySql}`);
         } catch (error) {
             this.logger.debug(`[TenderResult] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
         }

@@ -91,6 +91,9 @@ export default function TenderResultEditPage() {
     const tenderDetails = {
         tenderNo: (result as any).tenderNo || '',
         tenderName: (result as any).tenderName || '',
+        partiesCount: result.qualifiedPartiesCount || '',
+        partiesNames: result.qualifiedPartiesNames || [],
+
     };
 
     return (

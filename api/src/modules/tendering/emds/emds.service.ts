@@ -417,9 +417,9 @@ export class EmdsService {
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     or(
-                        eq(tenderInformation.emdRequired, 'Yes'),
-                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                        inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
                     or(
                         gt(tenderInfos.emd, sql`0`),
@@ -503,9 +503,9 @@ export class EmdsService {
                     TenderInfosService.getApprovedCondition(),
                     TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
                     or(
-                        eq(tenderInformation.emdRequired, 'Yes'),
-                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                        inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
                     or(
                         gt(tenderInfos.emd, sql`0`),
@@ -519,6 +519,7 @@ export class EmdsService {
             .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
+        console.log(rows);
 
         const wrapped = wrapPaginatedResponse(rows as PendingTenderRow[], totalCount, page, limit);
         return {
@@ -541,9 +542,9 @@ export class EmdsService {
                     TenderInfosService.getApprovedCondition(),
                     inArray(tenderInfos.status, dnbStatusIds),
                     or(
-                        eq(tenderInformation.emdRequired, 'Yes'),
-                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                        inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
                     userCondition
                 )
@@ -621,9 +622,9 @@ export class EmdsService {
                     TenderInfosService.getApprovedCondition(),
                     inArray(tenderInfos.status, dnbStatusIds),
                     or(
-                        eq(tenderInformation.emdRequired, 'Yes'),
-                        eq(tenderInformation.tenderFeeRequired, 'Yes'),
-                        eq(tenderInformation.processingFeeRequired, 'Yes')
+                        inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                        inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
                     userCondition
                 )

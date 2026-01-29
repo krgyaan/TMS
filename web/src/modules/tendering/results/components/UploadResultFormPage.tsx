@@ -45,6 +45,8 @@ interface UploadResultFormPageProps {
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
+        partiesCount: string;
+        partiesNames: string[];
     };
     isEditMode?: boolean;
     onSuccess?: () => void;
@@ -72,13 +74,15 @@ export default function UploadResultFormPage({
     const [newPartyName, setNewPartyName] = useState('');
     const [showResultDetails, setShowResultDetails] = useState(isEditMode);
 
+    console.log(tenderDetails);
+
     const form = useForm<FormValues>({
         resolver: zodResolver(UploadResultSchema) as Resolver<FormValues>,
         defaultValues: {
             technicallyQualified: 'Yes',
             disqualificationReason: '',
-            qualifiedPartiesCount: '',
-            qualifiedPartiesNames: [],
+            qualifiedPartiesCount: tenderDetails.partiesCount || '',
+            qualifiedPartiesNames: tenderDetails.partiesNames || [],
             result: 'Won',
             l1Price: '',
             l2Price: '',
