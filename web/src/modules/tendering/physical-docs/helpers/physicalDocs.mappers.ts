@@ -23,7 +23,7 @@ export const buildDefaultValues = (
 
     return {
         tenderId,
-        courierNo: undefined as unknown as number,
+        courierNo: 0 as number,
         submittedDocs: [],
         physicalDocsPersons: personsFromClients.length > 0
             ? personsFromClients

@@ -15,7 +15,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import QualificationDialog from './components/QualificationDialog';
-import type { TabKey, TqManagementDashboardRow, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
+import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
 
@@ -267,7 +267,7 @@ const TqManagementListPage = () => {
         {
             field: 'tqStatus',
             headerName: 'TQ Status',
-            width: 180,
+            width: 130,
             colId: 'tqStatus',
             sortable: true,
             filter: true,
@@ -284,7 +284,7 @@ const TqManagementListPage = () => {
         {
             field: 'tqCount',
             headerName: 'TQ Count',
-            width: 120,
+            width: 110,
             colId: 'tqCount',
             valueGetter: (params: any) => params.data?.tqCount || 0,
             sortable: true,
@@ -299,7 +299,7 @@ const TqManagementListPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 120,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;

@@ -222,7 +222,7 @@ const ReverseAuctionListPage = () => {
                 field: 'bidSubmissionDate',
                 colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
@@ -234,29 +234,27 @@ const ReverseAuctionListPage = () => {
                 field: 'raStartTime',
                 colId: 'raStartTime',
                 headerName: 'RA Start Time',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.raStartTime ? formatDateTime(params.data.raStartTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raEndTime',
                 colId: 'raEndTime',
                 headerName: 'RA End Time',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.raEndTime ? formatDateTime(params.data.raEndTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raStatus',
                 colId: 'raStatus',
                 headerName: 'RA Status',
-                width: 160,
+                width: 130,
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
@@ -264,16 +262,6 @@ const ReverseAuctionListPage = () => {
                     if (!status) return '—';
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
                 },
-            },
-            {
-                field: 'result',
-                colId: 'result',
-                headerName: 'Result',
-                width: 100,
-                valueGetter: (params) => params.data?.result || '—',
-                sortable: true,
-                filter: true,
-                hide: activeTab !== 'completed',
             },
             {
                 headerName: 'Actions',
