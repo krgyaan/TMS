@@ -46,8 +46,8 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'Costing Sheets': 'costing-sheets',
         'Costing Approval': 'costing-approvals',
         'Bid Submissions': 'bid-submissions',
-        'TQs': 'tq-management',
-        'RA': 'reverse-auction',
+        'TQ Management': 'tq-management',
+        'RA Management': 'reverse-auction',
         'Results': 'tender-result',
 
         // Operations sub-items
