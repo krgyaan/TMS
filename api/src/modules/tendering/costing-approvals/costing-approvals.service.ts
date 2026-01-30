@@ -17,6 +17,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -64,6 +65,7 @@ export class CostingApprovalsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     private costingApprovalBaseQuery(select: any): any {
@@ -138,7 +140,7 @@ export class CostingApprovalsService {
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            conditions.push(isNull(tenderCostingSheets.status));
+            conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
         } else if (activeTab === 'approved') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
@@ -195,68 +197,6 @@ export class CostingApprovalsService {
             .limit(limit)
             .offset(offset) as any;
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map((r: any) => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            const data = rows.map((row: any) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    teamMember: row.teamMember,
-                    teamMemberName: row.teamMemberName,
-                    itemName: row.itemName,
-                    status: row.status,
-                    statusName: row.statusName,
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    dueDate: row.dueDate,
-                    emdAmount: row.emdAmount,
-                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
-                    costingStatus: row.costingStatus,
-                    googleSheetUrl: row.googleSheetUrl,
-                    costingSheetId: row.costingSheetId,
-                };
-            });
-
-            return wrapPaginatedResponse(data, Number(count), page, limit);
-        }
-
         const data = rows.map((row: any) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
@@ -291,7 +231,7 @@ export class CostingApprovalsService {
         const pendingConditions = [
             ...baseConditions,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(tenderCostingSheets.status),
+            eq(tenderCostingSheets.status, 'Submitted'),
         ];
 
         // Count approved: costing_status = 'Approved'
@@ -424,6 +364,38 @@ export class CostingApprovalsService {
 
         // Send email notification
         await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
+
+        // TIMER TRANSITION: Complete costing_approval step
+        try {
+            this.logger.log(`Transitioning timers for tender ${costingSheet.tenderId} after costing approval`);
+
+            // Get workflow status
+            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', costingSheet.tenderId.toString());
+
+            // Complete the costing_approval step
+            const costingApprovalStep = workflowStatus.steps.find(step =>
+                step.stepKey === 'costing_approval' && step.status === 'IN_PROGRESS'
+            );
+
+            if (costingApprovalStep) {
+                this.logger.log(`Completing costing_approval step ${costingApprovalStep.id} for tender ${costingSheet.tenderId}`);
+                await this.workflowService.completeStep(costingApprovalStep.id.toString(), {
+                    userId: userId.toString(),
+                    notes: 'Costing approved'
+                });
+                this.logger.log(`Successfully completed costing_approval step for tender ${costingSheet.tenderId}`);
+            } else {
+                this.logger.warn(`No active costing_approval step found for tender ${costingSheet.tenderId}`);
+                // Try to find any costing_approval step
+                const anyCostingApprovalStep = workflowStatus.steps.find(step => step.stepKey === 'costing_approval');
+                if (anyCostingApprovalStep) {
+                    this.logger.warn(`Found costing_approval step ${anyCostingApprovalStep.id} with status ${anyCostingApprovalStep.status}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Failed to transition timers for tender ${costingSheet.tenderId} after costing approval:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
 
         return result;
     }

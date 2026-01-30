@@ -20,6 +20,7 @@ import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { Logger } from "@nestjs/common";
 import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { WorkflowService } from "@/modules/timers/services/workflow.service";
 
 export type RfqFilters = {
     rfqStatus?: "pending" | "sent";
@@ -81,7 +82,8 @@ export class RfqsService {
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
-        private readonly recipientResolver: RecipientResolver
+        private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService
     ) {}
 
     /**
@@ -419,6 +421,38 @@ export class RfqsService {
 
         // Send email notification
         await this.sendRfqSentEmail(data.tenderId, rfqDetails, changedBy);
+
+        // TIMER TRANSITION: Complete rfq_sent step
+        try {
+            this.logger.log(`Transitioning timers for tender ${data.tenderId} after RFQ sent`);
+
+            // Get workflow status
+            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
+
+            // Complete the rfq_sent step
+            const rfqSentStep = workflowStatus.steps.find(step =>
+                step.stepKey === 'rfq_sent' && step.status === 'IN_PROGRESS'
+            );
+
+            if (rfqSentStep) {
+                this.logger.log(`Completing rfq_sent step ${rfqSentStep.id} for tender ${data.tenderId}`);
+                await this.workflowService.completeStep(rfqSentStep.id.toString(), {
+                    userId: changedBy.toString(),
+                    notes: 'RFQ sent'
+                });
+                this.logger.log(`Successfully completed rfq_sent step for tender ${data.tenderId}`);
+            } else {
+                this.logger.warn(`No active rfq_sent step found for tender ${data.tenderId}`);
+                // Try to find any rfq_sent step
+                const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === 'rfq_sent');
+                if (anyRfqSentStep) {
+                    this.logger.warn(`Found rfq_sent step ${anyRfqSentStep.id} with status ${anyRfqSentStep.status}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Failed to transition timers for tender ${data.tenderId} after RFQ sent:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
 
         return rfqDetails;
     }

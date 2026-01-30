@@ -21,6 +21,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export interface PendingTenderRow {
     tenderId: number;
@@ -210,6 +211,7 @@ export class EmdsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     async getDashboardData(
@@ -889,6 +891,41 @@ export class EmdsService {
         if (tender) {
             for (const instrumentInfo of createdInstruments) {
                 await this.sendPaymentRequestEmail(tenderId || 0, instrumentInfo, tender, userId || 0);
+            }
+        }
+
+        // TIMER TRANSITION: Complete emd_requested step if EMD was requested
+        // Only for TMS requests with valid tenderId
+        if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
+            try {
+                this.logger.log(`Transitioning timers for tender ${tenderId} after EMD requested`);
+
+                // Get workflow status
+                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
+
+                // Complete the emd_requested step
+                const emdRequestedStep = workflowStatus.steps.find(step =>
+                    step.stepKey === 'emd_requested' && step.status === 'IN_PROGRESS'
+                );
+
+                if (emdRequestedStep) {
+                    this.logger.log(`Completing emd_requested step ${emdRequestedStep.id} for tender ${tenderId}`);
+                    await this.workflowService.completeStep(emdRequestedStep.id.toString(), {
+                        userId: userId.toString(),
+                        notes: 'EMD requested'
+                    });
+                    this.logger.log(`Successfully completed emd_requested step for tender ${tenderId}`);
+                } else {
+                    this.logger.warn(`No active emd_requested step found for tender ${tenderId}`);
+                    // Try to find any emd_requested step
+                    const anyEmdRequestedStep = workflowStatus.steps.find(step => step.stepKey === 'emd_requested');
+                    if (anyEmdRequestedStep) {
+                        this.logger.warn(`Found emd_requested step ${anyEmdRequestedStep.id} with status ${anyEmdRequestedStep.status}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to transition timers for tender ${tenderId} after EMD requested:`, error);
+                // Don't fail the entire operation if timer transition fails
             }
         }
 
