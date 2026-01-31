@@ -107,39 +107,26 @@ const TenderResultListPage = () => {
     const resultData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: ResultDashboardRow) => {
-        if (row.id) return navigate(paths.tendering.resultsShow(row.tenderId));
-    }, [navigate]);
-
-    const handleUploadResult = useCallback((row: ResultDashboardRow) => {
-        if (row.id) return navigate(paths.tendering.resultsEdit(row.id));
-        else return navigate(paths.tendering.resultsUpload(row.tenderId));
-    }, [navigate]);
-
-    const handleViewRa = useCallback((row: ResultDashboardRow) => {
-        if (row.reverseAuctionId) return navigate(paths.tendering.rasShow(row.reverseAuctionId));
-    }, [navigate]);
-
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: ResultDashboardRow) => navigate(paths.tendering.resultsShow(row.tenderId)),
             },
             {
                 label: 'Upload Result',
                 icon: <Upload className="h-4 w-4" />,
-                onClick: handleUploadResult,
+                onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.tenderId)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
             },
             {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
-                onClick: handleViewRa,
+                onClick: (row: ResultDashboardRow) => navigate(paths.tendering.rasShow(row.reverseAuctionId!)),
                 visible: (row) => row.raApplicable && !!row.reverseAuctionId,
             },
         ],
-        [handleViewDetails, handleUploadResult, handleViewRa]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<ResultDashboardRow>[]>(

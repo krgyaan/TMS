@@ -143,34 +143,22 @@ const ReverseAuctionListPage = () => {
     const raData = response?.data || [];
     const totalRows = response?.meta?.total || raData.length;
 
-    const handleViewDetails = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasShow(row.id));
-    }, [navigate]);
-
-    const handleScheduleRa = useCallback((row: RaDashboardRow) => {
-        navigate(paths.tendering.rasSchedule(row.tenderId));
-    }, [navigate]);
-
-    const handleUploadResult = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasUploadResult(row.id));
-    }, [navigate]);
-
     const raActions: ActionItem<RaDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
-                onClick: handleViewDetails,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Schedule RA',
-                onClick: handleScheduleRa,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasSchedule(row.tenderId)),
                 icon: <Calendar className="h-4 w-4" />,
                 visible: (row) => row.raStatus === RA_STATUS.UNDER_EVALUATION,
             },
             {
                 label: 'Upload RA Result',
-                onClick: handleUploadResult,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasUploadResult(row.id)),
                 icon: <Upload className="h-4 w-4" />,
                 visible: (row) =>
                     [RA_STATUS.RA_SCHEDULED, RA_STATUS.RA_STARTED, RA_STATUS.RA_ENDED].includes(
@@ -178,7 +166,7 @@ const ReverseAuctionListPage = () => {
                     ),
             },
         ],
-        [handleViewDetails, handleScheduleRa, handleUploadResult]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<RaDashboardRow>[]>(
@@ -222,7 +210,7 @@ const ReverseAuctionListPage = () => {
                 field: 'bidSubmissionDate',
                 colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
@@ -234,29 +222,27 @@ const ReverseAuctionListPage = () => {
                 field: 'raStartTime',
                 colId: 'raStartTime',
                 headerName: 'RA Start Time',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.raStartTime ? formatDateTime(params.data.raStartTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raEndTime',
                 colId: 'raEndTime',
                 headerName: 'RA End Time',
-                width: 170,
+                width: 150,
                 valueGetter: (params) =>
                     params.data?.raEndTime ? formatDateTime(params.data.raEndTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raStatus',
                 colId: 'raStatus',
                 headerName: 'RA Status',
-                width: 160,
+                width: 130,
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
@@ -264,16 +250,6 @@ const ReverseAuctionListPage = () => {
                     if (!status) return '—';
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
                 },
-            },
-            {
-                field: 'result',
-                colId: 'result',
-                headerName: 'Result',
-                width: 100,
-                valueGetter: (params) => params.data?.result || '—',
-                sortable: true,
-                filter: true,
-                hide: activeTab !== 'completed',
             },
             {
                 headerName: 'Actions',

@@ -79,24 +79,22 @@ export class ReverseAuctionController {
         );
     }
 
-    @Patch(':id/schedule')
+    @Post(':tenderId/schedule')
     async scheduleRa(
-        @Param('id', ParseIntPipe) id: number,
+        @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() dto: ScheduleRaDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        // Fetch RA to get tenderId
-        const ra = await this.reverseAuctionService.findById(id);
-        return this.reverseAuctionService.scheduleRa(id, ra.tenderId, dto, user.sub);
+        return this.reverseAuctionService.scheduleRa(tenderId, dto, user.sub);
     }
 
-    @Patch(':id/upload-result')
+    @Patch(':raId/upload-result')
     uploadResult(
-        @Param('id', ParseIntPipe) id: number,
+        @Param('raId', ParseIntPipe) raId: number,
         @Body() dto: UploadRaResultDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        return this.reverseAuctionService.uploadResult(id, dto, user.sub);
+        return this.reverseAuctionService.uploadResult(raId, dto, user.sub);
     }
 
     @Post('update-started-status')
