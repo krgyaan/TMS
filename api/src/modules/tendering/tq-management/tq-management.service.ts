@@ -103,7 +103,7 @@ export class TqManagementService {
                         SELECT tq2.id
                         FROM ${tenderQueries} tq2
                         WHERE tq2.tender_id = ${tenderQueries.tenderId}
-                        ORDER BY tq2.created_at DESC, tq2.id DESC
+                        ORDER BY tq2.updated_at DESC, tq2.created_at DESC, tq2.id DESC
                         LIMIT 1
                     )`
                 )
@@ -307,16 +307,17 @@ export class TqManagementService {
             };
         }
 
-        // Get all TQ records for these tenders, ordered by createdAt DESC
+        // Get all TQ records for these tenders, ordered by updatedAt DESC to prioritize recently updated TQs
         const allTqs = await this.db
             .select({
                 tenderId: tenderQueries.tenderId,
                 status: tenderQueries.status,
                 createdAt: tenderQueries.createdAt,
+                updatedAt: tenderQueries.updatedAt,
             })
             .from(tenderQueries)
             .where(inArray(tenderQueries.tenderId, tenderIds))
-            .orderBy(desc(tenderQueries.createdAt));
+            .orderBy(desc(tenderQueries.updatedAt), desc(tenderQueries.createdAt));
 
         // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
         const statusMap = new Map<number, TenderQueryStatus>();

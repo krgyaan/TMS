@@ -865,70 +865,109 @@ export class EmdsService {
             }
         });
 
-        // Generate PDFs for DD, FDR, and BG instruments (after transaction commits)
-        for (const instrumentInfo of createdInstruments) {
-            if (instrumentInfo.mode === 'DD' || instrumentInfo.mode === 'FDR' || instrumentInfo.mode === 'BG') {
-                try {
-                    await this.generatePdfsForInstrument(
-                        instrumentInfo.instrumentId,
-                        instrumentInfo.mode,
-                        instrumentInfo.requestId,
-                        tender,
-                        userId
-                    );
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to generate PDFs for instrument ${instrumentInfo.instrumentId} (${instrumentInfo.mode}): ${error instanceof Error ? error.message : String(error)}`
-                    );
-                    // Continue with other instruments even if PDF generation fails
-                }
-            }
-        }
-
-        // Send email notifications for each created instrument
-        // Only if we have a valid tender object
-        if (tender) {
-            for (const instrumentInfo of createdInstruments) {
-                await this.sendPaymentRequestEmail(tenderId || 0, instrumentInfo, tender, userId || 0);
-            }
-        }
-
-        // TIMER TRANSITION: Complete emd_requested step if EMD was requested
-        // Only for TMS requests with valid tenderId
-        if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
-            try {
-                this.logger.log(`Transitioning timers for tender ${tenderId} after EMD requested`);
-
-                // Get workflow status
-                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-
-                // Complete the emd_requested step
-                const emdRequestedStep = workflowStatus.steps.find(step =>
-                    step.stepKey === 'emd_requested' && step.status === 'IN_PROGRESS'
-                );
-
-                if (emdRequestedStep) {
-                    this.logger.log(`Completing emd_requested step ${emdRequestedStep.id} for tender ${tenderId}`);
-                    await this.workflowService.completeStep(emdRequestedStep.id.toString(), {
-                        userId: userId.toString(),
-                        notes: 'EMD requested'
-                    });
-                    this.logger.log(`Successfully completed emd_requested step for tender ${tenderId}`);
-                } else {
-                    this.logger.warn(`No active emd_requested step found for tender ${tenderId}`);
-                    // Try to find any emd_requested step
-                    const anyEmdRequestedStep = workflowStatus.steps.find(step => step.stepKey === 'emd_requested');
-                    if (anyEmdRequestedStep) {
-                        this.logger.warn(`Found emd_requested step ${anyEmdRequestedStep.id} with status ${anyEmdRequestedStep.status}`);
-                    }
-                }
-            } catch (error) {
-                this.logger.error(`Failed to transition timers for tender ${tenderId} after EMD requested:`, error);
-                // Don't fail the entire operation if timer transition fails
-            }
-        }
+        // Return immediately after transaction commits to avoid blocking the HTTP response
+        // Background operations (PDF generation, emails, timer transition) run asynchronously
+        this.handleBackgroundOperations(
+            createdInstruments,
+            tenderId,
+            tender,
+            userId,
+            emdRequested,
+            isNonTmsRequest
+        ).catch((error) => {
+            this.logger.error('Background operations failed:', error);
+        });
 
         return createdRequests;
+    }
+
+    /**
+     * Handle background operations (PDF generation, emails, timer transition) asynchronously
+     * This runs after the HTTP response is returned to avoid blocking and timeout issues
+     */
+    private async handleBackgroundOperations(
+        createdInstruments: Array<{ requestId: number; instrumentId: number; mode: string; purpose: PaymentPurpose; amount: number; details: any }>,
+        tenderId: number,
+        tender: any,
+        userId: number | undefined,
+        emdRequested: boolean,
+        isNonTmsRequest: boolean
+    ): Promise<void> {
+        try {
+            // Generate PDFs for DD, FDR, and BG instruments (after transaction commits)
+            for (const instrumentInfo of createdInstruments) {
+                if (instrumentInfo.mode === 'DD' || instrumentInfo.mode === 'FDR' || instrumentInfo.mode === 'BG') {
+                    try {
+                        await this.generatePdfsForInstrument(
+                            instrumentInfo.instrumentId,
+                            instrumentInfo.mode,
+                            instrumentInfo.requestId,
+                            tender,
+                            userId
+                        );
+                    } catch (error) {
+                        this.logger.error(
+                            `Failed to generate PDFs for instrument ${instrumentInfo.instrumentId} (${instrumentInfo.mode}): ${error instanceof Error ? error.message : String(error)}`
+                        );
+                        // Continue with other instruments even if PDF generation fails
+                    }
+                }
+            }
+
+            // Send email notifications for each created instrument
+            // Only if we have a valid tender object
+            if (tender) {
+                for (const instrumentInfo of createdInstruments) {
+                    try {
+                        await this.sendPaymentRequestEmail(tenderId || 0, instrumentInfo, tender, userId || 0);
+                    } catch (error) {
+                        this.logger.error(
+                            `Failed to send email for instrument ${instrumentInfo.instrumentId} (${instrumentInfo.mode}): ${error instanceof Error ? error.message : String(error)}`
+                        );
+                        // Continue with other instruments even if email sending fails
+                    }
+                }
+            }
+
+            // TIMER TRANSITION: Complete emd_requested step if EMD was requested
+            // Only for TMS requests with valid tenderId
+            if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
+                try {
+                    this.logger.log(`Transitioning timers for tender ${tenderId} after EMD requested`);
+
+                    // Get workflow status
+                    const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
+
+                    // Complete the emd_requested step
+                    const emdRequestedStep = workflowStatus.steps.find(step =>
+                        step.stepKey === 'emd_requested' && step.status === 'IN_PROGRESS'
+                    );
+
+                    if (emdRequestedStep) {
+                        this.logger.log(`Completing emd_requested step ${emdRequestedStep.id} for tender ${tenderId}`);
+                        await this.workflowService.completeStep(emdRequestedStep.id.toString(), {
+                            userId: userId.toString(),
+                            notes: 'EMD requested'
+                        });
+                        this.logger.log(`Successfully completed emd_requested step for tender ${tenderId}`);
+                    } else {
+                        this.logger.warn(`No active emd_requested step found for tender ${tenderId}`);
+                        // Try to find any emd_requested step
+                        const anyEmdRequestedStep = workflowStatus.steps.find(step => step.stepKey === 'emd_requested');
+                        if (anyEmdRequestedStep) {
+                            this.logger.warn(`Found emd_requested step ${anyEmdRequestedStep.id} with status ${anyEmdRequestedStep.status}`);
+                        }
+                    }
+                } catch (error) {
+                    this.logger.error(`Failed to transition timers for tender ${tenderId} after EMD requested:`, error);
+                    // Don't fail the entire operation if timer transition fails
+                }
+            }
+        } catch (error) {
+            this.logger.error('Unexpected error in background operations:', error);
+            // Re-throw to be caught by the caller's error handler
+            throw error;
+        }
     }
 
     private async createPaymentRequest(
