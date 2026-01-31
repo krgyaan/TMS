@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tqManagementService } from '@/services/api/tq-management.service';
 import { toast } from 'sonner';
 import type { TabKey, TqManagementDashboardCounts, TqManagementFilters } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
+import { handleQueryError } from '@/lib/react-query';
+import type { CreateTqReceivedDto } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
 
 export const tqManagementKey = {
     all: ['tq-management'] as const,
@@ -57,7 +59,7 @@ export const useCreateTqReceived = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: tqManagementService.createTqReceived,
+        mutationFn: (data: CreateTqReceivedDto) => tqManagementService.createTqReceived(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
@@ -65,7 +67,7 @@ export const useCreateTqReceived = () => {
             toast.success('TQ received successfully');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to create TQ');
+            toast.error(handleQueryError(error));
         },
     });
 };
@@ -83,7 +85,7 @@ export const useUpdateTqReplied = () => {
             toast.success('TQ replied successfully');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to update TQ reply');
+            toast.error(handleQueryError(error));
         },
     });
 };
@@ -101,7 +103,7 @@ export const useUpdateTqMissed = () => {
             toast.success('TQ marked as missed');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to mark TQ as missed');
+            toast.error(handleQueryError(error));
         },
     });
 };
@@ -119,7 +121,7 @@ export const useMarkAsNoTq = () => {
             toast.success('Marked as No TQ');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to mark as No TQ');
+            toast.error(handleQueryError(error));
         },
     });
 };
@@ -136,7 +138,7 @@ export const useTqQualified = () => {
             toast.success('TQ marked as qualified');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to mark as TQ qualified');
+            toast.error(handleQueryError(error));
         },
     });
 };
@@ -154,7 +156,7 @@ export const useUpdateTqReceived = () => {
             toast.success('TQ updated successfully');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to update TQ');
+            toast.error(handleQueryError(error));
         },
     });
 };

@@ -18,10 +18,7 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     bt_req: z.enum(['Accepted', 'Rejected']).optional(),
     reason_req: z.string().optional(),
     utr_no: z.string().optional(),
-    account_name: z.string().optional(),
-    account_no: z.string().optional(),
-    ifsc_code: z.string().optional(),
-    amount: z.coerce.number().optional(),
+    utr_mgs: z.string().optional(),
     payment_date: z.string().optional(),
     remarks: z.string().optional(),
 
@@ -36,19 +33,12 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     proof_image: z.any().optional(), // File
 
     // Returned
-    return_reason: z.string().optional(),
     return_date: z.string().optional(),
-    return_remarks: z.string().optional(),
     utr_num: z.string().optional(),
-
-    // Settled
-    settlement_date: z.string().optional(),
-    settlement_amount: z.coerce.number().optional(),
-    settlement_reference_no: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
-        if (data.action === 'accounts-form-1') {
+        if (data.action === 'accounts-form') {
             return !!data.bt_req;
         }
         return true;
@@ -59,7 +49,7 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form-1' && data.bt_req === 'Rejected') {
+        if (data.action === 'accounts-form' && data.bt_req === 'Rejected') {
             return !!data.reason_req;
         }
         return true;
@@ -110,7 +100,7 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 3: return_reason, return_date, utr_num are required
         if (data.action === 'returned') {
-            return !!data.return_reason && !!data.return_date && !!data.utr_num;
+            return !!data.return_date && !!data.utr_num;
         }
         return true;
     },

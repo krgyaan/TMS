@@ -254,9 +254,9 @@ export default function TenderShowPage() {
                         <TenderResultShow
                             result={tenderResult as any}
                             onEdit={() => {
-                                // Result edit needs result ID, which we'd need to get from tenderResult
-                                if ((tenderResult as any)?.id) {
-                                    navigate(paths.tendering.resultsEdit((tenderResult as any).id));
+                                // Result edit uses tender ID
+                                if (tenderId) {
+                                    navigate(paths.tendering.resultsEdit(tenderId));
                                 }
                             }}
                         />

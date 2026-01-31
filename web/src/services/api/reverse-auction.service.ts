@@ -55,12 +55,12 @@ class ReverseAuctionService extends BaseApiService {
         return this.get<ReverseAuction>(`/tender/${tenderId}`);
     }
 
-    async scheduleRa(id: number, data: ScheduleRaDto): Promise<ReverseAuction> {
-        return this.patch<ReverseAuction>(`/${id}/schedule`, data);
+    async scheduleRa(tenderId: number, data: ScheduleRaDto): Promise<ReverseAuction> {
+        return this.post<ReverseAuction>(`/${tenderId}/schedule`, data);
     }
 
-    async uploadResult(id: number, data: UploadRaResultDto): Promise<ReverseAuction> {
-        return this.patch<ReverseAuction>(`/${id}/upload-result`, data);
+    async uploadResult(raId: number, data: UploadRaResultDto): Promise<ReverseAuction> {
+        return this.patch<ReverseAuction>(`/${raId}/upload-result`, data);
     }
 }
 

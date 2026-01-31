@@ -14,14 +14,12 @@ import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
-import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer } from '@/modules/tendering/costing-approvals/helpers/costing-approval.types';
+import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer, CostingApprovalTab } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 
-type TabKey = 'pending' | 'approved' | 'tender-dnb';
-
 const CostingApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [activeTab, setActiveTab] = useState<CostingApprovalTab>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -42,7 +40,7 @@ const CostingApprovalListPage = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingApprovals(
-        activeTab as TabKey,
+        activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
@@ -89,17 +87,17 @@ const CostingApprovalListPage = () => {
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'pending' as CostingApprovalTab,
                 name: 'Pending Approval',
                 count: counts?.pending ?? 0,
             },
             {
-                key: 'approved' as TabKey,
+                key: 'approved' as CostingApprovalTab,
                 name: 'Approved',
                 count: counts?.approved ?? 0,
             },
             {
-                key: 'tender-dnb' as TabKey,
+                key: 'tender-dnb' as CostingApprovalTab,
                 name: 'Tender DNB',
                 count: counts?.['tender-dnb'] ?? 0,
             },
@@ -111,7 +109,7 @@ const CostingApprovalListPage = () => {
             headerName: 'Tender',
             filter: true,
             flex: 2,
-            minWidth: 250,
+            minWidth: 200,
         }),
         {
             field: 'teamMemberName',
@@ -138,25 +136,11 @@ const CostingApprovalListPage = () => {
             colId: 'emdAmount',
             headerName: 'EMD',
             flex: 1,
-            minWidth: 130,
+            minWidth: 100,
             valueGetter: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
             },
             sortable: true,
             filter: true,
@@ -178,20 +162,6 @@ const CostingApprovalListPage = () => {
             minWidth: 130,
             valueGetter: (params: any) => {
                 const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'submittedBudgetPrice',
-            colId: 'submittedBudgetPrice',
-            headerName: 'TE Budget',
-            flex: 1,
-            minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedBudgetPrice;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
             },
@@ -323,7 +293,7 @@ const CostingApprovalListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingApprovalTab)}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
@@ -354,9 +324,9 @@ const CostingApprovalListPage = () => {
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'submitted' && 'Submitted costing sheets will appear here for approval'}
+                                                {tab.key === 'pending' && 'Pending costing sheets will appear here for approval'}
                                                 {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
-                                                {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
+                                                {tab.key === 'tender-dnb' && 'Tender DNB costing sheets will appear here'}
                                             </p>
                                         </div>
                                     ) : (

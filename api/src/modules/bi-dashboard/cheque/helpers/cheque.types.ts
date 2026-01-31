@@ -1,6 +1,5 @@
 export interface ChequeDashboardRow {
     id: number;
-    date: Date | null;
     chequeNo: string | null;
     payeeName: string | null;
     bidValidity: Date | null;
@@ -8,7 +7,7 @@ export interface ChequeDashboardRow {
     type: string | null;
     cheque: string | null;
     dueDate: Date | null;
-    expiry: Date | null;
+    expiry: string | null;
     chequeStatus: string | null;
 }
 

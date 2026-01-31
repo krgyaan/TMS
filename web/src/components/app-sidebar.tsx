@@ -57,8 +57,8 @@ const navMain: NavGroup[] = [
             { title: "Costing Sheets", url: paths.tendering.costingSheets, permission: "costing-sheets" },
             { title: "Costing Approval", url: paths.tendering.costingApprovals, permission: "costing-approvals" },
             { title: "Bid Submissions", url: paths.tendering.bidSubmissions, permission: "bid-submissions" },
-            { title: "TQs", url: paths.tendering.tqManagement, permission: "tq-management" },
-            { title: "RA", url: paths.tendering.ras, permission: "reverse-auction" },
+            { title: "TQ Management", url: paths.tendering.tqManagement, permission: "tq-management" },
+            { title: "RA Management", url: paths.tendering.ras, permission: "reverse-auction" },
             { title: "Results", url: paths.tendering.results, permission: "tender-result" },
         ],
     },
@@ -69,6 +69,7 @@ const navMain: NavGroup[] = [
             { title: "Work Order", url: paths.operations.workOrder, permission: "work-orders" },
             { title: "Kick Off", url: paths.operations.kickOff, permission: "kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "contract-agreement" },
+            { title: "Project Dashboard", url: paths.operations.projectDashboard, permission: "project-dashboard" },
         ],
     },
     {

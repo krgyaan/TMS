@@ -17,6 +17,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -58,6 +59,7 @@ export class CostingSheetsService {
         private readonly googleDriveService: GoogleDriveService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     private determineCostingStatus(
@@ -103,13 +105,13 @@ export class CostingSheetsService {
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            conditions.push(isNull(tenderCostingSheets.id));
-            conditions.push(isNull(tenderCostingSheets.submittedFinalPrice));
+            conditions.push(or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
+                isNull(tenderCostingSheets.submittedFinalPrice)) as any);
         } else if (activeTab === 'submitted') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            conditions.push(isNotNull(tenderCostingSheets.submittedFinalPrice));
+            conditions.push(or(eq(tenderCostingSheets.status, 'Submitted'),
+                isNotNull(tenderCostingSheets.submittedFinalPrice)) as any);
         } else if (activeTab === 'tender-dnb') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             conditions.push(inArray(tenderInfos.status, [8, 34]));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -210,70 +212,6 @@ export class CostingSheetsService {
             .offset(offset)
             .orderBy(orderByClause);
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            const enrichedRows = rows.map((row) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    teamMemberName: row.teamMemberName,
-                    itemName: row.itemName,
-                    status: row.status,
-                    statusName: row.statusName,
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    dueDate: row.dueDate,
-                    emdAmount: row.emdAmount,
-                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
-                    costingStatus: this.determineCostingStatus(row.costingSheetId, row.costingSheetStatus),
-                    submittedFinalPrice: row.submittedFinalPrice,
-                    submittedBudgetPrice: row.submittedBudgetPrice,
-                    googleSheetUrl: row.googleSheetUrl,
-                    costingSheetId: row.costingSheetId,
-                };
-            });
-
-            return wrapPaginatedResponse(enrichedRows, total, page, limit);
-        }
-
         const data = rows.map((row) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
@@ -309,13 +247,14 @@ export class CostingSheetsService {
         const pendingConditions = [
             ...baseConditions,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(tenderCostingSheets.id),
-            isNull(tenderCostingSheets.submittedFinalPrice),
+            or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
+                isNull(tenderCostingSheets.submittedFinalPrice)),
         ];
         const submittedConditions = [
             ...baseConditions,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
+            or(eq(tenderCostingSheets.status, 'Submitted'),
+                isNotNull(tenderCostingSheets.submittedFinalPrice)),
         ];
 
         const tenderDnbConditions = [
@@ -442,6 +381,38 @@ export class CostingSheetsService {
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
 
+        // TIMER TRANSITION: Complete costing_sheets step
+        try {
+            this.logger.log(`Transitioning timers for tender ${data.tenderId} after costing sheet submitted`);
+
+            // Get workflow status
+            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
+
+            // Complete the costing_sheets step
+            const costingSheetsStep = workflowStatus.steps.find(step =>
+                step.stepKey === 'costing_sheets' && step.status === 'IN_PROGRESS'
+            );
+
+            if (costingSheetsStep) {
+                this.logger.log(`Completing costing_sheets step ${costingSheetsStep.id} for tender ${data.tenderId}`);
+                await this.workflowService.completeStep(costingSheetsStep.id.toString(), {
+                    userId: data.submittedBy.toString(),
+                    notes: 'Costing sheet submitted'
+                });
+                this.logger.log(`Successfully completed costing_sheets step for tender ${data.tenderId}`);
+            } else {
+                this.logger.warn(`No active costing_sheets step found for tender ${data.tenderId}`);
+                // Try to find any costing_sheets step
+                const anyCostingSheetsStep = workflowStatus.steps.find(step => step.stepKey === 'costing_sheets');
+                if (anyCostingSheetsStep) {
+                    this.logger.warn(`Found costing_sheets step ${anyCostingSheetsStep.id} with status ${anyCostingSheetsStep.status}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Failed to transition timers for tender ${data.tenderId} after costing sheet submitted:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
+
         return result[0];
     }
 
@@ -502,6 +473,40 @@ export class CostingSheetsService {
 
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(costingSheet.tenderId, result, changedBy);
+
+        // TIMER TRANSITION: Complete costing_sheets step if status is 'Submitted'
+        if (updateData.status === 'Submitted') {
+            try {
+                this.logger.log(`Transitioning timers for tender ${costingSheet.tenderId} after costing sheet resubmitted`);
+
+                // Get workflow status
+                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', costingSheet.tenderId.toString());
+
+                // Complete the costing_sheets step
+                const costingSheetsStep = workflowStatus.steps.find(step =>
+                    step.stepKey === 'costing_sheets' && step.status === 'IN_PROGRESS'
+                );
+
+                if (costingSheetsStep) {
+                    this.logger.log(`Completing costing_sheets step ${costingSheetsStep.id} for tender ${costingSheet.tenderId}`);
+                    await this.workflowService.completeStep(costingSheetsStep.id.toString(), {
+                        userId: changedBy.toString(),
+                        notes: 'Costing sheet resubmitted'
+                    });
+                    this.logger.log(`Successfully completed costing_sheets step for tender ${costingSheet.tenderId}`);
+                } else {
+                    this.logger.warn(`No active costing_sheets step found for tender ${costingSheet.tenderId}`);
+                    // Try to find any costing_sheets step
+                    const anyCostingSheetsStep = workflowStatus.steps.find(step => step.stepKey === 'costing_sheets');
+                    if (anyCostingSheetsStep) {
+                        this.logger.warn(`Found costing_sheets step ${anyCostingSheetsStep.id} with status ${anyCostingSheetsStep.status}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to transition timers for tender ${costingSheet.tenderId} after costing sheet resubmitted:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
+        }
 
         return result;
     }

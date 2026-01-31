@@ -119,6 +119,15 @@ const Checklists = () => {
             filter: true,
         },
         {
+            field: 'itemName',
+            colId: 'itemName',
+            headerName: 'Item',
+            width: 150,
+            valueGetter: (params: any) => params.data?.itemName || '—',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'gstValues',
             colId: 'gstValues',
             headerName: 'Tender Value',
@@ -135,7 +144,7 @@ const Checklists = () => {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            width: 150,
+            width: 160,
             valueGetter: (params: any) => params.data?.statusName || '—',
             sortable: true,
             filter: true,
@@ -152,7 +161,7 @@ const Checklists = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;

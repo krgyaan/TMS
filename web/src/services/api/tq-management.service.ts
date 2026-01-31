@@ -49,6 +49,8 @@ class TqManagementService extends BaseApiService {
     }
 
     async createTqReceived(data: CreateTqReceivedDto): Promise<TenderQuery> {
+        console.log('Creating TQ received:', data);
+        console.log('this:', this);
         return this.post<TenderQuery>('/received', data);
     }
 

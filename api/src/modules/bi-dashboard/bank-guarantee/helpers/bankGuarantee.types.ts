@@ -15,7 +15,6 @@ export interface BankGuaranteeDashboardRow {
     fdrNo: string | null;
     fdrValue: number | null;
     tenderStatus: string | null;
-    expiry: Date | null;
     expiryStatus: string | null;
     bgStatus: string | null;
 }

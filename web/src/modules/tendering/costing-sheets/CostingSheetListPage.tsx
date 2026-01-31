@@ -13,16 +13,17 @@ import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { CostingSheetDashboardRow, CostingSheetDashboardRowWithTimer, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
+import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import { tenderNameCol } from "@/components/data-grid/columns";
 import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import axiosInstance from "@/lib/axios";
 
 const CostingSheets = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
@@ -35,6 +36,7 @@ const CostingSheets = () => {
         suggestedName?: string;
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [isConnectingDrive, setIsConnectingDrive] = useState(false);
 
     const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
@@ -56,7 +58,7 @@ const CostingSheets = () => {
     }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
-        activeTab as TabKey,
+        activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
@@ -122,11 +124,39 @@ const CostingSheets = () => {
         }
     }, [duplicateInfo, createSheetWithNameMutation]);
 
-    const handleConnectDrive = useCallback(() => {
-        // Redirect to Google OAuth with Drive scopes
-        const authUrl = `${import.meta.env.VITE_API_URL}/integrations/google/drive-auth-url`;
-        window.location.href = authUrl;
-    }, []);
+    const handleConnectDrive = useCallback(async () => {
+        if (isConnectingDrive) return;
+
+        setIsConnectingDrive(true);
+        try {
+            // Fetch the OAuth URL from the API
+            const response = await axiosInstance.get('/integrations/google/drive-auth-url');
+            const data = response.data;
+
+            // Check if user already has scopes
+            if (data.hasScopes) {
+                toast.success('Google Drive is already connected');
+                setConnectDriveOpen(false);
+                return;
+            }
+
+            // Extract the OAuth URL from the response
+            if (data.url && typeof data.url === 'string') {
+                // Redirect to Google OAuth
+                window.location.href = data.url;
+            } else {
+                throw new Error('Invalid response from server: missing OAuth URL');
+            }
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.message ||
+                error?.message ||
+                'Failed to connect Google Drive. Please try again.';
+            toast.error(errorMessage);
+            console.error('Failed to get Google Drive auth URL:', error);
+        } finally {
+            setIsConnectingDrive(false);
+        }
+    }, [isConnectingDrive]);
 
     const costingSheetActions: ActionItem<CostingSheetDashboardRowWithTimer>[] = useMemo(() => [
         {
@@ -172,17 +202,17 @@ const CostingSheets = () => {
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'pending' as CostingSheetTab,
                 name: 'Costing Sheet Pending',
                 count: counts?.pending || 0,
             },
             {
-                key: 'submitted' as TabKey,
+                key: 'submitted' as CostingSheetTab,
                 name: 'Costing Sheet Submitted',
                 count: counts?.submitted || 0,
             },
             {
-                key: 'tender-dnb' as TabKey,
+                key: 'tender-dnb' as CostingSheetTab,
                 name: 'Tender DNB',
                 count: counts?.['tender-dnb'] || 0,
             },
@@ -227,23 +257,10 @@ const CostingSheets = () => {
             filter: true,
         },
         {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            width: 120,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            width: 120,
+            width: 150,
             sortable: true,
             filter: true,
             cellRenderer: (params: any) => {
@@ -279,19 +296,6 @@ const CostingSheets = () => {
             filter: true,
         },
         {
-            field: 'submittedBudgetPrice',
-            colId: 'submittedBudgetPrice',
-            headerName: 'Budget',
-            width: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedBudgetPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
             field: 'googleSheetUrl',
             headerName: 'Sheet',
             width: 80,
@@ -316,7 +320,7 @@ const CostingSheets = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -398,7 +402,7 @@ const CostingSheets = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingSheetTab)}>
                     <TabsList className="m-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
@@ -482,11 +486,15 @@ const CostingSheets = () => {
                         </ul>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConnectDriveOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConnectDriveOpen(false)}
+                            disabled={isConnectingDrive}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleConnectDrive}>
-                            Connect Google Drive
+                        <Button onClick={handleConnectDrive} disabled={isConnectingDrive}>
+                            {isConnectingDrive ? 'Connecting...' : 'Connect Google Drive'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

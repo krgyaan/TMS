@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { PhysicalDocsFormSchema } from './physicalDocs.schema';
 import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import { useMemo } from 'react';
+import { useDocumentsSubmitted } from '@/hooks/api/useDocumentsSubmitted';
+import { useCourierDashboard } from '@/modules/shared/courier/courier.hooks';
 
 // Form Values Type
 export type PhysicalDocsFormValues = z.infer<typeof PhysicalDocsFormSchema>;
@@ -108,19 +111,27 @@ export interface PhysicalDocsDashboardCounts {
     total: number;
 }
 
-// Constants - Courier Options
-export const courierOptions = [
-    { value: '1', label: '1' },
-    { value: '2', label: '2' },
-    { value: '3', label: '3' },
-    { value: '4', label: '4' },
-    { value: '5', label: '5' },
-];
+export const useDocumentSubmittedOptions = () => {
+    const { data: documentSubmitted = [] } = useDocumentsSubmitted();
 
-// Constants - Submitted Docs Options
-export const submittedDocsOptions = [
-    { value: 'technicalBid', label: 'Technical Bid' },
-    { value: 'financialBid', label: 'Financial Bid' },
-    { value: 'emd', label: 'EMD' },
-    { value: 'other', label: 'Other' },
-];
+    return useMemo(
+        () => documentSubmitted.map((d) => ({ value: String(d.id), label: d.name })),
+        [documentSubmitted]
+    );
+};
+
+export const useCourierOptions = () => {
+    const { data: courier = [] } = useCourierDashboard();
+
+    // Defensive to avoid the 'map' error if courier is not an array
+    return useMemo(
+        () =>
+            Array.isArray(courier)
+                ? courier.map((c: any) => ({
+                    value: String(c.courierNo),
+                    label: `${c.courierNo} - ${c.courierName}`,
+                }))
+                : [],
+        [courier]
+    );
+}

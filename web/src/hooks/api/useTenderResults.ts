@@ -73,7 +73,17 @@ export const useTenderResult = (id: number | null) => {
 export const useTenderResultByTenderId = (tenderId: number | null) => {
     return useQuery<TenderResult | null>({
         queryKey: tenderId ? tenderResultKey.byTender(tenderId) : tenderResultKey.byTender(0),
-        queryFn: () => tenderResultService.getByTenderId(tenderId!),
+        queryFn: async () => {
+            try {
+                return await tenderResultService.getByTenderId(tenderId!);
+            } catch (error: any) {
+                // Handle 404 gracefully - return null if resource doesn't exist
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
         enabled: !!tenderId,
     });
 };
@@ -83,11 +93,11 @@ export const useUploadResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UploadResultFormPageProps }) =>
-            tenderResultService.uploadResult(id, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: UploadResultFormPageProps }) =>
+            tenderResultService.uploadResult(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
-            queryClient.invalidateQueries({ queryKey: tenderResultKey.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderResultKey.counts() });
             toast.success("Result uploaded successfully");
         },

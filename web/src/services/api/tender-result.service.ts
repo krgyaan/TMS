@@ -12,9 +12,6 @@ class TenderResultService extends BaseApiService {
 
     async getAll(params?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
         const search = new URLSearchParams();
-        console.log('=== tenderResultService.getAll ===');
-        console.log('params:', params);
-
         if (params) {
             if (params.tab) {
                 search.set('tab', params.tab);
@@ -43,7 +40,6 @@ class TenderResultService extends BaseApiService {
             const result = await this.get<PaginatedResult<ResultDashboardRow>>(url);
             return result;
         } catch (error) {
-            console.error('=== tenderResultService.getAll Error ===');
             console.error('error:', error);
             throw error;
         }
@@ -70,7 +66,6 @@ class TenderResultService extends BaseApiService {
             const result = await this.get<ResultDashboardCounts>('/dashboard/counts');
             return result;
         } catch (error) {
-            console.error('=== tenderResultService.getCounts Error ===');
             console.error('error:', error);
             throw error;
         }

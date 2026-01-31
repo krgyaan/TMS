@@ -17,6 +17,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -48,6 +49,7 @@ export class DocumentChecklistsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     /**
@@ -286,6 +288,42 @@ export class DocumentChecklistsService {
         } catch (error) {
             this.logger.error(`Failed to send document checklist submitted email for tender ${createDocumentChecklistDto.tenderId}: ${error instanceof Error ? error.message : String(error)}`);
             // Continue execution - email failure shouldn't break the main operation
+        }
+
+        // TIMER TRANSITION: Complete document_checklist step
+        try {
+            this.logger.log(`Transitioning timers for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted`);
+
+            // Get tender to find team member for userId
+            const tender = await this.tenderInfosService.findById(createDocumentChecklistDto.tenderId);
+            const userId = tender?.teamMember || 1; // Use team member or default to 1
+
+            // Get workflow status
+            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', createDocumentChecklistDto.tenderId.toString());
+
+            // Complete the document_checklist step
+            const documentChecklistStep = workflowStatus.steps.find(step =>
+                step.stepKey === 'document_checklist' && step.status === 'IN_PROGRESS'
+            );
+
+            if (documentChecklistStep) {
+                this.logger.log(`Completing document_checklist step ${documentChecklistStep.id} for tender ${createDocumentChecklistDto.tenderId}`);
+                await this.workflowService.completeStep(documentChecklistStep.id.toString(), {
+                    userId: userId.toString(),
+                    notes: 'Document checklist submitted'
+                });
+                this.logger.log(`Successfully completed document_checklist step for tender ${createDocumentChecklistDto.tenderId}`);
+            } else {
+                this.logger.warn(`No active document_checklist step found for tender ${createDocumentChecklistDto.tenderId}`);
+                // Try to find any document_checklist step
+                const anyDocumentChecklistStep = workflowStatus.steps.find(step => step.stepKey === 'document_checklist');
+                if (anyDocumentChecklistStep) {
+                    this.logger.warn(`Found document_checklist step ${anyDocumentChecklistStep.id} with status ${anyDocumentChecklistStep.status}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Failed to transition timers for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted:`, error);
+            // Don't fail the entire operation if timer transition fails
         }
 
         return result;

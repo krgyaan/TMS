@@ -1,5 +1,7 @@
 export type TenderFileContext =
     | 'tender-documents'
+    | 'bg-format-files'
+    | 'bg-po-files'
     | 'emds'
     | 'tender-fees'
     | 'physical-docs'
@@ -17,8 +19,9 @@ export type TenderFileContext =
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
-    | 'reverse-auctions'
-    | 'ra-screenshots'
+    | 'screenshot_qualified_parties'
+    | 'screenshot_decrements'
+    | 'final_result_screenshot'
     | 'result-screenshots';
 
 export interface FileConfig {

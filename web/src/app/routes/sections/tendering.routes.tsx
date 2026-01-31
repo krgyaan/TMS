@@ -24,6 +24,8 @@ const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/Emd
 const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
 const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdEditPage'));
 const Tendering_EMD_Show = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdShowPage'));
+const Tendering_OldEmd_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/OldEmdCreatePage'));
+const Tendering_BiOtherThanEmd_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/BiOtherThanEmdCreatePage'));
 const Tendering_DocumentChecklist = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistListPage'));
 const Tendering_DocumentChecklist_Create = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistCreatePage'));
 const Tendering_DocumentChecklist_Edit = lazy(() => import('@/modules/tendering/checklists/DocumentChecklistEditPage'));
@@ -88,6 +90,8 @@ export default function TenderingRoutes() {
             <Route path="emds-tenderfees/:id/edit" element={<RouteWrapper><Tendering_EMD_Edit /></RouteWrapper>} />
             <Route path="emds-tenderfees/:id" element={<RouteWrapper><Tendering_EMD_Show /></RouteWrapper>} />
             <Route path="document-checklists" element={<RouteWrapper><Tendering_DocumentChecklist /></RouteWrapper>} />
+            <Route path="emds-tenderfees/old-entries/create" element={<RouteWrapper><Tendering_OldEmd_Create /></RouteWrapper>} />
+            <Route path="emds-tenderfees/bi-other-than-emds/create" element={<RouteWrapper><Tendering_BiOtherThanEmd_Create /></RouteWrapper>} />
             <Route path="document-checklists/create/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Create /></RouteWrapper>} />
             <Route path="document-checklists/edit/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Edit /></RouteWrapper>} />
             <Route path="document-checklists/:id" element={<RouteWrapper><Tendering_DocumentChecklist_Show /></RouteWrapper>} />
@@ -117,14 +121,14 @@ export default function TenderingRoutes() {
             <Route path="tq-management/view/:id" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
             <Route path="tq-management/view-all/:tenderId" element={<RouteWrapper><TqViewAllPage /></RouteWrapper>} />
             <Route path="reverse-auctions" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
-            <Route path="ras/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />
+            <Route path="reverse-auctions/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />
             <Route path="reverse-auctions/upload-result/:raId" element={<RouteWrapper><Tendering_RA_UploadResult /></RouteWrapper>} />
             <Route path="reverse-auctions/:id" element={<RouteWrapper><Tendering_RA_Show /></RouteWrapper>} />
             <Route path="reverse-auctions/:id/edit" element={<RouteWrapper><Tendering_RA_Edit /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
             <Route path="results/upload/:tenderId" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
-            <Route path="results/:id" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
-            <Route path="results/:id/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
+            <Route path="results/:tenderId" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
+            <Route path="results/:tenderId/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
         </Routes>
     );
 }

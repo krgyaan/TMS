@@ -27,6 +27,7 @@ import { Logger } from '@nestjs/common';
 import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -83,6 +84,7 @@ export class PhysicalDocsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService,
     ) { }
 
     /**
@@ -196,7 +198,7 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause);
@@ -225,75 +227,13 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause)
             .limit(limit)
             .offset(offset)
             .orderBy(orderByClause);
-
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            const enrichedRows = rows.map((row) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    dueDate: row.dueDate,
-                    courierAddress: row.courierAddress || '',
-                    physicalDocsRequired: row.physicalDocsRequired || '',
-                    physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
-                    teamMemberName: row.teamMemberName || '',
-                    status: row.status,
-                    statusName: row.statusName || '',
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    physicalDocs: row.physicalDocs,
-                    courierNo: row.courierNo || null,
-                    courierDate: row.courierDate || null,
-                };
-            });
-
-            return wrapPaginatedResponse(enrichedRows, total, page, limit);
-        }
 
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
@@ -353,7 +293,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...pendingConditions))
@@ -363,7 +303,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...sentConditions))
@@ -373,7 +313,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...tenderDnbConditions))
@@ -573,6 +513,39 @@ export class PhysicalDocsService {
         }).then(async (result) => {
             // Send email notification after transaction
             await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+
+            // TIMER TRANSITION: Complete physical_docs step
+            try {
+                this.logger.log(`Transitioning timers for tender ${data.tenderId} after physical docs submitted`);
+
+                // Get workflow status
+                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
+
+                // Complete the physical_docs step
+                const physicalDocsStep = workflowStatus.steps.find(step =>
+                    step.stepKey === 'physical_docs' && step.status === 'IN_PROGRESS'
+                );
+
+                if (physicalDocsStep) {
+                    this.logger.log(`Completing physical_docs step ${physicalDocsStep.id} for tender ${data.tenderId}`);
+                    await this.workflowService.completeStep(physicalDocsStep.id.toString(), {
+                        userId: changedBy.toString(),
+                        notes: 'Physical docs submitted'
+                    });
+                    this.logger.log(`Successfully completed physical_docs step for tender ${data.tenderId}`);
+                } else {
+                    this.logger.warn(`No active physical_docs step found for tender ${data.tenderId}`);
+                    // Try to find any physical_docs step
+                    const anyPhysicalDocsStep = workflowStatus.steps.find(step => step.stepKey === 'physical_docs');
+                    if (anyPhysicalDocsStep) {
+                        this.logger.warn(`Found physical_docs step ${anyPhysicalDocsStep.id} with status ${anyPhysicalDocsStep.status}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to transition timers for tender ${data.tenderId} after physical docs submitted:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
+
             return result;
         });
     }

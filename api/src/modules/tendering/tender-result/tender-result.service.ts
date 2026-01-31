@@ -186,7 +186,6 @@ export class TenderResultService {
         try {
             const sqlQuery = query.toSQL();
             dataQuerySql = JSON.stringify(sqlQuery);
-            this.logger.debug(`[TenderResult] SQL Query: ${dataQuerySql}`);
         } catch (error) {
             this.logger.debug(`[TenderResult] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -456,12 +455,42 @@ export class TenderResultService {
 
     async findByTenderId(tenderId: number) {
         const [result] = await this.db
-            .select()
+            .select({
+                result: tenderResults,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamExecutiveName: users.name,
+                tenderValue: tenderInfos.gstValues,
+                costingFinalPrice: tenderCostingSheets.finalPrice,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
+            })
             .from(tenderResults)
+            .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
-        return result || null;
+        if (!result) {
+            return null;
+        }
+
+        return {
+            ...result.result,
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            teamExecutiveName: result.teamExecutiveName,
+            tenderValue: result.tenderValue,
+            finalPrice: result.costingFinalPrice || result.tenderValue,
+            itemName: result.itemName,
+            tenderStatus: result.tenderStatus,
+            raApplicable: result.reverseAuctionApplicable === 'Yes',
+        };
     }
 
     async getOrCreateForTender(tenderId: number): Promise<{ id: number; isNew: boolean }> {

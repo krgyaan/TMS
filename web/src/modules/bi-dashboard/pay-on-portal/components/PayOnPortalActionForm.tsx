@@ -28,7 +28,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (POP) 1 - Request to Portal' },
+    { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned', label: 'Returned' },
     { value: 'settled', label: 'Settled' },
@@ -108,7 +108,7 @@ export function PayOnPortalActionForm({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="!max-w-1/2 w-full max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Pay on Portal Action Form</DialogTitle>
                     <DialogDescription>

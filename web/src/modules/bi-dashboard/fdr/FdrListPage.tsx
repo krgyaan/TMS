@@ -12,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
 import type { FdrDashboardRow, FdrDashboardTab } from './helpers/fdr.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { FdrActionForm } from './components/FdrActionForm';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const TABS_CONFIG: Array<{ key: FdrDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -146,16 +148,18 @@ const FdrListPage = () => {
 
     const colDefs = useMemo<ColDef<FdrDashboardRow>[]>(
         () => [
-            dateCol<FdrDashboardRow>('fdrCreationDate', {
-                headerName: 'FDR Creation Date',
-                width: 160,
+            {
+                field: 'fdrCreationDate',
+                headerName: 'FDR Date',
+                width: 110,
                 colId: 'fdrCreationDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'fdrNo',
                 headerName: 'FDR No',
-                width: 120,
+                width: 130,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
@@ -164,21 +168,22 @@ const FdrListPage = () => {
             {
                 field: 'beneficiaryName',
                 headerName: 'Beneficiary name',
-                width: 180,
+                maxWidth: 200,
                 colId: 'beneficiaryName',
                 valueGetter: (params) => params.data?.beneficiaryName || '—',
                 sortable: true,
                 filter: true,
             },
-            currencyCol<FdrDashboardRow>('fdrAmount', {
-                field:'fdrAmount',
+            {
+                field: 'fdrAmount',
                 headerName: 'FDR Amount',
                 width: 130,
                 colId: 'fdrAmount',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             tenderNameCol<FdrDashboardRow>('tenderNo', {
-                field:'tenderNo',
+                field: 'tenderNo',
                 headerName: 'Tender Name',
                 width: 200,
                 colId: 'tenderNo',
@@ -202,12 +207,14 @@ const FdrListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            dateCol<FdrDashboardRow>('expiry', {
+            {
+                field: 'expiry',
                 headerName: 'Expiry',
                 width: 120,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
             {
                 field: 'fdrStatus',
                 headerName: 'FDR Status',

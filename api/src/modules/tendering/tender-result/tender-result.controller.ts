@@ -52,7 +52,7 @@ export class TenderResultController {
         return this.tenderResultService.createForTender(tenderId);
     }
 
-    @Patch(':id/upload-result')
+    @Post(':id/upload-result')
     async uploadResult(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UploadResultDto,

@@ -16,6 +16,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -59,6 +60,7 @@ export class BidSubmissionsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly workflowService: WorkflowService,
     ) { }
 
 
@@ -427,6 +429,38 @@ export class BidSubmissionsService {
 
         // Send email notification
         await this.sendBidSubmittedEmail(data.tenderId, result, data.submittedBy);
+
+        // TIMER TRANSITION: Complete bid_submission step
+        try {
+            this.logger.log(`Transitioning timers for tender ${data.tenderId} after bid submitted`);
+
+            // Get workflow status
+            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
+
+            // Complete the bid_submission step
+            const bidSubmissionStep = workflowStatus.steps.find(step =>
+                step.stepKey === 'bid_submission' && step.status === 'IN_PROGRESS'
+            );
+
+            if (bidSubmissionStep) {
+                this.logger.log(`Completing bid_submission step ${bidSubmissionStep.id} for tender ${data.tenderId}`);
+                await this.workflowService.completeStep(bidSubmissionStep.id.toString(), {
+                    userId: data.submittedBy.toString(),
+                    notes: 'Bid submitted'
+                });
+                this.logger.log(`Successfully completed bid_submission step for tender ${data.tenderId}`);
+            } else {
+                this.logger.warn(`No active bid_submission step found for tender ${data.tenderId}`);
+                // Try to find any bid_submission step
+                const anyBidSubmissionStep = workflowStatus.steps.find(step => step.stepKey === 'bid_submission');
+                if (anyBidSubmissionStep) {
+                    this.logger.warn(`Found bid_submission step ${anyBidSubmissionStep.id} with status ${anyBidSubmissionStep.status}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Failed to transition timers for tender ${data.tenderId} after bid submitted:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
 
         return result;
     }

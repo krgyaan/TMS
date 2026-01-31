@@ -58,6 +58,7 @@ class BankTransfersService extends BaseApiService {
     }
 
     async updateAction(id: number, formData: FormData): Promise<any> {
+        console.log('Action Form Data:', formData);
         return this.put<any, FormData>(`/instruments/${id}/action`, formData);
     }
 }

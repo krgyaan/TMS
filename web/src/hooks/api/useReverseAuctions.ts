@@ -61,15 +61,23 @@ export const useReverseAuction = (id: number) => {
     });
 };
 
+// Fetch RA by tenderId
+export const useReverseAuctionByTender = (tenderId: number) => {
+    return useQuery<ReverseAuction>({
+        queryKey: [...reverseAuctionsKey.details(), 'byTender', tenderId],
+        queryFn: () => reverseAuctionService.getByTenderId(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
 // Schedule RA mutation
 export const useScheduleRa = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(id, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(tenderId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
-            // Explicitly invalidate dashboard counts to ensure they refresh
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
         },
     });
@@ -80,7 +88,7 @@ export const useUploadRaResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(id, data),
+        mutationFn: ({ raId, data }: { raId: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(raId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
