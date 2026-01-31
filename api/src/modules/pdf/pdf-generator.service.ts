@@ -9,6 +9,8 @@ import { PDF_CONFIG, getOutputPath, getRelativePath, getPaperSize } from './conf
 export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(PdfGeneratorService.name);
     private browser: Browser | null = null;
+    private readonly maxRetries = 3;
+    private readonly retryDelays = [1000, 2000, 4000]; // Exponential backoff in milliseconds
 
     async onModuleInit() {
         try {
@@ -16,7 +18,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             this.logger.log('Puppeteer browser launched successfully');
         } catch (error) {
             this.logger.error(`Failed to launch Puppeteer browser: ${error instanceof Error ? error.message : String(error)}`);
-            // Don't throw - PDF generation will fail gracefully later
+            // Don't throw - PDF generation will fail gracefully later with retry logic
         }
     }
 
@@ -183,11 +185,70 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Ensure browser is initialized, with retry logic and lazy initialization
+     * Attempts to initialize the browser if it's null, with exponential backoff retries
+     */
+    private async ensureBrowser(): Promise<void> {
+        if (this.browser) {
+            return;
+        }
+
+        this.logger.warn('Browser not initialized, attempting to initialize with retry logic...');
+
+        for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+            try {
+                this.browser = await puppeteer.launch(PDF_CONFIG.browserOptions);
+                this.logger.log(`Puppeteer browser launched successfully (attempt ${attempt + 1}/${this.maxRetries})`);
+                return;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.warn(`Failed to launch Puppeteer browser (attempt ${attempt + 1}/${this.maxRetries}): ${errorMessage}`);
+
+                if (attempt < this.maxRetries - 1) {
+                    const delay = this.retryDelays[attempt];
+                    this.logger.log(`Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    // Last attempt failed
+                    const detailedError = this.buildDetailedError(errorMessage);
+                    this.logger.error(`Failed to initialize Puppeteer browser after ${this.maxRetries} attempts: ${detailedError}`);
+                    throw new Error(detailedError);
+                }
+            }
+        }
+    }
+
+    /**
+     * Build a detailed error message with actionable information
+     */
+    private buildDetailedError(originalError: string): string {
+        let message = `Puppeteer browser initialization failed: ${originalError}`;
+
+        if (originalError.includes('Could not find Chrome')) {
+            message += '\n\nPossible solutions:';
+            message += '\n1. Run: npx puppeteer browsers install chrome';
+            message += '\n2. Ensure the postinstall script ran successfully during package installation';
+            message += '\n3. Check that the cache path is correctly configured';
+            message += '\n4. Verify disk space is available for browser installation';
+        } else if (originalError.includes('Failed to launch')) {
+            message += '\n\nPossible solutions:';
+            message += '\n1. Check system permissions';
+            message += '\n2. Verify required system dependencies are installed';
+            message += '\n3. Check available memory and system resources';
+        }
+
+        return message;
+    }
+
+    /**
      * Convert HTML to PDF using Puppeteer
      */
     private async htmlToPdf(html: string, templateType: string): Promise<Buffer> {
+        // Ensure browser is initialized before use
+        await this.ensureBrowser();
+
         if (!this.browser) {
-            throw new Error('Puppeteer browser is not initialized');
+            throw new Error('Puppeteer browser is not initialized after retry attempts');
         }
 
         let page: Page | null = null;

@@ -21,7 +21,8 @@
         "test:e2e": "jest --config ./test/jest-e2e.json",
         "drizzle:generate": "drizzle-kit generate --config ./drizzle.config.ts",
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
-        "db:seed": "tsx src/db/seed.ts"
+        "db:seed": "tsx src/db/seed.ts",
+        "postinstall": "npx puppeteer browsers install chrome"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",
