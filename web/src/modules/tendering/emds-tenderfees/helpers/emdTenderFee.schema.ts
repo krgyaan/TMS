@@ -49,7 +49,7 @@ export const PaymentDetailsSchema = z.object({
     fdrDate: z.string().optional(),
 
     // BG fields
-    bgNeededIn: z.string().optional(),
+    bgNeededIn: z.coerce.string().optional(),
     bgPurpose: z.string().optional(),
     bgFavouring: z.string().optional(),
     bgAddress: z.string().optional(),
@@ -71,7 +71,7 @@ export const PaymentDetailsSchema = z.object({
     // Bank Transfer fields
     btPurpose: z.string().optional(),
     btAccountName: z.string().optional(),
-    btAccountNo: z.string().optional(),
+    btAccountNo: z.string().optional(), 
     btIfsc: z.string().optional(),
 
     // Portal fields
