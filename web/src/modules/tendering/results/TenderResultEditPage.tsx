@@ -1,38 +1,20 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTenderResult } from '@/hooks/api/useTenderResults';
+import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
 import UploadResultFormPage from './components/UploadResultFormPage';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { paths } from '@/app/routes/paths';
 
 export default function TenderResultEditPage() {
-    const { id } = useParams<{ id: string }>();
+    const { tenderId } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
-    const resultId = id ? Number(id) : null;
-    const { data: result, isLoading, error } = useTenderResult(resultId!);
+    const tenderIdNum = tenderId ? Number(tenderId) : null;
+    const { data: result, isLoading: isResultLoading, error: resultError } = useTenderResultByTenderId(tenderIdNum);
 
-    if (!resultId) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Invalid Result ID.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate('/tendering/results')}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    if (isLoading) {
+    if (isResultLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -49,7 +31,7 @@ export default function TenderResultEditPage() {
         );
     }
 
-    if (error || !result) {
+    if (resultError || !result) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -59,7 +41,7 @@ export default function TenderResultEditPage() {
                         variant="outline"
                         size="sm"
                         className="ml-4"
-                        onClick={() => navigate('/tendering/results')}
+                        onClick={() => navigate(paths.tendering.results)}
                     >
                         Back to List
                     </Button>
@@ -98,10 +80,10 @@ export default function TenderResultEditPage() {
 
     return (
         <UploadResultFormPage
-            resultId={resultId}
+            tenderId={result.tenderId}
             tenderDetails={tenderDetails}
             isEditMode={true}
-            onSuccess={() => navigate(`/tendering/results/${resultId}`)}
+            onSuccess={() => navigate(paths.tendering.results)}
         />
     );
 }

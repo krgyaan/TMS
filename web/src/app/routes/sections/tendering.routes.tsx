@@ -127,8 +127,8 @@ export default function TenderingRoutes() {
             <Route path="reverse-auctions/:id/edit" element={<RouteWrapper><Tendering_RA_Edit /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
             <Route path="results/upload/:tenderId" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
-            <Route path="results/:id" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
-            <Route path="results/:id/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
+            <Route path="results/:tenderId" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
+            <Route path="results/:tenderId/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
         </Routes>
     );
 }

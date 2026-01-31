@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Resolver, type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -14,8 +15,8 @@ import { Label } from "@/components/ui/label";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
-import { useUploadResult, useTenderResult } from "@/hooks/api/useTenderResults";
-import { ArrowLeft, IndianRupee, Plus, X } from "lucide-react";
+import { useUploadResult, useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
+import { ArrowLeft, IndianRupee, Plus, X, Save } from "lucide-react";
 
 const UploadResultSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No']),
@@ -41,7 +42,7 @@ const UploadResultSchema = z.object({
 type FormValues = z.infer<typeof UploadResultSchema>;
 
 interface UploadResultFormPageProps {
-    resultId: number;
+    tenderId: number;
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
@@ -63,18 +64,16 @@ const resultOptions = [
 ];
 
 export default function UploadResultFormPage({
-    resultId,
+    tenderId,
     tenderDetails,
     isEditMode = false,
     onSuccess,
 }: UploadResultFormPageProps) {
     const navigate = useNavigate();
     const uploadResultMutation = useUploadResult();
-    const { data: existingResult } = useTenderResult(resultId);
+    const { data: existingResult } = useTenderResultByTenderId(tenderId);
     const [newPartyName, setNewPartyName] = useState('');
     const [showResultDetails, setShowResultDetails] = useState(isEditMode);
-
-    console.log(tenderDetails);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(UploadResultSchema) as Resolver<FormValues>,
@@ -96,7 +95,7 @@ export default function UploadResultFormPage({
     const qualifiedPartiesScreenshot = useWatch({ control: form.control, name: 'qualifiedPartiesScreenshot' });
     const finalResultScreenshot = useWatch({ control: form.control, name: 'finalResultScreenshot' });
 
-    // Pre-populate form in edit mode
+    // Pre-populate form in edit mode when data loads
     useEffect(() => {
         if (isEditMode && existingResult) {
             const result = existingResult;
@@ -178,13 +177,13 @@ export default function UploadResultFormPage({
             }
 
             await uploadResultMutation.mutateAsync({
-                id: resultId,
+                tenderId: tenderId,
                 data: submitData,
             });
             if (onSuccess) {
                 onSuccess();
             } else {
-                navigate(`/tendering/results/${resultId}`);
+                navigate(paths.tendering.results);
             }
         } catch (error) {
             console.error('Error uploading result:', error);
@@ -199,15 +198,16 @@ export default function UploadResultFormPage({
                     {tenderDetails.tenderNo} - {tenderDetails.tenderName}
                 </CardDescription>
                 <CardAction>
-                    <Button variant="outline" onClick={() => navigate(`/tendering/results/${resultId}`)}>
-                        <ArrowLeft /> Return Back
+                    <Button variant="outline" onClick={() => navigate(paths.tendering.results)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
                     </Button>
                 </CardAction>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
                             {/* Technically Qualified */}
                             <SelectField
                                 control={form.control}
@@ -254,43 +254,46 @@ export default function UploadResultFormPage({
                                     </FieldWrapper>
 
                                     {/* Name of Qualified Parties */}
-                                    <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-medium">
-                                            Name of Qualified Parties
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={newPartyName}
-                                                onChange={(e) => setNewPartyName(e.target.value)}
-                                                placeholder="Enter party name"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        addPartyName();
-                                                    }
-                                                }}
-                                            />
+                                    <div className="flex gap-2 items-center">
+                                        <div className="flex gap-2 items-center">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="qualifiedPartiesNames"
+                                                label="Name of Qualified Parties"
+                                                description="Add party names or enter 'not known' if unknown"
+                                            >
+                                                {(_field) => (
+                                                    <Input
+                                                        value={newPartyName}
+                                                        onChange={(e) => setNewPartyName(e.target.value)}
+                                                        placeholder="Enter party name"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                addPartyName();
+                                                            }
+                                                        }}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
                                             <Button type="button" onClick={addPartyName} size="icon">
                                                 <Plus className="h-4 w-4" />
                                             </Button>
                                         </div>
-                                        {qualifiedPartiesNames.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                {qualifiedPartiesNames.map((name, index) => (
-                                                    <Badge key={index} variant="secondary" className="gap-1">
-                                                        {name}
-                                                        <X
-                                                            className="h-3 w-3 cursor-pointer"
-                                                            onClick={() => removePartyName(index)}
-                                                        />
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            Add party names or enter "not known" if unknown
-                                        </p>
                                     </div>
+                                    {qualifiedPartiesNames.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {qualifiedPartiesNames.map((name, index) => (
+                                                <Badge key={index} variant="secondary" className="gap-1">
+                                                    {name}
+                                                    <X
+                                                        className="h-3 w-3 cursor-pointer"
+                                                        onClick={() => removePartyName(index)}
+                                                    />
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Checkbox to show Result Details */}
                                     {!isEditMode && (
@@ -301,7 +304,7 @@ export default function UploadResultFormPage({
                                                 onCheckedChange={(checked) => setShowResultDetails(checked === true)}
                                             />
                                             <Label htmlFor="showResultDetails" className="text-sm font-medium cursor-pointer">
-                                                Add Result Details
+                                                Add Result Details Right Away (Optional)
                                             </Label>
                                         </div>
                                     )}
@@ -409,20 +412,19 @@ export default function UploadResultFormPage({
                             )}
                         </div>
 
-                        <div className="w-full flex items-center justify-center gap-2">
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? "Saving..." : "Upload Result"}
-                            </Button>
+                        <div className="flex justify-end gap-2 pt-4">
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => navigate(`/tendering/results/${resultId}`)}
+                                onClick={() => navigate(paths.tendering.results)}
                                 disabled={isSubmitting}
                             >
                                 Cancel
                             </Button>
-                            <Button type="button" variant="outline" onClick={() => form.reset()} disabled={isSubmitting}>
-                                Reset
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
+                                <Save className="mr-2 h-4 w-4" />
+                                Upload Result
                             </Button>
                         </div>
                     </form>
