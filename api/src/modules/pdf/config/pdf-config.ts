@@ -41,6 +41,12 @@ export const PDF_CONFIG = {
             directory: 'dd', // DD and FDR use same templates
             templates: ['receiving'],
             storagePath: 'chqcreate',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
         },
         bg: {
             directory: 'bg',
@@ -54,21 +60,45 @@ export const PDF_CONFIG = {
                 'set-off',
             ],
             storagePath: 'bgpdfs',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
         },
         ddCancellation: {
             directory: 'dd',
             templates: ['dd-cancellation'],
             storagePath: 'ddcancel',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
         },
         reqExtLetter: {
             directory: 'letters',
             templates: ['req-ext-letter'],
             storagePath: 'reqext',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
         },
         reqCancelLetter: {
             directory: 'letters',
             templates: ['req-cancel-letter'],
             storagePath: 'reqcancel',
+            margin: {
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm',
+            },
         },
         ddFormat: {
             directory: 'dd',
@@ -132,6 +162,23 @@ export function getPaperSize(templateType: string): string | { width: number; he
     }
 
     return undefined; // Use default A4
+}
+
+/**
+ * Get PDF margins for a template type
+ * Returns template-specific margins if configured, otherwise returns default margins
+ */
+export function getPdfMargins(templateType: string): { top: string; right: string; bottom: string; left: string } {
+    const typeConfig = PDF_CONFIG.templateTypes[templateType as keyof typeof PDF_CONFIG.templateTypes];
+    if (!typeConfig) {
+        return PDF_CONFIG.puppeteerOptions.margin;
+    }
+
+    if ('margin' in typeConfig && typeConfig.margin) {
+        return typeConfig.margin;
+    }
+
+    return PDF_CONFIG.puppeteerOptions.margin;
 }
 
 /**

@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { PDF_CONFIG, getOutputPath, getRelativePath, getPaperSize } from './config/pdf-config';
+import { PDF_CONFIG, getOutputPath, getRelativePath, getPaperSize, getPdfMargins } from './config/pdf-config';
 
 @Injectable()
 export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
@@ -113,6 +113,79 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Flatten PDF data structure for template access
+     * Extracts nested properties from bgDetails/ddDetails/fdrDetails, instrument, request, tender
+     * and merges them to top level so templates can access them directly
+     */
+    private flattenPdfData(data: Record<string, any>): Record<string, any> {
+        const flattened: Record<string, any> = {};
+
+        // Handle double-wrapping: data might be { data: { data: {...} } } or { data: {...} }
+        const actualData = data.data || data;
+
+        // Flatten bgDetails/ddDetails/fdrDetails - these contain the main instrument properties
+        if (actualData.bgDetails && typeof actualData.bgDetails === 'object') {
+            Object.assign(flattened, actualData.bgDetails);
+        }
+        if (actualData.ddDetails && typeof actualData.ddDetails === 'object') {
+            Object.assign(flattened, actualData.ddDetails);
+        }
+        if (actualData.fdrDetails && typeof actualData.fdrDetails === 'object') {
+            Object.assign(flattened, actualData.fdrDetails);
+        }
+
+        // Flatten tender properties
+        if (actualData.tender && typeof actualData.tender === 'object') {
+            if (actualData.tender.tenderNo) {
+                flattened.tender_no = actualData.tender.tenderNo;
+            }
+            if (actualData.tender.tenderName) {
+                flattened.tender_name = actualData.tender.tenderName;
+            }
+            if (actualData.tender.dueDate) {
+                // Format date if needed - templates might use formatDateTime helper
+                flattened.due_date_formatted = actualData.tender.dueDate;
+            }
+        }
+
+        // Flatten request properties
+        if (actualData.request && typeof actualData.request === 'object') {
+            if (actualData.request.accountNumber) {
+                flattened.account_number = actualData.request.accountNumber;
+            }
+            // Copy other request properties that might be needed
+            if (actualData.request.accountNo) {
+                flattened.account_number = actualData.request.accountNo;
+            }
+        }
+
+        // Flatten instrument properties
+        if (actualData.instrument && typeof actualData.instrument === 'object') {
+            // Copy relevant instrument properties if needed
+            // Most properties are already in bgDetails/ddDetails/fdrDetails
+        }
+
+        // Copy any top-level properties that might already be flattened
+        // This includes image base64 data, dates, etc.
+        Object.keys(actualData).forEach(key => {
+            // Skip nested objects we've already processed
+            if (!['bgDetails', 'ddDetails', 'fdrDetails', 'tender', 'request', 'instrument', 'user', 'generatedAt'].includes(key)) {
+                // Only copy primitive values or arrays, not nested objects
+                if (actualData[key] !== null && typeof actualData[key] !== 'object') {
+                    flattened[key] = actualData[key];
+                } else if (Array.isArray(actualData[key])) {
+                    flattened[key] = actualData[key];
+                }
+            }
+        });
+
+        // Preserve nested structure for backward compatibility (in case any templates use {{ data.bgDetails.bg_no }})
+        flattened.data = actualData;
+
+        return flattened;
+    }
+
+    /**
      * Render Handlebars template to HTML
      */
     private async renderTemplate(
@@ -125,8 +198,11 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         try {
             const templateContent = await fs.readFile(templatePath, 'utf-8');
             const template = Handlebars.compile(templateContent);
-            // Wrap data in 'data' object to match Laravel's structure
-            return template({ data });
+            
+            // Flatten data structure for template access
+            const flattenedData = this.flattenPdfData(data);
+            
+            return template(flattenedData);
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
                 throw new Error(`Template not found: ${templatePath}`);
@@ -291,6 +367,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             const pdfOptions: any = {
                 ...PDF_CONFIG.puppeteerOptions,
             };
+
+            // Override margins with template-specific margins
+            pdfOptions.margin = getPdfMargins(templateType);
 
             // Override paper size if custom size is specified
             if (paperSize && typeof paperSize === 'object' && 'width' in paperSize && 'height' in paperSize) {
