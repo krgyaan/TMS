@@ -143,34 +143,22 @@ const ReverseAuctionListPage = () => {
     const raData = response?.data || [];
     const totalRows = response?.meta?.total || raData.length;
 
-    const handleViewDetails = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasShow(row.id));
-    }, [navigate]);
-
-    const handleScheduleRa = useCallback((row: RaDashboardRow) => {
-        navigate(paths.tendering.rasSchedule(row.tenderId));
-    }, [navigate]);
-
-    const handleUploadResult = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasUploadResult(row.id));
-    }, [navigate]);
-
     const raActions: ActionItem<RaDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
-                onClick: handleViewDetails,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Schedule RA',
-                onClick: handleScheduleRa,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasSchedule(row.tenderId)),
                 icon: <Calendar className="h-4 w-4" />,
                 visible: (row) => row.raStatus === RA_STATUS.UNDER_EVALUATION,
             },
             {
                 label: 'Upload RA Result',
-                onClick: handleUploadResult,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasUploadResult(row.id)),
                 icon: <Upload className="h-4 w-4" />,
                 visible: (row) =>
                     [RA_STATUS.RA_SCHEDULED, RA_STATUS.RA_STARTED, RA_STATUS.RA_ENDED].includes(
@@ -178,7 +166,7 @@ const ReverseAuctionListPage = () => {
                     ),
             },
         ],
-        [handleViewDetails, handleScheduleRa, handleUploadResult]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<RaDashboardRow>[]>(
