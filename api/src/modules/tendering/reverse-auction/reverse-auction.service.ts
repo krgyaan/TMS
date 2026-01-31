@@ -662,20 +662,13 @@ export class ReverseAuctionService {
      * Schedule RA - Update with qualification details
      * Creates RA entry if it doesn't exist
      */
-    async scheduleRa(id: number | null, tenderId: number, dto: ScheduleRaDto, changedBy: number) {
-        let raId = id;
-
-        // If no RA ID provided, get or create one
-        if (!raId) {
-            const result = await this.getOrCreateForTender(tenderId);
-            raId = result.id;
-        }
-
-        const existing = await this.findById(raId);
-
+    async scheduleRa(tenderId: number, dto: ScheduleRaDto, changedBy: number) {
         // Get current tender status before update
+        console.log('scheduleRa service', tenderId, dto, changedBy);
         const currentTender = await this.tenderInfosService.findById(tenderId);
+        console.log('currentTender', currentTender);
         const prevStatus = currentTender?.status ?? null;
+        console.log('prevStatus', prevStatus);
 
         let updateData: any = {
             technicallyQualified: dto.technicallyQualified,
@@ -696,7 +689,7 @@ export class ReverseAuctionService {
             updateData.qualifiedPartiesNames = dto.qualifiedPartiesNames;
             updateData.raStartTime = dto.raStartTime ? new Date(dto.raStartTime) : null;
             updateData.raEndTime = dto.raEndTime ? new Date(dto.raEndTime) : null;
-            updateData.scheduledAt = new Date();
+            updateData.scheduledAt = dto.raStartTime ? new Date(dto.raStartTime) : new Date();
 
             // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
             newStatus = 23; // Status ID for "RA scheduled"
@@ -704,14 +697,22 @@ export class ReverseAuctionService {
         }
 
         const result = await this.db.transaction(async (tx) => {
-            const [updated] = await tx
-                .update(reverseAuctions)
-                .set(updateData)
-                .where(eq(reverseAuctions.id, raId))
+            const [inserted] = await tx
+                .insert(reverseAuctions)
+                .values({
+                    tenderId: tenderId,
+                    tenderNo: currentTender?.tenderNo ?? '',
+                    technicallyQualified: dto.technicallyQualified,
+                    disqualificationReason: dto.disqualificationReason,
+                    qualifiedPartiesCount: dto.qualifiedPartiesCount,
+                    qualifiedPartiesNames: dto.qualifiedPartiesNames,
+                    raStartTime: dto.raStartTime ? new Date(dto.raStartTime) : null,
+                    raEndTime: dto.raEndTime ? new Date(dto.raEndTime) : null,
+                })
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, raId, updated.status);
+            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status);
 
             // Update tender status if RA was scheduled
             if (newStatus !== null) {
@@ -731,7 +732,7 @@ export class ReverseAuctionService {
                 );
             }
 
-            return updated;
+            return inserted;
         });
 
         // Send email notification if RA was scheduled (not disqualified)
@@ -745,8 +746,8 @@ export class ReverseAuctionService {
     /**
      * Upload RA Result
      */
-    async uploadResult(id: number, dto: UploadRaResultDto, changedBy: number) {
-        const existing = await this.findById(id);
+    async uploadResult(raId: number, dto: UploadRaResultDto, changedBy: number) {
+        const existing = await this.findById(raId);
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(existing.tenderId);
@@ -789,11 +790,11 @@ export class ReverseAuctionService {
                     resultUploadedAt: new Date(),
                     updatedAt: new Date(),
                 })
-                .where(eq(reverseAuctions.id, id))
+                .where(eq(reverseAuctions.id, raId))
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, id, status);
+            await this.syncToTenderResult(existing.tenderId, raId, status);
 
             // Update tender status if H1 Elimination
             if (newTenderStatus !== null) {

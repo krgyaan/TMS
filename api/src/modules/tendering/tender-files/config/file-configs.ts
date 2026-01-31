@@ -19,8 +19,9 @@ export type TenderFileContext =
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
-    | 'reverse-auctions'
-    | 'ra-screenshots'
+    | 'screenshot_qualified_parties'
+    | 'screenshot_decrements'
+    | 'final_result_screenshot'
     | 'result-screenshots';
 
 export interface FileConfig {
@@ -255,9 +256,9 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
-    'reverse-auctions': {
-        maxFiles: 1,
-        maxSizeBytes: MB(5),
+    'screenshot_qualified_parties': {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
         compressImages: true,
@@ -265,8 +266,18 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
-    'ra-screenshots': {
-        maxFiles: 3,
+    'screenshot_decrements': {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'final_result_screenshot': {
+        maxFiles: 2,
         maxSizeBytes: MB(8),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
