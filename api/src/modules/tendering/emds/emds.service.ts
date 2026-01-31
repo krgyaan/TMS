@@ -521,7 +521,6 @@ export class EmdsService {
             .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
-        console.log(rows);
 
         const wrapped = wrapPaginatedResponse(rows as PendingTenderRow[], totalCount, page, limit);
         return {
