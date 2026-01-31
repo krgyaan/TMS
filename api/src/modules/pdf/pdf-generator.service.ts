@@ -224,7 +224,32 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     private buildDetailedError(originalError: string): string {
         let message = `Puppeteer browser initialization failed: ${originalError}`;
 
-        if (originalError.includes('Could not find Chrome')) {
+        // Check for shared library errors (missing system dependencies)
+        if (
+            originalError.includes('error while loading shared libraries') ||
+            originalError.includes('cannot open shared object file') ||
+            (originalError.includes('No such file or directory') && originalError.includes('.so'))
+        ) {
+            message += '\n\nMissing system dependencies detected!';
+            message += '\nChrome requires system libraries that are not installed on this server.';
+            message += '\n\nTo fix this issue:';
+            message += '\n1. Run the installation script on your server:';
+            message += '\n   sudo bash api/scripts/install-puppeteer-deps.sh';
+            message += '\n\n2. Or install manually based on your Linux distribution:';
+            message += '\n   Ubuntu/Debian:';
+            message += '\n     sudo apt-get update && sudo apt-get install -y \\';
+            message += '\n       libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgbm1 \\';
+            message += '\n       libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \\';
+            message += '\n       libxrandr2 libasound2 libpango-1.0-0 libcairo2 \\';
+            message += '\n       libatspi2.0-0 libgtk-3-0 libnss3 libxss1 libgconf-2-4';
+            message += '\n\n   CentOS/RHEL/Fedora:';
+            message += '\n     sudo yum install -y atk at-spi2-atk cups-libs libdrm libgbm \\';
+            message += '\n       libxkbcommon libXcomposite libXdamage libXfixes libXrandr \\';
+            message += '\n       alsa-lib pango cairo at-spi2-core gtk3 nss libXScrnSaver GConf2';
+            message += '\n\n3. After installing dependencies, restart your application:';
+            message += '\n   pm2 restart tms-api';
+            message += '\n\nSee api/docs/puppeteer-setup.md for more details.';
+        } else if (originalError.includes('Could not find Chrome')) {
             message += '\n\nPossible solutions:';
             message += '\n1. Run: npx puppeteer browsers install chrome';
             message += '\n2. Ensure the postinstall script ran successfully during package installation';
@@ -233,8 +258,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         } else if (originalError.includes('Failed to launch')) {
             message += '\n\nPossible solutions:';
             message += '\n1. Check system permissions';
-            message += '\n2. Verify required system dependencies are installed';
+            message += '\n2. Verify required system dependencies are installed (see api/docs/puppeteer-setup.md)';
             message += '\n3. Check available memory and system resources';
+            message += '\n4. Ensure Chrome binary has execute permissions';
         }
 
         return message;
