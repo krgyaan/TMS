@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,9 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
-import { ChequeActionForm } from './components/ChequeActionForm';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -81,11 +82,10 @@ const getStatusVariant = (status: string | null): string => {
 
 const ChequeListPage = () => {
     const [activeTab, setActiveTab] = useState<ChequeDashboardTab>('cheque-pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<ChequeDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -122,9 +122,8 @@ const ChequeListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: ChequeDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.chequeAction(row.id), { state: row });
+    }, [navigate]);
 
     const chequeActions: ActionItem<ChequeDashboardRow>[] = useMemo(
         () => [
@@ -387,20 +386,6 @@ const ChequeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <ChequeActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        chequeNo: selectedInstrument.chequeNo || undefined,
-                        chequeDate: selectedInstrument.date || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,9 +14,9 @@ import { Input } from '@/components/ui/input';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
-import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -97,11 +98,9 @@ const PayOnPortalListPage = () => {
 
     const { data: counts } = usePayOnPortalDashboardCounts();
 
+    const navigate = useNavigate();
     const popData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
-
-    const [selectedInstrument, setSelectedInstrument] = useState<PayOnPortalDashboardRow | null>(null);
-    const [actionFormOpen, setActionFormOpen] = useState(false);
 
     const handleViewDetails = useCallback((row: PayOnPortalDashboardRow) => {
         // TODO: Implement navigation to detail page
@@ -109,9 +108,8 @@ const PayOnPortalListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: PayOnPortalDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.payOnPortalAction(row.id), { state: row });
+    }, [navigate]);
 
     const popActions: ActionItem<PayOnPortalDashboardRow>[] = useMemo(
         () => [
@@ -363,22 +361,6 @@ const PayOnPortalListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <PayOnPortalActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        utrNo: selectedInstrument.utrNo || undefined,
-                        portalName: selectedInstrument.portalName || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

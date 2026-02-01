@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,9 +14,9 @@ import { Input } from '@/components/ui/input';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
-import { DemandDraftActionForm } from './components/DemandDraftActionForm';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -67,11 +68,10 @@ const getStatusVariant = (status: string | null): string => {
 
 const DemandDraftListPage = () => {
     const [activeTab, setActiveTab] = useState<DemandDraftDashboardTab>('pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<DemandDraftDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -108,9 +108,8 @@ const DemandDraftListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: DemandDraftDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.demandDraftAction(row.id), { state: row });
+    }, [navigate]);
 
     const ddActions: ActionItem<DemandDraftDashboardRow>[] = useMemo(
         () => [
@@ -376,22 +375,6 @@ const DemandDraftListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <DemandDraftActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        ddNo: selectedInstrument.ddNo || undefined,
-                        ddDate: selectedInstrument.ddCreationDate || undefined,
-                        amount: selectedInstrument.ddAmount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

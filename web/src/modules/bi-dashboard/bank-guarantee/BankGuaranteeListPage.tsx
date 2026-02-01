@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,10 +14,10 @@ import { Input } from '@/components/ui/input';
 import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
 import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
-import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import BankStatsCards from './components/BankStatsCards';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -71,11 +72,10 @@ const getStatusVariant = (status: string | null): string => {
 
 const BankGuaranteeListPage = () => {
     const [activeTab, setActiveTab] = useState<BankGuaranteeDashboardTab>('new-requests');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<BankGuaranteeDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -113,9 +113,8 @@ const BankGuaranteeListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: BankGuaranteeDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.bankGuaranteeAction(row.id), { state: row });
+    }, [navigate]);
 
     const bgActions: ActionItem<BankGuaranteeDashboardRow>[] = useMemo(
         () => [
@@ -430,22 +429,6 @@ const BankGuaranteeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <BankGuaranteeActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        bgNo: selectedInstrument.bgNo || undefined,
-                        bgDate: selectedInstrument.bgDate || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

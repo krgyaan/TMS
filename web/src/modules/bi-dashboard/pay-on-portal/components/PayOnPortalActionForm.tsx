@@ -1,14 +1,6 @@
-import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
@@ -19,11 +11,12 @@ import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { NumberInput } from '@/components/form/NumberInput';
+import DateInput from '@/components/form/DateInput';
 import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues } from '../helpers/payOnPortalActionForm.schema';
 import { useUpdatePayOnPortalAction } from '@/hooks/api/usePayOnPortals';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
-import { DatePicker } from '@/components/ui/date-picker';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
@@ -35,8 +28,6 @@ const ACTION_OPTIONS = [
 ];
 
 interface PayOnPortalActionFormProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
     instrumentId: number;
     instrumentData?: {
         utrNo?: string;
@@ -48,11 +39,10 @@ interface PayOnPortalActionFormProps {
 }
 
 export function PayOnPortalActionForm({
-    open,
-    onOpenChange,
     instrumentId,
     instrumentData,
 }: PayOnPortalActionFormProps) {
+    const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
 
     const form = useForm<PayOnPortalActionFormValues>({
@@ -92,7 +82,7 @@ export function PayOnPortalActionForm({
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Action submitted successfully');
-            onOpenChange(false);
+            navigate(-1);
             form.reset();
         } catch (error: any) {
             toast.error(error?.message || 'Failed to submit action');
@@ -100,37 +90,16 @@ export function PayOnPortalActionForm({
         }
     };
 
-    useEffect(() => {
-        if (!open) {
-            form.reset();
-        }
-    }, [open, form]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="!max-w-1/2 w-full max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Pay on Portal Action Form</DialogTitle>
-                    <DialogDescription>
-                        {instrumentData?.tenderNo && instrumentData?.tenderName
-                            ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                            : `Instrument ID: ${instrumentId}`}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(_field) => (
-                                <SelectField
-                                    label="Choose What to do"
-                                    control={form.control}
-                                    name="action"
-                                    options={ACTION_OPTIONS}
-                                    placeholder="Select an option"
-                                />
-                            )}
-                        </FieldWrapper>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                        <SelectField
+                            label="Choose What to do"
+                            control={form.control}
+                            name="action"
+                            options={ACTION_OPTIONS}
+                            placeholder="Select an option"
+                        />
 
                         {/* Accounts Form (POP) 1 */}
                         <ConditionalSection show={action === 'accounts-form-1'}>
@@ -176,15 +145,10 @@ export function PayOnPortalActionForm({
                                         {(field) => <Input {...field} placeholder="Enter portal name" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="amount" label="Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                 </div>
 
@@ -208,12 +172,7 @@ export function PayOnPortalActionForm({
                                 <ContactPersonFields control={form.control} name="contacts" />
 
                                 <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                                    {(field) => (
-                                        <DatePicker
-                                            date={field.value ? new Date(field.value) : undefined}
-                                            onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                        />
-                                    )}
+                                    {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
 
                                 <FollowUpFrequencySelect control={form.control} name="frequency" />
@@ -242,12 +201,7 @@ export function PayOnPortalActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="return_date" label="Return Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
@@ -269,15 +223,10 @@ export function PayOnPortalActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="settlement_date" label="Settlement Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="settlement_amount" label="Settlement Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="settlement_reference_no" label="Reference No.">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
@@ -286,17 +235,15 @@ export function PayOnPortalActionForm({
                             </div>
                         </ConditionalSection>
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                        <div className="flex justify-end gap-4 pt-4">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? 'Submitting...' : 'Submit'}
                             </Button>
-                        </DialogFooter>
+                        </div>
                     </form>
                 </Form>
-            </DialogContent>
-        </Dialog>
     );
 }

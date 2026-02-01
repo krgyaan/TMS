@@ -1,32 +1,25 @@
-import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { FileUploadField } from '@/components/form/FileUploadField';
+import { CompactTenderFileUploader, TenderFileUploader } from '@/components/tender-file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { NumberInput } from '@/components/form/NumberInput';
+import DateInput from '@/components/form/DateInput';
 import { DemandDraftActionFormSchema, type DemandDraftActionFormValues } from '../helpers/demandDraftActionForm.schema';
 import { useUpdateDemandDraftAction } from '@/hooks/api/useDemandDrafts';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
-import { DatePicker } from '@/components/ui/date-picker';
 
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form (DD) 1 - Request to Bank' },
@@ -41,8 +34,6 @@ const ACTION_OPTIONS = [
 ];
 
 interface DemandDraftActionFormProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
     instrumentId: number;
     instrumentData?: {
         ddNo?: string;
@@ -54,13 +45,11 @@ interface DemandDraftActionFormProps {
 }
 
 export function DemandDraftActionForm({
-    open,
-    onOpenChange,
     instrumentId,
     instrumentData,
 }: DemandDraftActionFormProps) {
+    const navigate = useNavigate();
     const updateMutation = useUpdateDemandDraftAction();
-    const [fileUploads, setFileUploads] = useState<Record<string, File[]>>({});
 
     const form = useForm<DemandDraftActionFormValues>({
         resolver: zodResolver(DemandDraftActionFormSchema) as Resolver<DemandDraftActionFormValues>,
@@ -81,7 +70,7 @@ export function DemandDraftActionForm({
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('proof_image')) {
+                if (key === 'contacts' || key.includes('proof_image')) {
                     return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
@@ -98,62 +87,19 @@ export function DemandDraftActionForm({
                 formData.append('contacts', JSON.stringify(values.contacts));
             }
 
-            const allFiles: File[] = [];
-            if (values.dd_format_imran && fileUploads.dd_format_imran) {
-                allFiles.push(...fileUploads.dd_format_imran);
-            }
-            if (values.prefilled_signed_dd && fileUploads.prefilled_signed_dd) {
-                allFiles.push(...fileUploads.prefilled_signed_dd);
-            }
-            if (values.request_letter_email && fileUploads.request_letter_email) {
-                allFiles.push(...fileUploads.request_letter_email);
-            }
-            if (values.docket_slip && fileUploads.docket_slip) {
-                allFiles.push(...fileUploads.docket_slip);
-            }
-            if (values.covering_letter && fileUploads.covering_letter) {
-                allFiles.push(...fileUploads.covering_letter);
-            }
-            if (values.proof_image && fileUploads.proof_image) {
-                allFiles.push(...fileUploads.proof_image);
-            }
-
-            allFiles.forEach((file) => {
-                formData.append('files', file);
-            });
-
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Action submitted successfully');
-            onOpenChange(false);
+            navigate(-1);
             form.reset();
-            setFileUploads({});
         } catch (error: any) {
             toast.error(error?.message || 'Failed to submit action');
             console.error('Error submitting action:', error);
         }
     };
 
-    useEffect(() => {
-        if (!open) {
-            form.reset();
-            setFileUploads({});
-        }
-    }, [open, form]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="!max-w-1/2 w-full max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Demand Draft Action Form</DialogTitle>
-                    <DialogDescription>
-                        {instrumentData?.tenderNo && instrumentData?.tenderName
-                            ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                            : `Instrument ID: ${instrumentId}`}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="action" label="Action *">
                             {(_field) => (
                                 <SelectField
@@ -203,31 +149,21 @@ export function DemandDraftActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="dd_format_imran" label="DD Format (Upload by Imran)">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="dd_format_imran"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, dd_format_imran: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="dd-format-imran"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_dd" label="Prefilled Bank Formats">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="prefilled_signed_dd"
-                                            label=""
-                                            allowMultiple={true}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, prefilled_signed_dd: files }));
-                                            }}
+                                    {(field) => (
+                                        <TenderFileUploader
+                                            context="dd-prefilled-signed"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -244,12 +180,7 @@ export function DemandDraftActionForm({
                                         {(field) => <Input {...field} placeholder="Enter DD number" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="dd_date" label="DD Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                 </div>
 
@@ -272,23 +203,23 @@ export function DemandDraftActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="dd_amount" label="DD Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                 </div>
 
                                 <h5 className="font-medium text-sm mt-4">Charges</h5>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="dd_charges" label="DD Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="sfms_charges" label="SFMS Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="stamp_charges" label="Stamp Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="other_charges" label="Other Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                 </div>
                             </div>
@@ -306,12 +237,7 @@ export function DemandDraftActionForm({
                                 <ContactPersonFields control={form.control} name="contacts" />
 
                                 <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                                    {(field) => (
-                                        <DatePicker
-                                            date={field.value ? new Date(field.value) : undefined}
-                                            onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                        />
-                                    )}
+                                    {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
 
                                 <FollowUpFrequencySelect control={form.control} name="frequency" />
@@ -352,16 +278,11 @@ export function DemandDraftActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="request_letter_email" label="Request Letter/Email">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="request_letter_email"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, request_letter_email: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="dd-request-letter-email"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -387,16 +308,11 @@ export function DemandDraftActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="docket_slip"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, docket_slip: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="dd-docket-slip"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -410,12 +326,7 @@ export function DemandDraftActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="utr" label="UTR Number">
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
@@ -430,16 +341,11 @@ export function DemandDraftActionForm({
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
                                 <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="covering_letter"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, covering_letter: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="dd-covering-letter"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -459,15 +365,10 @@ export function DemandDraftActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="dd_cancellation_date" label="Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="dd_cancellation_amount" label="Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="dd_cancellation_reference_no" label="Reference No.">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
@@ -476,17 +377,15 @@ export function DemandDraftActionForm({
                             </div>
                         </ConditionalSection>
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                        <div className="flex justify-end gap-4 pt-4">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? 'Submitting...' : 'Submit'}
                             </Button>
-                        </DialogFooter>
+                        </div>
                     </form>
                 </Form>
-            </DialogContent>
-        </Dialog>
     );
 }

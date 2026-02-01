@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,9 +14,9 @@ import { Input } from '@/components/ui/input';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
 import type { FdrDashboardRow, FdrDashboardTab } from './helpers/fdr.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
-import { FdrActionForm } from './components/FdrActionForm';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: FdrDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -85,11 +86,10 @@ const getStatusVariant = (status: string | null): string => {
 
 const FdrListPage = () => {
     const [activeTab, setActiveTab] = useState<FdrDashboardTab>('pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<FdrDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -126,9 +126,8 @@ const FdrListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: FdrDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.fdrAction(row.id), { state: row });
+    }, [navigate]);
 
     const fdrActions: ActionItem<FdrDashboardRow>[] = useMemo(
         () => [
@@ -381,22 +380,6 @@ const FdrListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <FdrActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        fdrNo: selectedInstrument.fdrNo || undefined,
-                        fdrDate: selectedInstrument.fdrCreationDate || undefined,
-                        amount: selectedInstrument.fdrAmount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

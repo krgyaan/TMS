@@ -1,32 +1,25 @@
-import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { FileUploadField } from '@/components/form/FileUploadField';
+import { CompactTenderFileUploader, TenderFileUploader } from '@/components/tender-file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { NumberInput } from '@/components/form/NumberInput';
+import DateInput from '@/components/form/DateInput';
 import { ChequeActionFormSchema, type ChequeActionFormValues } from '../helpers/chequeActionForm.schema';
 import { useUpdateChequeAction } from '@/hooks/api/useCheques';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
-import { DatePicker } from '@/components/ui/date-picker';
 
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form (CHQ) 1 - Request to Bank' },
@@ -42,8 +35,6 @@ const ACTION_OPTIONS = [
 ];
 
 interface ChequeActionFormProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
     instrumentId: number;
     instrumentData?: {
         chequeNo?: string;
@@ -55,13 +46,11 @@ interface ChequeActionFormProps {
 }
 
 export function ChequeActionForm({
-    open,
-    onOpenChange,
     instrumentId,
     instrumentData,
 }: ChequeActionFormProps) {
+    const navigate = useNavigate();
     const updateMutation = useUpdateChequeAction();
-    const [fileUploads, setFileUploads] = useState<Record<string, File[]>>({});
 
     const form = useForm<ChequeActionFormValues>({
         resolver: zodResolver(ChequeActionFormSchema) as Resolver<ChequeActionFormValues>,
@@ -82,7 +71,7 @@ export function ChequeActionForm({
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('_imran') || key.includes('prefilled') || key.includes('_slip') || key.includes('covering') || key.includes('cheque_images') || key.includes('cancelled_image_path') || key.includes('proof_image')) {
+                if (key === 'contacts' || key.includes('proof_image')) {
                     return; // Handle separately
                 }
                 if (value === undefined || value === null || value === '') return;
@@ -99,65 +88,19 @@ export function ChequeActionForm({
                 formData.append('contacts', JSON.stringify(values.contacts));
             }
 
-            const allFiles: File[] = [];
-            if (values.cheque_format_imran && fileUploads.cheque_format_imran) {
-                allFiles.push(...fileUploads.cheque_format_imran);
-            }
-            if (values.prefilled_signed_cheque && fileUploads.prefilled_signed_cheque) {
-                allFiles.push(...fileUploads.prefilled_signed_cheque);
-            }
-            if (values.cheque_images && fileUploads.cheque_images) {
-                allFiles.push(...fileUploads.cheque_images);
-            }
-            if (values.docket_slip && fileUploads.docket_slip) {
-                allFiles.push(...fileUploads.docket_slip);
-            }
-            if (values.covering_letter && fileUploads.covering_letter) {
-                allFiles.push(...fileUploads.covering_letter);
-            }
-            if (values.cancelled_image_path && fileUploads.cancelled_image_path) {
-                allFiles.push(...fileUploads.cancelled_image_path);
-            }
-            if (values.proof_image && fileUploads.proof_image) {
-                allFiles.push(...fileUploads.proof_image);
-            }
-
-            allFiles.forEach((file) => {
-                formData.append('files', file);
-            });
-
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Action submitted successfully');
-            onOpenChange(false);
+            navigate(-1);
             form.reset();
-            setFileUploads({});
         } catch (error: any) {
             toast.error(error?.message || 'Failed to submit action');
             console.error('Error submitting action:', error);
         }
     };
 
-    useEffect(() => {
-        if (!open) {
-            form.reset();
-            setFileUploads({});
-        }
-    }, [open, form]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="!max-w-1/2 w-full max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Cheque Action Form</DialogTitle>
-                    <DialogDescription>
-                        {instrumentData?.tenderNo && instrumentData?.tenderName
-                            ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                            : `Instrument ID: ${instrumentId}`}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="action" label="Action *">
                             {(_field) => (
                                 <SelectField
@@ -207,31 +150,21 @@ export function ChequeActionForm({
                                 )}
 
                                 <FieldWrapper control={form.control} name="cheque_format_imran" label="Cheque Format (Upload by Imran)">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="cheque_format_imran"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, cheque_format_imran: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="cheque-format-imran"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="prefilled_signed_cheque" label="Prefilled Bank Formats">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="prefilled_signed_cheque"
-                                            label=""
-                                            allowMultiple={true}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, prefilled_signed_cheque: files }));
-                                            }}
+                                    {(field) => (
+                                        <TenderFileUploader
+                                            context="cheque-prefilled-signed"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -248,15 +181,10 @@ export function ChequeActionForm({
                                         {(field) => <Input {...field} placeholder="Enter cheque number" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="cheque_date" label="Cheque Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="cheque_amount" label="Cheque Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="cheque_type" label="Cheque Type">
                                         {(field) => <Input {...field} placeholder="Enter cheque type" />}
@@ -265,12 +193,7 @@ export function ChequeActionForm({
                                         {(field) => <Input {...field} placeholder="Enter reason" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="due_date" label="Due Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                 </div>
 
@@ -292,18 +215,11 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Accounts Form (CHQ) 3 - Capture Cheque Details</h4>
 
                                 <FieldWrapper control={form.control} name="cheque_images" label="Cheque Images (Max 2)">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="cheque_images"
-                                            label=""
-                                            allowMultiple={true}
-                                            acceptedFileTypes={['image/*']}
-                                            onChange={(files: File[]) => {
-                                                if (files.length <= 2) {
-                                                    setFileUploads((prev) => ({ ...prev, cheque_images: files }));
-                                                }
-                                            }}
+                                    {(field) => (
+                                        <TenderFileUploader
+                                            context="cheque-images"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -311,13 +227,13 @@ export function ChequeActionForm({
                                 <h5 className="font-medium text-sm mt-4">Charges</h5>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="cheque_charges" label="Cheque Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="stamp_charges" label="Stamp Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="other_charges" label="Other Charges">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter charges" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                 </div>
                             </div>
@@ -335,12 +251,7 @@ export function ChequeActionForm({
                                 <ContactPersonFields control={form.control} name="contacts" />
 
                                 <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                                    {(field) => (
-                                        <DatePicker
-                                            date={field.value ? new Date(field.value) : undefined}
-                                            onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                        />
-                                    )}
+                                    {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
 
                                 <FollowUpFrequencySelect control={form.control} name="frequency" />
@@ -380,18 +291,13 @@ export function ChequeActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="utr" label="UTR Number">
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="amount" label="UTR Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                 </div>
                             </div>
@@ -404,12 +310,7 @@ export function ChequeActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="bt_transfer_date" label="Transfer Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="reference" label="Bank Reference No">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
@@ -424,16 +325,11 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Cancelled/Torn</h4>
 
                                 <FieldWrapper control={form.control} name="cancelled_image_path" label="Upload Photo/confirmation from Beneficiary">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="cancelled_image_path"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, cancelled_image_path: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="cheque-cancelled-image"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -450,16 +346,11 @@ export function ChequeActionForm({
                                 </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="docket_slip"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, docket_slip: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="cheque-docket-slip"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -472,16 +363,11 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Request Cancellation</h4>
 
                                 <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(_field) => (
-                                        <FileUploadField
-                                            control={form.control}
-                                            name="covering_letter"
-                                            label=""
-                                            allowMultiple={false}
-                                            acceptedFileTypes={['application/pdf', 'image/*']}
-                                            onChange={(files: File[]) => {
-                                                setFileUploads((prev) => ({ ...prev, covering_letter: files }));
-                                            }}
+                                    {(field) => (
+                                        <CompactTenderFileUploader
+                                            context="cheque-covering-letter"
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     )}
                                 </FieldWrapper>
@@ -501,15 +387,10 @@ export function ChequeActionForm({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="cheque_cancellation_date" label="Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
+                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="cheque_cancellation_amount" label="Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
+                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="cheque_cancellation_reference_no" label="Reference No.">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
@@ -518,17 +399,15 @@ export function ChequeActionForm({
                             </div>
                         </ConditionalSection>
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                        <div className="flex justify-end gap-4 pt-4">
+                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? 'Submitting...' : 'Submit'}
                             </Button>
-                        </DialogFooter>
+                        </div>
                     </form>
                 </Form>
-            </DialogContent>
-        </Dialog>
     );
 }
