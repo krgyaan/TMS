@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { type Control, useWatch } from 'react-hook-form';
 import { FieldWrapper } from './FieldWrapper';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,10 +5,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileUploadField } from './FileUploadField';
 
 export const STOP_REASON_LABELS: Record<number, string> = {
-    1: 'Party Angry / Not Interested',
-    2: 'Objective Achieved',
-    3: 'Not Reachable',
-    4: 'Other',
+    1: 'The person is getting angry/or has requested to stop',
+    2: 'Followup Objective achieved',
+    3: 'External Followup Initiated',
+    4: 'Remarks',
 };
 
 interface StopReasonFieldsProps<TFieldValues extends Record<string, any>> {
@@ -38,7 +37,7 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
     }
 
     return (
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
             <FieldWrapper control={control} name={stopReasonFieldName as any} label="Stop Reason">
                 {(field) => (
                     <Select
@@ -61,7 +60,7 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
 
             {/* Proof Details (when stopReason = 2) */}
             {stopReason === 2 && (
-                <>
+                <div className="col-span-2" id="proof-details">
                     <FieldWrapper control={control} name={proofTextFieldName as any} label="Proof Details">
                         {(field) => (
                             <Textarea
@@ -80,7 +79,7 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
                             acceptedFileTypes={['image/*', 'application/pdf']}
                         />
                     )}
-                </>
+                </div>
             )}
 
             {/* Remarks (when stopReason = 4) */}
