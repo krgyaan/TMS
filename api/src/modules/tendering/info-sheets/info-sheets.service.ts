@@ -887,11 +887,15 @@ export class TenderInfoSheetsService {
             'info-sheet.filled',
             tenderId,
             changedBy,
-            `Tender Info Sheet Filled: ${tender.tenderNo}`,
+            `Tender Info - ${tender.tenderName}`,
             'tender-info-sheet-filled',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                    { type: 'role', role: 'Coordinator', teamId: tender.team },
+                ],
             }
         );
     }

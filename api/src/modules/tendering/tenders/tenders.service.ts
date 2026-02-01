@@ -698,7 +698,7 @@ export class TenderInfosService {
                     'tender.created',
                     tenderId,
                     coordinatorUserId,
-                    `New Tender Assigned: ${tender.tenderNo}`,
+                    `New Tender allocated - ${tender.tenderName}`,
                     'tender-created',
                     {
                         ...emailData,
@@ -723,7 +723,7 @@ export class TenderInfosService {
                     'tender.created.unallocated',
                     tenderId,
                     coordinatorUserId,
-                    `New Tender Awaiting Allocation: ${tender.tenderNo}`,
+                    `New Tender Identified - Pending Allocation - ${tender.tenderName}`,
                     'tender-created-unallocated',
                     emailData,
                     {
@@ -1025,4 +1025,3 @@ export class TenderInfosService {
         return result?.count ?? 0;
     }
 }
-

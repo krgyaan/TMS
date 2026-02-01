@@ -828,11 +828,14 @@ export class CostingSheetsService {
             'costing-sheet.submitted',
             tenderId,
             submittedBy,
-            `Costing Sheet Submitted: ${tender.tenderNo}`,
+            `Costing Sheet submitted - ${tender.tenderName}`,
             'costing-sheet-submitted',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }

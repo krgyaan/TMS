@@ -755,11 +755,16 @@ export class PhysicalDocsService {
                 'physical-docs.sent',
                 tenderId,
                 sentBy,
-                `Physical Documents Sent: ${tender.tenderNo}`,
+                `Physical Documents Courier - ${tender.tenderNo}`,
                 'physical-docs-sent',
                 emailData,
                 {
                     to: [{ type: 'emails', emails: [client.clientEmail] }],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tender.team },
+                        { type: 'role', role: 'Team Leader', teamId: tender.team },
+                        { type: 'role', role: 'Coordinator', teamId: tender.team },
+                    ],
                 }
             );
         }

@@ -550,8 +550,8 @@ export class TenderApprovalService {
             }
         });
 
-        // Send email notification for approval/rejection
-        if (payload.tlStatus === '1' || payload.tlStatus === '2') {
+        // Send email notification for approval/rejection/review
+        if (payload.tlStatus === '1' || payload.tlStatus === '2' || payload.tlStatus === '3') {
             await this.sendApprovalEmail(tenderId, payload, changedBy);
         }
 
@@ -764,13 +764,23 @@ export class TenderApprovalService {
             tlName,
         };
 
-        const template = isBidApproved ? 'tender-approved-by-tl' : 'tender-rejected-by-tl';
-        const subject = isBidApproved
-            ? `Tender Approved: ${tender.tenderNo}`
-            : `Tender Rejected: ${tender.tenderNo}`;
+        const template = isBidApproved ? 'tender-approved-by-tl' : (isReview ? 'tender-rejected-by-tl' : 'tender-rejected-by-tl');
+        let subject: string;
+        let eventType: string;
+        
+        if (isBidApproved) {
+            subject = `Tender Approved - ${tender.tenderName}`;
+            eventType = 'tender.approved';
+        } else if (isReview) {
+            subject = `Tender Needs Review - ${tender.tenderName}`;
+            eventType = 'tender.review';
+        } else {
+            subject = `Tender Rejected - ${tender.tenderName}`;
+            eventType = 'tender.rejected';
+        }
 
         await this.sendEmail(
-            isBidApproved ? 'tender.approved' : 'tender.rejected',
+            eventType,
             tenderId,
             changedBy,
             subject,
@@ -778,6 +788,10 @@ export class TenderApprovalService {
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                    { type: 'role', role: 'Coordinator', teamId: tender.team },
+                ],
             }
         );
     }

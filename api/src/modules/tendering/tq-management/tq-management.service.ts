@@ -9,6 +9,7 @@ import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
 import { tenderQueryItems } from '@db/schemas/tendering';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -665,6 +666,11 @@ export class TqManagementService {
             return updated[0];
         });
 
+        // Send email notification only when qualified
+        if (qualified) {
+            await this.sendTqQualifiedEmail(tenderId, userId);
+        }
+
         return result;
     }
 
@@ -708,6 +714,19 @@ export class TqManagementService {
         }
 
         return tqRecord;
+    }
+
+    /**
+     * Get accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
     }
 
     /**
@@ -800,15 +819,23 @@ export class TqManagementService {
             coordinator: coordinatorName,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.received',
             tenderId,
             receivedBy,
-            `TQ Received: ${tender.tenderNo}`,
+            `TQ Received - ${tender.tenderName}`,
             'tq-received',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }
@@ -877,15 +904,87 @@ export class TqManagementService {
             teName: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.replied',
             tenderId,
             repliedBy,
-            `TQ Replied: ${tender.tenderNo}`,
+            `TQ Replied - ${tender.tenderName}`,
             'tq-replied',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+            }
+        );
+    }
+
+    /**
+     * Send TQ qualified email
+     */
+    private async sendTqQualifiedEmail(
+        tenderId: number,
+        qualifiedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get coordinator name
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', tender.team);
+        let coordinatorName = 'Coordinator';
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            if (coordinatorUser?.name) {
+                coordinatorName = coordinatorUser.name;
+            }
+        }
+
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            te: teUser.name,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            dueDate,
+            coordinator: coordinatorName,
+        };
+
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
+        await this.sendEmail(
+            'tq.qualified',
+            tenderId,
+            qualifiedBy,
+            `TQ Qualified - ${tender.tenderName}`,
+            'tq-qualified',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }
@@ -938,15 +1037,22 @@ export class TqManagementService {
             te_name: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.missed',
             tenderId,
             changedBy,
-            `TQ Missed: ${tender.tenderNo}`,
+            `TQ Missed - ${tender.tenderName}`,
             'tq-missed',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }

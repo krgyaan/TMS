@@ -426,11 +426,14 @@ export class DocumentChecklistsService {
             'document-checklist.submitted',
             tenderId,
             tender.teamMember,
-            `Document Checklist Submitted: ${tender.tenderNo}`,
+            `Document Checklist - ${tender.tenderName}`,
             'document-checklist-submitted',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }
