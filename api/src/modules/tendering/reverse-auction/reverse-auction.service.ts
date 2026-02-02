@@ -1035,15 +1035,24 @@ export class ReverseAuctionService {
             time_until_start: timeUntilStart,
         };
 
+        // Get Both Admins emails
+        const bothAdminsEmails = await this.recipientResolver.getBothAdmins(tender.team);
+
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'ra.scheduled',
             tenderId,
             scheduledBy,
-            `RA Scheduled: ${tender.tenderNo}`,
+            `RA Scheduled - ${tender.tenderName}`,
             'ra-scheduled',
             emailData,
             {
-                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                to: [{ type: 'emails', emails: bothAdminsEmails }],
+                cc: ccRecipients,
             }
         );
     }
@@ -1102,15 +1111,25 @@ export class ReverseAuctionService {
             isH1Elimination: raRecord.raResult === 'H1 Elimination',
         };
 
+        // Get Both Admins emails
+        const bothAdminsEmails = await this.recipientResolver.getBothAdmins(tender.team);
+
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'emails', emails: bothAdminsEmails },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'ra.result',
             tenderId,
             uploadedBy,
-            `RA Result: ${tender.tenderNo}`,
+            `RA Result - ${tender.tenderName}`,
             'ra-result',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
             }
         );
     }

@@ -104,11 +104,17 @@ export const paths = {
     // ==================== BI DASHBOARD ====================
     bi: {
         demandDraft: "/bi-dashboard/demand-draft",
+        demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         cheque: "/bi-dashboard/cheque",
+        chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
+        bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
+        bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
+        payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
     },
 
     // ==================== ACCOUNTS ====================

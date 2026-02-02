@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,9 +14,9 @@ import { Input } from '@/components/ui/input';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
 import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
-import { BankTransferActionForm } from './components/BankTransferActionForm';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
 
 const TABS_CONFIG: Array<{ key: BankTransferDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -67,11 +68,10 @@ const getStatusVariant = (status: string | null): string => {
 
 const BankTransferListPage = () => {
     const [activeTab, setActiveTab] = useState<BankTransferDashboardTab>('pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<BankTransferDashboardRow | null>(null);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -108,9 +108,8 @@ const BankTransferListPage = () => {
     }, []);
 
     const handleOpenActionForm = useCallback((row: BankTransferDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
+        navigate(paths.bi.bankTransferAction(row.id), { state: row });
+    }, [navigate]);
 
     const btActions: ActionItem<BankTransferDashboardRow>[] = useMemo(
         () => [
@@ -362,22 +361,6 @@ const BankTransferListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <BankTransferActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        utrNo: selectedInstrument.utrNo || undefined,
-                        accountName: selectedInstrument.accountName || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

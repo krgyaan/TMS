@@ -564,7 +564,7 @@ export class CostingApprovalsService {
             'costing-sheet.approved',
             tenderId,
             approvedBy,
-            `Costing Sheet Approved: ${tender.tenderNo}`,
+            `Costing approved - ${tender.tenderName}`,
             'costing-sheet-approved',
             emailData,
             {
@@ -626,11 +626,14 @@ export class CostingApprovalsService {
             'costing-sheet.rejected',
             tenderId,
             rejectedBy,
-            `Costing Sheet Rejected: ${tender.tenderNo}`,
+            `Costing Rejected/Redo costing - ${tender.tenderName}`,
             'costing-sheet-rejected',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }

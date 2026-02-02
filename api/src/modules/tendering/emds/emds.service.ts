@@ -1903,6 +1903,13 @@ export class EmdsService {
             return;
         }
 
+        // Get tender team ID if not in tender object
+        let tenderTeamId: number | null = null;
+        if (tenderId > 0) {
+            const tenderData = await this.tenderInfosService.findById(tenderId);
+            tenderTeamId = tenderData?.team || null;
+        }
+
         // Format currency
         const formatCurrency = (amount: number) => {
             return `₹${amount.toLocaleString('en-IN')}`;
@@ -1945,7 +1952,7 @@ export class EmdsService {
 
             if (mode === 'DD') {
                 template = 'demand-draft-request';
-                subject = `Demand Draft Request: ${tender.tenderNo}`;
+                subject = `DD Request for EMD - ${tender.tenderName || tender.tenderNo}`;
                 emailData = {
                     chequeNo: ddDetails?.ddNo || 'N/A',
                     dueDate: formatDate(tender.dueDate),
@@ -1958,7 +1965,8 @@ export class EmdsService {
                 };
             } else {
                 template = 'cheque-request';
-                subject = `Cheque Request: ${tender.tenderNo}`;
+                // CHEQUE might map to SB (Security Bank/Standby) in expected format
+                subject = `SB Request for EMD - ${tender.tenderName || tender.tenderNo}`;
                 emailData = {
                     purpose: instrumentInfo.purpose,
                     partyName: instrument.favouring || 'Not specified',
@@ -1978,7 +1986,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'bank-guarantee-request';
-            subject = `Bank Guarantee Request: ${tender.tenderNo}`;
+            subject = `BG Request for EMD - ${tender.tenderName || tender.tenderNo}`;
             emailData = {
                 purpose: instrumentInfo.purpose,
                 bg_in_favor_of: instrument.favouring || 'Not specified',
@@ -2003,7 +2011,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'fixed-deposit-receipt-request';
-            subject = `Fixed Deposit Receipt Request: ${tender.tenderNo}`;
+            subject = `FDR Request for EMD - ${tender.tenderName || tender.tenderNo}`;
             emailData = {
                 purpose: instrumentInfo.purpose,
                 beneficiaryName: instrument.favouring || 'Not specified',
@@ -2021,7 +2029,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'bank-transfer-request';
-            subject = `Bank Transfer Request: ${tender.tenderNo}`;
+            subject = `BT Request for EMD - ${tender.tenderName || tender.tenderNo}`;
             emailData = {
                 tenderNo: tender.tenderNo,
                 tenderName: tender.tenderName,
@@ -2046,7 +2054,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'pay-on-portal-request';
-            subject = `Portal Payment Request: ${tender.tenderNo}`;
+            subject = `POP Request for EMD - ${tender.tenderName || tender.tenderNo}`;
             emailData = {
                 portal: portalDetails?.portalName || 'Payment Portal',
                 purpose: instrumentInfo.purpose,
@@ -2066,6 +2074,22 @@ export class EmdsService {
             return;
         }
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [];
+        
+        // Add Team Admin and Team Leader from tender team (if tender team exists)
+        if (tenderTeamId) {
+            ccRecipients.push(
+                { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                { type: 'role', role: 'Team Leader', teamId: tenderTeamId }
+            );
+        }
+        
+        // Add Account Team Leader from accounts team
+        ccRecipients.push(
+            { type: 'role', role: 'Team Leader', teamId: accountsTeamId }
+        );
+
         await this.sendEmail(
             `payment-request.${mode.toLowerCase()}`,
             tenderId,
@@ -2075,6 +2099,7 @@ export class EmdsService {
             emailData,
             {
                 to: [{ type: 'role', role: 'Admin', teamId: accountsTeamId }],
+                cc: ccRecipients,
             }
         );
     }

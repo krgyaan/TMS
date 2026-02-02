@@ -722,8 +722,13 @@ export class RfqsService {
                 teMail: teUser.email,
             };
 
-            await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ: ${tender.tenderNo}`, "rfq-sent", emailData, {
+            await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
                 to: [{ type: "emails", emails: vendorEmails }],
+                cc: [
+                    { type: "role", role: "Admin", teamId: tender.team },
+                    { type: "role", role: "Team Leader", teamId: tender.team },
+                    { type: "role", role: "Coordinator", teamId: tender.team },
+                ],
             });
         }
     }

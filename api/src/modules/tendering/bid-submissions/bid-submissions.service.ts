@@ -8,6 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -685,17 +686,44 @@ export class BidSubmissionsService {
             teName,
         };
 
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+        
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+        
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
         await this.sendEmail(
             'bid.submitted',
             tenderId,
             submittedBy,
-            `Bid Submitted: ${tender.tenderNo}`,
+            `Bid Submitted - ${tender.tenderName}`,
             'bid-submitted',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
             }
         );
+    }
+
+    /**
+     * Get Accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
     }
 
     /**
@@ -746,15 +774,29 @@ export class BidSubmissionsService {
             te_name: teName,
         };
 
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+        
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+        
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
         await this.sendEmail(
             'bid.missed',
             tenderId,
             submittedBy,
-            `Bid Missed: ${tender.tenderNo}`,
+            `Bid Submission deadline Missed - ${tender.tenderName}`,
             'bid-missed',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
             }
         );
     }
