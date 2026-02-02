@@ -2,30 +2,54 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import type { ColDef } from "ag-grid-community";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Trash } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Trash, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { TableSortFilter } from "@/components/ui/table-sort-filter";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
 const TenderListPage = () => {
     const [activeTab, setActiveTab] = useState<TenderDashboardTab>('under-preparation');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [search, setSearch] = useState<string>('');
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
 
     const { data: counts } = useTendersDashboardCounts();
 
@@ -44,7 +68,7 @@ const TenderListPage = () => {
     const { data: apiResponse, isLoading: tendersLoading } = useTenders(
         activeTab,
         getCategoryForTab(activeTab),
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize }
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
     );
 
     const deleteTender = useDeleteTender();
@@ -247,7 +271,7 @@ const TenderListPage = () => {
                     onValueChange={(value) => setActiveTab(value as TenderDashboardTab)}
                     className="flex flex-col w-full"
                 >
-                    <div className="flex-none m-auto">
+                    <div className="flex-none m-auto mb-4">
                         <TabsList>
                             {tabsConfig.map(tab => {
                                 return (
@@ -266,6 +290,35 @@ const TenderListPage = () => {
                         </TabsList>
                     </div>
 
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Sort Filter Button (Right) */}
+                        <TableSortFilter
+                            columnDefs={colDefs}
+                            currentSort={sortModel[0]}
+                            onSortChange={(sort) => {
+                                setSortModel(sort ? [sort] : []);
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                            }}
+                        />
+                    </div>
+
                     <div className="flex-1 min-h-0">
                         {tabsConfig.map(tab => (
                             <TabsContent
@@ -282,11 +335,15 @@ const TenderListPage = () => {
                                         rowCount={totalRows}
                                         paginationState={pagination}
                                         onPaginationChange={setPagination}
+                                        onPageSizeChange={handlePageSizeChange}
+                                        showTotalCount={true}
+                                        showLengthChange={true}
                                         gridOptions={{
                                             defaultColDef: {
                                                 filter: true,
                                                 sortable: true,
                                             },
+                                            onSortChanged: handleSortChanged,
                                         }}
                                         enableFiltering={true}
                                         enableSorting={true}

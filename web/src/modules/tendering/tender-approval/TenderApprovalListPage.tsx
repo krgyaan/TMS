@@ -1,4 +1,4 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -19,6 +19,9 @@ import { tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { TableSortFilter } from '@/components/ui/table-sort-filter';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
 type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
@@ -33,11 +36,16 @@ const TenderApprovalListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -52,7 +60,7 @@ const TenderApprovalListPage = () => {
 
     const { data: apiResponse, isLoading: loading, error } = useTenderApprovals(
         activeTab,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: search || undefined },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -297,38 +305,54 @@ const TenderApprovalListPage = () => {
                             Review and approve tender decisions.
                         </CardDescription>
                     </div>
-                    <CardAction>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by tender name, number, value, due date, member, item..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                    </CardAction>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
-                    <div className="flex flex-col gap-4 mb-4 px-6">
-                        <TabsList className="m-auto">
-                            {tabsConfig.map((tab) => (
-                                <TabsTrigger
-                                    key={tab.key}
-                                    value={tab.key}
-                                    className="data-[state=active]:shadow-md flex items-center gap-1"
-                                >
-                                    <span className="font-semibold text-sm">{tab.name}</span>
-                                    {tab.count > 0 && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            {tab.count}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
+                    <TabsList className="m-auto mb-4">
+                        {tabsConfig.map((tab) => (
+                            <TabsTrigger
+                                key={tab.key}
+                                value={tab.key}
+                                className="data-[state=active]:shadow-md flex items-center gap-1"
+                            >
+                                <span className="font-semibold text-sm">{tab.name}</span>
+                                {tab.count > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {tab.count}
+                                    </Badge>
+                                )}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Sort Filter Button (Right) */}
+                        <TableSortFilter
+                            columnDefs={colDefs as ColDef<any>[]}
+                            currentSort={sortModel[0]}
+                            onSortChange={(sort) => {
+                                setSortModel(sort ? [sort] : []);
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                            }}
+                        />
                     </div>
 
                     {tabsConfig.map((tab) => (
@@ -352,6 +376,9 @@ const TenderApprovalListPage = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
