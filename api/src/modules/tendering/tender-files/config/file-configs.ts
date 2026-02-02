@@ -48,7 +48,9 @@ export type TenderFileContext =
     | 'cheque-images'
     | 'cheque-docket-slip'
     | 'cheque-covering-letter'
-    | 'cheque-cancelled-image';
+    | 'cheque-cancelled-image'
+    | 'cheque-receiving-handed-over'
+    | 'cheque-positive-pay-confirmation';
 
 export interface FileConfig {
     maxFiles: number;
@@ -578,6 +580,26 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     },
     'cheque-cancelled-image': {
         maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-receiving-handed-over': {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-positive-pay-confirmation': {
+        maxFiles: 1,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],

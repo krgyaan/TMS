@@ -48,7 +48,9 @@ export type TenderFileContext =
     | 'cheque-images'
     | 'cheque-docket-slip'
     | 'cheque-covering-letter'
-    | 'cheque-cancelled-image';
+    | 'cheque-cancelled-image'
+    | 'cheque-receiving-handed-over'
+    | 'cheque-positive-pay-confirmation';
 
 export interface FileConfig {
     context: string;
