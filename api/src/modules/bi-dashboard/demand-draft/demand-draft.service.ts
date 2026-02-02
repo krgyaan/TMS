@@ -89,16 +89,22 @@ export class DemandDraftService {
 
         const conditions = this.buildDdDashboardConditions(tab);
 
-        // Search filter
+        // Search filter - search across all rendered columns
         if (options?.search) {
             const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentDdDetails.ddNo} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentDdDetails.ddNo} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${instrumentDdDetails.ddDate}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
