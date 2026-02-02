@@ -436,7 +436,7 @@ export class TenderResultService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .where(eq(tenderResults.id, id))
+            .where(eq(tenderResults.tenderId, id))
             .limit(1);
 
         if (!result) {
