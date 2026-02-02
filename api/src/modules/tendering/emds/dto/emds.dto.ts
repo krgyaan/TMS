@@ -266,7 +266,9 @@ export interface PaymentRequestRow {
     tenderName: string;
     purpose: PaymentPurpose;
     amountRequired: string;
+    requestType: string | null;
     dueDate: Date | null;
+    bidValid: Date | null;
     teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;

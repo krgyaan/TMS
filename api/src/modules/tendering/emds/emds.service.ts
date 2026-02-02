@@ -47,8 +47,10 @@ export interface PaymentRequestRow {
     tenderNo: string;
     tenderName: string;
     purpose: PaymentPurpose;
+    requestType: string | null;
     amountRequired: string;
     dueDate: Date | null;
+    bidValid: Date | null;
     teamMember: string | null;
     teamMemberId: number | null;
     instrumentId: number | null;
@@ -291,10 +293,7 @@ export class EmdsService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
-            .where(and(
-                or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
-                userCondition
-            ));
+            .where(userCondition);
 
         return {
             sent: Number(result?.sent || 0),
@@ -336,7 +335,6 @@ export class EmdsService {
         const whereClause = and(
             this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
-            or(eq(paymentRequests.tenderId, 0)),
             userCondition
         );
 
@@ -361,8 +359,11 @@ export class EmdsService {
                 tenderName: tenderInfos.tenderName,
                 projectName: paymentRequests.projectName,
                 purpose: paymentRequests.purpose,
+                requestType: paymentRequests.type,
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
+                dueDate2: paymentRequests.dueDate,
+                bidValid: tenderInformation.bidValidityDays,
                 teamMember: users.name,
                 teamMemberId: users.id,
                 instrumentId: paymentInstruments.id,
@@ -372,6 +373,7 @@ export class EmdsService {
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
@@ -382,23 +384,37 @@ export class EmdsService {
             .limit(limit)
             .offset(offset);
 
-        // Map response
-        const data: PaymentRequestRow[] = rows.map((row) => ({
-            id: row.id,
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
-            tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
-            purpose: row.purpose as PaymentPurpose,
-            amountRequired: row.amountRequired || '0',
-            dueDate: row.dueDate,
-            teamMemberId: row.teamMemberId,
-            teamMember: row.teamMember?.toString() ?? null,
-            instrumentId: row.instrumentId,
-            instrumentType: row.instrumentType as InstrumentType | null,
-            instrumentStatus: row.instrumentStatus,
-            displayStatus: deriveDisplayStatus(row.instrumentStatus),
-            createdAt: row.createdAt,
-        }));
+        const data: PaymentRequestRow[] = rows.map((row) => {
+            const effectiveDueDate = row.dueDate ?? row.dueDate2;
+
+            return {
+                id: row.id,
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
+                tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
+                purpose: row.purpose as PaymentPurpose,
+                amountRequired: row.amountRequired ?? '0',
+                requestType: row.requestType,
+                dueDate: effectiveDueDate,
+
+                bidValid: row.bidValid && effectiveDueDate
+                    ? (() => {
+                        const date = new Date(effectiveDueDate);
+                        date.setDate(date.getDate() + row.bidValid);
+                        return date;
+                    })()
+                    : null,
+
+                teamMemberId: row.teamMemberId,
+                teamMember: row.teamMember?.toString() ?? null,
+                instrumentId: row.instrumentId,
+                instrumentType: row.instrumentType as InstrumentType | null,
+                instrumentStatus: row.instrumentStatus,
+                displayStatus: deriveDisplayStatus(row.instrumentStatus),
+                createdAt: row.createdAt,
+            };
+        });
+
 
         return {
             ...wrapPaginatedResponse(data, Number(countResult?.count || 0), page, limit),
@@ -2076,7 +2092,7 @@ export class EmdsService {
 
         // Build CC recipients
         const ccRecipients: RecipientSource[] = [];
-        
+
         // Add Team Admin and Team Leader from tender team (if tender team exists)
         if (tenderTeamId) {
             ccRecipients.push(
@@ -2084,7 +2100,7 @@ export class EmdsService {
                 { type: 'role', role: 'Team Leader', teamId: tenderTeamId }
             );
         }
-        
+
         // Add Account Team Leader from accounts team
         ccRecipients.push(
             { type: 'role', role: 'Team Leader', teamId: accountsTeamId }

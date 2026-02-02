@@ -148,7 +148,9 @@ export interface PaymentRequestRow {
     tenderName: string;
     purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string;
+    requestType: string | null;
     dueDate: string | null;
+    bidValid: Date | null;
     teamMemberId: number | null;
     teamMember: string | null;
     instrumentId: number | null;

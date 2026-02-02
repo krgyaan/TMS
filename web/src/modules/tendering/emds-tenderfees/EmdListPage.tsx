@@ -243,7 +243,7 @@ const EmdsAndTenderFeesPage = () => {
         tenderNameCol<PaymentRequestRowWithTimer>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            width: 200,
+            width: 250,
         }),
         {
             field: 'purpose',
@@ -270,6 +270,14 @@ const EmdsAndTenderFeesPage = () => {
                 ),
         },
         {
+            field: 'requestType',
+            headerName: 'Request Type',
+            width: 100,
+            cellRenderer: (params: any) => {
+                return <span>{params.value}</span>;
+            },
+        },
+        {
             field: 'instrumentType',
             headerName: 'Mode',
             width: 120,
@@ -292,19 +300,12 @@ const EmdsAndTenderFeesPage = () => {
             },
         },
         {
-            field: 'dueDate',
-            headerName: 'Due Date',
-            width: 140,
+            field: 'bidValid',
+            headerName: 'Bid Valid Till',
+            width: 150,
             cellRenderer: (params: any) => {
                 if (!params.value) return <span className="text-gray-400">—</span>;
-                const dueDate = new Date(params.value);
-                const isOverdue = dueDate < new Date();
-                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-                return (
-                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
-                        {formatDateTime(params.value)}
-                    </span>
-                );
+                return (formatDateTime(params.value));
             },
         },
         {
@@ -313,14 +314,6 @@ const EmdsAndTenderFeesPage = () => {
             width: 140,
             cellRenderer: (params: any) =>
                 params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
-        },
-        {
-            field: 'createdAt',
-            headerName: 'Requested On',
-            width: 140,
-            cellRenderer: (params: any) => {
-                return <span>{formatDateTime(params.value)}</span>;
-            },
         },
         {
             field: 'timer',
