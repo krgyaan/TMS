@@ -18,6 +18,9 @@ import type { ResultDashboardRow, ResultDashboardType } from '@/modules/tenderin
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { TableSortFilter } from '@/components/ui/table-sort-filter';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -77,10 +80,15 @@ const TenderResultListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -99,7 +107,7 @@ const TenderResultListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useResultDashboardCounts();
@@ -330,18 +338,6 @@ const TenderResultListPage = () => {
                                 Track and manage tender results after bid submission.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -349,7 +345,7 @@ const TenderResultListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as ResultDashboardType)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -366,6 +362,35 @@ const TenderResultListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Sort Filter Button (Right) */}
+                            <TableSortFilter
+                                columnDefs={colDefs}
+                                currentSort={sortModel[0]}
+                                onSortChange={(sort) => {
+                                    setSortModel(sort ? [sort] : []);
+                                    setPagination(p => ({ ...p, pageIndex: 0 }));
+                                }}
+                            />
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -390,6 +415,9 @@ const TenderResultListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
