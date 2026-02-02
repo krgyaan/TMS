@@ -90,17 +90,22 @@ export class BankTransferService {
 
         const conditions = this.buildBtDashboardConditions(tab);
 
-        // Search filter
+        // Search filter - search across all rendered columns
         if (options?.search) {
             const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentTransferDetails.utrNum} ILIKE ${searchStr} OR
-                    ${instrumentTransferDetails.accountName} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.utrNum} ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.accountName} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.transactionDate}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
