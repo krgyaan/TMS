@@ -155,4 +155,5 @@ export type CostingApprovalListParams = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };

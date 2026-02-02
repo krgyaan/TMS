@@ -9,8 +9,9 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide-react";
+import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
@@ -21,11 +22,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import axiosInstance from "@/lib/axios";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { TableSortFilter } from "@/components/ui/table-sort-filter";
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
 
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
@@ -44,7 +50,7 @@ const CostingSheets = () => {
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -57,9 +63,13 @@ const CostingSheets = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
         activeTab,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -403,7 +413,7 @@ const CostingSheets = () => {
             </CardHeader>
             <CardContent className="px-0">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingSheetTab)}>
-                    <TabsList className="m-auto">
+                    <TabsList className="m-auto mb-4">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -419,6 +429,35 @@ const CostingSheets = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) - Optional, can be added per page */}
+                        
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* Sort Filter Button (Right) */}
+                        <TableSortFilter
+                            columnDefs={colDefs as ColDef<any>[]}
+                            currentSort={sortModel[0]}
+                            onSortChange={(sort) => {
+                                setSortModel(sort ? [sort] : []);
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                            }}
+                        />
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -447,6 +486,9 @@ const CostingSheets = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,

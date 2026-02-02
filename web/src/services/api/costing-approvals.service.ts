@@ -36,6 +36,9 @@ class CostingApprovalsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
         }
 
         const queryString = search.toString();
