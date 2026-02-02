@@ -137,17 +137,23 @@ export class RfqsService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Add search conditions
+        // Add search conditions - search across all rendered columns
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                        ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                        ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                        ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
-                        ${users.name} ILIKE ${searchStr}
-                    )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${items.name} ILIKE ${searchStr}`,
+                sql`EXISTS (
+                    SELECT 1 FROM ${vendorOrganizations}
+                    WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
+                    AND ${vendorOrganizations.name} ILIKE ${searchStr}
+                )`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
