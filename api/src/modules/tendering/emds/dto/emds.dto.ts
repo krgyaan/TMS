@@ -194,6 +194,7 @@ export const DashboardQuerySchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
     sortBy: z.string().optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
+    search: z.string().optional(),
 });
 
 export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;

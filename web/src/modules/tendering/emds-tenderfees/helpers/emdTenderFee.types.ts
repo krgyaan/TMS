@@ -70,6 +70,7 @@ export interface DashboardResponse {
 export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
 
 export type EmdDashboardFilters = {
+    search?: string;
     tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
     userId?: number;
     page?: number;

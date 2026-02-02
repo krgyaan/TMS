@@ -220,14 +220,15 @@ export class EmdsService {
         tab: DashboardTab = 'pending',
         userId?: number,
         pagination?: { page?: number; limit?: number },
-        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        search?: string
     ): Promise<PendingTabResponse | RequestTabResponse> {
         const counts = await this.getDashboardCounts(userId);
 
-        if (tab === 'pending') return this.getPendingTenders(userId, pagination, sort, counts);
-        if (tab === 'tender-dnb') return this.getTenderDnbTenders(userId, pagination, sort, counts);
+        if (tab === 'pending') return this.getPendingTenders(userId, pagination, sort, counts, search);
+        if (tab === 'tender-dnb') return this.getTenderDnbTenders(userId, pagination, sort, counts, search);
 
-        return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
+        return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts, search);
     }
 
     async getDashboardCounts(userId?: number): Promise<DashboardCounts> {
@@ -308,7 +309,8 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<RequestTabResponse> {
         const userCondition = userId
             ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
@@ -317,6 +319,26 @@ export class EmdsService {
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.purpose} ILIKE ${searchStr}`,
+                sql`${paymentRequests.type} ILIKE ${searchStr}`,
+                sql`${paymentRequests.amountRequired}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.instrumentType} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`
+            );
+        }
 
         // Sorting Logic
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -335,7 +357,8 @@ export class EmdsService {
         const whereClause = and(
             this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
-            userCondition
+            userCondition,
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
         // Get Total for Pagination
@@ -457,12 +480,30 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<PendingTabResponse> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
 
         // Build order clause
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -531,7 +572,8 @@ export class EmdsService {
                         gt(tenderInformation.processingFeeAmount, sql`0`)
                     ),
                     sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
-                    userCondition
+                    userCondition,
+                    searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
                 )
             )
             .orderBy(orderClause)
@@ -574,13 +616,31 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<PendingTabResponse> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
         const dnbStatusIds = StatusCache.getIds('dnb');
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
 
         // Build order clause (same as getPendingTenders)
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -643,7 +703,8 @@ export class EmdsService {
                         inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
                         inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
-                    userCondition
+                    userCondition,
+                    searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
                 )
             )
             .orderBy(orderClause)

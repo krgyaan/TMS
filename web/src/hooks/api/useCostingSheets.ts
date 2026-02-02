@@ -15,7 +15,7 @@ export const costingSheetsKey = {
 
 export const useCostingSheets = (
     tab?: TabKey,
-    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params: CostingSheetListParams = {
@@ -24,6 +24,7 @@ export const useCostingSheets = (
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        ...(pagination.search && { search: pagination.search }),
     };
 
     return useQuery<PaginatedResult<CostingSheetDashboardRow>>({

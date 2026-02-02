@@ -14,7 +14,7 @@ export const bidSubmissionsKey = {
 
 export const useBidSubmissions = (
     tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
-    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const params: BidSubmissionListParams = {
@@ -23,6 +23,7 @@ export const useBidSubmissions = (
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        ...(pagination.search && { search: pagination.search }),
     };
 
     const queryKeyFilters = {

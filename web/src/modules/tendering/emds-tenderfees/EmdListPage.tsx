@@ -5,7 +5,7 @@ import DataTable from "@/components/ui/data-table";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw } from "lucide-react";
+import { EyeIcon, Pencil, Plus, RefreshCw, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +13,15 @@ import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/useE
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
 import { tenderNameCol } from "@/components/data-grid";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { TableSortFilter } from "@/components/ui/table-sort-filter";
 
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
@@ -58,10 +62,12 @@ const EmdsAndTenderFeesPage = () => {
     const [activeTab, setActiveTab] = useState<TabValue>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -74,11 +80,16 @@ const EmdsAndTenderFeesPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
     // Fetch dashboard data
     const { data: dashboardData, isLoading, error, refetch } = usePaymentDashboard(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort },
+        debouncedSearch || undefined
     );
 
     const { data: countsFromHook } = usePaymentDashboardCounts();
@@ -451,11 +462,6 @@ const EmdsAndTenderFeesPage = () => {
                         <CardTitle>EMDs, Tender Fees & Processing Fees</CardTitle>
                         <CardDescription>
                             Track all payment requests for your assigned tenders
-                            {counts && (
-                                <span className="ml-2 text-muted-foreground">
-                                    • {counts.total} total items
-                                </span>
-                            )}
                         </CardDescription>
                     </div>
                     <CardAction className="flex items-center gap-2">
@@ -469,16 +475,45 @@ const EmdsAndTenderFeesPage = () => {
                         </Button>
                     </CardAction>
                 </div>
-
             </CardHeader>
 
             <CardContent className="flex-1 px-0">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="flex flex-col w-full">
-                    <div className="flex-none m-auto">
+                    <div className="flex-none m-auto mb-4">
                         <TabsList>
                             {TABS.map(renderTabTrigger)}
                         </TabsList>
                     </div>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Sort Filter Button (Right) */}
+                        <TableSortFilter
+                            columnDefs={columnDefs as ColDef<any>[]}
+                            currentSort={sortModel[0]}
+                            onSortChange={(sort) => {
+                                setSortModel(sort ? [sort] : []);
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                            }}
+                        />
+                    </div>
+
                     <div className="flex-1 min-h-0">
                         <DataTable
                             data={tableData}
@@ -488,6 +523,9 @@ const EmdsAndTenderFeesPage = () => {
                             rowCount={totalRows}
                             paginationState={pagination}
                             onPaginationChange={setPagination}
+                            onPageSizeChange={handlePageSizeChange}
+                            showTotalCount={true}
+                            showLengthChange={true}
                             gridOptions={{
                                 defaultColDef: {
                                     filter: true,
