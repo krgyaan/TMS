@@ -157,15 +157,19 @@ export class ReverseAuctionService {
 
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${items.name} ILIKE ${searchStr}`,
+                sql`${reverseAuctions.status} ILIKE ${searchStr}`,
+                sql`${reverseAuctions.raStartTime}::text ILIKE ${searchStr}`,
+                sql`${reverseAuctions.raEndTime}::text ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
