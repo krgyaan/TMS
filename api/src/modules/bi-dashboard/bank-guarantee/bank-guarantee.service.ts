@@ -102,17 +102,24 @@ export class BankGuaranteeService {
 
         const conditions = this.buildDashboardConditions(tab);
 
-        // Search filter
+        // Search filter - search across all rendered columns
         if (options?.search) {
             const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${paymentRequests.projectName} ILIKE ${searchStr} OR
-                    ${paymentRequests.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentBgDetails.bgNo} ILIKE ${searchStr} OR
-                    ${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgNo} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.fdrNo} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.fdrAmt} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
