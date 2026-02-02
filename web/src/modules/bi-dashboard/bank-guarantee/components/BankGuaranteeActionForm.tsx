@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -18,8 +19,39 @@ import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { BankGuaranteeActionFormSchema, type BankGuaranteeActionFormValues } from '../helpers/bankGuaranteeActionForm.schema';
 import { useUpdateBankGuaranteeAction } from '@/hooks/api/useBankGuarantees';
+import { useCourierDashboard } from '@/modules/shared/courier/courier.hooks';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
+
+const FDR_PERCENTAGE_OPTIONS = [
+    { value: '10', label: '10%' },
+    { value: '15', label: '15%' },
+    { value: '100', label: '100%' },
+];
+
+const useCourierRequestOptions = () => {
+    const { data: dashboardData } = useCourierDashboard();
+
+    return useMemo(() => {
+        if (!dashboardData) return [];
+
+        // Combine all couriers from dashboard
+        const allCouriers = [
+            ...(dashboardData.pending || []),
+            ...(dashboardData.dispatched || []),
+            ...(dashboardData.notDelivered || []),
+            ...(dashboardData.delivered || []),
+            ...(dashboardData.rejected || []),
+        ];
+
+        return allCouriers
+            .filter(c => c.docketNo) // Only include couriers with docket numbers
+            .map(c => ({
+                value: c.docketNo!,
+                label: c.docketNo!,
+            }));
+    }, [dashboardData]);
+};
 
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form (BG) 1 - Request to Bank' },
@@ -50,6 +82,7 @@ export function BankGuaranteeActionForm({
 }: BankGuaranteeActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuaranteeAction();
+    const courierRequestOptions = useCourierRequestOptions();
 
     const form = useForm<BankGuaranteeActionFormValues>({
         resolver: zodResolver(BankGuaranteeActionFormSchema) as Resolver<BankGuaranteeActionFormValues>,
@@ -188,20 +221,24 @@ export function BankGuaranteeActionForm({
                                     <FieldWrapper control={form.control} name="bg_no" label="BG No.">
                                         {(field) => <Input {...field} placeholder="Enter BG number" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="bg_date" label="BG Date">
+                                    <FieldWrapper control={form.control} name="bg_date" label="BG Creation Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="bg_validity" label="BG Validity">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="bg_claim_period" label="BG Claim Period">
+                                    <FieldWrapper control={form.control} name="bg_claim_period" label="BG Claim Period Expiry">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                 </div>
 
-                                <FieldWrapper control={form.control} name="courier_no" label="Courier Request No.">
-                                    {(field) => <Input {...field} placeholder="Enter courier request number" />}
-                                </FieldWrapper>
+                                <SelectField
+                                    label="Courier Request No."
+                                    control={form.control}
+                                    name="courier_no"
+                                    options={courierRequestOptions}
+                                    placeholder="Select courier request number"
+                                />
 
                                 <FieldWrapper control={form.control} name="bg2_remark" label="Remarks">
                                     {(field) => (
@@ -227,9 +264,13 @@ export function BankGuaranteeActionForm({
                                 </FieldWrapper>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="fdr_per" label="FDR Percentage">
-                                        {(field) => <NumberInput {...field} placeholder="Enter percentage" />}
-                                    </FieldWrapper>
+                                    <SelectField
+                                        label="FDR Percentage"
+                                        control={form.control}
+                                        name="fdr_per"
+                                        options={FDR_PERCENTAGE_OPTIONS}
+                                        placeholder="Select percentage"
+                                    />
                                     <FieldWrapper control={form.control} name="fdr_amt" label="FDR Amount">
                                         {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
@@ -248,7 +289,7 @@ export function BankGuaranteeActionForm({
                                     <FieldWrapper control={form.control} name="fdr_validity" label="FDR Validity">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="fdr_roi" label="FDR ROI">
+                                    <FieldWrapper control={form.control} name="fdr_roi" label="FDR ROI%">
                                         {(field) => <NumberInput {...field} placeholder="Enter ROI" />}
                                     </FieldWrapper>
                                 </div>
@@ -261,7 +302,7 @@ export function BankGuaranteeActionForm({
                                     <FieldWrapper control={form.control} name="sfms_charge_deducted" label="SFMS Charges Deducted">
                                         {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="stamp_charge_deducted" label="Stamp Charges Deducted">
+                                    <FieldWrapper control={form.control} name="stamp_charge_deducted" label="Stamp Paper Charges Deducted">
                                         {(field) => <NumberInput {...field} placeholder="Enter charges" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="other_charge_deducted" label="Other Charges Deducted">
@@ -323,7 +364,7 @@ export function BankGuaranteeActionForm({
                                     )}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="ext_letter" label="Request Letter/Email">
+                                <FieldWrapper control={form.control} name="ext_letter" label="Request Letter/email from Client">
                                     {(field) => (
                                         <CompactTenderFileUploader
                                             context="bg-ext-letter"
@@ -367,7 +408,7 @@ export function BankGuaranteeActionForm({
                                     {(field) => <Input {...field} placeholder="Enter docket number" />}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
+                                <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
                                     {(field) => (
                                         <CompactTenderFileUploader
                                             context="bg-docket-slip"

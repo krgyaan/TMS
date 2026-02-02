@@ -17,9 +17,9 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     // Accounts Form (BT) 1 - Request to Bank
     bt_req: z.enum(['Accepted', 'Rejected']).optional(),
     reason_req: z.string().optional(),
+    payment_datetime: z.string().optional(),
     utr_no: z.string().optional(),
-    utr_mgs: z.string().optional(),
-    payment_date: z.string().optional(),
+    utr_message: z.string().optional(),
     remarks: z.string().optional(),
 
     // Initiate Followup
@@ -32,13 +32,12 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     stop_remarks: z.string().optional().nullable(),
     proof_image: z.any().optional(), // File
 
-    // Returned
-    return_date: z.string().optional(),
-    utr_num: z.string().optional(),
+    // Returned via Bank Transfer
+    transfer_date: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
-        if (data.action === 'accounts-form') {
+        if (data.action === 'accounts-form-1') {
             return !!data.bt_req;
         }
         return true;
@@ -49,7 +48,7 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form' && data.bt_req === 'Rejected') {
+        if (data.action === 'accounts-form-1' && data.bt_req === 'Rejected') {
             return !!data.reason_req;
         }
         return true;
@@ -57,6 +56,18 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'Reason for rejection is required',
         path: ['reason_req'],
+    }
+).refine(
+    (data) => {
+        // Action 1: When Accepted, payment_datetime, utr_no, utr_message, remarks are required
+        if (data.action === 'accounts-form-1' && data.bt_req === 'Accepted') {
+            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message && !!data.remarks;
+        }
+        return true;
+    },
+    {
+        message: 'Date and time of payment, UTR number, UTR message, and remarks are required when accepted',
+        path: ['payment_datetime'],
     }
 ).refine(
     (data) => {
@@ -98,15 +109,15 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Action 3: return_reason, return_date, utr_num are required
+        // Action 3: transfer_date and utr_no are required
         if (data.action === 'returned') {
-            return !!data.return_date && !!data.utr_num;
+            return !!data.transfer_date && !!data.utr_no;
         }
         return true;
     },
     {
-        message: 'Return reason, return date, and UTR number are required',
-        path: ['return_reason'],
+        message: 'Transfer date and UTR number are required',
+        path: ['transfer_date'],
     }
 );
 

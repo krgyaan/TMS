@@ -22,16 +22,12 @@ import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
 
 const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (CHQ) 1 - Request to Bank' },
-    { value: 'accounts-form-2', label: 'Accounts Form (CHQ) 2 - After Cheque Creation' },
-    { value: 'accounts-form-3', label: 'Accounts Form (CHQ) 3 - Capture Cheque Details' },
+    { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'stop-cheque', label: 'Stop the cheque from the bank' },
     { value: 'paid-via-bank-transfer', label: 'Paid via Bank Transfer' },
     { value: 'deposited-in-bank', label: 'Deposited in Bank' },
     { value: 'cancelled-torn', label: 'Cancelled/Torn' },
-    { value: 'returned-courier', label: 'Returned via Courier' },
-    { value: 'request-cancellation', label: 'Request Cancellation' },
 ];
 
 interface ChequeActionFormProps {
@@ -113,10 +109,10 @@ export function ChequeActionForm({
                             )}
                         </FieldWrapper>
 
-                        {/* Accounts Form (CHQ) 1 */}
+                        {/* Accounts Form */}
                         <ConditionalSection show={action === 'accounts-form-1'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (CHQ) 1 - Request to Bank</h4>
+                                <h4 className="font-semibold text-base">Accounts Form</h4>
 
                                 <FieldWrapper control={form.control} name="cheque_req" label="Cheque Request">
                                     {(field) => (
@@ -140,104 +136,64 @@ export function ChequeActionForm({
                                 {chequeReq === 'Rejected' && (
                                     <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
                                         {(field) => (
-                                            <Textarea
+                                            <Input
                                                 {...field}
                                                 placeholder="Enter reason for rejection"
-                                                className="min-h-[80px]"
                                             />
                                         )}
                                     </FieldWrapper>
                                 )}
 
-                                <FieldWrapper control={form.control} name="cheque_format_imran" label="Cheque Format (Upload by Imran)">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="cheque-format-imran"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                {chequeReq === 'Accepted' && (
+                                    <>
+                                        <FieldWrapper control={form.control} name="cheque_no" label="Cheque No.">
+                                            {(field) => <Input {...field} placeholder="Enter cheque number" />}
+                                        </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="prefilled_signed_cheque" label="Prefilled Bank Formats">
-                                    {(field) => (
-                                        <TenderFileUploader
-                                            context="cheque-prefilled-signed"
-                                            value={field.value || []}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="due_date" label="Due date (if payable)">
+                                            {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                                        </FieldWrapper>
+
+                                        <FieldWrapper control={form.control} name="receiving_cheque_handed_over" label="Receiving of the cheque handed over">
+                                            {(field) => (
+                                                <CompactTenderFileUploader
+                                                    context="cheque-receiving-handed-over"
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+
+                                        <FieldWrapper control={form.control} name="cheque_images" label="Upload soft copy of Cheque (both sides)">
+                                            {(field) => (
+                                                <TenderFileUploader
+                                                    context="cheque-images"
+                                                    value={field.value || []}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+
+                                        <FieldWrapper control={form.control} name="positive_pay_confirmation" label="Upload Positive pay confirmation copy">
+                                            {(field) => (
+                                                <CompactTenderFileUploader
+                                                    context="cheque-positive-pay-confirmation"
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+
+                                        <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                            {(field) => (
+                                                <Input {...field} placeholder="Enter remarks" />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
                             </div>
                         </ConditionalSection>
 
-                        {/* Accounts Form (CHQ) 2 */}
-                        <ConditionalSection show={action === 'accounts-form-2'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (CHQ) 2 - After Cheque Creation</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="cheque_no" label="Cheque No.">
-                                        {(field) => <Input {...field} placeholder="Enter cheque number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_date" label="Cheque Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_amount" label="Cheque Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_type" label="Cheque Type">
-                                        {(field) => <Input {...field} placeholder="Enter cheque type" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_reason" label="Cheque Reason">
-                                        {(field) => <Input {...field} placeholder="Enter reason" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="due_date" label="Due Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <FieldWrapper control={form.control} name="courier_request_no" label="Courier Request No.">
-                                    {(field) => <Input {...field} placeholder="Enter courier request number" />}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </ConditionalSection>
-
-                        {/* Accounts Form (CHQ) 3 */}
-                        <ConditionalSection show={action === 'accounts-form-3'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (CHQ) 3 - Capture Cheque Details</h4>
-
-                                <FieldWrapper control={form.control} name="cheque_images" label="Cheque Images (Max 2)">
-                                    {(field) => (
-                                        <TenderFileUploader
-                                            context="cheque-images"
-                                            value={field.value || []}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                <h5 className="font-medium text-sm mt-4">Charges</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="cheque_charges" label="Cheque Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="stamp_charges" label="Stamp Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="other_charges" label="Other Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                </div>
-                            </div>
-                        </ConditionalSection>
 
                         {/* Initiate Followup */}
                         <ConditionalSection show={action === 'initiate-followup'}>
@@ -293,11 +249,11 @@ export function ChequeActionForm({
                                     <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="utr" label="UTR Number">
-                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                    </FieldWrapper>
                                     <FieldWrapper control={form.control} name="amount" label="UTR Amount">
                                         {(field) => <NumberInput {...field} placeholder="Enter amount" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr" label="UTR Number">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                 </div>
                             </div>
@@ -309,7 +265,7 @@ export function ChequeActionForm({
                                 <h4 className="font-semibold text-base">Deposited in Bank</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="bt_transfer_date" label="Transfer Date">
+                                    <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="reference" label="Bank Reference No">
@@ -336,68 +292,6 @@ export function ChequeActionForm({
                             </div>
                         </ConditionalSection>
 
-                        {/* Returned via courier */}
-                        <ConditionalSection show={action === 'returned-courier'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Returned via Courier</h4>
-
-                                <FieldWrapper control={form.control} name="docket_no" label="Docket No.">
-                                    {(field) => <Input {...field} placeholder="Enter docket number" />}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="cheque-docket-slip"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </ConditionalSection>
-
-                        {/* Request Cancellation */}
-                        <ConditionalSection show={action === 'request-cancellation'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Request Cancellation</h4>
-
-                                <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="cheque-covering-letter"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="cancellation_remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </ConditionalSection>
-
-                        {/* Cheque Cancellation Confirmation */}
-                        <ConditionalSection show={action === 'cheque-cancellation-confirmation'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Cheque Cancellation Confirmation</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="cheque_cancellation_date" label="Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_cancellation_amount" label="Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="cheque_cancellation_reference_no" label="Reference No.">
-                                        {(field) => <Input {...field} placeholder="Enter reference number" />}
-                                    </FieldWrapper>
-                                </div>
-                            </div>
-                        </ConditionalSection>
 
                         <div className="flex justify-end gap-4 pt-4">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>

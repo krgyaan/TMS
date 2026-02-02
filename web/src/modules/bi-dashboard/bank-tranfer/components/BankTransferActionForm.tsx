@@ -12,6 +12,7 @@ import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySele
 import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
+import DateTimeInput from '@/components/form/DateTimeInput';
 import { BankTransferActionFormSchema, type BankTransferActionFormValues } from '../helpers/bankTransferActionForm.schema';
 import { useUpdateBankTransferAction } from '@/hooks/api/useBankTransfers';
 import { toast } from 'sonner';
@@ -127,28 +128,33 @@ export function BankTransferActionForm({
                                 {btReq === 'Rejected' && (
                                     <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
                                         {(field) => (
-                                            <Textarea
+                                            <Input
                                                 {...field}
                                                 placeholder="Enter reason for rejection"
-                                                className="min-h-[80px]"
                                             />
                                         )}
                                     </FieldWrapper>
                                 )}
                                 {btReq === 'Accepted' && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FieldWrapper control={form.control} name="utr_no" label="UTR No.">
+                                        <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
+                                            {(field) => (
+                                                <DateTimeInput
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="Select date and time"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="utr_no" label="UTR for the transaction">
                                             {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                         </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="utr_mgs" label="UTR Message">
+                                        <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
                                             {(field) => <Input {...field} placeholder="Enter UTR message" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
-                                            {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                         </FieldWrapper>
                                         <FieldWrapper control={form.control} name="remarks" label="Remarks">
                                             {(field) => (
-                                                <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
+                                                <Input {...field} placeholder="Enter remarks" />
                                             )}
                                         </FieldWrapper>
                                     </div>
@@ -184,26 +190,26 @@ export function BankTransferActionForm({
                             </div>
                         </ConditionalSection>
 
-                        {/* Returned */}
+                        {/* Returned via Bank Transfer */}
                         <ConditionalSection show={action === 'returned'}>
                             <div className="space-y-4 border rounded-lg p-4">
                                 <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="return_date" label="Return Date">
+                                    <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="utr_num" label="UTR Number">
+                                    <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                 </div>
                             </div>
                         </ConditionalSection>
 
-                        {/* Settled */}
+                        {/* Settled with Project Account */}
                         <ConditionalSection show={action === 'settled'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Settled with Project</h4>
+                                <h4 className="font-semibold text-base">Settled with Project Account</h4>
                             </div>
                         </ConditionalSection>
 

@@ -18,20 +18,43 @@ import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { DemandDraftActionFormSchema, type DemandDraftActionFormValues } from '../helpers/demandDraftActionForm.schema';
 import { useUpdateDemandDraftAction } from '@/hooks/api/useDemandDrafts';
+import { useCourierDashboard } from '@/modules/shared/courier/courier.hooks';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
+import { useMemo } from 'react';
 
 const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (DD) 1 - Request to Bank' },
-    { value: 'accounts-form-2', label: 'Accounts Form (DD) 2 - After DD Creation' },
-    { value: 'accounts-form-3', label: 'Accounts Form (DD) 3 - Capture DD Details' },
+    { value: 'accounts-form-1', label: 'Accounts Form (DD)' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'request-extension', label: 'Request Extension' },
-    { value: 'returned-courier', label: 'Returned via Courier' },
+    { value: 'returned-courier', label: 'Returned via courier' },
     { value: 'returned-bank-transfer', label: 'Returned via Bank Transfer' },
-    { value: 'request-cancellation', label: 'Request Cancellation' },
-    { value: 'dd-cancellation-confirmation', label: 'DD Cancellation Confirmation' },
+    { value: 'settled', label: 'Settled with Project Account' },
+    { value: 'request-cancellation', label: 'Send DD Cancellation Request' },
+    { value: 'dd-cancellation-confirmation', label: 'DD cancelled at Branch' },
 ];
+
+const useCourierRequestOptions = () => {
+    const { data: dashboardData } = useCourierDashboard();
+
+    return useMemo(() => {
+        if (!dashboardData) return [];
+
+        const allCouriers = [
+            ...(dashboardData.pending || []),
+            ...(dashboardData.dispatched || []),
+            ...(dashboardData.notDelivered || []),
+            ...(dashboardData.delivered || []),
+            ...(dashboardData.rejected || []),
+        ];
+
+        return allCouriers
+            .filter(c => c.docketNo)
+            .map(c => ({
+                value: c.docketNo!,
+                label: c.docketNo! + (c.toOrg ? ` - ${c.toOrg}` : ''),
+            }));
+    }, [dashboardData]);
+};
 
 interface DemandDraftActionFormProps {
     instrumentId: number;
@@ -50,6 +73,7 @@ export function DemandDraftActionForm({
 }: DemandDraftActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateDemandDraftAction();
+    const courierRequestOptions = useCourierRequestOptions();
 
     const form = useForm<DemandDraftActionFormValues>({
         resolver: zodResolver(DemandDraftActionFormSchema) as Resolver<DemandDraftActionFormValues>,
@@ -61,7 +85,6 @@ export function DemandDraftActionForm({
 
     const action = useWatch({ control: form.control, name: 'action' });
     const ddReq = useWatch({ control: form.control, name: 'dd_req' });
-    const modificationRequired = useWatch({ control: form.control, name: 'modification_required' });
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
@@ -112,10 +135,10 @@ export function DemandDraftActionForm({
                             )}
                         </FieldWrapper>
 
-                        {/* Accounts Form (DD) 1 */}
+                        {/* Accounts Form (DD) */}
                         <ConditionalSection show={action === 'accounts-form-1'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (DD) 1 - Request to Bank</h4>
+                                <h4 className="font-semibold text-base">Accounts Form (DD)</h4>
 
                                 <FieldWrapper control={form.control} name="dd_req" label="DD Request">
                                     {(field) => (
@@ -139,91 +162,40 @@ export function DemandDraftActionForm({
                                 {ddReq === 'Rejected' && (
                                     <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
                                         {(field) => (
-                                            <Textarea
+                                            <Input
                                                 {...field}
                                                 placeholder="Enter reason for rejection"
-                                                className="min-h-[80px]"
                                             />
                                         )}
                                     </FieldWrapper>
                                 )}
 
-                                <FieldWrapper control={form.control} name="dd_format_imran" label="DD Format (Upload by Imran)">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="dd-format-imran"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                {ddReq === 'Accepted' && (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FieldWrapper control={form.control} name="dd_date" label="DD Date">
+                                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="dd_no" label="DD No.">
+                                                {(field) => <Input {...field} placeholder="Enter DD number" />}
+                                            </FieldWrapper>
+                                        </div>
 
-                                <FieldWrapper control={form.control} name="prefilled_signed_dd" label="Prefilled Bank Formats">
-                                    {(field) => (
-                                        <TenderFileUploader
-                                            context="dd-prefilled-signed"
-                                            value={field.value || []}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="req_no" label="Courier request No.">
+                                            {(field) => (
+                                                <SelectField
+                                                    control={form.control}
+                                                    name="req_no"
+                                                    options={courierRequestOptions}
+                                                    placeholder="Select courier request number"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
                             </div>
                         </ConditionalSection>
 
-                        {/* Accounts Form (DD) 2 */}
-                        <ConditionalSection show={action === 'accounts-form-2'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (DD) 2 - After DD Creation</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="dd_no" label="DD No.">
-                                        {(field) => <Input {...field} placeholder="Enter DD number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="dd_date" label="DD Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <FieldWrapper control={form.control} name="req_no" label="Courier Request No.">
-                                    {(field) => <Input {...field} placeholder="Enter courier request number" />}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </ConditionalSection>
-
-                        {/* Accounts Form (DD) 3 */}
-                        <ConditionalSection show={action === 'accounts-form-3'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (DD) 3 - Capture DD Details</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="dd_amount" label="DD Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <h5 className="font-medium text-sm mt-4">Charges</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="dd_charges" label="DD Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="sfms_charges" label="SFMS Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="stamp_charges" label="Stamp Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="other_charges" label="Other Charges">
-                                        {(field) => <NumberInput {...field} placeholder="Enter charges" />}
-                                    </FieldWrapper>
-                                </div>
-                            </div>
-                        </ConditionalSection>
 
                         {/* Initiate Followup */}
                         <ConditionalSection show={action === 'initiate-followup'}>
@@ -253,61 +225,17 @@ export function DemandDraftActionForm({
                             </div>
                         </ConditionalSection>
 
-                        {/* Request Extension */}
-                        <ConditionalSection show={action === 'request-extension'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Request Extension</h4>
-
-                                <FieldWrapper control={form.control} name="modification_required" label="Modification Required">
-                                    {(field) => (
-                                        <RadioGroup
-                                            value={field.value}
-                                            onValueChange={field.onChange}
-                                            className="flex gap-6"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="Yes" id="mod_yes" />
-                                                <Label htmlFor="mod_yes">Yes</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="No" id="mod_no" />
-                                                <Label htmlFor="mod_no">No</Label>
-                                            </div>
-                                        </RadioGroup>
-                                    )}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="request_letter_email" label="Request Letter/Email">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="dd-request-letter-email"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                {modificationRequired === 'Yes' && (
-                                    <div className="space-y-2">
-                                        <Label>Modification Fields</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Modification fields table can be added here
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </ConditionalSection>
 
                         {/* Returned via courier */}
                         <ConditionalSection show={action === 'returned-courier'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Returned via Courier</h4>
+                                <h4 className="font-semibold text-base">Returned via courier</h4>
 
                                 <FieldWrapper control={form.control} name="docket_no" label="Docket No.">
                                     {(field) => <Input {...field} placeholder="Enter docket number" />}
                                 </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="docket_slip" label="Docket Slip Upload">
+                                <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
                                     {(field) => (
                                         <CompactTenderFileUploader
                                             context="dd-docket-slip"
@@ -335,42 +263,33 @@ export function DemandDraftActionForm({
                             </div>
                         </ConditionalSection>
 
-                        {/* Request Cancellation */}
-                        <ConditionalSection show={action === 'request-cancellation'}>
+                        {/* Settled with Project Account */}
+                        <ConditionalSection show={action === 'settled'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Request Cancellation</h4>
-
-                                <FieldWrapper control={form.control} name="covering_letter" label="Covering Letter Upload">
-                                    {(field) => (
-                                        <CompactTenderFileUploader
-                                            context="dd-covering-letter"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="cancellation_remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
+                                <h4 className="font-semibold text-base">Settled with Project Account</h4>
                             </div>
                         </ConditionalSection>
 
-                        {/* DD Cancellation Confirmation */}
+                        {/* Send DD Cancellation Request */}
+                        <ConditionalSection show={action === 'request-cancellation'}>
+                            <div className="space-y-4 border rounded-lg p-4">
+                                <h4 className="font-semibold text-base">Send DD Cancellation Request</h4>
+                            </div>
+                        </ConditionalSection>
+
+                        {/* DD cancelled at Branch */}
                         <ConditionalSection show={action === 'dd-cancellation-confirmation'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">DD Cancellation Confirmation</h4>
+                                <h4 className="font-semibold text-base">DD cancelled at Branch</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FieldWrapper control={form.control} name="dd_cancellation_date" label="Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="dd_cancellation_amount" label="Amount">
+                                    <FieldWrapper control={form.control} name="dd_cancellation_amount" label="Amount credited">
                                         {(field) => <NumberInput {...field} placeholder="Enter amount" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="dd_cancellation_reference_no" label="Reference No.">
+                                    <FieldWrapper control={form.control} name="dd_cancellation_reference_no" label="Bank reference No">
                                         {(field) => <Input {...field} placeholder="Enter reference number" />}
                                     </FieldWrapper>
                                 </div>

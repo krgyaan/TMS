@@ -13,6 +13,7 @@ import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
+import DateTimeInput from '@/components/form/DateTimeInput';
 import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues } from '../helpers/payOnPortalActionForm.schema';
 import { useUpdatePayOnPortalAction } from '@/hooks/api/usePayOnPortals';
 import { toast } from 'sonner';
@@ -23,8 +24,8 @@ import { Label } from '@/components/ui/label';
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned' },
-    { value: 'settled', label: 'Settled' },
+    { value: 'returned', label: 'Returned via Bank Transfer' },
+    { value: 'settled', label: 'Settled with Project Account' },
 ];
 
 interface PayOnPortalActionFormProps {
@@ -128,35 +129,41 @@ export function PayOnPortalActionForm({
                                 {popReq === 'Rejected' && (
                                     <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
                                         {(field) => (
-                                            <Textarea
+                                            <Input
                                                 {...field}
                                                 placeholder="Enter reason for rejection"
-                                                className="min-h-[80px]"
                                             />
                                         )}
                                     </FieldWrapper>
                                 )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="utr_no" label="UTR No.">
-                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="portal_name" label="Portal Name">
-                                        {(field) => <Input {...field} placeholder="Enter portal name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="amount" label="Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                </div>
+                                {popReq === 'Accepted' && (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
+                                                {(field) => (
+                                                    <DateTimeInput
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                        placeholder="Select date and time"
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="utr_no" label="UTR for the transaction">
+                                                {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
+                                                {(field) => <Input {...field} placeholder="Enter UTR message" />}
+                                            </FieldWrapper>
+                                        </div>
 
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                            {(field) => (
+                                                <Input {...field} placeholder="Enter remarks" />
+                                            )}
+                                        </FieldWrapper>
+                                    </>
+                                )}
                             </div>
                         </ConditionalSection>
 
@@ -188,50 +195,26 @@ export function PayOnPortalActionForm({
                             </div>
                         </ConditionalSection>
 
-                        {/* Returned */}
+                        {/* Returned via Bank Transfer */}
                         <ConditionalSection show={action === 'returned'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Returned</h4>
-
-                                <FieldWrapper control={form.control} name="return_reason" label="Return Reason">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter return reason" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
+                                <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="return_date" label="Return Date">
+                                    <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                         {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
                                         {(field) => <Input {...field} placeholder="Enter UTR number" />}
                                     </FieldWrapper>
                                 </div>
-
-                                <FieldWrapper control={form.control} name="return_remarks" label="Return Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
                             </div>
                         </ConditionalSection>
 
-                        {/* Settled */}
+                        {/* Settled with Project Account */}
                         <ConditionalSection show={action === 'settled'}>
                             <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Settled</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="settlement_date" label="Settlement Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_amount" label="Settlement Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_reference_no" label="Reference No.">
-                                        {(field) => <Input {...field} placeholder="Enter reference number" />}
-                                    </FieldWrapper>
-                                </div>
+                                <h4 className="font-semibold text-base">Settled with Project Account</h4>
                             </div>
                         </ConditionalSection>
 
