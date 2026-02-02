@@ -6,7 +6,6 @@ import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { StopReasonFields } from '@/components/form/StopReasonFields';

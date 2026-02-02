@@ -69,7 +69,7 @@ const BankStatsCards = ({ cardStats }: { cardStats: BankGuaranteeCardStats }) =>
                     >
                         <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-green-600 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`} />
 
-                        <CardHeader className="p-3 pb-0 flex flex-row items-start justify-between space-y-0">
+                        <CardHeader className="px-3 pb-0 flex flex-row items-start justify-between space-y-0">
                             <div className="space-y-0.5">
                                 <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
                                     {bankNameMap[bankName] || bankName}
@@ -83,7 +83,7 @@ const BankStatsCards = ({ cardStats }: { cardStats: BankGuaranteeCardStats }) =>
                             </div>
                         </CardHeader>
 
-                        <CardContent className="p-3 pt-2">
+                        <CardContent className="px-3 pt-0">
                             <div>
                                 <span className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Total BG Amount</span>
                                 <div className="flex items-center justify-between">
