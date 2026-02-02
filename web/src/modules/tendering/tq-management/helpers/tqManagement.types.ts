@@ -48,6 +48,7 @@ export type TqManagementFilters = {
     tqStatus?: TenderQueryStatus | TenderQueryStatus[];
     page?: number;
     limit?: number;
+    search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };

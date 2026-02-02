@@ -30,6 +30,9 @@ class TqManagementService extends BaseApiService {
             if (filters.sortOrder) {
                 search.set('sortOrder', filters.sortOrder);
             }
+            if (filters.search) {
+                search.set('search', filters.search);
+            }
         }
 
         const queryString = search.toString();
