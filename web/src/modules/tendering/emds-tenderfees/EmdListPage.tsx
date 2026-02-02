@@ -21,7 +21,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
-import { TableSortFilter } from "@/components/ui/table-sort-filter";
 
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
@@ -189,6 +188,12 @@ const EmdsAndTenderFeesPage = () => {
                         {formatDateTime(params.value)}
                     </span>
                 );
+            },
+            comparator: (dateA, dateB) => {
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return new Date(dateA).getTime() - new Date(dateB).getTime();
             },
         },
         {
@@ -487,7 +492,12 @@ const EmdsAndTenderFeesPage = () => {
 
                     {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-                        {/* Quick Filters (Left) - Optional, can be added per page */}
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
 
                         {/* Search Bar (Center) - Flex grow */}
                         <div className="flex-1 flex justify-end">
@@ -503,15 +513,6 @@ const EmdsAndTenderFeesPage = () => {
                             </div>
                         </div>
 
-                        {/* Sort Filter Button (Right) */}
-                        <TableSortFilter
-                            columnDefs={columnDefs as ColDef<any>[]}
-                            currentSort={sortModel[0]}
-                            onSortChange={(sort) => {
-                                setSortModel(sort ? [sort] : []);
-                                setPagination(p => ({ ...p, pageIndex: 0 }));
-                            }}
-                        />
                     </div>
 
                     <div className="flex-1 min-h-0">

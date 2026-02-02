@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { PhysicalDocsDashboardRow, PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
+import type { PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Search } from 'lucide-react';
@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { TableSortFilter } from '@/components/ui/table-sort-filter';
 
 const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
@@ -118,6 +117,12 @@ const PhysicalDocsListPage = () => {
             valueGetter: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
             sortable: true,
             filter: true,
+            comparator: (dateA, dateB) => {
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return new Date(dateA).getTime() - new Date(dateB).getTime();
+            },
         },
         {
             field: 'courierAddress',
@@ -256,8 +261,13 @@ const PhysicalDocsListPage = () => {
 
                     {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-                        {/* Quick Filters (Left) - Optional, can be added per page */}
-                        
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
                         {/* Search Bar (Center) - Flex grow */}
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
@@ -271,16 +281,7 @@ const PhysicalDocsListPage = () => {
                                 />
                             </div>
                         </div>
-                        
-                        {/* Sort Filter Button (Right) */}
-                        <TableSortFilter
-                            columnDefs={colDefs as ColDef<any>[]}
-                            currentSort={sortModel[0]}
-                            onSortChange={(sort) => {
-                                setSortModel(sort ? [sort] : []);
-                                setPagination(p => ({ ...p, pageIndex: 0 }));
-                            }}
-                        />
+
                     </div>
 
                     {tabsConfig.map((tab) => (
