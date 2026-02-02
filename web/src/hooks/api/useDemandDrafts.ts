@@ -23,7 +23,14 @@ export const useDemandDraftDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<DemandDraftDashboardRow>>({
         queryKey: demandDraftsKey.list(queryKeyFilters),

@@ -23,7 +23,14 @@ export const useFdrDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<FdrDashboardRow>>({
         queryKey: fdrsKey.list(queryKeyFilters),

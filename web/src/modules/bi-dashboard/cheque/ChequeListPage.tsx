@@ -18,7 +18,6 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { TableSortFilter } from '@/components/ui/table-sort-filter';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -158,6 +157,12 @@ const ChequeListPage = () => {
                 colId: 'cheque',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'chequeNo',
@@ -184,6 +189,12 @@ const ChequeListPage = () => {
                 colId: 'bidValidity',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'amount',
@@ -214,6 +225,12 @@ const ChequeListPage = () => {
                 colId: 'dueDate',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'expiry',
@@ -341,7 +358,7 @@ const ChequeListPage = () => {
                             ))}
                         </TabsList>
 
-                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
                             {/* Quick Filters (Left) - Optional, can be added per page */}
                             
@@ -358,16 +375,6 @@ const ChequeListPage = () => {
                                     />
                                 </div>
                             </div>
-                            
-                            {/* Sort Filter Button (Right) */}
-                            <TableSortFilter
-                                columnDefs={colDefs}
-                                currentSort={sortModel[0]}
-                                onSortChange={(sort) => {
-                                    setSortModel(sort ? [sort] : []);
-                                    setPagination(p => ({ ...p, pageIndex: 0 }));
-                                }}
-                            />
                         </div>
 
                         {tabsWithData.map((tab) => (
