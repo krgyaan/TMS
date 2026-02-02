@@ -41,7 +41,7 @@ export function TableSortFilter({
         const dateCols: ColumnInfo[] = [];
         const amountCols: ColumnInfo[] = [];
 
-        const datePattern = /date|time|created|updated|due|expiry|deadline|submission|dispatch|approval|rejection/i;
+        const datePattern = /date|created|updated|due|expiry|deadline|submission|dispatch|approval|rejection/i;
         const amountPattern = /amount|price|value|fee|cost|total|sum|gst|emd|tenderfee|processingfee|fdr|cheque|dd|bg|bt|pop/i;
 
         columnDefs.forEach((col) => {
