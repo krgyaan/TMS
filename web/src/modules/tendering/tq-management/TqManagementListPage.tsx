@@ -20,7 +20,6 @@ import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqMana
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { TableSortFilter } from '@/components/ui/table-sort-filter';
 
 
 const TqManagementListPage = () => {
@@ -256,6 +255,12 @@ const TqManagementListPage = () => {
             valueGetter: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
+            comparator: (dateA, dateB) => {
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return new Date(dateA).getTime() - new Date(dateB).getTime();
+            },
         },
         {
             field: 'statusName',
@@ -274,6 +279,12 @@ const TqManagementListPage = () => {
             valueGetter: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
+            comparator: (dateA, dateB) => {
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return new Date(dateA).getTime() - new Date(dateB).getTime();
+            },
         },
         {
             field: 'tqStatus',
@@ -412,8 +423,16 @@ const TqManagementListPage = () => {
 
                     {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-                        {/* Quick Filters (Left) - Optional, can be added per page */}
-                        
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]}
+                            value={search}
+                            onChange={(value) => setSearch(value)}
+                        />
+
                         {/* Search Bar (Center) - Flex grow */}
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
@@ -427,16 +446,7 @@ const TqManagementListPage = () => {
                                 />
                             </div>
                         </div>
-                        
-                        {/* Sort Filter Button (Right) */}
-                        <TableSortFilter
-                            columnDefs={colDefs}
-                            currentSort={sortModel[0]}
-                            onSortChange={(sort) => {
-                                setSortModel(sort ? [sort] : []);
-                                setPagination(p => ({ ...p, pageIndex: 0 }));
-                            }}
-                        />
+
                     </div>
 
                     {tabsConfig.map((tab) => (
