@@ -38,6 +38,10 @@ export interface SendTenderEmailOptions {
     subject: string;
     template: string;
     data: Record<string, any>;
+    attachments?: {
+        files: string[];
+        baseDir?: string;
+    };
 }
 
 export interface ResolvedEmail {
