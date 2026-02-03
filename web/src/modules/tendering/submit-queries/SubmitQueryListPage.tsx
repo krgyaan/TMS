@@ -14,6 +14,7 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { SubmitQueryListRow } from './helpers/submitQueries.types';
 import { useSubmitQueries } from '@/hooks/api/useSubmitQuery';
+import { Badge } from '@/components/ui/badge';
 
 const SubmitQueryListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -45,7 +46,6 @@ const SubmitQueryListPage = () => {
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
         },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
     const rows = apiResponse?.data ?? [];
@@ -55,12 +55,12 @@ const SubmitQueryListPage = () => {
         () => [
             {
                 label: 'View',
-                onClick: (row) => navigate(paths.tendering.requestExtensionView(row.id)),
+                onClick: (row) => navigate(paths.tendering.submitQueryView(row.tenderId, row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Edit',
-                onClick: (row) => navigate(paths.tendering.requestExtensionEdit(row.tenderId, row.id)),
+                onClick: (row) => navigate(paths.tendering.submitQueryEdit(row.tenderId, row.id)),
                 icon: <Edit className="h-4 w-4" />,
             },
         ],
@@ -90,6 +90,53 @@ const SubmitQueryListPage = () => {
                 valueGetter: (params) => params.data?.tenderNo ?? '—',
                 sortable: true,
                 filter: true,
+            },
+            {
+                field: 'queries',
+                colId: 'queries',
+                headerName: 'Query Types',
+                flex: 1,
+                cellRenderer: (params: { data?: any }) => (
+                    params.data?.queries ? (
+                        <div className="flex flex-wrap gap-1">
+                            {params.data.queries.map((query: any, index: number) => (
+                                <Badge key={index} variant="outline" className="h-5 px-1">
+                                    {query.queryType}
+                                </Badge>
+                            ))}
+                        </div>
+                    ) : '—'
+                ),
+                sortable: false,
+                filter: false,
+            },
+            {
+                field: 'clientContacts',
+                colId: 'clientContacts',
+                headerName: 'Sent To',
+                flex: 1,
+                cellRenderer: (params: { data?: any }) => {
+                    if (!params.data) return '—';
+                    let emails: string[] = [];
+                    params.data.clientContacts.forEach((contact: any) => {
+                        if (contact.client_email) {
+                            emails.push(contact.client_email.trim());
+                        }
+                    });
+
+                    return emails.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                            {emails.map((email: string, index: number) => (
+                                <Badge key={index} variant="outline" className="h-5 px-1">
+                                    {email}
+                                </Badge>
+                            ))}
+                        </div>
+                    ) : '—';
+                },
+                sortable: false,
+                filter: false,
+
             },
             {
                 field: 'createdAt',

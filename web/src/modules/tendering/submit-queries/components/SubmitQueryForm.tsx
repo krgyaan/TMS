@@ -445,17 +445,17 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                     size="sm"
                                                     onClick={() => handleAddCcEmail(index)}
                                                 >
-                                                    <Plus className="h-3 w-3" />
+                                                    Add CC Mail<Plus className="h-3 w-3" />
                                                 </Button>
                                             </div>
 
-                                            <div className="space-y-2">
+                                            <div className="grid gap-2 grid-cols-6">
                                                 {(form.watch(`clientContacts.${index}.ccEmails`) || []).map((_, emailIndex) => (
                                                     <div key={emailIndex} className="flex items-center gap-2">
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`clientContacts.${index}.ccEmails.${emailIndex}`}
-                                                            label="CC Email"
+                                                            label=""
                                                             className="flex-1"
                                                         >
                                                             {(fieldProps) => (

@@ -1,4 +1,4 @@
-import type { CreateSubmitQueryDto, SubmitQueryListParams, SubmitQueryListRow, UpdateSubmitQueryDto } from '@/modules/tendering/submit-queries/helpers/submitQueries.types';
+import type { CreateSubmitQueryPayload, SubmitQueryListParams, SubmitQueryListRow, UpdateSubmitQueryPayload } from '@/modules/tendering/submit-queries/helpers/submitQueries.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -22,11 +22,11 @@ class SubmitQueryService extends BaseApiService {
         return this.get<SubmitQueryListRow>(`/${id}`);
     }
 
-    async create(data: CreateSubmitQueryDto): Promise<SubmitQueryListRow> {
+    async create(data: CreateSubmitQueryPayload): Promise<SubmitQueryListRow> {
         return this.post<SubmitQueryListRow>('', data);
     }
 
-    async update(id: number, data: Omit<UpdateSubmitQueryDto, 'id'>): Promise<SubmitQueryListRow> {
+    async update(id: number, data: Omit<UpdateSubmitQueryPayload, 'id'>): Promise<SubmitQueryListRow> {
         return this.patch<SubmitQueryListRow>(`/${id}`, data);
     }
 
