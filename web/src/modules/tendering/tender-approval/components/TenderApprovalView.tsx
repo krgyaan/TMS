@@ -6,6 +6,40 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Pencil, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { dummyTechnicalDocuments, dummyFinancialDocuments } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+
+// Helper function to map document IDs to names
+const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return [];
+    return ids
+        .map(id => {
+            const doc = documentList.find(d => d.value === id);
+            return doc ? doc.label : id;
+        })
+        .filter(Boolean);
+};
+
+const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+    if (!documents.length) {
+        return <span className="text-muted-foreground">No documents listed</span>
+    }
+
+    return (
+        <div className="flex flex-wrap gap-2">
+            {documents.map((doc, index) => {
+                // Handle both string arrays and object arrays
+                const docName = typeof doc === 'string' ? doc : doc.documentName;
+                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+
+                return (
+                    <Badge key={docKey} variant="outline">
+                        {docName}
+                    </Badge>
+                );
+            })}
+        </div>
+    )
+}
 
 interface TenderApprovalViewProps {
     tender: TenderWithRelations;
@@ -267,6 +301,26 @@ export function TenderApprovalView({
                                         )}
                                     </TableCell>
                                 </TableRow>
+                                {approval.approvePqrSelection === '2' && approval.alternativeTechnicalDocs && approval.alternativeTechnicalDocs.length > 0 && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Alternative Technical Documents
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeTechnicalDocs, dummyTechnicalDocuments))}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {approval.approveFinanceDocSelection === '2' && approval.alternativeFinancialDocs && approval.alternativeFinancialDocs.length > 0 && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Alternative Financial Documents
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeFinancialDocs, dummyFinancialDocuments))}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </>
                         )}
 

@@ -156,8 +156,8 @@ export interface TenderInfoSheetResponse {
     orderValue3: string | number | null;
     customEligibilityCriteria: string | null;
 
-    technicalWorkOrders: string[] | null;
-    commercialDocuments: string[] | null;
+    technicalWorkOrders: Array<{ id?: number; documentName: string }> | string[] | null;
+    commercialDocuments: Array<{ id?: number; documentName: string }> | string[] | null;
 
     avgAnnualTurnoverType: string | null;
     avgAnnualTurnoverValue: string | number | null;

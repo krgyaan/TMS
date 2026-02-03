@@ -214,57 +214,6 @@ export class TenderApprovalService {
         // Execute query
         const rows = (await query) as unknown as TenderRow[];
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender using window function approach
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            for (const row of rows) {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                if (latestLog) {
-                    // Use latest status from log
-                    row.status = latestLog.newStatus;
-                    row.statusName = statusNameMap.get(latestLog.newStatus) || row.statusName;
-                    row.statusRemark = latestLog.comment;
-                } else {
-                    // Keep current status if no log exists
-                    row.statusRemark = null;
-                }
-            }
-        }
-
         // Get total count
         let countQuery: any = this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
@@ -284,7 +233,6 @@ export class TenderApprovalService {
 
         const [countResult] = await countQuery.where(whereClause);
         const total = Number(countResult?.count || 0);
-        this.logger.debug(`[TenderApproval] Query result: ${rows.length} rows, total: ${total}`);
 
         return wrapPaginatedResponse(rows, total, page, limit);
     }
@@ -744,6 +692,36 @@ export class TenderApprovalService {
         // Get physical docs requirement
         const phyDocs = 'As per tender requirements'; // TODO: Get from tender data if available
 
+        // Map document IDs to names
+        const technicalDocMap: Record<string, string> = {
+            '1': 'Technical Specification Document',
+            '2': 'Product Catalog',
+            '3': 'Test Certificates',
+            '4': 'Quality Certifications (ISO, etc.)',
+            '5': 'OEM Authorization',
+            '6': 'Similar Work Experience Certificates',
+            '7': 'Installation Manual',
+        };
+
+        const financialDocMap: Record<string, string> = {
+            '1': 'Balance Sheet (Last 3 Years)',
+            '2': 'Profit & Loss Statement',
+            '3': 'Income Tax Returns',
+            '4': 'GST Registration Certificate',
+            '5': 'PAN Card',
+            '6': 'Audited Financial Statements',
+            '7': 'Bank Solvency Certificate',
+            '8': 'Working Capital Certificate',
+        };
+
+        const mapDocIdsToNames = (ids: string[] | undefined, map: Record<string, string>): string[] => {
+            if (!ids || !Array.isArray(ids)) return [];
+            return ids.map(id => map[id] || id).filter(Boolean);
+        };
+
+        const alternativeTechnicalDocNames = mapDocIdsToNames(payload.alternativeTechnicalDocs, technicalDocMap);
+        const alternativeFinancialDocNames = mapDocIdsToNames(payload.alternativeFinancialDocs, financialDocMap);
+
         const emailData = {
             assignee: assignee.name,
             isBidApproved,
@@ -761,13 +739,15 @@ export class TenderApprovalService {
             phyDocs,
             pqrApproved: payload.approvePqrSelection === '1',
             finApproved: payload.approveFinanceDocSelection === '1',
+            alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(', ') : '',
+            alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(', ') : '',
             tlName,
         };
 
         const template = isBidApproved ? 'tender-approved-by-tl' : (isReview ? 'tender-rejected-by-tl' : 'tender-rejected-by-tl');
         let subject: string;
         let eventType: string;
-        
+
         if (isBidApproved) {
             subject = `Tender Approved - ${tender.tenderName}`;
             eventType = 'tender.approved';
