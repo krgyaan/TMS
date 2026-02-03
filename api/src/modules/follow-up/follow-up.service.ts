@@ -19,6 +19,13 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import path from "path";
 
+import { MailerService } from "@/mailer/mailer.service";
+import { GoogleService } from "@/modules/integrations/google/google.service";
+
+import { FollowupMailTemplates } from "./follow-up.mail";
+import { FollowupMailDataBuilder } from "./follow-up.mail-data";
+import { FollowupMailBase } from "./zod/mail.dto";
+
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
@@ -41,7 +48,9 @@ const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts");
 export class FollowUpService {
     constructor(
         @Inject(DRIZZLE)
-        private readonly db: DbInstance
+        private readonly db: DbInstance,
+        private readonly mailerService: MailerService,
+        private readonly googleService: GoogleService
     ) {}
 
     // ========================
@@ -153,7 +162,7 @@ export class FollowUpService {
             conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`))!);
         }
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toLocaleDateString("en-CA");
 
         if (tab === "ongoing") {
             conditions.push(ne(followUps.frequency, 6));
@@ -264,6 +273,7 @@ export class FollowUpService {
 
             createdAt: formatDateTime(result.createdAt),
             updatedAt: formatDateTime(result.updatedAt),
+            reminderCount: result.reminderCount ?? 0,
         };
     }
 
@@ -499,9 +509,56 @@ export class FollowUpService {
         }
     }
 
-    // ========================
-    // HELPERS
-    // ========================
+    // ==========================
+    // MAILING BEGINS HERE
+    // ==========================
+    async processFollowupMail(id: number) {
+        console.log("Sending followup mail for", id);
+
+        const builder = new FollowupMailDataBuilder(this.db);
+
+        const payload = await builder.build(id);
+        console.log("mail payload", payload);
+
+        if (!payload) return;
+
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
+
+        console.log("googleConnection", googleConnection);
+
+        if (!googleConnection) return;
+
+        await this.mailerService.sendMail(
+            payload.template,
+            payload.context,
+            {
+                to: payload.to,
+                cc: payload.cc,
+                subject: payload.subject,
+                attachments: payload.attachments,
+            },
+            googleConnection
+        );
+    }
+
+    async getDueFollowupsForCurrentWindow(frequency: number) {
+        const today = new Date().toLocaleDateString("en-CA");
+
+        return this.db
+            .select()
+            .from(followUps)
+            .where(and(eq(followUps.frequency, frequency), sql`${followUps.startFrom} <= ${today}`, isNull(followUps.deletedAt), ne(followUps.frequency, 6)));
+    }
+
+    async incrementReminderCount(id: number) {
+        await this.db
+            .update(followUps)
+            .set({
+                reminderCount: sql`${followUps.reminderCount} + 1`,
+                updatedAt: new Date(),
+            })
+            .where(eq(followUps.id, id));
+    }
 
     private getOrderColumn(sortBy: string) {
         const columnMap: Record<string, any> = {

@@ -79,6 +79,7 @@ import { WorkOrderModule } from "@/modules/operations/work-order/work-order.modu
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 
 @Module({
     imports: [
@@ -168,6 +169,7 @@ import { ProjectsMasterModule } from "./modules/master/projects-master/projects-
         KickOffMeetingModule,
         ProjectsModule,
         ProjectsMasterModule,
+        FollowupSchedulerModule,
         // BusinessPerformanceModule,
     ],
     controllers: [AppController],
