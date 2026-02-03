@@ -346,6 +346,7 @@ export class EmailService {
                 tenderName,
             },
             labelPath,
+            attachments: options.attachments,
         });
     }
 

@@ -340,7 +340,7 @@ export class DocumentChecklistsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -352,6 +352,7 @@ export class DocumentChecklistsService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
