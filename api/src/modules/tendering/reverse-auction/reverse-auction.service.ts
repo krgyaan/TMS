@@ -251,13 +251,6 @@ export class ReverseAuctionService {
             .limit(limit)
             .offset(offset);
 
-        try {
-            const sqlQuery = finalQuery.toSQL();
-            this.logger.debug(`[ReverseAuction] SQL Query: ${JSON.stringify(sqlQuery)}`);
-        } catch (error) {
-            this.logger.debug(`[ReverseAuction] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
         const rows = await finalQuery;
 
         const data: RaDashboardRow[] = rows.map((row) => ({
