@@ -14,12 +14,21 @@ export class TenderInfoController {
     ) { }
 
     @Get('dashboard/counts')
-    async getDashboardCounts() {
-        return this.tenderInfosService.getDashboardCounts();
+    async getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tenderInfosService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get()
     async list(
+        @CurrentUser() user: ValidatedUser,
         @Query('statusIds') statusIds?: string,
         @Query('category') category?: string,
         @Query('unallocated') unallocated?: string,
@@ -50,6 +59,7 @@ export class TenderInfoController {
             search,
             teamId: parseNumber(teamId),
             assignedTo: parseNumber(assignedTo),
+            user,
         });
 
         const tendersWithTimers = await Promise.all(

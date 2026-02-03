@@ -119,9 +119,13 @@ export const useGenerateTenderName = () => {
 };
 
 export const useTendersDashboardCounts = () => {
+    const { teamId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     return useQuery({
-        queryKey: tendersKey.dashboardCounts(),
-        queryFn: () => tenderInfosService.getDashboardCounts(),
+        queryKey: [...tendersKey.dashboardCounts(), teamIdParam],
+        queryFn: () => tenderInfosService.getDashboardCounts(teamIdParam),
         staleTime: 30000,
     });
 };

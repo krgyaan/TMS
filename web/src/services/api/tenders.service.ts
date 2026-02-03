@@ -67,8 +67,13 @@ class TenderInfosService extends BaseApiService {
         return this.post<{ tenderName: string }>('/generate-name', params);
     }
 
-    async getDashboardCounts(): Promise<any> {
-        return this.get<any>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<any> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<any>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 }
 
