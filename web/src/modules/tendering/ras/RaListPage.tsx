@@ -17,6 +17,8 @@ import type { RaDashboardRow, RaDashboardTab } from '@/modules/tendering/ras/hel
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
 
 const RA_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
@@ -112,10 +114,15 @@ const ReverseAuctionListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -135,7 +142,7 @@ const ReverseAuctionListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useReverseAuctionDashboardCounts();
@@ -217,6 +224,12 @@ const ReverseAuctionListPage = () => {
                         : '—',
                 sortable: true,
                 filter: true,
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'raStartTime',
@@ -227,6 +240,12 @@ const ReverseAuctionListPage = () => {
                     params.data?.raStartTime ? formatDateTime(params.data.raStartTime) : '—',
                 sortable: true,
                 filter: true,
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'raEndTime',
@@ -237,6 +256,12 @@ const ReverseAuctionListPage = () => {
                     params.data?.raEndTime ? formatDateTime(params.data.raEndTime) : '—',
                 sortable: true,
                 filter: true,
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'raStatus',
@@ -320,18 +345,6 @@ const ReverseAuctionListPage = () => {
                                 Manage reverse auctions for tenders with RA applicable.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -339,7 +352,7 @@ const ReverseAuctionListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as RaDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -354,6 +367,31 @@ const ReverseAuctionListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'This Week', value: 'this-week' },
+                                { label: 'This Month', value: 'this-month' },
+                                { label: 'This Year', value: 'this-year' },
+                            ]} value={search} onChange={(value) => setSearch(value)} />
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -373,6 +411,9 @@ const ReverseAuctionListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,

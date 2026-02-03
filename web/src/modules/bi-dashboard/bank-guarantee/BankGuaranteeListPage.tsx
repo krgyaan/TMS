@@ -18,6 +18,8 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import BankStatsCards from './components/BankStatsCards';
 import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -76,10 +78,15 @@ const BankGuaranteeListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -98,7 +105,7 @@ const BankGuaranteeListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useBankGuaranteeDashboardCounts();
@@ -141,6 +148,12 @@ const BankGuaranteeListPage = () => {
                 colId: 'bgDate',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'bgNo',
@@ -188,6 +201,12 @@ const BankGuaranteeListPage = () => {
                 colId: 'bgExpiryDate',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
             },
             {
                 field: 'bgClaimPeriod',
@@ -351,18 +370,6 @@ const BankGuaranteeListPage = () => {
                                 Track and manage bank guarantees for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -370,7 +377,7 @@ const BankGuaranteeListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as BankGuaranteeDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -387,6 +394,25 @@ const BankGuaranteeListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -410,6 +436,9 @@ const BankGuaranteeListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,

@@ -70,6 +70,7 @@ export interface DashboardResponse {
 export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
 
 export type EmdDashboardFilters = {
+    search?: string;
     tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
     userId?: number;
     page?: number;
@@ -148,7 +149,9 @@ export interface PaymentRequestRow {
     tenderName: string;
     purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string;
+    requestType: string | null;
     dueDate: string | null;
+    bidValid: Date | null;
     teamMemberId: number | null;
     teamMember: string | null;
     instrumentId: number | null;

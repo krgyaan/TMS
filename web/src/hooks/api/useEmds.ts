@@ -20,12 +20,14 @@ export const paymentRequestsKey = {
 export const usePaymentDashboard = (
     tab: string = 'pending',
     pagination?: { page: number; limit: number },
-    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+    search?: string
 ) => {
     const queryKeyFilters = {
         tab,
         ...pagination,
         ...sort,
+        ...(search && { search }),
     };
 
     return useQuery({
@@ -35,6 +37,7 @@ export const usePaymentDashboard = (
             ...(pagination && { page: pagination.page, limit: pagination.limit }),
             ...(sort?.sortBy && { sortBy: sort.sortBy }),
             ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+            ...(search && { search }),
         }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {

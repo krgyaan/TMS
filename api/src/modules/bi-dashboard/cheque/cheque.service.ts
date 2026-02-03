@@ -126,17 +126,22 @@ export class ChequeService {
 
         const conditions = this.buildChequeDashboardConditions(tab);
 
-        // Search filter
+        // Search filter - search across all rendered columns
         if (options?.search) {
             const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentChequeDetails.chequeNo} ILIKE ${searchStr} OR
-                    ${instrumentChequeDetails.chequeReason} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentChequeDetails.chequeNo} ILIKE ${searchStr}`,
+                sql`${instrumentChequeDetails.chequeReason} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${instrumentChequeDetails.chequeDate}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentChequeDetails.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);

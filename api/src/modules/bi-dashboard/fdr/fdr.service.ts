@@ -118,7 +118,27 @@ export class FdrService {
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const { conditions } = this.buildFdrDashboardConditions(tab);
+        const { conditions: baseConditions, needsFdrDetails } = this.buildFdrDashboardConditions(tab);
+        const conditions = [...baseConditions];
+
+        // Search filter - search across all rendered columns
+        // Note: We always join instrumentFdrDetails in the query, so we can search FDR columns
+        if (options?.search) {
+            const searchStr = `%${options.search}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentFdrDetails.fdrNo} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${instrumentFdrDetails.fdrDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentFdrDetails.fdrExpiryDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+        }
 
         // Build order clause
         let orderClause: any = desc(paymentInstruments.createdAt);
@@ -142,8 +162,8 @@ export class FdrService {
             }
         }
 
-        // Data query
-        const rows = await this.db
+        // Build base query with joins
+        const baseQuery = this.db
             .select({
                 id: paymentInstruments.id,
                 fdrCreationDate: instrumentFdrDetails.fdrDate,
@@ -165,20 +185,26 @@ export class FdrService {
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+
+        // Data query
+        const rows = await baseQuery
             .where(and(...conditions))
             .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
 
         // Count query
-        const [countResult] = await this.db
+        const countQuery = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
-            .where(and(...conditions));
+            .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+
+        const [countResult] = await countQuery.where(and(...conditions));
 
         const total = Number(countResult?.count || 0);
 

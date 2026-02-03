@@ -133,18 +133,21 @@ export class PhysicalDocsService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Add search conditions
+        // Add search conditions - search across all rendered columns
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${tenderInfos.gstValues}::text ILIKE ${searchStr} OR
-                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${tenderInformation.courierAddress} ILIKE ${searchStr}`,
+                sql`${tenderInformation.physicalDocsDeadline}::text ILIKE ${searchStr}`,
+                sql`${physicalDocs.courierNo} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);

@@ -47,8 +47,10 @@ export interface PaymentRequestRow {
     tenderNo: string;
     tenderName: string;
     purpose: PaymentPurpose;
+    requestType: string | null;
     amountRequired: string;
     dueDate: Date | null;
+    bidValid: Date | null;
     teamMember: string | null;
     teamMemberId: number | null;
     instrumentId: number | null;
@@ -218,14 +220,15 @@ export class EmdsService {
         tab: DashboardTab = 'pending',
         userId?: number,
         pagination?: { page?: number; limit?: number },
-        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        search?: string
     ): Promise<PendingTabResponse | RequestTabResponse> {
         const counts = await this.getDashboardCounts(userId);
 
-        if (tab === 'pending') return this.getPendingTenders(userId, pagination, sort, counts);
-        if (tab === 'tender-dnb') return this.getTenderDnbTenders(userId, pagination, sort, counts);
+        if (tab === 'pending') return this.getPendingTenders(userId, pagination, sort, counts, search);
+        if (tab === 'tender-dnb') return this.getTenderDnbTenders(userId, pagination, sort, counts, search);
 
-        return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts);
+        return this.getPaymentRequestsByTab(tab, userId, pagination, sort, counts, search);
     }
 
     async getDashboardCounts(userId?: number): Promise<DashboardCounts> {
@@ -291,10 +294,7 @@ export class EmdsService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
-            .where(and(
-                or(eq(paymentRequests.tenderId, 0), isNotNull(tenderInfos.id)),
-                userCondition
-            ));
+            .where(userCondition);
 
         return {
             sent: Number(result?.sent || 0),
@@ -309,7 +309,8 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<RequestTabResponse> {
         const userCondition = userId
             ? or(eq(tenderInfos.teamMember, userId), eq(paymentRequests.requestedBy, userId))
@@ -318,6 +319,26 @@ export class EmdsService {
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.purpose}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.type}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.amountRequired}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.instrumentType} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`
+            );
+        }
 
         // Sorting Logic
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -336,8 +357,8 @@ export class EmdsService {
         const whereClause = and(
             this.getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
-            or(eq(paymentRequests.tenderId, 0)),
-            userCondition
+            userCondition,
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
         // Get Total for Pagination
@@ -361,8 +382,11 @@ export class EmdsService {
                 tenderName: tenderInfos.tenderName,
                 projectName: paymentRequests.projectName,
                 purpose: paymentRequests.purpose,
+                requestType: paymentRequests.type,
                 amountRequired: paymentRequests.amountRequired,
                 dueDate: tenderInfos.dueDate,
+                dueDate2: paymentRequests.dueDate,
+                bidValid: tenderInformation.bidValidityDays,
                 teamMember: users.name,
                 teamMemberId: users.id,
                 instrumentId: paymentInstruments.id,
@@ -372,6 +396,7 @@ export class EmdsService {
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
@@ -382,23 +407,37 @@ export class EmdsService {
             .limit(limit)
             .offset(offset);
 
-        // Map response
-        const data: PaymentRequestRow[] = rows.map((row) => ({
-            id: row.id,
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
-            tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
-            purpose: row.purpose as PaymentPurpose,
-            amountRequired: row.amountRequired || '0',
-            dueDate: row.dueDate,
-            teamMemberId: row.teamMemberId,
-            teamMember: row.teamMember?.toString() ?? null,
-            instrumentId: row.instrumentId,
-            instrumentType: row.instrumentType as InstrumentType | null,
-            instrumentStatus: row.instrumentStatus,
-            displayStatus: deriveDisplayStatus(row.instrumentStatus),
-            createdAt: row.createdAt,
-        }));
+        const data: PaymentRequestRow[] = rows.map((row) => {
+            const effectiveDueDate = row.dueDate ?? row.dueDate2;
+
+            return {
+                id: row.id,
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
+                tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
+                purpose: row.purpose as PaymentPurpose,
+                amountRequired: row.amountRequired ?? '0',
+                requestType: row.requestType,
+                dueDate: effectiveDueDate,
+
+                bidValid: row.bidValid && effectiveDueDate
+                    ? (() => {
+                        const date = new Date(effectiveDueDate);
+                        date.setDate(date.getDate() + row.bidValid);
+                        return date;
+                    })()
+                    : null,
+
+                teamMemberId: row.teamMemberId,
+                teamMember: row.teamMember?.toString() ?? null,
+                instrumentId: row.instrumentId,
+                instrumentType: row.instrumentType as InstrumentType | null,
+                instrumentStatus: row.instrumentStatus,
+                displayStatus: deriveDisplayStatus(row.instrumentStatus),
+                createdAt: row.createdAt,
+            };
+        });
+
 
         return {
             ...wrapPaginatedResponse(data, Number(countResult?.count || 0), page, limit),
@@ -441,12 +480,30 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<PendingTabResponse> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
 
         // Build order clause
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -515,7 +572,8 @@ export class EmdsService {
                         gt(tenderInformation.processingFeeAmount, sql`0`)
                     ),
                     sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
-                    userCondition
+                    userCondition,
+                    searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
                 )
             )
             .orderBy(orderClause)
@@ -558,13 +616,31 @@ export class EmdsService {
         userId?: number,
         pagination?: { page?: number; limit?: number },
         sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
-        counts?: DashboardCounts
+        counts?: DashboardCounts,
+        search?: string
     ): Promise<PendingTabResponse> {
         const userCondition = userId ? eq(tenderInfos.teamMember, userId) : undefined;
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
         const dnbStatusIds = StatusCache.getIds('dnb');
+
+        // Build search conditions
+        const searchConditions: any[] = [];
+        if (search) {
+            const searchStr = `%${search}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
 
         // Build order clause (same as getPendingTenders)
         let orderClause: any = asc(tenderInfos.dueDate);
@@ -627,7 +703,8 @@ export class EmdsService {
                         inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
                         inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
                     ),
-                    userCondition
+                    userCondition,
+                    searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
                 )
             )
             .orderBy(orderClause)
@@ -2076,7 +2153,7 @@ export class EmdsService {
 
         // Build CC recipients
         const ccRecipients: RecipientSource[] = [];
-        
+
         // Add Team Admin and Team Leader from tender team (if tender team exists)
         if (tenderTeamId) {
             ccRecipients.push(
@@ -2084,7 +2161,7 @@ export class EmdsService {
                 { type: 'role', role: 'Team Leader', teamId: tenderTeamId }
             );
         }
-        
+
         // Add Account Team Leader from accounts team
         ccRecipients.push(
             { type: 'role', role: 'Team Leader', teamId: accountsTeamId }

@@ -14,6 +14,7 @@ export type DocumentChecklistListParams = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };
 
 class DocumentChecklistService extends BaseApiService {
@@ -39,6 +40,9 @@ class DocumentChecklistService extends BaseApiService {
             }
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
+            }
+            if (params.search) {
+                search.set('search', params.search);
             }
         }
 

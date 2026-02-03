@@ -194,6 +194,7 @@ export const DashboardQuerySchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
     sortBy: z.string().optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
+    search: z.string().optional(),
 });
 
 export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
@@ -266,7 +267,9 @@ export interface PaymentRequestRow {
     tenderName: string;
     purpose: PaymentPurpose;
     amountRequired: string;
+    requestType: string | null;
     dueDate: Date | null;
+    bidValid: Date | null;
     teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;

@@ -109,6 +109,7 @@ export interface CostingSheetDashboardCounts {
 }
 
 export type CostingSheetListParams = {
+    search?: string;
     tab?: CostingSheetTab;
     page?: number;
     limit?: number;

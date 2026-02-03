@@ -36,7 +36,8 @@ export class EmdsController {
             parsed.tab as DashboardTab ?? 'pending',
             userId,
             parsed.page && parsed.limit ? { page: parsed.page, limit: parsed.limit } : undefined,
-            parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined
+            parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined,
+            parsed.search
         );
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
