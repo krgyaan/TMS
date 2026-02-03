@@ -18,6 +18,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -28,6 +29,7 @@ export type TenderListFilters = {
     search?: string;
     teamId?: number;
     assignedTo?: number;
+    user?: ValidatedUser;
 };
 
 @Injectable()
@@ -370,10 +372,23 @@ export class TenderInfosService {
             }
         }
 
-        // TODO: Add role-based filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator/Operation Leader: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        if (filters?.user) {
+            const user = filters.user;
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided from frontend
+                // The teamId filter is already applied below if provided
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    conditions.push(eq(tenderInfos.team, user.teamId));
+                }
+            } else {
+                // All other roles: Show only own tenders
+                conditions.push(eq(tenderInfos.teamMember, user.sub));
+            }
+        }
 
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
@@ -391,10 +406,15 @@ export class TenderInfosService {
             );
         }
 
-        if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
-            conditions.push(eq(tenderInfos.team, filters.teamId));
+        // Apply teamId filter only for Super User/Admin (they can switch teams)
+        // For other roles, team filtering is handled by role-based logic above
+        if (filters?.user && (filters.user.roleId === 1 || filters.user.roleId === 2)) {
+            if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
+                conditions.push(eq(tenderInfos.team, filters.teamId));
+            }
         }
 
+        // assignedTo filter (for explicit user filtering, typically not used with role-based filtering)
         if (!filters?.unallocated && filters?.assignedTo !== undefined && filters?.assignedTo !== null) {
             conditions.push(eq(tenderInfos.teamMember, filters.assignedTo));
         }
@@ -973,7 +993,7 @@ export class TenderInfosService {
         return { tenderName: uniqueName };
     }
 
-    async getDashboardCounts(): Promise<{
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{
         'under-preparation': number;
         'did-not-bid': number;
         'tenders-bid': number;
@@ -985,6 +1005,42 @@ export class TenderInfosService {
         // Base condition
         const baseCondition = TenderInfosService.getActiveCondition();
 
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const baseConditions = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
         // Tab-specific status IDs using StatusCache
         const underPreparationStatusIds = StatusCache.getIds('prep');
         const didNotBidStatusIds = StatusCache.getIds('dnb');
@@ -994,12 +1050,12 @@ export class TenderInfosService {
 
         // Count for each tab
         const counts = await Promise.all([
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, underPreparationStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, didNotBidStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tendersBidStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderWonStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderLostStatusIds))),
-            this.countTabItems(and(baseCondition, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, underPreparationStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, didNotBidStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tendersBidStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderWonStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderLostStatusIds))),
+            this.countTabItems(and(baseConditions, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
         ]);
 
         return {

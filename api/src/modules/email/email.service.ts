@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -15,6 +15,8 @@ import {
     EmailStatus,
 } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
+import { normalize } from 'path';
+import { basename, join } from 'path';
 
 @Injectable()
 export class EmailService {
@@ -58,6 +60,7 @@ export class EmailService {
         });
 
         Handlebars.registerHelper('eq', (a, b) => a === b);
+        Handlebars.registerHelper('ne', (a, b) => a !== b);
         Handlebars.registerHelper('or', (a, b) => a || b);
         Handlebars.registerHelper('and', (a, b) => a && b);
     }
@@ -75,6 +78,32 @@ export class EmailService {
         const templateContent = fs.readFileSync(templatePath, 'utf-8');
         const template = Handlebars.compile(templateContent);
         return template(data);
+    }
+
+    /**
+     * Resolve attachment file paths
+     */
+    private resolveAttachments(input: { files: string[]; baseDir?: string }): Array<{ filename: string; path: string }> {
+        const uploadsRoot = join(process.cwd(), 'uploads');
+        const attachments: Array<{ filename: string; path: string }> = [];
+
+        for (const file of input.files) {
+            const safeName = normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
+            const relativePath = input.baseDir ? join(input.baseDir, safeName) : safeName;
+            const absolutePath = join(uploadsRoot, relativePath);
+
+            if (!fs.existsSync(absolutePath)) {
+                this.logger.warn(`Attachment not found on disk: ${relativePath}`);
+                continue;
+            }
+
+            attachments.push({
+                filename: basename(absolutePath),
+                path: absolutePath,
+            });
+        }
+
+        return attachments;
     }
 
     /**
@@ -127,6 +156,12 @@ export class EmailService {
                 }
             });
 
+            // 5.5. Process attachments if provided
+            let resolvedAttachments: Array<{ filename: string; path: string }> | undefined;
+            if (options.attachments && options.attachments.files.length > 0) {
+                resolvedAttachments = this.resolveAttachments(options.attachments);
+            }
+
             // 6. Get thread info
             const threadInfo = await this.gmail.getThreadInfo(
                 options.referenceType,
@@ -175,6 +210,7 @@ export class EmailService {
                     threadId: threadInfo.threadId || undefined,
                     inReplyTo: threadInfo.inReplyTo || undefined,
                     messageId,
+                    attachments: resolvedAttachments,
                 },
                 referenceType: options.referenceType || '',
                 referenceId: options.referenceId || 0,

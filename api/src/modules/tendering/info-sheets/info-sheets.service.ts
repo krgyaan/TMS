@@ -826,42 +826,91 @@ export class TenderInfoSheetsService {
         const tenderDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
         const ceDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
 
+        // Format array fields (modes) as comma-separated strings
+        const formatArray = (arr: string[] | null | undefined): string => {
+            if (!arr || arr.length === 0) return 'Not specified';
+            return arr.join(', ');
+        };
+
+        // Format physical docs deadline
+        const formatPhysicalDocsDeadline = (deadline: Date | string | null): string => {
+            if (!deadline) return 'N/A';
+            const date = deadline instanceof Date ? deadline : new Date(deadline);
+            return date.toLocaleString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        };
+
         // Build email data matching template
         const emailData: Record<string, any> = {
+            organization: tender.organizationName || 'Not specified',
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,
             dueDate,
             recommendation_by_te: infoSheet.teRecommendation || 'Not specified',
             reason: infoSheet.teRejectionReason || infoSheet.teRejectionRemarks || 'N/A',
+            // Processing Fee fields
+            processing_fee_required: infoSheet.processingFeeRequired || 'No',
+            processing_fee_amount: formatCurrency(infoSheet.processingFeeAmount),
+            processing_fee_modes: formatArray(infoSheet.processingFeeMode),
+            // Tender Fee fields
+            tender_fee_required: infoSheet.tenderFeeRequired || 'No',
             tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
-            tender_fees_in_form_of: infoSheet.tenderFeeMode || 'Not specified',
+            tender_fees_in_form_of: formatArray(infoSheet.tenderFeeMode),
+            // EMD fields
             emd: formatCurrency(infoSheet.emdAmount),
             emd_required: infoSheet.emdRequired || 'No',
-            emd_in_form_of: infoSheet.emdMode || 'Not specified',
+            emd_in_form_of: formatArray(infoSheet.emdMode),
+            // Tender Value
             tender_value: formatCurrency(tender.gstValues),
+            // OEM Experience
+            oem_experience: infoSheet.oemExperience || 'Not specified',
+            // Bid & Commercial
             bid_validity: infoSheet.bidValidityDays?.toString() || 'Not specified',
             commercial_evaluation: infoSheet.commercialEvaluation || 'Not specified',
             ra_applicable: infoSheet.reverseAuctionApplicable || 'No',
             maf_required: infoSheet.mafRequired || 'No',
+            // Delivery Time
             delivery_time: infoSheet.deliveryTimeSupply?.toString() || 'Not specified',
+            delivery_time_ic_inclusive: infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No',
             delivery_time_ic: infoSheet.deliveryTimeInstallationDays?.toString() || 'Not specified',
+            // PBG fields
+            pbg_required: infoSheet.pbgRequired || 'No',
+            pbg_form: formatArray(infoSheet.pbgMode ? JSON.parse(infoSheet.pbgMode) : null),
             pbg_percentage: formatPercent(infoSheet.pbgPercentage),
             pbg_duration: infoSheet.pbgDurationMonths?.toString() || 'Not specified',
+            // SD fields
+            sd_required: infoSheet.sdRequired || 'No',
+            sd_form: formatArray(infoSheet.sdMode ? JSON.parse(infoSheet.sdMode) : null),
+            sd_percentage: formatPercent(infoSheet.sdPercentage),
+            sd_duration: infoSheet.sdDurationMonths?.toString() || 'Not specified',
+            // Payment Terms
             payment_terms: formatPercent(infoSheet.paymentTermsSupply?.toString() || null),
             payment_terms_ic: formatPercent(infoSheet.paymentTermsInstallation?.toString() || null),
+            // LD fields
+            ld_required: infoSheet.ldRequired || 'No',
             ld_percentage: formatPercent(infoSheet.ldPercentagePerWeek),
             max_ld: formatPercent(infoSheet.maxLdPercentage),
+            // Physical Docs
             phydocs_submission_required: infoSheet.physicalDocsRequired || 'No',
             phydocsRequired: infoSheet.physicalDocsRequired === 'Yes',
-            phydocs_submission_deadline: infoSheet.physicalDocsDeadline || 'N/A',
+            phydocs_submission_deadline: formatPhysicalDocsDeadline(infoSheet.physicalDocsDeadline),
+            // Technical Eligibility
             eligibility_criterion: infoSheet.techEligibilityAge?.toString() || 'Not specified',
+            work_value_type: infoSheet.workValueType || 'Not specified',
+            custom_eligibility_criteria: infoSheet.customEligibilityCriteria || '',
             work_value1: formatCurrency(infoSheet.orderValue1),
             name1: infoSheet.workValueType === 'orderValue1' ? 'Selected' : '',
             work_value2: formatCurrency(infoSheet.orderValue2),
             name2: infoSheet.workValueType === 'orderValue2' ? 'Selected' : '',
             work_value3: formatCurrency(infoSheet.orderValue3),
             name3: infoSheet.workValueType === 'orderValue3' ? 'Selected' : '',
+            // Financial Criterion
             aat_display: infoSheet.avgAnnualTurnoverType || 'Not specified',
             aat_amt: formatCurrency(infoSheet.avgAnnualTurnoverValue),
             wc_display: infoSheet.workingCapitalType || 'Not specified',
@@ -870,15 +919,21 @@ export class TenderInfoSheetsService {
             nw_amt: formatCurrency(infoSheet.netWorthValue),
             sc_display: infoSheet.solvencyCertificateType || 'Not specified',
             sc_amt: formatCurrency(infoSheet.solvencyCertificateValue),
+            // Documents
             te_docs: teDocs || '<li>None</li>',
             tender_docs: tenderDocs || '<li>None</li>',
             ce_docs: ceDocs || '<li>None</li>',
+            // Clients
             clients: infoSheet.clients.map(client => ({
                 client_name: client.clientName,
                 client_designation: client.clientDesignation || '',
                 client_email: client.clientEmail || '',
                 client_mobile: client.clientMobile || '',
             })),
+            // Courier & Remarks
+            courier_address: infoSheet.courierAddress || 'Not specified',
+            te_final_remark: infoSheet.teFinalRemark || '',
+            // Link & Assignee
             link: `#/tendering/tender-approvals/${tenderId}/approval`, // TODO: Update with actual frontend URL
             assignee: assignee.name,
         };

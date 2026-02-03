@@ -69,8 +69,9 @@ export default function CostingSheetSubmitForm({
         const receipt = parseFloat(receiptPrice) || 0;
         const budget = parseFloat(budgetPrice) || 0;
 
-        if (budget > 0) {
-            const margin = ((budget - receipt) / budget) * 100;
+        // grossMargin = receipt > 0 ? ((receipt - budget) / receipt) * 100 : 0;
+        if (receipt > 0) {
+            const margin = ((receipt - budget) / receipt) * 100;
             form.setValue('submittedGrossMargin', margin.toFixed(2));
         } else {
             form.setValue('submittedGrossMargin', '0.00');
