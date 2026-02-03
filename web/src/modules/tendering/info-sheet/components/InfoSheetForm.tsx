@@ -1231,8 +1231,13 @@ export function TenderInformationForm({
                                                     control={form.control}
                                                     name={`clients.${index}.clientMobile`}
                                                     label="Number"
+                                                    description="e.g., 1234567890, 9876543210"
                                                 >
-                                                    {(field) => <Input placeholder="Enter number" {...field} />}
+                                                    {(field) => (
+                                                        <div>
+                                                            <Input placeholder="Enter phone number(s), separated by comma" {...field} />
+                                                        </div>
+                                                    )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment(`clients.${index}.clientMobile`) && (
                                                     <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientMobile`)!} />
