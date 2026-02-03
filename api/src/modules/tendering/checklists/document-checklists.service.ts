@@ -422,6 +422,11 @@ export class DocumentChecklistsService {
             te: teName,
         };
 
+        // Collect attachment file paths from extraDocuments
+        const attachmentFiles = checklist.extraDocuments
+            ?.map(doc => doc.path)
+            .filter((path): path is string => !!path) || [];
+
         await this.sendEmail(
             'document-checklist.submitted',
             tenderId,
@@ -434,6 +439,7 @@ export class DocumentChecklistsService {
                 cc: [
                     { type: 'role', role: 'Admin', teamId: tender.team },
                 ],
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
     }

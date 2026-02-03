@@ -132,10 +132,10 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     // Initialize due date from tender data when creating new RFQ
     useEffect(() => {
         if (!isEditMode && initialDueDate) {
-            form.setValue('dueDate', initialDueDate, { 
+            form.setValue('dueDate', initialDueDate, {
                 shouldValidate: false,
                 shouldDirty: false,
-                shouldTouch: false 
+                shouldTouch: false
             });
         }
     }, [isEditMode, initialDueDate, form]);

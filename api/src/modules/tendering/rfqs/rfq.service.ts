@@ -84,7 +84,7 @@ export class RfqsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly workflowService: WorkflowService
-    ) {}
+    ) { }
 
     /**
      * Get RFQ Dashboard data - Refactored to use dashboard config
@@ -682,10 +682,10 @@ export class RfqsService {
         // Format due date
         const dueDate = rfqDetails.dueDate
             ? new Date(rfqDetails.dueDate).toLocaleDateString("en-IN", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-              })
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            })
             : "Not specified";
 
         // Check document types
@@ -728,6 +728,11 @@ export class RfqsService {
                 teMail: teUser.email,
             };
 
+            // Collect attachment file paths from RFQ documents
+            const attachmentFiles = rfqDetails.documents
+                ?.map(doc => doc.path)
+                .filter((path): path is string => !!path) || [];
+
             await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
                 to: [{ type: "emails", emails: vendorEmails }],
                 cc: [
@@ -735,6 +740,7 @@ export class RfqsService {
                     { type: "role", role: "Team Leader", teamId: tender.team },
                     { type: "role", role: "Coordinator", teamId: tender.team },
                 ],
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             });
         }
     }
