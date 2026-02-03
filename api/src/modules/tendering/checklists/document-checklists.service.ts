@@ -1,23 +1,23 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
-import { StatusCache } from '@/utils/status-cache';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { Inject, Injectable, BadRequestException } from "@nestjs/common";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from "@/modules/tendering/checklists/dto/document-checklist.dto";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { Logger } from "@nestjs/common";
+import { StatusCache } from "@/utils/status-cache";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { WorkflowService } from "@/modules/timers/services/workflow.service";
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -29,14 +29,14 @@ type TenderDocumentChecklistDashboardRow = {
     dueDate: Date | null;
     gstValues: number;
     checklistSubmitted: boolean;
-}
+};
 
 export type DocumentChecklistFilters = {
-    tab?: 'pending' | 'submitted' | 'tender-dnb';
+    tab?: "pending" | "submitted" | "tender-dnb";
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     search?: string;
 };
 
@@ -49,21 +49,21 @@ export class DocumentChecklistsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
-        private readonly workflowService: WorkflowService,
-    ) { }
+        private readonly workflowService: WorkflowService
+    ) {}
 
     /**
      * Get dashboard data by tab
      */
     async getDashboardData(
-        tab?: 'pending' | 'submitted' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        tab?: "pending" | "submitted" | "tender-dnb",
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string }
     ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const activeTab = tab || 'pending';
+        const activeTab = tab || "pending";
 
         // Build base conditions
         const baseConditions = [
@@ -74,14 +74,14 @@ export class DocumentChecklistsService {
 
         const conditions = [...baseConditions];
 
-        if (activeTab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        if (activeTab === "pending") {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
             conditions.push(isNull(tenderDocumentChecklists.id));
-        } else if (activeTab === 'submitted') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        } else if (activeTab === "submitted") {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
             conditions.push(isNotNull(tenderDocumentChecklists.id));
-        } else if (activeTab === 'tender-dnb') {
-            const dnbStatusIds = StatusCache.getIds('dnb');
+        } else if (activeTab === "tender-dnb") {
+            const dnbStatusIds = StatusCache.getIds("dnb");
             if (dnbStatusIds.length > 0) {
                 conditions.push(inArray(tenderInfos.status, dnbStatusIds));
             } else {
@@ -110,34 +110,34 @@ export class DocumentChecklistsService {
 
         // Build orderBy clause
         const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || 'asc';
+        const sortOrder = filters?.sortOrder || "asc";
         let orderByClause: any = asc(tenderInfos.dueDate);
 
         if (sortBy) {
-            const sortFn = sortOrder === 'desc' ? desc : asc;
+            const sortFn = sortOrder === "desc" ? desc : asc;
             switch (sortBy) {
-                case 'tenderNo':
+                case "tenderNo":
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
-                case 'tenderName':
+                case "tenderName":
                     orderByClause = sortFn(tenderInfos.tenderName);
                     break;
-                case 'teamMemberName':
+                case "teamMemberName":
                     orderByClause = sortFn(users.name);
                     break;
-                case 'dueDate':
+                case "dueDate":
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'submissionDate':
+                case "submissionDate":
                     orderByClause = sortFn(tenderDocumentChecklists.createdAt);
                     break;
-                case 'statusChangeDate':
+                case "statusChangeDate":
                     orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
-                case 'gstValues':
+                case "gstValues":
                     orderByClause = sortFn(tenderInfos.gstValues);
                     break;
-                case 'statusName':
+                case "statusName":
                     orderByClause = sortFn(statuses.name);
                     break;
                 default:
@@ -181,7 +181,7 @@ export class DocumentChecklistsService {
             .offset(offset)
             .orderBy(orderByClause);
 
-        const data = rows.map((row) => ({
+        const data = rows.map(row => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
@@ -196,32 +196,18 @@ export class DocumentChecklistsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-        ];
+    async getDashboardCounts(): Promise<{ pending: number; submitted: number; "tender-dnb": number; total: number }> {
+        const baseConditions = [TenderInfosService.getActiveCondition(), TenderInfosService.getApprovedCondition()];
 
         // Count pending: exclude dnb/lost, checklistId IS NULL
-        const pendingConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(tenderDocumentChecklists.id),
-        ];
+        const pendingConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNull(tenderDocumentChecklists.id)];
 
         // Count submitted: exclude dnb/lost, checklistId IS NOT NULL
-        const submittedConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(tenderDocumentChecklists.id),
-        ];
+        const submittedConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNotNull(tenderDocumentChecklists.id)];
 
         // Count tender-dnb: status in dnb category
-        const dnbStatusIds = StatusCache.getIds('dnb');
-        const tenderDnbConditions = [
-            ...baseConditions,
-            ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []),
-        ];
+        const dnbStatusIds = StatusCache.getIds("dnb");
+        const tenderDnbConditions = [...baseConditions, ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : [])];
 
         const [pendingResult, submittedResult, tenderDnbResult] = await Promise.all([
             this.db
@@ -240,29 +226,25 @@ export class DocumentChecklistsService {
                 .then(r => Number(r[0]?.count || 0)),
             dnbStatusIds.length > 0
                 ? this.db
-                    .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                    .from(tenderInfos)
-                    .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                    .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
-                    .where(and(...tenderDnbConditions))
-                    .then(r => Number(r[0]?.count || 0))
+                      .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                      .from(tenderInfos)
+                      .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                      .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+                      .where(and(...tenderDnbConditions))
+                      .then(r => Number(r[0]?.count || 0))
                 : Promise.resolve(0),
         ]);
 
         return {
             pending: pendingResult,
             submitted: submittedResult,
-            'tender-dnb': tenderDnbResult,
+            "tender-dnb": tenderDnbResult,
             total: pendingResult + submittedResult + tenderDnbResult,
         };
     }
 
     async findByTenderId(tenderId: number) {
-        const result = await this.db
-            .select()
-            .from(tenderDocumentChecklists)
-            .where(eq(tenderDocumentChecklists.tenderId, tenderId))
-            .limit(1);
+        const result = await this.db.select().from(tenderDocumentChecklists).where(eq(tenderDocumentChecklists.tenderId, tenderId)).limit(1);
 
         return result[0] || null;
     }
@@ -275,9 +257,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: createDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: createDocumentChecklistDto.extraDocuments
                     ? createDocumentChecklistDto.extraDocuments.map(doc => ({
-                        name: doc.name ?? '',
-                        path: doc.path ?? ''
-                    }))
+                          name: doc.name ?? "",
+                          path: doc.path ?? "",
+                      }))
                     : null,
             })
             .returning();
@@ -286,7 +268,9 @@ export class DocumentChecklistsService {
         try {
             await this.sendDocumentChecklistSubmittedEmail(createDocumentChecklistDto.tenderId, result);
         } catch (error) {
-            this.logger.error(`Failed to send document checklist submitted email for tender ${createDocumentChecklistDto.tenderId}: ${error instanceof Error ? error.message : String(error)}`);
+            this.logger.error(
+                `Failed to send document checklist submitted email for tender ${createDocumentChecklistDto.tenderId}: ${error instanceof Error ? error.message : String(error)}`
+            );
             // Continue execution - email failure shouldn't break the main operation
         }
 
@@ -299,24 +283,22 @@ export class DocumentChecklistsService {
             const userId = tender?.teamMember || 1; // Use team member or default to 1
 
             // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', createDocumentChecklistDto.tenderId.toString());
+            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", createDocumentChecklistDto.tenderId.toString());
 
             // Complete the document_checklist step
-            const documentChecklistStep = workflowStatus.steps.find(step =>
-                step.stepKey === 'document_checklist' && step.status === 'IN_PROGRESS'
-            );
+            const documentChecklistStep = workflowStatus.steps.find(step => step.stepKey === "document_checklist" && step.status === "IN_PROGRESS");
 
             if (documentChecklistStep) {
                 this.logger.log(`Completing document_checklist step ${documentChecklistStep.id} for tender ${createDocumentChecklistDto.tenderId}`);
                 await this.workflowService.completeStep(documentChecklistStep.id.toString(), {
                     userId: userId.toString(),
-                    notes: 'Document checklist submitted'
+                    notes: "Document checklist submitted",
                 });
                 this.logger.log(`Successfully completed document_checklist step for tender ${createDocumentChecklistDto.tenderId}`);
             } else {
                 this.logger.warn(`No active document_checklist step found for tender ${createDocumentChecklistDto.tenderId}`);
                 // Try to find any document_checklist step
-                const anyDocumentChecklistStep = workflowStatus.steps.find(step => step.stepKey === 'document_checklist');
+                const anyDocumentChecklistStep = workflowStatus.steps.find(step => step.stepKey === "document_checklist");
                 if (anyDocumentChecklistStep) {
                     this.logger.warn(`Found document_checklist step ${anyDocumentChecklistStep.id} with status ${anyDocumentChecklistStep.status}`);
                 }
@@ -336,9 +318,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: updateDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: updateDocumentChecklistDto.extraDocuments
                     ? updateDocumentChecklistDto.extraDocuments.map(doc => ({
-                        name: doc.name ?? '',
-                        path: doc.path ?? ''
-                    }))
+                          name: doc.name ?? "",
+                          path: doc.path ?? "",
+                      }))
                     : null,
                 updatedAt: new Date(),
             })
@@ -388,14 +370,10 @@ export class DocumentChecklistsService {
         if (!tender || !tender.teamMember) return;
 
         // Get Team Leader name
-        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
-        let tlName = 'Team Leader';
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole("Team Leader", tender.team);
+        let tlName = "Team Leader";
         if (teamLeaderEmails.length > 0) {
-            const [tlUser] = await this.db
-                .select({ name: users.name })
-                .from(users)
-                .where(eq(users.email, teamLeaderEmails[0]))
-                .limit(1);
+            const [tlUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.email, teamLeaderEmails[0])).limit(1);
             if (tlUser?.name) {
                 tlName = tlUser.name;
             }
@@ -403,7 +381,7 @@ export class DocumentChecklistsService {
 
         // Get TE name
         const teUser = await this.recipientResolver.getUserById(tender.teamMember);
-        const teName = teUser?.name || 'Tender Executive';
+        const teName = teUser?.name || "Tender Executive";
 
         // Build documents list
         const documents: string[] = [];
@@ -418,29 +396,17 @@ export class DocumentChecklistsService {
             tl: tlName,
             tenderNo: tender.tenderNo,
             tenderName: tender.tenderName,
-            documents: documents.length > 0 ? documents : ['No documents specified'],
+            documents: documents.length > 0 ? documents : ["No documents specified"],
             te: teName,
         };
 
         // Collect attachment file paths from extraDocuments
-        const attachmentFiles = checklist.extraDocuments
-            ?.map(doc => doc.path)
-            .filter((path): path is string => !!path) || [];
+        const attachmentFiles = checklist.extraDocuments?.map(doc => doc.path).filter((path): path is string => !!path) || [];
 
-        await this.sendEmail(
-            'document-checklist.submitted',
-            tenderId,
-            tender.teamMember,
-            `Document Checklist - ${tender.tenderName}`,
-            'document-checklist-submitted',
-            emailData,
-            {
-                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
-                cc: [
-                    { type: 'role', role: 'Admin', teamId: tender.team },
-                ],
-                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
-            }
-        );
+        await this.sendEmail("document-checklist.submitted", tenderId, tender.teamMember, `Document Checklist - ${tender.tenderName}`, "document-checklist-submitted", emailData, {
+            to: [{ type: "role", role: "Team Leader", teamId: tender.team }],
+            cc: [{ type: "role", role: "Admin", teamId: tender.team }],
+            // attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+        });
     }
 }
