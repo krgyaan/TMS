@@ -301,3 +301,19 @@ Redis → followup-mail-queue
 ## 🧠 One-Line Summary
 
 > Scheduler produces jobs → Redis stores them → Worker consumes them.
+
+          (every minute)
+
+Cron ────────────────┐
+↓
+Find due followups
+↓
+Push jobs to Redis
+↓
+┌─────────────────┐
+│ REDIS │ ← job queue lives here
+└─────────────────┘
+↓
+Worker pulls jobs
+↓
+FollowUpService → MailerService
