@@ -1,5 +1,5 @@
 // src/modules/courier/courier.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException, LoggerService } from "@nestjs/common";
 import { eq, and, desc } from "drizzle-orm";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -45,21 +45,21 @@ interface CourierDoc {
 @Injectable()
 export class CourierService {
     constructor(
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger,
+
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailerService: MailerService,
         private readonly googleService: GoogleService,
 
-        private readonly mailAudience: MailAudienceService,
-
-        @Inject(WINSTON_MODULE_PROVIDER)
-        private readonly logger: Logger
+        private readonly mailAudience: MailAudienceService
     ) {}
 
     //General db helper functions to carry out simple DB ops
     // Get all couriers (dashboard)
     async findAll() {
-        this.logger.debug("Fetching all couriers for dashboard");
+        this.logger.info("Fetching all couriers for dashboard");
 
         try {
             const result = await this.db.query.couriers.findMany({
@@ -285,6 +285,12 @@ export class CourierService {
             filesCount: files?.length ?? 0,
         });
 
+        const deliveryDate = new Date(`${data.delDate}T00:00:00.000Z`);
+
+        if (isNaN(deliveryDate.getTime())) {
+            throw new Error(`Invalid delDate received: ${data.delDate}`);
+        }
+
         try {
             const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
 
@@ -297,7 +303,7 @@ export class CourierService {
                 empFrom: data.empFrom,
                 urgency: data.urgency,
                 userId,
-                delDate: new Date(data.delDate),
+                delDate: deliveryDate,
                 courierDocs,
                 status: COURIER_STATUS.PENDING,
                 createdAt: new Date(),
