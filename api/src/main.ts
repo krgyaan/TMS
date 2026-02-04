@@ -1,18 +1,31 @@
 import { NestFactory } from "@nestjs/core";
+import * as Sentry from "@sentry/node";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "@/app.module";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { join } from "path";
 import cookieParser from "cookie-parser";
+import { AllExceptionsFilter } from "@/logger/all-exception.filter";
+import { requestIdMiddleware } from "@/logger/request-id.middleware";
 
 import { DRIZZLE } from "@/db/database.module";
 import { StatusCache } from "@/utils/status-cache";
 import type { DbInstance } from "@db";
 
 async function bootstrap() {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV,
+        tracesSampleRate: 1.0,
+    });
+
     // ✅ IMPORTANT: Use NestExpressApplication
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+    app.use(requestIdMiddleware);
+
+    app.useGlobalFilters(app.get(AllExceptionsFilter));
 
     const config = app.get(ConfigService);
     const appCfg = config.get<{ port: number; apiPrefix: string }>("app", {
