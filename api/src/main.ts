@@ -8,6 +8,7 @@ import { join } from "path";
 import cookieParser from "cookie-parser";
 import { AllExceptionsFilter } from "@/logger/all-exception.filter";
 import { requestIdMiddleware } from "@/logger/request-id.middleware";
+import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
 
 import { DRIZZLE } from "@/db/database.module";
 import { StatusCache } from "@/utils/status-cache";
