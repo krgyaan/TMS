@@ -10,7 +10,7 @@ import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
@@ -26,6 +27,10 @@ const PhysicalDocsListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -60,6 +65,11 @@ const PhysicalDocsListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
+        {
+            label: 'Change Status',
+            onClick: (row: PhysicalDocsDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
         {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
@@ -332,6 +342,15 @@ const PhysicalDocsListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

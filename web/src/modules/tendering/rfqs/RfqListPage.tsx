@@ -10,7 +10,7 @@ import { paths } from '@/app/routes/paths';
 import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
@@ -25,6 +26,10 @@ const Rfqs = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -63,6 +68,11 @@ const Rfqs = () => {
     const deleteMutation = useDeleteRfq();
 
     const rfqsActions: ActionItem<RfqDashboardRowWithTimer>[] = [
+        {
+            label: 'Change Status',
+            onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
@@ -344,6 +354,15 @@ const Rfqs = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };
