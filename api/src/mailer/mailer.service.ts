@@ -62,7 +62,15 @@ export class MailerService {
 
         return attachments.map(({ size, ...rest }) => rest);
     }
+
     async sendAsUser(payload: SendMailInput, connection: GoogleConnection) {
+        const isSandbox = process.env.MAIL_MODE === "sandbox";
+
+        const finalTo = isSandbox ? [process.env.MAIL_SANDBOX_TO!] : payload.to;
+
+        const finalCc = isSandbox ? [] : payload.cc;
+        const finalBcc = isSandbox ? [] : payload.bcc;
+
         if (!connection.hasRefreshToken) {
             throw new BadRequestException("Google account does not have offline access");
         }

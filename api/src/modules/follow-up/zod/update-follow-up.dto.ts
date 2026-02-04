@@ -93,6 +93,10 @@ export const FollowUpDetailsSchema = z.object({
 
     followUpHistory: z.array(z.any()).optional().default([]),
 
+    reminderCount: z.number().optional().default(0),
+
+    emdId: z.number().positive().nullable().optional(),
+
     // Contacts
     contacts: z.array(contactPersonSchema),
 

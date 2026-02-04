@@ -85,7 +85,7 @@ export class RfqsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly workflowService: WorkflowService
-    ) { }
+    ) {}
 
     /**
      * Build role-based filter conditions for tender queries
@@ -469,24 +469,22 @@ export class RfqsService {
             this.logger.log(`Transitioning timers for tender ${data.tenderId} after RFQ sent`);
 
             // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
+            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", data.tenderId.toString());
 
             // Complete the rfq_sent step
-            const rfqSentStep = workflowStatus.steps.find(step =>
-                step.stepKey === 'rfq_sent' && step.status === 'IN_PROGRESS'
-            );
+            const rfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent" && step.status === "IN_PROGRESS");
 
             if (rfqSentStep) {
                 this.logger.log(`Completing rfq_sent step ${rfqSentStep.id} for tender ${data.tenderId}`);
                 await this.workflowService.completeStep(rfqSentStep.id.toString(), {
                     userId: changedBy.toString(),
-                    notes: 'RFQ sent'
+                    notes: "RFQ sent",
                 });
                 this.logger.log(`Successfully completed rfq_sent step for tender ${data.tenderId}`);
             } else {
                 this.logger.warn(`No active rfq_sent step found for tender ${data.tenderId}`);
                 // Try to find any rfq_sent step
-                const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === 'rfq_sent');
+                const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent");
                 if (anyRfqSentStep) {
                     this.logger.warn(`Found rfq_sent step ${anyRfqSentStep.id} with status ${anyRfqSentStep.status}`);
                 }
@@ -722,10 +720,10 @@ export class RfqsService {
         // Format due date
         const dueDate = rfqDetails.dueDate
             ? new Date(rfqDetails.dueDate).toLocaleDateString("en-IN", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-            })
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+              })
             : "Not specified";
 
         // Check document types
@@ -769,9 +767,7 @@ export class RfqsService {
             };
 
             // Collect attachment file paths from RFQ documents
-            const attachmentFiles = rfqDetails.documents
-                ?.map(doc => doc.path)
-                .filter((path): path is string => !!path) || [];
+            const attachmentFiles = rfqDetails.documents?.map(doc => doc.path).filter((path): path is string => !!path) || [];
 
             await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
                 to: [{ type: "emails", emails: vendorEmails }],
@@ -780,7 +776,7 @@ export class RfqsService {
                     { type: "role", role: "Team Leader", teamId: tender.team },
                     { type: "role", role: "Coordinator", teamId: tender.team },
                 ],
-                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+                // attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             });
         }
     }
