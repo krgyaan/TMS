@@ -1,30 +1,21 @@
 import React from 'react';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface PhysicalDocsViewProps {
     physicalDoc: PhysicalDocs | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function PhysicalDocsView({
     physicalDoc,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: PhysicalDocsViewProps) {
     if (isLoading) {
@@ -52,20 +43,6 @@ export function PhysicalDocsView({
                         <Package className="h-5 w-5" />
                         Physical Documents
                     </CardTitle>
-                    <CardAction className="flex gap-2">
-                        {showEditButton && onEdit && (
-                            <Button variant="default" size="sm" onClick={onEdit}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Create Physical Docs
-                            </Button>
-                        )}
-                        {showBackButton && onBack && (
-                            <Button variant="outline" size="sm" onClick={onBack}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
-                            </Button>
-                        )}
-                    </CardAction>
                 </CardHeader>
                 <CardContent>
                     <div className="text-center py-8 text-muted-foreground">
@@ -83,20 +60,6 @@ export function PhysicalDocsView({
                     <Package className="h-5 w-5 text-blue-500" />
                     Physical Documents Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>

@@ -5,7 +5,8 @@ import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { TenderApprovalView } from "@/modules/tendering/tender-approval/components/TenderApprovalView";
 import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TenderWithRelations } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
@@ -34,35 +35,28 @@ export default function PhysicalDocsShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="physical-docs" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-4 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.physicalDocs)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-2 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     <TenderView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
-                        <InfoSheetView
-                            infoSheet={infoSheet}
-                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
-                        />
+                        <InfoSheetView infoSheet={infoSheet} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -71,17 +65,9 @@ export default function PhysicalDocsShowPage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
                     <TenderApprovalView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
                 </TabsContent>
 
@@ -90,11 +76,7 @@ export default function PhysicalDocsShowPage() {
                     {physicalDocLoading ? (
                         <PhysicalDocsView isLoading={true} physicalDoc={null} />
                     ) : physicalDoc ? (
-                        <PhysicalDocsView
-                            physicalDoc={physicalDoc}
-                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
-                            onBack={() => navigate(paths.tendering.physicalDocs)}
-                        />
+                        <PhysicalDocsView physicalDoc={physicalDoc} />
                     ) : (
                         <PhysicalDocsView isLoading={false} physicalDoc={null} />
                     )}
