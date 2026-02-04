@@ -8,6 +8,7 @@ import type {
     UploadRaResultDto,
 } from '@/modules/tendering/ras/helpers/reverseAuction.types';
 import { reverseAuctionService } from '@/services/api/reverse-auction.service';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const reverseAuctionsKey = {
     all: ['reverse-auctions'] as const,
@@ -44,10 +45,14 @@ export const useReverseAuctionDashboard = (
 
 // Fetch only counts (for badges)
 export const useReverseAuctionDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...reverseAuctionsKey.counts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<RaDashboardCounts>({
-        queryKey: reverseAuctionsKey.counts(),
-        queryFn: () => reverseAuctionService.getDashboardCounts(),
-        staleTime: 30000, // 30 seconds - counts don't need to be as fresh as data
+        queryKey,
+        queryFn: () => reverseAuctionService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
         retry: 2,
     });
 };

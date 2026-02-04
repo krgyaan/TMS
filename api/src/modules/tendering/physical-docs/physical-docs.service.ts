@@ -28,6 +28,7 @@ import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -88,9 +89,46 @@ export class PhysicalDocsService {
     ) { }
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+        
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+        
+        return roleFilterConditions;
+    }
+
+    /**
      * Get dashboard data by tab - Refactored to use config
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'pending' | 'sent' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
@@ -108,13 +146,11 @@ export class PhysicalDocsService {
             inArray(tenderInformation.physicalDocsRequired, ['Yes', 'YES']),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'pending') {
             conditions.push(isNull(physicalDocs.id));
@@ -260,12 +296,15 @@ export class PhysicalDocsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(tenderInformation.physicalDocsRequired, 'Yes'),
+            ...roleFilterConditions,
         ];
 
         // Count pending: status = 3, physicalDocsId IS NULL

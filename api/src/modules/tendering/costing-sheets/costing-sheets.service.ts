@@ -18,6 +18,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type CostingSheetDashboardRow = {
     tenderId: number;
@@ -80,7 +81,9 @@ export class CostingSheetsService {
      */
     async getDashboardData(
         tabKey?: 'pending' | 'submitted' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
+        user?: ValidatedUser,
+        teamId?: number
     ): Promise<PaginatedResult<CostingSheetDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -95,13 +98,40 @@ export class CostingSheetsService {
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+        
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
@@ -236,9 +266,47 @@ export class CostingSheetsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
+        const baseCondition = TenderInfosService.getActiveCondition();
+
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const filteredBaseCondition = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
+            filteredBaseCondition,
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];

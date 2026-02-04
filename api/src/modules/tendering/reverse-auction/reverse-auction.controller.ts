@@ -20,8 +20,10 @@ export class ReverseAuctionController {
 
     @Get('dashboard')
     getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tabKey') tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
         @Query('type') type?: RaDashboardType, // Legacy support
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -45,12 +47,20 @@ export class ReverseAuctionController {
             ...(search && { search }),
         };
 
-        return this.reverseAuctionService.getDashboardData(activeTab, filters);
+        return this.reverseAuctionService.getDashboardData(user, parseNumber(teamId), activeTab, filters);
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.reverseAuctionService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.reverseAuctionService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get()

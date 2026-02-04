@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderResultService } from '@/services/api/tender-result.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type {
     ResultDashboardResponse,
     ResultDashboardRow,
@@ -29,10 +30,10 @@ export const useResultDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { 
-        tab: filters?.tab, 
-        page: filters?.page, 
-        limit: filters?.limit, 
+    const queryKeyFilters = {
+        tab: filters?.tab,
+        page: filters?.page,
+        limit: filters?.limit,
         search: filters?.search,
         sortBy: filters?.sortBy,
         sortOrder: filters?.sortOrder
@@ -56,15 +57,18 @@ export const useResultDashboard = (
 };
 
 export const useResultDashboardCounts = () => {
-    const query = useQuery<ResultDashboardCounts>({
-        queryKey: tenderResultKey.counts(),
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
+
+    return useQuery<ResultDashboardCounts>({
+        queryKey,
         queryFn: async () => {
-            const result = await tenderResultService.getCounts();
+            const result = await tenderResultService.getCounts(teamIdParam);
             return result;
         },
+        staleTime: 0,
     });
-
-    return query;
 };
 
 // Fetch single result by ID
@@ -100,8 +104,8 @@ export const useUploadResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tenderId, data }: { tenderId: number; data: UploadResultFormPageProps }) =>
-            tenderResultService.uploadResult(tenderId, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: any }) =>
+            tenderResultService.uploadResultByTenderId(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
             queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });

@@ -22,7 +22,7 @@ class DocumentChecklistService extends BaseApiService {
         super('/document-checklists');
     }
 
-    async getAll(params?: DocumentChecklistListParams): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
+    async getAll(params?: DocumentChecklistListParams, teamId?: number): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {
@@ -45,13 +45,21 @@ class DocumentChecklistService extends BaseApiService {
                 search.set('search', params.search);
             }
         }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
 
         const queryString = search.toString();
         return this.get<PaginatedResult<TenderDocumentChecklistDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
-    async getDashboardCounts(): Promise<DocumentChecklistsDashboardCounts> {
-        return this.get<DocumentChecklistsDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<DocumentChecklistsDashboardCounts> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<DocumentChecklistsDashboardCounts>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 
     async getByTenderId(tenderId: number): Promise<TenderDocumentChecklist | null> {

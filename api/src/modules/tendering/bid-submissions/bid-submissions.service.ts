@@ -18,6 +18,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -66,9 +67,46 @@ export class BidSubmissionsService {
 
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+        
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+        
+        return roleFilterConditions;
+    }
+
+    /**
      * Get dashboard data by tab - Direct queries without config
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
@@ -88,13 +126,12 @@ export class BidSubmissionsService {
             eq(tenderCostingSheets.status, 'Approved'),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
         // Build tab-specific conditions
         const conditions = [...baseConditions];
+        
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
 
         if (activeTab === 'pending') {
             conditions.push(isNull(bidSubmissions.id));
@@ -234,12 +271,15 @@ export class BidSubmissionsService {
         return wrapPaginatedResponse(mappedRows, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(tenderCostingSheets.status, 'Approved'),
+            ...roleFilterConditions,
         ];
 
         const pendingConditions = [
@@ -262,6 +302,7 @@ export class BidSubmissionsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             eq(tenderCostingSheets.status, 'Approved'),
+            ...roleFilterConditions,
         ];
         const tenderDnbConditions = [
             ...tenderDnbBaseConditions,

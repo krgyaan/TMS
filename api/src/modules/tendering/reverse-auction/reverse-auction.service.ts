@@ -19,6 +19,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -91,9 +92,46 @@ export class ReverseAuctionService {
     ) { }
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+        
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+        
+        return roleFilterConditions;
+    }
+
+    /**
      * Get RA Dashboard data with counts for all tabs - Direct queries without config
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<RaDashboardResponse> {
@@ -111,12 +149,9 @@ export class ReverseAuctionService {
             inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
-        const conditions = [...baseConditions];
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         // Tab-specific filtering based on raResult field (matching Laravel logic)
         if (activeTab === 'under-evaluation') {
@@ -308,11 +343,14 @@ export class ReverseAuctionService {
         return response;
     }
 
-    async getDashboardCounts(): Promise<RaDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<RaDashboardCounts> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
+            ...roleFilterConditions,
         ];
 
         // Under-evaluation: No RA OR (RA exists but no result AND no schedule times)

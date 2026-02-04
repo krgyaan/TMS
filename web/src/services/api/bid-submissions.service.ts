@@ -64,8 +64,13 @@ class BidSubmissionsService extends BaseApiService {
         return this.patch<BidSubmission>(`/${id}`, data);
     }
 
-    async getDashboardCounts(): Promise<BidSubmissionDashboardCounts> {
-        return this.get<BidSubmissionDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<BidSubmissionDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<BidSubmissionDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

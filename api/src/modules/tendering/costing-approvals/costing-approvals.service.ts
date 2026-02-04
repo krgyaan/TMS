@@ -18,6 +18,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -112,9 +113,10 @@ export class CostingApprovalsService {
      * Get dashboard data by tab - Direct queries without config
      */
     async getDashboardData(
-        userTeam: number,
         tab?: 'pending' | 'approved' | 'tender-dnb',
-        filters?: CostingApprovalFilters
+        filters?: CostingApprovalFilters,
+        user?: ValidatedUser,
+        teamId?: number
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -130,13 +132,40 @@ export class CostingApprovalsService {
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
 
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
@@ -220,9 +249,47 @@ export class CostingApprovalsService {
         return wrapPaginatedResponse(data, Number(count), page, limit);
     }
 
-    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<CostingApprovalDashboardCounts> {
+        const baseCondition = TenderInfosService.getActiveCondition();
+
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const filteredBaseCondition = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
+            filteredBaseCondition,
             TenderInfosService.getApprovedCondition(),
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
@@ -243,7 +310,7 @@ export class CostingApprovalsService {
 
         // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
         const tenderDnbBaseConditions = [
-            TenderInfosService.getActiveCondition(),
+            filteredBaseCondition,
             TenderInfosService.getApprovedCondition(),
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];

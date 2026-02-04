@@ -11,14 +11,21 @@ export class TenderResultController {
 
     @Get('dashboard')
     getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tab') tab?: ResultDashboardType,
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        return this.tenderResultService.getDashboardData(tab, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tenderResultService.getDashboardData(user, parseNumber(teamId), tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -28,8 +35,16 @@ export class TenderResultController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.tenderResultService.getCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tenderResultService.getCounts(user, parseNumber(teamId));
     }
 
     @Get('tender/:tenderId')
@@ -50,6 +65,25 @@ export class TenderResultController {
     @Post('create/:tenderId')
     createForTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.tenderResultService.createForTender(tenderId);
+    }
+
+    @Post('upload/:tenderId')
+    async uploadResultByTenderId(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Body() dto: UploadResultDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        const existingResult = await this.tenderResultService.findByTenderId(tenderId);
+        let resultId: number | null = null;
+        
+        if (existingResult) {
+            resultId = existingResult.id;
+        } else {
+            const { id } = await this.tenderResultService.getOrCreateForTender(tenderId);
+            resultId = id;
+        }
+        
+        return this.tenderResultService.uploadResult(resultId, tenderId, dto, user.sub);
     }
 
     @Post(':id/upload-result')

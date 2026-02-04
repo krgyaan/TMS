@@ -61,9 +61,18 @@ class TenderResultService extends BaseApiService {
         return this.post<TenderResult>(`/${id}/upload-result`, data);
     }
 
-    async getCounts(): Promise<ResultDashboardCounts> {
+    async uploadResultByTenderId(tenderId: number, data: any): Promise<TenderResult> {
+        return this.post<TenderResult>(`/upload/${tenderId}`, data);
+    }
+
+    async getCounts(teamId?: number): Promise<ResultDashboardCounts> {
         try {
-            const result = await this.get<ResultDashboardCounts>('/dashboard/counts');
+            const params = new URLSearchParams();
+            if (teamId !== undefined && teamId !== null) {
+                params.append('teamId', teamId.toString());
+            }
+            const query = params.toString();
+            const result = await this.get<ResultDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
             return result;
         } catch (error) {
             console.error('error:', error);

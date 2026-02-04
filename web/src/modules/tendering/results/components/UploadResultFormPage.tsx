@@ -75,19 +75,21 @@ export default function UploadResultFormPage({
     const [newPartyName, setNewPartyName] = useState('');
     const [showResultDetails, setShowResultDetails] = useState(isEditMode);
 
+    console.log('existingResult', existingResult);
+
     const form = useForm<FormValues>({
         resolver: zodResolver(UploadResultSchema) as Resolver<FormValues>,
         defaultValues: {
-            technicallyQualified: 'Yes',
-            disqualificationReason: '',
-            qualifiedPartiesCount: tenderDetails.partiesCount || '',
-            qualifiedPartiesNames: tenderDetails.partiesNames || [],
-            result: 'Won',
-            l1Price: '',
-            l2Price: '',
-            ourPrice: '',
-            qualifiedPartiesScreenshot: [],
-            finalResultScreenshot: [],
+            technicallyQualified: existingResult?.technicallyQualified as 'Yes' | 'No' || 'Yes',
+            disqualificationReason: existingResult?.disqualificationReason || '',
+            qualifiedPartiesCount: existingResult?.qualifiedPartiesCount || '',
+            qualifiedPartiesNames: existingResult?.qualifiedPartiesNames || [],
+            result: existingResult?.result as 'Won' | 'Lost' || 'Won',
+            l1Price: existingResult?.l1Price || '',
+            l2Price: existingResult?.l2Price || '',
+            ourPrice: existingResult?.ourPrice || '',
+            qualifiedPartiesScreenshot: existingResult?.qualifiedPartiesScreenshot as string[] | undefined || [],
+            finalResultScreenshot: existingResult?.finalResultScreenshot as string[] | undefined || [],
         },
     });
 

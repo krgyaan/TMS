@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentChecklistService } from '@/services/api/document-checklist.service';
 import { toast } from 'sonner';
 import type { DocumentChecklistsDashboardCounts, PaginatedResult, TenderDocumentChecklistDashboardRow, CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/types/api.types';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const documentChecklistKeys = {
     all: ['documentChecklists'] as const,
@@ -17,6 +18,10 @@ export const useDocumentChecklists = (
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const params = {
         ...(tab && { tab }),
         page: pagination.page,
@@ -30,11 +35,14 @@ export const useDocumentChecklists = (
         tab,
         ...pagination,
         ...sort,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<TenderDocumentChecklistDashboardRow>>({
         queryKey: documentChecklistKeys.list(queryKeyFilters),
-        queryFn: () => documentChecklistService.getAll(params),
+        queryFn: () => documentChecklistService.getAll(params, teamIdParam),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
                 return previousData;
@@ -88,9 +96,17 @@ export const useUpdateDocumentChecklist = () => {
 
 
 export const useChecklistDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    
+    // Include all filter context in query key to ensure proper cache invalidation
+    // Use explicit values (including null) so React Query can properly differentiate cache entries
+    const queryKey = [...documentChecklistKeys.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<DocumentChecklistsDashboardCounts>({
-        queryKey: documentChecklistKeys.dashboardCounts(),
-        queryFn: () => documentChecklistService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => documentChecklistService.getDashboardCounts(teamIdParam),
+        staleTime: 0, // Always refetch when query key changes to ensure counts are up-to-date
     });
 };

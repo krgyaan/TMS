@@ -21,14 +21,21 @@ export class CostingSheetsController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
     ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
         const result = await this.costingSheetsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
-        });
+        }, user, parseNumber(teamId));
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
@@ -59,8 +66,16 @@ export class CostingSheetsController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.costingSheetsService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.costingSheetsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('check-drive-scopes')

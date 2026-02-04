@@ -1,23 +1,24 @@
-import { Inject, Injectable, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from "@/modules/tendering/checklists/dto/document-checklist.dto";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { EmailService } from "@/modules/email/email.service";
-import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { StatusCache } from "@/utils/status-cache";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { WorkflowService } from "@/modules/timers/services/workflow.service";
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { StatusCache } from '@/utils/status-cache';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -56,8 +57,10 @@ export class DocumentChecklistsService {
      * Get dashboard data by tab
      */
     async getDashboardData(
-        tab?: "pending" | "submitted" | "tender-dnb",
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string }
+        tab?: 'pending' | 'submitted' | 'tender-dnb',
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
+        user?: ValidatedUser,
+        teamId?: number
     ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -72,7 +75,39 @@ export class DocumentChecklistsService {
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
-        const conditions = [...baseConditions];
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === "pending") {
             conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
@@ -196,8 +231,49 @@ export class DocumentChecklistsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; "tender-dnb": number; total: number }> {
-        const baseConditions = [TenderInfosService.getActiveCondition(), TenderInfosService.getApprovedCondition()];
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
+        const baseCondition = TenderInfosService.getActiveCondition();
+
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const filteredBaseCondition = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
+        const baseConditions = [
+            filteredBaseCondition,
+            TenderInfosService.getApprovedCondition(),
+        ];
 
         // Count pending: exclude dnb/lost, checklistId IS NULL
         const pendingConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNull(tenderDocumentChecklists.id)];
@@ -206,8 +282,12 @@ export class DocumentChecklistsService {
         const submittedConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNotNull(tenderDocumentChecklists.id)];
 
         // Count tender-dnb: status in dnb category
-        const dnbStatusIds = StatusCache.getIds("dnb");
-        const tenderDnbConditions = [...baseConditions, ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : [])];
+        const dnbStatusIds = StatusCache.getIds('dnb');
+        const tenderDnbConditions = [
+            filteredBaseCondition,
+            TenderInfosService.getApprovedCondition(),
+            ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []),
+        ];
 
         const [pendingResult, submittedResult, tenderDnbResult] = await Promise.all([
             this.db

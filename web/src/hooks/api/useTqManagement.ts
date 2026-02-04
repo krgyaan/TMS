@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 import { tqManagementService } from '@/services/api/tq-management.service';
 import { toast } from 'sonner';
 import type { TabKey, TqManagementDashboardCounts, TqManagementFilters } from '@/modules/tendering/tq-management/helpers/tqManagement.types';
@@ -162,10 +163,14 @@ export const useUpdateTqReceived = () => {
 };
 
 export const useTqManagementDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...tqManagementKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<TqManagementDashboardCounts>({
-        queryKey: tqManagementKey.dashboardCounts(),
-        queryFn: () => tqManagementService.getDashboardCounts(),
-        staleTime: 30000,
+        queryKey,
+        queryFn: () => tqManagementService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
         retry: 2,
     });
 };
