@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderResultService } from '@/services/api/tender-result.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type {
     ResultDashboardResponse,
     ResultDashboardRow,
@@ -56,15 +57,18 @@ export const useResultDashboard = (
 };
 
 export const useResultDashboardCounts = () => {
-    const query = useQuery<ResultDashboardCounts>({
-        queryKey: tenderResultKey.counts(),
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
+    
+    return useQuery<ResultDashboardCounts>({
+        queryKey,
         queryFn: async () => {
-            const result = await tenderResultService.getCounts();
+            const result = await tenderResultService.getCounts(teamIdParam);
             return result;
         },
+        staleTime: 0,
     });
-
-    return query;
 };
 
 // Fetch single result by ID
