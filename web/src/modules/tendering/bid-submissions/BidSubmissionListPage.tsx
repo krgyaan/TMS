@@ -110,7 +110,7 @@ const BidSubmissionListPage = () => {
         {
             label: 'View Details',
             onClick: (row: BidSubmissionDashboardRow) => {
-                navigate(paths.tendering.bidView(row.bidSubmissionId!));
+                navigate(paths.tendering.bidView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
