@@ -111,11 +111,13 @@ export class TenderResultService {
                     eq(tenderResults.status, 'Under Evaluation')
                 )!
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'won') {
             conditions.push(
                 isNotNull(tenderResults.id),
                 eq(tenderResults.status, 'Won')
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'lost') {
             conditions.push(
                 isNotNull(tenderResults.id),

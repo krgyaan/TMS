@@ -71,7 +71,7 @@ export class TenderApprovalService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -97,7 +97,7 @@ export class TenderApprovalService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -129,7 +129,7 @@ export class TenderApprovalService {
 
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         // Tab-specific conditions
         let tabConditions: any[] = [];
         tabConditions.push(...roleFilterConditions);
@@ -277,7 +277,7 @@ export class TenderApprovalService {
 
     async getCounts(user?: ValidatedUser, teamId?: number) {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         // Base conditions for all tabs
         const baseConditions = [
             TenderInfosService.getActiveCondition(),

@@ -71,7 +71,7 @@ export class BidSubmissionsService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -97,7 +97,7 @@ export class BidSubmissionsService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -128,15 +128,17 @@ export class BidSubmissionsService {
 
         // Build tab-specific conditions
         const conditions = [...baseConditions];
-        
+
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
         conditions.push(...roleFilterConditions);
 
         if (activeTab === 'pending') {
             conditions.push(isNull(bidSubmissions.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'submitted') {
             conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'disqualified') {
             conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Tender Missed'));
         } else if (activeTab === 'tender-dnb') {
@@ -273,7 +275,7 @@ export class BidSubmissionsService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
@@ -729,12 +731,12 @@ export class BidSubmissionsService {
 
         // Get accounts team ID for CC
         const accountsTeamId = await this.getAccountsTeamId();
-        
+
         const ccRecipients: RecipientSource[] = [
             { type: 'role', role: 'Admin', teamId: tender.team },
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
-        
+
         // Add accounts team admin if accounts team exists
         if (accountsTeamId) {
             ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
@@ -817,12 +819,12 @@ export class BidSubmissionsService {
 
         // Get accounts team ID for CC
         const accountsTeamId = await this.getAccountsTeamId();
-        
+
         const ccRecipients: RecipientSource[] = [
             { type: 'role', role: 'Admin', teamId: tender.team },
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
-        
+
         // Add accounts team admin if accounts team exists
         if (accountsTeamId) {
             ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });

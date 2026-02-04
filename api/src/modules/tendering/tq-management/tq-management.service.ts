@@ -69,7 +69,7 @@ export class TqManagementService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -95,7 +95,7 @@ export class TqManagementService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -125,7 +125,7 @@ export class TqManagementService {
             TenderInfosService.getApprovedCondition(),
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
-        
+
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
         conditions.push(...roleFilterConditions);
@@ -318,7 +318,7 @@ export class TqManagementService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<TqManagementDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
