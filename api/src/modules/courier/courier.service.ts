@@ -2,6 +2,9 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, and, desc } from "drizzle-orm";
 
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
+
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { couriers } from "@/db/schemas/shared/couriers.schema";
@@ -18,6 +21,8 @@ import { CourierMailTemplates } from "./courier.mail";
 import { fi } from "zod/v4/locales";
 import { stat } from "fs";
 import { from } from "rxjs";
+
+import { MailAudienceService } from "@/core/mail/mail-audience.service";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -43,7 +48,12 @@ export class CourierService {
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailerService: MailerService,
-        private readonly googleService: GoogleService
+        private readonly googleService: GoogleService,
+
+        private readonly mailAudience: MailAudienceService,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
     ) {}
 
     //General db helper functions to carry out simple DB ops
@@ -195,10 +205,10 @@ export class CourierService {
         }
 
         // 3️⃣ Fetch creator user (optional – for template usage)
-        const [user] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+        const [user] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, 7)).limit(1);
 
         // 4️⃣ Fetch Google OAuth connection
-        const googleConnection = await this.googleService.getSanitizedGoogleConnection(userId);
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(57);
         console.log("Google Connection for user", userId, googleConnection);
 
         // 5️⃣ Send mail (NON-BLOCKING)
@@ -221,12 +231,16 @@ export class CourierService {
                     dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
                 };
 
+                const toMail = await this.mailAudience.getEmailsByRoleId(4); //to coordinators
+                const ccMail = await this.mailAudience.getEmailsByRoleId(1); //to admin
+
                 await this.mailerService.sendMail(
                     CourierMailTemplates.COURIER_REQUEST,
                     mailContext,
                     {
-                        to: ["abhijeetgaur.dev@gmail.com"],
-                        cc: ["abhijeetgaur777@gmail.com"],
+                        to: toMail,
+                        cc: ccMail,
+                        bcc: ["abhigaur.test@gmail.com"],
                         subject: "Courier Dispatch Request",
                         attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
                     },
@@ -382,7 +396,7 @@ export class CourierService {
         const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.userId)).limit(1);
 
         // 4️⃣ Fetch Google OAuth connection
-        const googleConnection = await this.googleService.getSanitizedGoogleConnection(user.userId);
+        const googleConnection = await this.googleService.getSanitizedGoogleConnection(57);
         console.log("Google Connection for user", userId, googleConnection);
 
         const courier = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
@@ -399,14 +413,17 @@ export class CourierService {
             }),
         };
 
+        const toMail = await this.mailAudience.getEmailsByRoleId(4); //to coordinators
+        const ccMail = await this.mailAudience.getEmailsByRoleId(1); //to admin
+
         if (googleConnection) {
             try {
                 await this.mailerService.sendMail(
                     CourierMailTemplates.COURIER_DISPATCH,
                     mailContext,
                     {
-                        to: ["abhijeetgaur.dev@gmail.com"],
-                        cc: ["abhijeetgaur777@gmail.com"],
+                        to: toMail,
+                        cc: ccMail,
                         subject: `Courier sent to ${courier[0].toOrg}`,
                         attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
                     },

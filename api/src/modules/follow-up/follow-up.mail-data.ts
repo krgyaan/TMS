@@ -4,6 +4,8 @@ import { FollowUpDetailsDto } from "./zod/update-follow-up.dto";
 import { FollowupMailBase, FollowupMailPayload } from "./zod/mail.dto";
 import { FollowupMailTemplates } from "./follow-up.mail";
 
+type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment" | "Surety Bond";
+
 export class FollowupMailDataBuilder {
     constructor(private db: DbInstance) {}
 
@@ -24,7 +26,7 @@ export class FollowupMailDataBuilder {
             since,
         };
 
-        const instrument = await this.resolveInstrumentData(fu.emdId, followupId);
+        const instrument = fu.emdId ? await this.resolveInstrumentData(Number(fu.emdId)) : null;
 
         const template = instrument?.template ?? FollowupMailTemplates.DEFAULT;
 
@@ -92,96 +94,195 @@ export class FollowupMailDataBuilder {
         return ["abhigaur.test@gmail.com"];
     }
 
-    private async getRecipients(id: number): Promise<string[]> {
-        const rows = await this.db.execute(sql`
-            SELECT email
-            FROM follow_up_persons
-            WHERE follow_up_id = ${id}
-            AND email IS NOT NULL
-        `);
+    // private async getRecipients(id: number): Promise<string[]> {
+    //     const rows = await this.db.execute(sql`
+    //         SELECT email
+    //         FROM follow_up_persons
+    //         WHERE follow_up_id = ${id}
+    //         AND email IS NOT NULL
+    //     `);
 
-        return rows.rows.map((r: any) => r.email as string);
+    //     return rows.rows.map((r: any) => r.email as string);
+    // }
+
+    private async getRecipients(id: number): Promise<string[]> {
+        return ["abhijeetgaur.dev@gmail.com" as string];
     }
 
-    private async resolveInstrumentData(emdId: number | null, id: number) {
-        if (!emdId) return null;
+    private async resolveInstrumentData(instrumentId: number) {
+        const rows = await this.db.execute(sql`
+        SELECT id, instrument_type, request_id, amount
+        FROM payment_instruments
+        WHERE id = ${instrumentId}
+    `);
 
-        const resolvers = {
-            1: this.ddResolver.bind(this),
-            3: this.chqResolver.bind(this),
-            4: this.bgResolver.bind(this),
-            5: this.btResolver.bind(this),
-            6: this.popResolver.bind(this),
+        const instrument = rows.rows[0] as {
+            id: number;
+            instrument_type: InstrumentType;
+            request_id: number;
+            amount: string;
         };
 
-        return resolvers[emdId]?.(id) ?? null;
-    }
+        if (!instrument) return null;
 
+        const resolvers: Record<InstrumentType, (id: number, reqId: number, amount: string) => Promise<any>> = {
+            DD: this.ddResolver.bind(this),
+            Cheque: this.chqResolver.bind(this),
+            BG: this.bgResolver.bind(this),
+            "Bank Transfer": this.btResolver.bind(this),
+            "Portal Payment": this.popResolver.bind(this),
+            FDR: async () => null,
+            "Surety Bond": async () => null,
+        };
+
+        return resolvers[instrument.instrument_type](instrument.id, instrument.request_id, instrument.amount);
+    }
     //RESOLVERS TO BE IMPLEMENTED TO GET THE DATA WE ARE LOOKING FORRRRR
-    private async ddResolver(id: number) {
+    private async ddResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
-      SELECT dd.dd_no, dd.dd_amt, dd.dd_date,
-             t.tender_no, t.project_name, s.name as status
-      FROM dd_table dd
-      JOIN emds e ON e.id = dd.emd_id
-      JOIN tenders t ON t.id = e.tender_id
-      JOIN statuses s ON s.id = t.status_id
-      WHERE dd.followup_id = ${id}
+        SELECT
+            d.dd_no,
+            d.dd_date,
+            pr.tender_no,
+            pr.project_name,
+            pr.status
+        FROM instrument_dd_details d
+        JOIN payment_instruments pi ON pi.id = d.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE d.instrument_id = ${instrumentId}
     `);
 
-        return rows.rows[0];
+        const r: any = rows.rows[0];
+
+        return {
+            template: FollowupMailTemplates.DD,
+            context: {
+                ddNo: r.dd_no,
+                date: r.dd_date,
+                amount,
+                tenderNo: r.tender_no,
+                projectName: r.project_name,
+                status: r.status,
+            },
+        };
     }
 
-    private async chqResolver(id: number) {
+    private async chqResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
-      SELECT dd.dd_no, dd.dd_amt, dd.dd_date,
-             t.tender_no, t.project_name, s.name as status
-      FROM dd_table dd
-      JOIN emds e ON e.id = dd.emd_id
-      JOIN tenders t ON t.id = e.tender_id
-      JOIN statuses s ON s.id = t.status_id
-      WHERE dd.followup_id = ${id}
+        SELECT
+            c.cheque_no,
+            c.cheque_date,
+            pr.status
+        FROM instrument_cheque_details c
+        JOIN payment_instruments pi ON pi.id = c.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE c.instrument_id = ${instrumentId}
     `);
 
-        return rows.rows[0];
+        const r: any = rows.rows[0];
+
+        return {
+            template: FollowupMailTemplates.CHQ,
+            context: {
+                chequeNo: r.cheque_no,
+                date: r.cheque_date,
+                amount,
+                status: r.status,
+            },
+        };
     }
 
-    private async bgResolver(id: number) {
+    private async bgResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
-      SELECT dd.dd_no, dd.dd_amt, dd.dd_date,
-             t.tender_no, t.project_name, s.name as status
-      FROM dd_table dd
-      JOIN emds e ON e.id = dd.emd_id
-      JOIN tenders t ON t.id = e.tender_id
-      JOIN statuses s ON s.id = t.status_id
-      WHERE dd.followup_id = ${id}
+        SELECT
+            b.bg_no,
+            b.validity_date,
+            b.claim_expiry_date,
+            b.beneficiary_name,
+            b.bg_soft_copy,
+            pr.tender_no,
+            pr.project_name,
+            pr.status
+        FROM instrument_bg_details b
+        JOIN payment_instruments pi ON pi.id = b.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE b.instrument_id = ${instrumentId}
     `);
+
+        const r: any = rows.rows[0];
+
+        return {
+            template: FollowupMailTemplates.BG,
+            context: {
+                bgNo: r.bg_no,
+                amount,
+                bgValidity: r.validity_date,
+                bgClaimExpiry: r.claim_expiry_date,
+                favour: r.beneficiary_name,
+                attachment: r.bg_soft_copy,
+                tenderNo: r.tender_no,
+                projectName: r.project_name,
+                status: r.status,
+            },
+        };
     }
 
-    private async btResolver(id: number) {
+    private async btResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
-      SELECT dd.dd_no, dd.dd_amt, dd.dd_date,
-             t.tender_no, t.project_name, s.name as status
-      FROM dd_table dd
-      JOIN emds e ON e.id = dd.emd_id
-      JOIN tenders t ON t.id = e.tender_id
-      JOIN statuses s ON s.id = t.status_id
-      WHERE dd.followup_id = ${id}
+        SELECT
+            t.transaction_date,
+            t.utr_num,
+            pr.tender_no,
+            pr.project_name,
+            pr.status
+        FROM instrument_transfer_details t
+        JOIN payment_instruments pi ON pi.id = t.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE t.instrument_id = ${instrumentId}
     `);
+
+        const r: any = rows.rows[0];
+
+        return {
+            template: FollowupMailTemplates.BT,
+            context: {
+                date: r.transaction_date,
+                utr: r.utr_num,
+                amount,
+                tenderNo: r.tender_no,
+                projectName: r.project_name,
+                status: r.status,
+            },
+        };
     }
 
-    private async popResolver(id: number) {
+    private async popResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
-      SELECT dd.dd_no, dd.dd_amt, dd.dd_date,
-             t.tender_no, t.project_name, s.name as status
-      FROM dd_table dd
-      JOIN emds e ON e.id = dd.emd_id
-      JOIN tenders t ON t.id = e.tender_id
-      JOIN statuses s ON s.id = t.status_id
-      WHERE dd.followup_id = ${id}
+        SELECT
+            t.transaction_date,
+            t.utr_num,
+            pr.tender_no,
+            pr.project_name,
+            pr.status
+        FROM instrument_transfer_details t
+        JOIN payment_instruments pi ON pi.id = t.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE t.instrument_id = ${instrumentId}
     `);
 
-        return rows.rows[0];
+        const r: any = rows.rows[0];
+
+        return {
+            template: FollowupMailTemplates.POP,
+            context: {
+                date: r.transaction_date,
+                utr: r.utr_num,
+                amount,
+                tenderNo: r.tender_no,
+                projectName: r.project_name,
+                status: r.status,
+            },
+        };
     }
 
     //HELPERS

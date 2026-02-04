@@ -1,12 +1,17 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { Worker } from "bullmq";
 import { redisConnection } from "@/config/redis.config";
-import { MailerService } from "@/mailer/mailer.service";
 import { FollowUpService } from "./follow-up.service";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
 
 @Injectable()
 export class FollowupWorker implements OnModuleInit {
-    constructor(private readonly followUpService: FollowUpService) {}
+    constructor(
+        private readonly followUpService: FollowUpService,
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
+    ) {}
 
     onModuleInit() {
         const worker = new Worker(
@@ -14,10 +19,25 @@ export class FollowupWorker implements OnModuleInit {
             async job => {
                 const { followupId } = job.data;
 
+                this.logger.info("Processing follow-up mail job", {
+                    jobId: job.id,
+                    followupId,
+                });
+
                 try {
                     await this.followUpService.processFollowupMail(followupId);
-                } catch (err) {
-                    console.error("Mail failed", err);
+
+                    this.logger.info("Follow-up mail job completed", {
+                        jobId: job.id,
+                        followupId,
+                    });
+                } catch (err: any) {
+                    this.logger.error("Follow-up mail job failed", {
+                        jobId: job.id,
+                        followupId,
+                        error: err.message,
+                        stack: err.stack,
+                    });
                     throw err;
                 }
             },
@@ -28,9 +48,12 @@ export class FollowupWorker implements OnModuleInit {
         );
 
         worker.on("failed", (job, err) => {
-            console.error("Job failed", job?.id, err);
+            this.logger.error("BullMQ job failed", {
+                jobId: job?.id,
+                error: err.message,
+            });
         });
 
-        console.log("✅ Followup worker started");
+        this.logger.info("Followup worker started and listening to queue");
     }
 }

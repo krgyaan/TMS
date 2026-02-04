@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService } from "@nestjs/common";
 import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray } from "drizzle-orm";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
 
 import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "@/db/schemas/shared/follow-ups.schema";
 import { clientDirectory } from "@/db/schemas/shared/client-directory.schema";
@@ -50,7 +52,10 @@ export class FollowUpService {
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
         private readonly mailerService: MailerService,
-        private readonly googleService: GoogleService
+        private readonly googleService: GoogleService,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
     ) {}
 
     // ========================
@@ -58,88 +63,88 @@ export class FollowUpService {
     // ========================
 
     async create(dto: CreateFollowUpDto, currentUserId: number): Promise<FollowUp> {
-        // normalize contacts
-        const contacts: FollowUpContact[] = dto.contacts.map(c => ({
-            name: c.name,
-            email: c.email ?? null,
-            phone: c.phone ?? null,
-            org: c.org ?? null,
-            addedAt: new Date().toISOString(),
-        }));
+        this.logger.info("Creating follow-up", {
+            partyName: dto.partyName,
+            assignedToId: dto.assignedToId,
+            createdBy: currentUserId,
+            contactsCount: dto.contacts?.length ?? 0,
+        });
 
-        // keep client directory in sync (your existing helper)
-        await this.syncToClientDirectory(contacts);
+        try {
+            const contacts: FollowUpContact[] = dto.contacts.map(c => ({
+                name: c.name,
+                email: c.email ?? null,
+                phone: c.phone ?? null,
+                org: c.org ?? null,
+                addedAt: new Date().toISOString(),
+            }));
 
-        // normalize dates to YYYY-MM-DD for DATE columns
-        const normalizeDateToISODate = (v?: string | null) => {
-            if (!v) return null;
-            const d = new Date(v);
-            if (isNaN(d.getTime())) return null;
-            return d.toISOString().split("T")[0];
-        };
+            await this.syncToClientDirectory(contacts);
 
-        const startFrom = normalizeDateToISODate(dto.startFrom) ?? new Date().toISOString().split("T")[0];
-        const nextFollowUpDate = normalizeDateToISODate(dto.nextFollowUpDate ?? null);
+            this.logger.debug("Client directory synced", {
+                contactsCount: contacts.length,
+            });
 
-        // frequency and stopReason are numeric in DB (smallint)
-        const frequency = typeof (dto as any).frequency === "number" ? (dto as any).frequency : dto.frequency ? Number((dto as any).frequency) : 1;
+            const normalizeDateToISODate = (v?: string | null) => {
+                if (!v) return null;
+                const d = new Date(v);
+                if (isNaN(d.getTime())) return null;
+                return d.toISOString().split("T")[0];
+            };
 
-        const stopReason = dto.stopReason == null ? null : Number(dto.stopReason);
+            const startFrom = normalizeDateToISODate(dto.startFrom) ?? new Date().toISOString().split("T")[0];
 
-        const reminderCount = dto.reminderCount ?? 1;
+            const nextFollowUpDate = normalizeDateToISODate(dto.nextFollowUpDate ?? null);
 
-        // insert into DB
-        const [created] = await this.db
-            .insert(followUps)
-            .values({
-                // required fields
-                area: dto.area,
-                partyName: dto.partyName,
-                amount: dto.amount != null ? String(dto.amount) : "0",
+            const frequency = typeof (dto as any).frequency === "number" ? (dto as any).frequency : dto.frequency ? Number((dto as any).frequency) : 1;
 
-                // followup_for in your DDL is varchar(50)
-                followupFor: dto.followupFor ?? null,
+            const stopReason = dto.stopReason == null ? null : Number(dto.stopReason);
 
-                // relationships (nullable in your DDL)
-                assignedToId: dto.assignedToId ?? null,
-                createdById: currentUserId,
+            const reminderCount = dto.reminderCount ?? 1;
 
-                // assignment status is varchar in your DDL
-                assignmentStatus: "assigned",
+            const [created] = await this.db
+                .insert(followUps)
+                .values({
+                    area: dto.area,
+                    partyName: dto.partyName,
+                    amount: dto.amount != null ? String(dto.amount) : "0",
+                    followupFor: dto.followupFor ?? null,
+                    assignedToId: dto.assignedToId ?? null,
+                    createdById: currentUserId,
+                    assignmentStatus: "assigned",
+                    comment: dto.comment ?? null,
+                    details: dto.details ?? null,
+                    latestComment: dto.latestComment ?? null,
+                    contacts,
+                    followUpHistory: dto.followUpHistory ?? [],
+                    attachments: dto.attachments ?? [],
+                    startFrom,
+                    nextFollowUpDate,
+                    frequency,
+                    reminderCount,
+                    stopReason,
+                    proofText: dto.proofText ?? null,
+                    proofImagePath: dto.proofImagePath ?? null,
+                    stopRemarks: dto.stopRemarks ?? null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    deletedAt: null,
+                    emdId: dto.emdId ?? null,
+                })
+                .returning();
 
-                // text fields
-                comment: dto.comment ?? null,
-                details: dto.details ?? null,
-                latestComment: dto.latestComment ?? null,
+            this.logger.info("Follow-up created successfully", {
+                followUpId: created.id,
+            });
 
-                // JSON/array fields
-                contacts,
-                followUpHistory: dto.followUpHistory ?? [],
-                attachments: dto.attachments ?? [],
-
-                // scheduling / numeric fields
-                startFrom,
-                nextFollowUpDate,
-                frequency,
-                reminderCount,
-                stopReason,
-
-                // other optional fields
-                proofText: dto.proofText ?? null,
-                proofImagePath: dto.proofImagePath ?? null,
-                stopRemarks: dto.stopRemarks ?? null,
-
-                // audit
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                deletedAt: null,
-
-                // optional
-                emdId: dto.emdId ?? null,
-            })
-            .returning();
-
-        return created;
+            return created;
+        } catch (error: any) {
+            this.logger.error("Failed to create follow-up", {
+                error: error.message,
+                stack: error.stack,
+            });
+            throw error;
+        }
     }
 
     // ========================
@@ -147,80 +152,83 @@ export class FollowUpService {
     // ========================
 
     async findAll(query: FollowUpQueryDto, currentUser: { id: number; role: string }) {
-        const { tab, assignedToId, search, page, limit, sortBy, sortOrder } = query;
-        const offset = (page - 1) * limit;
+        const { tab, search, page, limit, sortBy, sortOrder } = query;
 
-        const conditions: SQL[] = [isNull(followUps.deletedAt)];
-
-        // if (currentUser.role !== "admin") {
-        //     conditions.push(eq(followUps.assignedToId, currentUser.id));
-        // } else if (assignedToId) {
-        //     conditions.push(eq(followUps.assignedToId, assignedToId));
-        // }
-
-        if (search) {
-            conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`))!);
-        }
-
-        const today = new Date().toLocaleDateString("en-CA");
-
-        if (tab === "ongoing") {
-            conditions.push(ne(followUps.frequency, 6));
-        } else if (tab === "achieved") {
-            conditions.push(eq(followUps.frequency, 6));
-            conditions.push(eq(followUps.stopReason, 2));
-        } else if (tab === "angry") {
-            conditions.push(eq(followUps.frequency, 6));
-            conditions.push(eq(followUps.stopReason, 1));
-        } else if (tab === "future") {
-            conditions.push(sql`${followUps.startFrom} > ${today}`);
-        }
-
-        const orderDirection = sortOrder === "asc" ? asc : desc;
-        const orderColumn = this.getOrderColumn(sortBy);
-
-        // ⭐ DRIZZLE RELATION QUERY — contacts auto-included
-        const results = await this.db.query.followUps.findMany({
-            where: and(...conditions),
-            with: {
-                contacts: true,
-                assignee: true,
-                creator: true,
-            },
-            orderBy: orderDirection(orderColumn),
+        this.logger.info("Fetching follow-ups list", {
+            userId: currentUser.id,
+            tab,
+            search,
+            page,
             limit,
-            offset,
         });
 
-        // Count for pagination
-        const [{ count }] = await this.db
-            .select({ count: sql<number>`count(*)` })
-            .from(followUps)
-            .where(and(...conditions));
+        try {
+            const offset = (page - 1) * limit;
+            const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
-        // Transform + include contacts
-        const data = results.map(fu => ({
-            ...this.transformFollowUp(fu),
-            contacts: fu.contacts,
-            creator: fu.creator,
-            assignee: fu.assignee,
-        }));
+            if (search) {
+                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`))!);
+            }
 
-        return {
-            data,
-            meta: {
-                total: Number(count),
-                page,
+            const today = new Date().toLocaleDateString("en-CA");
+
+            if (tab === "ongoing") conditions.push(ne(followUps.frequency, 6));
+            else if (tab === "achieved") {
+                conditions.push(eq(followUps.frequency, 6));
+                conditions.push(eq(followUps.stopReason, 2));
+            } else if (tab === "angry") {
+                conditions.push(eq(followUps.frequency, 6));
+                conditions.push(eq(followUps.stopReason, 1));
+            } else if (tab === "future") {
+                conditions.push(sql`${followUps.startFrom} > ${today}`);
+            }
+
+            const orderDirection = sortOrder === "asc" ? asc : desc;
+            const orderColumn = this.getOrderColumn(sortBy);
+
+            const results = await this.db.query.followUps.findMany({
+                where: and(...conditions),
+                with: { contacts: true, assignee: true, creator: true },
+                orderBy: orderDirection(orderColumn),
                 limit,
-                totalPages: Math.ceil(Number(count) / limit),
-            },
-        };
+                offset,
+            });
+
+            this.logger.debug("Follow-ups fetched", { count: results.length });
+
+            const [{ count }] = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(followUps)
+                .where(and(...conditions));
+
+            return {
+                data: results.map(fu => ({
+                    ...this.transformFollowUp(fu),
+                    contacts: fu.contacts,
+                    creator: fu.creator,
+                    assignee: fu.assignee,
+                })),
+                meta: {
+                    total: Number(count),
+                    page,
+                    limit,
+                    totalPages: Math.ceil(Number(count) / limit),
+                },
+            };
+        } catch (error: any) {
+            this.logger.error("Error fetching follow-ups", {
+                error: error.message,
+            });
+            throw error;
+        }
     }
 
     // ========================
     // FIND ONE
     // ========================
     async findOne(id: number): Promise<FollowUpDetailsDto> {
+        this.logger.info("Fetching follow-up details", { followUpId: id });
+
         const result = await this.db.query.followUps.findFirst({
             where: and(eq(followUps.id, id), isNull(followUps.deletedAt)),
             with: {
@@ -229,6 +237,7 @@ export class FollowUpService {
         });
 
         if (!result) {
+            this.logger.warn("Follow-up not found", { followUpId: id });
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
 
@@ -240,6 +249,11 @@ export class FollowUpService {
             if (isNaN(dateObj.getTime())) return null;
             return dateObj.toISOString().split("T")[0];
         };
+
+        this.logger.debug("Follow-up details loaded", {
+            followUpId: result.id,
+            contactsCount: result.contacts?.length ?? 0,
+        });
 
         return {
             id: result.id,
@@ -281,138 +295,170 @@ export class FollowUpService {
     // UPDATE
     // ========================
 
-    async update(
-        id: number,
-        dto: any, // multipart-safe raw body
-        files: Express.Multer.File[],
-        currentUser: { id: number; name: string }
-    ): Promise<FollowUp> {
-        // ========================
-        // FETCH FOLLOW-UP
-        // ========================
-        const existing = await this.db
-            .select()
-            .from(followUps)
-            .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
-            .limit(1)
-            .then(r => r[0]);
+    async update(id: number, dto: any, files: Express.Multer.File[], currentUser: { id: number; name: string }): Promise<FollowUp> {
+        this.logger.info("Updating follow-up", {
+            followUpId: id,
+            userId: currentUser.id,
+            filesUploaded: files?.length ?? 0,
+        });
 
-        if (!existing) {
-            throw new NotFoundException(`Follow-up with ID ${id} not found`);
-        }
+        try {
+            // ========================
+            // FETCH FOLLOW-UP
+            // ========================
+            const existing = await this.db
+                .select()
+                .from(followUps)
+                .where(and(eq(followUps.id, id), isNull(followUps.deletedAt)))
+                .limit(1)
+                .then(r => r[0] ?? null);
 
-        // ========================
-        // NORMALIZE MULTIPART INPUT
-        // ========================
-        const normalizedDto = {
-            ...dto,
-            assignedToId: dto.assignedToId !== undefined ? Number(dto.assignedToId) : undefined,
-            frequency: dto.frequency !== undefined ? Number(dto.frequency) : undefined,
-            stopReason: dto.stopReason !== undefined ? Number(dto.stopReason) : undefined,
-            amount: dto.amount !== undefined ? Number(dto.amount) : undefined,
-            contacts: dto.contacts ? JSON.parse(Array.isArray(dto.contacts) ? dto.contacts[dto.contacts.length - 1] : dto.contacts) : [],
-            removedAttachments: dto.removedAttachments ? (Array.isArray(dto.removedAttachments) ? dto.removedAttachments : [dto.removedAttachments]) : [],
-        };
-
-        // ========================
-        // VALIDATE
-        // ========================
-        const parsed = updateFollowUpSchema.safeParse(normalizedDto);
-        if (!parsed.success) {
-            throw new BadRequestException(parsed.error.flatten());
-        }
-
-        const data = parsed.data;
-
-        // ========================
-        // UPDATE FOLLOW-UP (PARENT)
-        // ========================
-        const updateData: Partial<typeof followUps.$inferInsert> = {
-            updatedAt: new Date(),
-        };
-
-        // Basic fields
-        if (data.area !== undefined) updateData.area = data.area;
-        if (data.partyName !== undefined) updateData.partyName = data.partyName;
-        if (data.amount !== undefined) updateData.amount = String(data.amount);
-        if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
-        if (data.details !== undefined) updateData.details = data.details;
-
-        // Scheduling
-        if (data.frequency !== undefined) updateData.frequency = data.frequency;
-        if (data.startFrom !== undefined) updateData.startFrom = data.startFrom;
-
-        // Stop fields
-        if (data.stopReason !== undefined) updateData.stopReason = data.stopReason;
-        if (data.proofText !== undefined) updateData.proofText = data.proofText;
-        if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
-
-        // ========================
-        // ATTACHMENTS (UNCHANGED LOGIC)
-        // ========================
-        const existingAttachments = existing.attachments ?? [];
-
-        const removedAttachments = (data.removedAttachments ?? []).filter(f => !f.includes("..") && !path.isAbsolute(f));
-
-        // delete removed files from disk
-        for (const file of removedAttachments) {
-            const filePath = path.join(UPLOAD_DIR, file);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            if (!existing) {
+                this.logger.warn("Follow-up not found for update", { followUpId: id });
+                throw new NotFoundException(`Follow-up with ID ${id} not found`);
             }
+
+            this.logger.debug("Existing follow-up loaded", {
+                followUpId: id,
+                existingAttachments: existing.attachments?.length ?? 0,
+            });
+
+            // ========================
+            // NORMALIZE MULTIPART INPUT
+            // ========================
+            const normalizedDto = {
+                ...dto,
+                assignedToId: dto.assignedToId !== undefined ? Number(dto.assignedToId) : undefined,
+                frequency: dto.frequency !== undefined ? Number(dto.frequency) : undefined,
+                stopReason: dto.stopReason !== undefined ? Number(dto.stopReason) : undefined,
+                amount: dto.amount !== undefined ? Number(dto.amount) : undefined,
+                contacts: dto.contacts ? JSON.parse(Array.isArray(dto.contacts) ? dto.contacts[dto.contacts.length - 1] : dto.contacts) : [],
+                removedAttachments: dto.removedAttachments ? (Array.isArray(dto.removedAttachments) ? dto.removedAttachments : [dto.removedAttachments]) : [],
+            };
+
+            // ========================
+            // VALIDATE
+            // ========================
+            const parsed = updateFollowUpSchema.safeParse(normalizedDto);
+            if (!parsed.success) {
+                this.logger.warn("Validation failed while updating follow-up", {
+                    followUpId: id,
+                    errors: parsed.error.flatten(),
+                });
+                throw new BadRequestException(parsed.error.flatten());
+            }
+
+            const data = parsed.data;
+
+            // ========================
+            // PREPARE UPDATE DATA
+            // ========================
+            const updateData: Partial<typeof followUps.$inferInsert> = {
+                updatedAt: new Date(),
+            };
+
+            if (data.area !== undefined) updateData.area = data.area;
+            if (data.partyName !== undefined) updateData.partyName = data.partyName;
+            if (data.amount !== undefined) updateData.amount = String(data.amount);
+            if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+            if (data.details !== undefined) updateData.details = data.details;
+            if (data.frequency !== undefined) updateData.frequency = data.frequency;
+            if (data.startFrom !== undefined) updateData.startFrom = data.startFrom;
+            if (data.stopReason !== undefined) updateData.stopReason = data.stopReason;
+            if (data.proofText !== undefined) updateData.proofText = data.proofText;
+            if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
+
+            // ========================
+            // ATTACHMENTS
+            // ========================
+            const existingAttachments = existing.attachments ?? [];
+
+            const removedAttachments = (data.removedAttachments ?? []).filter(f => !f.includes("..") && !path.isAbsolute(f));
+
+            this.logger.debug("Removing attachments from disk", {
+                followUpId: id,
+                removedAttachmentsCount: removedAttachments.length,
+            });
+
+            for (const file of removedAttachments) {
+                const filePath = path.join(UPLOAD_DIR, file);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            }
+
+            const remainingAttachments = existingAttachments.filter(f => !removedAttachments.includes(f));
+
+            const newFiles = Array.isArray(files) ? files.map(f => f.filename) : [];
+
+            updateData.attachments = Array.from(new Set([...remainingAttachments, ...newFiles]));
+
+            // ========================
+            // UPDATE FOLLOW-UP
+            // ========================
+            await this.db.update(followUps).set(updateData).where(eq(followUps.id, id));
+
+            this.logger.info("Follow-up main record updated", {
+                followUpId: id,
+            });
+
+            // ========================
+            // CONTACTS
+            // ========================
+            const existingContacts = await this.db.select().from(followUpPersons).where(eq(followUpPersons.followUpId, id));
+
+            const incomingContacts = data.contacts ?? [];
+            const incomingIds = incomingContacts.filter(c => c.id !== undefined && c.id !== null).map(c => Number(c.id));
+
+            const contactsToDelete = existingContacts.filter(ec => !incomingIds.includes(ec.id));
+
+            if (contactsToDelete.length > 0) {
+                const idsToDelete = contactsToDelete.map(c => Number(c.id));
+
+                await this.db.delete(followUpPersons).where(and(eq(followUpPersons.followUpId, id), inArray(followUpPersons.id, idsToDelete)));
+
+                this.logger.debug("Contacts deleted", {
+                    followUpId: id,
+                    count: contactsToDelete.length,
+                });
+            }
+
+            const newContacts = incomingContacts.filter(c => !c.id);
+
+            if (newContacts.length > 0) {
+                await this.db.insert(followUpPersons).values(
+                    newContacts.map(c => ({
+                        followUpId: existing.id,
+                        name: c.name,
+                        email: c.email ?? null,
+                        phone: c.phone ?? null,
+                    }))
+                );
+
+                this.logger.debug("New contacts inserted", {
+                    followUpId: id,
+                    count: newContacts.length,
+                });
+            }
+
+            // ========================
+            // RETURN UPDATED FOLLOW-UP
+            // ========================
+            const [updated] = await this.db.select().from(followUps).where(eq(followUps.id, id)).limit(1);
+
+            this.logger.info("Follow-up updated successfully", {
+                followUpId: id,
+            });
+
+            return updated;
+        } catch (error: any) {
+            this.logger.error("Failed to update follow-up", {
+                followUpId: id,
+                error: error.message,
+                stack: error.stack,
+            });
+            throw error;
         }
-
-        const remainingAttachments = existingAttachments.filter(f => !removedAttachments.includes(f));
-
-        const newFiles = Array.isArray(files) ? files.map(f => f.filename) : [];
-
-        updateData.attachments = Array.from(new Set([...remainingAttachments, ...newFiles]));
-
-        // ========================
-        // SAVE FOLLOW-UP
-        // ========================
-        const followUp = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id));
-
-        // ========================
-        // CONTACTS LOGIC (SIMPLE CREATE / DELETE)
-        // ========================
-
-        const existingContacts = await this.db.select().from(followUpPersons).where(eq(followUpPersons.followUpId, id));
-
-        const incomingContacts = data.contacts ?? [];
-
-        // existing contact IDs coming from frontend
-        const incomingIds = incomingContacts.filter(c => c.id !== undefined && c.id !== null).map(c => Number(c.id));
-
-        // delete removed contacts
-        const contactsToDelete = existingContacts.filter(ec => !incomingIds.includes(ec.id));
-
-        if (contactsToDelete.length > 0) {
-            const idsToDelete = contactsToDelete.map(c => Number(c.id));
-
-            await this.db.delete(followUpPersons).where(and(eq(followUpPersons.followUpId, id), inArray(followUpPersons.id, idsToDelete)));
-        }
-
-        // insert new contacts (same as CREATE)
-        const newContacts = incomingContacts.filter(c => !c.id);
-
-        if (newContacts.length > 0) {
-            await this.db.insert(followUpPersons).values(
-                newContacts.map(c => ({
-                    followUpId: existing.id,
-                    name: c.name,
-                    email: c.email ?? null,
-                    phone: c.phone ?? null,
-                }))
-            );
-        }
-
-        // ========================
-        // RETURN UPDATED FOLLOW-UP
-        // ========================
-        const [updated] = await this.db.select().from(followUps).where(eq(followUps.id, id)).limit(1);
-
-        return updated;
     }
 
     // ========================
@@ -421,7 +467,7 @@ export class FollowUpService {
 
     async remove(id: number) {
         const existing = await this.findOne(id);
-
+        this.logger.warn("Soft deleting follow-up", { followUpId: id });
         await this.db.update(followUps).set({ deletedAt: new Date() }).where(eq(followUps.id, id));
         return { message: "Follow-up deleted successfully" };
     }
@@ -454,6 +500,11 @@ export class FollowUpService {
     // ========================
 
     async updateStatus(id: number, dto: any, currentUser: { id: number; name: string }, proofImage: Express.Multer.File): Promise<FollowUp> {
+        this.logger.info("Updating follow-up status", {
+            followUpId: id,
+            userId: currentUser.id,
+        });
+
         const existing = await this.db
             .select()
             .from(followUps)
@@ -480,6 +531,11 @@ export class FollowUpService {
         }
         const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
 
+        this.logger.info("Follow-up status updated", {
+            followUpId: updated.id,
+            newStatus: updated.assignmentStatus,
+        });
+
         return updated;
     }
 
@@ -505,6 +561,11 @@ export class FollowUpService {
                     phone: contact.phone,
                     organization: contact.org,
                 });
+
+                this.logger.debug("New client added to directory", {
+                    email: contact.email,
+                    phone: contact.phone,
+                });
             }
         }
     }
@@ -513,51 +574,108 @@ export class FollowUpService {
     // MAILING BEGINS HERE
     // ==========================
     async processFollowupMail(id: number) {
-        console.log("Sending followup mail for", id);
+        this.logger.info("Processing follow-up mail", { followUpId: id });
 
-        const builder = new FollowupMailDataBuilder(this.db);
+        try {
+            const builder = new FollowupMailDataBuilder(this.db);
 
-        const payload = await builder.build(id);
-        console.log("mail payload", payload);
+            const payload = await builder.build(id);
 
-        if (!payload) return;
+            if (!payload) {
+                this.logger.warn("Mail payload not built", { followUpId: id });
+                return;
+            }
 
-        const googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
+            this.logger.debug("Mail payload built", {
+                followUpId: id,
+                toCount: payload.to?.length ?? 0,
+                ccCount: payload.cc?.length ?? 0,
+            });
 
-        console.log("googleConnection", googleConnection);
+            const googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
 
-        if (!googleConnection) return;
+            if (!googleConnection) {
+                this.logger.warn("Google connection missing for user", {
+                    followUpId: id,
+                    userId: payload.assignedToUserId,
+                });
+                return;
+            }
 
-        await this.mailerService.sendMail(
-            payload.template,
-            payload.context,
-            {
-                to: payload.to,
-                cc: payload.cc,
+            await this.mailerService.sendMail(
+                payload.template,
+                payload.context,
+                {
+                    to: payload.to,
+                    cc: payload.cc,
+                    subject: payload.subject,
+                    attachments: payload.attachments,
+                },
+                googleConnection
+            );
+
+            this.logger.info("Follow-up mail sent successfully", {
+                followUpId: id,
                 subject: payload.subject,
-                attachments: payload.attachments,
-            },
-            googleConnection
-        );
+            });
+        } catch (error: any) {
+            this.logger.error("Error while sending follow-up mail", {
+                followUpId: id,
+                error: error.message,
+                stack: error.stack,
+            });
+        }
     }
 
     async getDueFollowupsForCurrentWindow(frequency: number) {
         const today = new Date().toLocaleDateString("en-CA");
 
-        return this.db
-            .select()
-            .from(followUps)
-            .where(and(eq(followUps.frequency, frequency), sql`${followUps.startFrom} <= ${today}`, isNull(followUps.deletedAt), ne(followUps.frequency, 6)));
+        this.logger.debug("Fetching due follow-ups", {
+            frequency,
+            date: today,
+        });
+
+        try {
+            const result = await this.db
+                .select()
+                .from(followUps)
+                .where(and(eq(followUps.frequency, frequency), sql`${followUps.startFrom} <= ${today}`, isNull(followUps.deletedAt), ne(followUps.frequency, 6)));
+
+            this.logger.debug("Due follow-ups fetched", {
+                frequency,
+                count: result.length,
+            });
+
+            return result;
+        } catch (error: any) {
+            this.logger.error("Error fetching due follow-ups", {
+                frequency,
+                error: error.message,
+            });
+            throw error;
+        }
     }
 
     async incrementReminderCount(id: number) {
-        await this.db
-            .update(followUps)
-            .set({
-                reminderCount: sql`${followUps.reminderCount} + 1`,
-                updatedAt: new Date(),
-            })
-            .where(eq(followUps.id, id));
+        this.logger.debug("Incrementing reminder count", { followUpId: id });
+
+        try {
+            await this.db
+                .update(followUps)
+                .set({
+                    reminderCount: sql`${followUps.reminderCount} + 1`,
+                    updatedAt: new Date(),
+                })
+                .where(eq(followUps.id, id));
+
+            this.logger.debug("Reminder count incremented", { followUpId: id });
+        } catch (error: any) {
+            this.logger.error("Failed to increment reminder count", {
+                followUpId: id,
+                error: error.message,
+            });
+            throw error;
+        }
     }
 
     private getOrderColumn(sortBy: string) {
@@ -568,10 +686,22 @@ export class FollowUpService {
             amount: followUps.amount,
             partyName: followUps.partyName,
         };
+
+        if (!columnMap[sortBy]) {
+            this.logger.warn("Invalid sortBy received, defaulting to startFrom", {
+                sortBy,
+            });
+        }
+
         return columnMap[sortBy] || followUps.startFrom;
     }
 
     private transformFollowUp(f: any, includeHistory = false) {
+        if (!f) {
+            this.logger.warn("transformFollowUp called with empty object");
+            return {};
+        }
+
         const result: any = {
             id: f.id,
             area: f.area,
@@ -593,6 +723,11 @@ export class FollowUpService {
         if (includeHistory) {
             result.follow_up_history = f.followUpsHistory || [];
         }
+
+        this.logger.debug("Follow-up transformed for response", {
+            followUpId: f.id,
+            contactsCount: result.followPerson.length,
+        });
 
         return result;
     }
