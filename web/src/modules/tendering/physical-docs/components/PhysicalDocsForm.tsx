@@ -18,8 +18,9 @@ import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 // Import from helpers
 import { PhysicalDocsFormSchema } from '../helpers/physicalDocs.schema';
 import type { PhysicalDocsFormValues, PhysicalDocsResponse } from '../helpers/physicalDocs.types';
-import { useDocumentSubmittedOptions, useCourierOptions } from '../helpers/physicalDocs.types';
+import { useDocumentSubmittedOptions } from '../helpers/physicalDocs.types';
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from '../helpers/physicalDocs.mappers';
+import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 
 interface PhysicalDocsFormProps {
     tenderId: number;

@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
 import { useReverseAuction } from '@/hooks/api/useReverseAuctions';
@@ -109,16 +110,20 @@ export default function TenderResultShowPage() {
         emdDetails,
     };
 
-    // Determine number of tabs (9 if no RA, 10 if RA exists)
+    // Determine number of tabs (7 if no RA, 8 if RA exists)
     const hasRa = raApplicable && reverseAuctionId && ra;
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="result" className="space-y-4">
-                <TabsList className={`grid w-fit ${hasRa ? 'grid-cols-10' : 'grid-cols-9'} gap-2`}>
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.results)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className={`grid w-fit ${hasRa ? 'grid-cols-8' : 'grid-cols-7'} gap-2`}>
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
                     <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
@@ -128,14 +133,12 @@ export default function TenderResultShowPage() {
                     <TabsTrigger value="result">Result</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     {tenderWithRelations ? (
                         <TenderView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
                     ) : (
                         <Alert>
@@ -143,10 +146,6 @@ export default function TenderResultShowPage() {
                             <AlertDescription>Tender information not available.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
@@ -157,22 +156,11 @@ export default function TenderResultShowPage() {
                             <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
-                    {tenderWithRelations ? (
+                    {tenderWithRelations && (
                         <TenderApprovalView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender approval information not available.</AlertDescription>
-                        </Alert>
                     )}
                 </TabsContent>
 
@@ -201,8 +189,6 @@ export default function TenderResultShowPage() {
                     <DocumentChecklistView
                         checklist={documentChecklist}
                         isLoading={documentChecklistLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -211,8 +197,6 @@ export default function TenderResultShowPage() {
                     <CostingSheetView
                         costingSheet={costingSheet}
                         isLoading={isLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -221,11 +205,7 @@ export default function TenderResultShowPage() {
                     {bidSubmissionLoading ? (
                         <BidSubmissionView bidSubmission={null} isLoading />
                     ) : bidSubmission ? (
-                        <BidSubmissionView
-                            bidSubmission={bidSubmission}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
+                        <BidSubmissionView bidSubmission={bidSubmission} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -240,8 +220,6 @@ export default function TenderResultShowPage() {
                         <RaShow
                             ra={ra as any}
                             isLoading={raLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
                     </TabsContent>
                 )}
@@ -251,10 +229,6 @@ export default function TenderResultShowPage() {
                     <TenderResultShow
                         result={resultDataForShow as any}
                         isLoading={resultLoading}
-                        showEditButton={true}
-                        showBackButton={true}
-                        onEdit={() => navigate(paths.tendering.resultsEdit(tenderIdNum))}
-                        onBack={() => navigate(paths.tendering.results)}
                     />
                 </TabsContent>
             </Tabs>

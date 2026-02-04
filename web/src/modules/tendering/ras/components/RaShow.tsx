@@ -1,8 +1,7 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, ArrowLeft, Gavel, Calendar, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Gavel, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { RaDashboardRow } from '../helpers/reverseAuction.types';
@@ -22,10 +21,6 @@ interface RaShowProps {
         finalResultScreenshot?: string | null;
     };
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
@@ -53,10 +48,6 @@ const getStatusVariant = (status: string): string => {
 export function RaShow({
     ra,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: RaShowProps) {
     if (isLoading) {
@@ -87,20 +78,6 @@ export function RaShow({
                     <Gavel className="h-5 w-5" />
                     Reverse Auction Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
@@ -205,7 +182,7 @@ export function RaShow({
                                     <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
                                         Disqualification Reason
                                     </td>
-                                    <td className="px-4 py-3 text-sm" colSpan={3}>
+                                    <td className="px-4 py-3 text-sm break-words" colSpan={3}>
                                         {ra.disqualificationReason}
                                     </td>
                                 </tr>

@@ -5,11 +5,12 @@ import { useTender } from "@/hooks/api/useTenders";
 import { paths } from "@/app/routes/paths";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
 import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
 import { TenderApprovalView } from "@/modules/tendering/tender-approval/components/TenderApprovalView";
 import type { TenderWithRelations } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
@@ -45,37 +46,30 @@ export default function DocumentChecklistShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="document-checklist" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-6 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.checklists)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-4">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
-                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD</TabsTrigger>
+                    <TabsTrigger value="document-checklist">Checklist</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     <TenderView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
-                        <InfoSheetView
-                            infoSheet={infoSheet}
-                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
-                        />
+                        <InfoSheetView infoSheet={infoSheet} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -84,17 +78,9 @@ export default function DocumentChecklistShowPage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
                     <TenderApprovalView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
                 </TabsContent>
 
@@ -103,11 +89,7 @@ export default function DocumentChecklistShowPage() {
                     {physicalDocLoading ? (
                         <PhysicalDocsView isLoading={true} physicalDoc={null} />
                     ) : physicalDoc ? (
-                        <PhysicalDocsView
-                            physicalDoc={physicalDoc}
-                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
-                            onBack={() => navigate(paths.tendering.physicalDocs)}
-                        />
+                        <PhysicalDocsView physicalDoc={physicalDoc} />
                     ) : (
                         <PhysicalDocsView isLoading={false} physicalDoc={null} />
                     )}
@@ -119,8 +101,6 @@ export default function DocumentChecklistShowPage() {
                         paymentRequests={paymentRequests || null}
                         tender={tender || null}
                         isLoading={isLoading}
-                        onEdit={() => navigate(paths.tendering.emdsTenderFeesEdit(tenderId!))}
-                        onBack={() => navigate(paths.tendering.emdsTenderFees)}
                     />
                 </TabsContent>
 
@@ -129,8 +109,6 @@ export default function DocumentChecklistShowPage() {
                     <DocumentChecklistView
                         checklist={documentChecklist}
                         isLoading={documentChecklistLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
             </Tabs>

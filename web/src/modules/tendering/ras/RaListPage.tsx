@@ -154,7 +154,7 @@ const ReverseAuctionListPage = () => {
         () => [
             {
                 label: 'View Details',
-                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.id)),
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.tenderId)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {

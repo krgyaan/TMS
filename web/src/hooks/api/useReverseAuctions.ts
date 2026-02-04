@@ -48,7 +48,7 @@ export const useReverseAuctionDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...reverseAuctionsKey.counts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<RaDashboardCounts>({
         queryKey,
         queryFn: () => reverseAuctionService.getDashboardCounts(teamIdParam),

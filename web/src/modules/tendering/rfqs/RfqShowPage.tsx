@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { useTender } from '@/hooks/api/useTenders';
@@ -57,36 +57,29 @@ export default function RfqShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="rfq" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-5 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.rfqs)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-3 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="rfq">RFQ</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     <TenderView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.rfqs)}
                     />
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
-                        <InfoSheetView
-                            infoSheet={infoSheet}
-                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
-                        />
+                        <InfoSheetView infoSheet={infoSheet} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -95,17 +88,9 @@ export default function RfqShowPage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
                     <TenderApprovalView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.rfqs)}
                     />
                 </TabsContent>
 
@@ -114,11 +99,7 @@ export default function RfqShowPage() {
                     {physicalDocLoading ? (
                         <PhysicalDocsView isLoading={true} physicalDoc={null} />
                     ) : physicalDoc ? (
-                        <PhysicalDocsView
-                            physicalDoc={physicalDoc}
-                            onEdit={() => navigate(paths.tendering.physicalDocsEdit(tenderId!))}
-                            onBack={() => navigate(paths.tendering.rfqs)}
-                        />
+                        <PhysicalDocsView physicalDoc={physicalDoc} />
                     ) : (
                         <PhysicalDocsView isLoading={false} physicalDoc={null} />
                     )}
@@ -131,20 +112,12 @@ export default function RfqShowPage() {
                             rfq={null as any}
                             tender={tender!}
                             isLoading={true}
-                            showEditButton={true}
-                            showBackButton={true}
-                            onEdit={() => navigate(paths.tendering.rfqsEdit(tenderId!))}
-                            onBack={() => navigate(paths.tendering.rfqs)}
                         />
                     ) : rfqData ? (
                         <RfqView
                             rfq={rfqData}
                             tender={tender!}
                             isLoading={isLoading}
-                            showEditButton={true}
-                            showBackButton={true}
-                            onEdit={() => navigate(paths.tendering.rfqsEdit(tenderId!))}
-                            onBack={() => navigate(paths.tendering.rfqs)}
                         />
                     ) : (
                         <Alert>

@@ -1,9 +1,8 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -11,20 +10,12 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 interface TenderViewProps {
     tender: TenderInfoWithNames;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function TenderView({
     tender,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: TenderViewProps) {
     if (isLoading) {
@@ -51,20 +42,6 @@ export function TenderView({
                     <FileText className="h-5 w-5" />
                     Tender Details
                 </CardTitle>
-                <CardAction className='flex gap-2'>
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -206,7 +183,7 @@ export function TenderView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {tender.remarks}
                                     </TableCell>
                                 </TableRow>

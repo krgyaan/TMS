@@ -1,9 +1,9 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink } from 'lucide-react';
 import type { BidSubmission } from '../helpers/bidSubmission.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -12,20 +12,12 @@ import { tenderFilesService } from '@/services/api/tender-files.service';
 interface BidSubmissionViewProps {
     bidSubmission?: BidSubmission | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function BidSubmissionView({
     bidSubmission,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: BidSubmissionViewProps) {
     if (isLoading) {
@@ -97,20 +89,6 @@ export function BidSubmissionView({
                     <FileText className="h-5 w-5" />
                     Bid Submission Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -250,7 +228,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Reason for Missing
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.reasonForMissing || '—'}
                                     </TableCell>
                                 </TableRow>
@@ -258,7 +236,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Prevention Measures
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.preventionMeasures || '—'}
                                     </TableCell>
                                 </TableRow>
@@ -266,7 +244,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         TMS Improvements
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.tmsImprovements || '—'}
                                     </TableCell>
                                 </TableRow>

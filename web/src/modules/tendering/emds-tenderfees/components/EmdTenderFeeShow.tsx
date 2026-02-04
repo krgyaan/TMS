@@ -1,9 +1,8 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { ArrowLeft, FileText, Pencil } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -36,8 +35,6 @@ interface EmdTenderFeeShowProps {
     paymentRequests?: PaymentRequest[] | null;
     tender?: TenderInfoWithNames | null;
     isLoading?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
 }
 
 const formatValue = (value?: string | number | null) => {
@@ -60,8 +57,6 @@ const hasValue = (value?: string | Date | number | null) => {
 export const EmdTenderFeeShow = ({
     paymentRequests,
     isLoading,
-    onEdit,
-    onBack,
 }: EmdTenderFeeShowProps) => {
     if (isLoading) {
         return (
@@ -242,7 +237,7 @@ export const EmdTenderFeeShow = ({
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Courier Address
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm break-words">
                                     {formatValue(instrument.courierAddress)}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
@@ -314,20 +309,6 @@ export const EmdTenderFeeShow = ({
                     <FileText className="h-5 w-5" />
                     Payment Requests Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -366,7 +347,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm break-words">
                                         {formatValue(emdRequest.remarks)}
                                     </TableCell>
                                 </TableRow>
@@ -408,7 +389,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm break-words">
                                         {formatValue(tenderFeeRequest.remarks)}
                                     </TableCell>
                                 </TableRow>
@@ -450,7 +431,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm break-words">
                                         {formatValue(processingFeeRequest.remarks)}
                                     </TableCell>
                                 </TableRow>

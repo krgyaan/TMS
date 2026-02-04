@@ -1,9 +1,9 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink } from 'lucide-react';
 import type { TenderDocumentChecklist } from '../helpers/documentChecklist.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';
@@ -11,20 +11,12 @@ import { tenderFilesService } from '@/services/api/tender-files.service';
 interface DocumentChecklistViewProps {
     checklist?: TenderDocumentChecklist | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function DocumentChecklistView({
     checklist,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: DocumentChecklistViewProps) {
     if (isLoading) {
@@ -69,20 +61,6 @@ export function DocumentChecklistView({
                     <FileText className="h-5 w-5" />
                     Document Checklist Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>

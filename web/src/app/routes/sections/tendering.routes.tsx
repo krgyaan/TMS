@@ -110,7 +110,7 @@ export default function TenderingRoutes() {
             <Route path="bid-submissions/edit/:id" element={<RouteWrapper><BidEditPage /></RouteWrapper>} />
             <Route path="bid-submissions/mark-missed/:tenderId" element={<RouteWrapper><BidMarkMissedPage /></RouteWrapper>} />
             <Route path="bid-submissions/edit-missed/:id" element={<RouteWrapper><BidEditMissedPage /></RouteWrapper>} />
-            <Route path="bid-submissions/view/:id" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
+            <Route path="bid-submissions/view/:tenderId" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
             <Route path="tq-management" element={<RouteWrapper><TqManagementListPage /></RouteWrapper>} />
             <Route path="tq-management/received/:tenderId" element={<RouteWrapper><TqReceivedPage /></RouteWrapper>} />
             <Route path="tq-management/edit-received/:id" element={<RouteWrapper><TqEditReceivedPage /></RouteWrapper>} />
@@ -123,7 +123,7 @@ export default function TenderingRoutes() {
             <Route path="reverse-auctions" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
             <Route path="reverse-auctions/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />
             <Route path="reverse-auctions/upload-result/:raId" element={<RouteWrapper><Tendering_RA_UploadResult /></RouteWrapper>} />
-            <Route path="reverse-auctions/:id" element={<RouteWrapper><Tendering_RA_Show /></RouteWrapper>} />
+            <Route path="reverse-auctions/:tenderId" element={<RouteWrapper><Tendering_RA_Show /></RouteWrapper>} />
             <Route path="reverse-auctions/:id/edit" element={<RouteWrapper><Tendering_RA_Edit /></RouteWrapper>} />
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
             <Route path="results/upload/:tenderId" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
