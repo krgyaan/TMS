@@ -1,9 +1,8 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { dummyTechnicalDocuments, dummyFinancialDocuments } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
@@ -44,10 +43,6 @@ const formatDocuments = (documents: string[] | Array<{ id?: number; documentName
 interface TenderApprovalViewProps {
     tender: TenderWithRelations;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
@@ -87,10 +82,6 @@ const getTlStatusConfig = (status: number) => {
 export function TenderApprovalView({
     tender,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: TenderApprovalViewProps) {
     const approval = tender.approval;
@@ -120,20 +111,6 @@ export function TenderApprovalView({
                         <Clock className="h-5 w-5" />
                         Tender Approval
                     </CardTitle>
-                    <CardAction className="flex gap-2">
-                        {showEditButton && onEdit && (
-                            <Button variant="default" size="sm" onClick={onEdit}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Start Approval
-                            </Button>
-                        )}
-                        {showBackButton && onBack && (
-                            <Button variant="outline" size="sm" onClick={onBack}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
-                            </Button>
-                        )}
-                    </CardAction>
                 </CardHeader>
                 <CardContent>
                     <div className="text-center py-8 text-muted-foreground">
@@ -154,20 +131,6 @@ export function TenderApprovalView({
                     <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
                     Tender Approval Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -204,7 +167,7 @@ export function TenderApprovalView({
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     TL Remarks
                                 </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
+                                <TableCell className="text-sm break-words" colSpan={3}>
                                     {approval.tlDecision}
                                 </TableCell>
                             </TableRow>
@@ -352,7 +315,7 @@ export function TenderApprovalView({
                                             Rejection Remarks
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="bg-destructive/10 p-3 rounded-md">
+                                            <div className="bg-destructive/10 p-3 rounded-md break-words">
                                                 {approval.tlRejectionRemarks}
                                             </div>
                                         </TableCell>
@@ -375,7 +338,7 @@ export function TenderApprovalView({
                                             {field.fieldName}
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200">
+                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200 break-words">
                                                 {field.comment}
                                             </div>
                                         </TableCell>

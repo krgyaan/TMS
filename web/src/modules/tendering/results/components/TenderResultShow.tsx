@@ -1,12 +1,12 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
+import { Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { ResultDashboardRow } from '../helpers/tenderResult.types';
+import { Button } from '@/components/ui/button';
 
 interface TenderResultShowProps {
     result: ResultDashboardRow & {
@@ -22,10 +22,6 @@ interface TenderResultShowProps {
         reverseAuctionId?: number | null;
     };
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     onViewRa?: (raId: number) => void;
     className?: string;
 }
@@ -60,10 +56,6 @@ const getEmdStatusVariant = (status: string | null): string => {
 export function TenderResultShow({
     result,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     onViewRa,
     className = '',
 }: TenderResultShowProps) {
@@ -84,8 +76,8 @@ export function TenderResultShow({
         );
     }
 
-    const isQualified = result.technicallyQualified === 'Yes';
-    const isDisqualified = result.technicallyQualified === 'No';
+    const isQualified = result?.technicallyQualified === 'Yes';
+    const isDisqualified = result?.technicallyQualified === 'No';
     const hasResult = !!result.result;
 
     return (
@@ -95,20 +87,6 @@ export function TenderResultShow({
                     <Trophy className="h-5 w-5" />
                     Tender Result Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -307,7 +285,7 @@ export function TenderResultShow({
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Disqualification Reason
                                         </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
+                                        <TableCell className="text-sm break-words" colSpan={3}>
                                             {result.disqualificationReason}
                                         </TableCell>
                                     </TableRow>
@@ -326,7 +304,7 @@ export function TenderResultShow({
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {result.qualifiedPartiesNames &&
-                                                result.qualifiedPartiesNames.length > 0 ? (
+                                                    result.qualifiedPartiesNames.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
                                                         {result.qualifiedPartiesNames.map((name, idx) => (
                                                             <Badge key={idx} variant="outline" className="text-xs">
@@ -362,8 +340,8 @@ export function TenderResultShow({
                                                 result.result === 'Won'
                                                     ? 'success'
                                                     : result.result === 'Lost'
-                                                    ? 'destructive'
-                                                    : 'secondary'
+                                                        ? 'destructive'
+                                                        : 'secondary'
                                             }
                                         >
                                             {result.result}

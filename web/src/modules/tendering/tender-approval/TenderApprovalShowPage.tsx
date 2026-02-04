@@ -5,7 +5,7 @@ import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { TenderApprovalView } from './components/TenderApprovalView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,36 +54,27 @@ export default function TenderApprovalShowPage() {
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="approval" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-3 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet" disabled={!hasInfoSheet && !infoSheetLoading}>
-                        Info Sheet
-                    </TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.tenderApproval)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-1 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     <TenderView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
-                        <InfoSheetView
-                            infoSheet={infoSheet}
-                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
-                        />
+                        <InfoSheetView infoSheet={infoSheet} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -92,17 +83,9 @@ export default function TenderApprovalShowPage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
                     <TenderApprovalView
                         tender={tenderWithRelations}
                         isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
                     />
                 </TabsContent>
             </Tabs>
