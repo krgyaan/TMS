@@ -80,9 +80,17 @@ import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { WinstonModule } from "nest-winston";
+import { winstonLogger } from "@/logger/logger.config";
+import { AllExceptionsFilter } from "./logger/all-exception.filter";
 
 @Module({
     imports: [
+        WinstonModule.forRoot({
+            transports: winstonLogger.transports,
+            format: winstonLogger.format,
+            level: winstonLogger.level,
+        }),
         ServeStaticModule.forRoot({
             rootPath: join(process.cwd(), "uploads"),
             serveRoot: "/uploads",
@@ -179,6 +187,7 @@ import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
         },
+        AllExceptionsFilter,
     ],
 })
 export class AppModule {}
