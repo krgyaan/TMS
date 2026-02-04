@@ -7,7 +7,7 @@ export type FollowupWindow = {
 
 export const FOLLOWUP_WINDOWS: FollowupWindow[] = [
     //testing the followups - dangerous
-    { hour: new Date().getHours(), minute: new Date().getMinutes() + 1, days: [0, 1, 2, 3, 4, 5, 6], frequency: 1 },
+    // { hour: new Date().getHours(), minute: new Date().getMinutes() + 1, days: [0, 1, 2, 3, 4, 5, 6], frequency: 1 },
 
     // Daily — 10:10 Mon–Sat
     { hour: 10, minute: 10, days: [1, 2, 3, 4, 5, 6], frequency: 1 },
