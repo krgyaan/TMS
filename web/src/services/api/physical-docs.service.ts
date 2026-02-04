@@ -91,8 +91,13 @@ class PhysicalDocsService extends BaseApiService {
         return this.delete<void>(`/${id}`);
     }
 
-    async getDashboardCounts(): Promise<PhysicalDocsDashboardCounts> {
-        return this.get<PhysicalDocsDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<PhysicalDocsDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<PhysicalDocsDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

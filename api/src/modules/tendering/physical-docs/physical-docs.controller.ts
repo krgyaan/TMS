@@ -30,14 +30,21 @@ export class PhysicalDocsController {
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tab') tab?: 'pending' | 'sent' | 'tender-dnb',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        const result = await this.physicalDocsService.getDashboardData(tab, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        const result = await this.physicalDocsService.getDashboardData(user, parseNumber(teamId), tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -74,8 +81,16 @@ export class PhysicalDocsController {
     }
 
     @Get('dashboard/counts')
-    async getDashboardCounts() {
-        return this.physicalDocsService.getDashboardCounts();
+    async getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.physicalDocsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('by-tender/:tenderId')
