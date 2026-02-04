@@ -77,8 +77,13 @@ class TqManagementService extends BaseApiService {
         return this.patch<TenderQuery>(`/${tqId}/qualified`, { qualified });
     }
 
-    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
-        return this.get<TqManagementDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<TqManagementDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<TqManagementDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

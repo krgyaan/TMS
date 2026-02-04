@@ -32,8 +32,10 @@ export class TqManagementController {
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tabKey') tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -42,8 +44,13 @@ export class TqManagementController {
     ) {
         // Use tabKey if provided, otherwise fall back to tab for backward compatibility
         const activeTab = tabKey || tab;
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
 
-        const result = await this.tqManagementService.getDashboardData(activeTab, {
+        const result = await this.tqManagementService.getDashboardData(user, parseNumber(teamId), activeTab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -80,8 +87,16 @@ export class TqManagementController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.tqManagementService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tqManagementService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('tender/:tenderId')

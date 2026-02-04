@@ -18,6 +18,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -64,9 +65,46 @@ export class TqManagementService {
     ) { }
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+        
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+        
+        return roleFilterConditions;
+    }
+
+    /**
      * Get dashboard data by tab
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         filters?: {
             page?: number;
@@ -87,6 +125,10 @@ export class TqManagementService {
             TenderInfosService.getApprovedCondition(),
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
+        
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
 
         // Latest TQ per tender (using subquery to get latest per tender)
         const latestTq = this.db.$with('latest_tq').as(
@@ -274,12 +316,15 @@ export class TqManagementService {
         return wrapPaginatedResponse(result, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<TqManagementDashboardCounts> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(bidSubmissions.status, 'Bid Submitted'),
+            ...roleFilterConditions,
         ];
 
         // Get all tenders matching base conditions
