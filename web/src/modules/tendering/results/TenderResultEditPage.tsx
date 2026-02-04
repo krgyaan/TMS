@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+import { useTenderResult } from '@/hooks/api/useTenderResults';
 import UploadResultFormPage from './components/UploadResultFormPage';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { paths } from '@/app/routes/paths';
 
 export default function TenderResultEditPage() {
-    const { tenderId } = useParams<{ tenderId: string }>();
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const tenderIdNum = tenderId ? Number(tenderId) : null;
-    const { data: result, isLoading: isResultLoading, error: resultError } = useTenderResultByTenderId(tenderIdNum);
+    const resultId = id ? Number(id) : null;
+    const { data: result, isLoading: isResultLoading, error: resultError } = useTenderResult(resultId);
 
     if (isResultLoading) {
         return (
@@ -37,12 +37,10 @@ export default function TenderResultEditPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                     Result not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate(paths.tendering.results)}
-                    >
+                    <br />
+                    {resultError?.message}
+                    <br />
+                    <Button variant="outline" size="sm" className="ml-4" onClick={() => navigate(paths.tendering.results)}>
                         Back to List
                     </Button>
                 </AlertDescription>
@@ -70,7 +68,7 @@ export default function TenderResultEditPage() {
         );
     }
 
-    const tenderDetails = {
+    const resultDetails = {
         tenderNo: (result as any).tenderNo || '',
         tenderName: (result as any).tenderName || '',
         partiesCount: result.qualifiedPartiesCount || '',
@@ -81,7 +79,7 @@ export default function TenderResultEditPage() {
     return (
         <UploadResultFormPage
             tenderId={result.tenderId}
-            tenderDetails={tenderDetails}
+            tenderDetails={resultDetails}
             isEditMode={true}
             onSuccess={() => navigate(paths.tendering.results)}
         />

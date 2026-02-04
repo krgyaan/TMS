@@ -30,10 +30,10 @@ export const useResultDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { 
-        tab: filters?.tab, 
-        page: filters?.page, 
-        limit: filters?.limit, 
+    const queryKeyFilters = {
+        tab: filters?.tab,
+        page: filters?.page,
+        limit: filters?.limit,
         search: filters?.search,
         sortBy: filters?.sortBy,
         sortOrder: filters?.sortOrder
@@ -60,7 +60,7 @@ export const useResultDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<ResultDashboardCounts>({
         queryKey,
         queryFn: async () => {
@@ -104,8 +104,8 @@ export const useUploadResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tenderId, data }: { tenderId: number; data: UploadResultFormPageProps }) =>
-            tenderResultService.uploadResult(tenderId, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: any }) =>
+            tenderResultService.uploadResultByTenderId(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
             queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });

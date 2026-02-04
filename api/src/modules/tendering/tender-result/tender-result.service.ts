@@ -44,15 +44,10 @@ export class TenderResultService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    /**
-     * Get dashboard data by tab - Direct queries without config
-     */
-    /**
-     * Build role-based filter conditions for tender queries
-     */
+
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -78,7 +73,7 @@ export class TenderResultService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -104,7 +99,7 @@ export class TenderResultService {
 
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         // Build tab-specific conditions
         const conditions = [...baseConditions, ...roleFilterConditions];
 
@@ -274,7 +269,7 @@ export class TenderResultService {
 
     async getCounts(user?: ValidatedUser, teamId?: number): Promise<ResultDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
@@ -475,7 +470,7 @@ export class TenderResultService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .where(eq(tenderResults.tenderId, id))
+            .where(eq(tenderResults.id, id))
             .limit(1);
 
         if (!result) {

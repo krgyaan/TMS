@@ -124,7 +124,7 @@ const TenderResultListPage = () => {
             {
                 label: 'Upload Result',
                 icon: <Upload className="h-4 w-4" />,
-                onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.tenderId)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
+                onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.id)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
             },
             {
                 label: 'View RA Details',
@@ -141,14 +141,14 @@ const TenderResultListPage = () => {
             tenderNameCol<ResultDashboardRow>('tenderNo', {
                 headerName: 'Tender',
                 filter: true,
-                width: 200,
+                width: 250,
                 colId: 'tenderNo',
                 sortable: true,
             }),
             {
                 field: 'teamExecutiveName',
                 headerName: 'Member',
-                width: 100,
+                width: 150,
                 colId: 'teamExecutiveName',
                 valueGetter: (params) => params.data?.teamExecutiveName || '—',
                 sortable: true,
@@ -175,7 +175,7 @@ const TenderResultListPage = () => {
             {
                 field: 'finalPrice',
                 headerName: 'Final Price',
-                width: 110,
+                width: 120,
                 colId: 'finalPrice',
                 valueGetter: (params) => {
                     const value = params.data?.finalPrice || params.data?.tenderValue;
@@ -197,7 +197,7 @@ const TenderResultListPage = () => {
             {
                 field: 'emdDetails',
                 headerName: 'EMD Details',
-                width: 140,
+                width: 150,
                 colId: 'emdDetails',
                 sortable: true,
                 filter: true,

@@ -1,5 +1,5 @@
 // D:\tms\web\src\components\ui\data-table.tsx
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, GridOptions, GridReadyEvent, RowSelectionOptions } from 'ag-grid-community';
 import { myAgTheme } from '@/components/data-grid/theme';
@@ -14,6 +14,7 @@ export interface DataTableProps<T = any> {
     columnDefs: ColDef<T>[];
     gridOptions?: Partial<GridOptions<T>>;
     loading?: boolean;
+    enableCellTextSelection?: boolean;
     onGridReady?: (event: GridReadyEvent<T>) => void;
     className?: string;
     enablePagination?: boolean;
@@ -41,6 +42,7 @@ export interface DataTableProps<T = any> {
 
 const DataTable = <T extends Record<string, any>>({
     data,
+    enableCellTextSelection = true,
     columnDefs,
     gridOptions = {},
     loading = false,
@@ -70,14 +72,12 @@ const DataTable = <T extends Record<string, any>>({
     const activePageSize = manualPagination ? (paginationState?.pageSize ?? 50) : pageSize;
     const currentPage = (paginationState?.pageIndex ?? 0) + 1;
     const totalPages = manualPagination ? Math.ceil(rowCount / activePageSize) : 0;
-    const startRow = (currentPage - 1) * activePageSize + 1;
-    const endRow = Math.min(currentPage * activePageSize, rowCount);
 
     // Generate page numbers to display (show max 5 pages around current)
     const getPageNumbers = () => {
         const pages: (number | string)[] = [];
         const maxPagesToShow = 5;
-        
+
         if (totalPages <= maxPagesToShow) {
             // Show all pages if total is less than max
             for (let i = 1; i <= totalPages; i++) {
@@ -87,27 +87,27 @@ const DataTable = <T extends Record<string, any>>({
             // Show pages around current page
             let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
             let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-            
+
             // Adjust if we're near the end
             if (endPage - startPage < maxPagesToShow - 1) {
                 startPage = Math.max(1, endPage - maxPagesToShow + 1);
             }
-            
+
             if (startPage > 1) {
                 pages.push(1);
                 if (startPage > 2) pages.push('...');
             }
-            
+
             for (let i = startPage; i <= endPage; i++) {
                 pages.push(i);
             }
-            
+
             if (endPage < totalPages) {
                 if (endPage < totalPages - 1) pages.push('...');
                 pages.push(totalPages);
             }
         }
-        
+
         return pages;
     };
 
@@ -195,6 +195,7 @@ const DataTable = <T extends Record<string, any>>({
 
                 <div style={{ width: '100%' }}>
                     <AgGridReact
+                        enableCellTextSelection={enableCellTextSelection}
                         rowData={data}
                         columnDefs={columnDefs}
                         gridOptions={defaultGridOptions}
@@ -217,7 +218,7 @@ const DataTable = <T extends Record<string, any>>({
                             Total: <strong>{rowCount}</strong>
                         </div>
                     )}
-                    
+
                     {/* Center: Pagination with Page Numbers */}
                     <div className="flex items-center gap-1">
                         <Button
@@ -261,7 +262,7 @@ const DataTable = <T extends Record<string, any>>({
                             <ChevronRight className="h-4 w-4" />
                         </Button>
                     </div>
-                    
+
                     {/* Right: Length Change */}
                     {showLengthChange && (
                         <div className="flex items-center gap-2">

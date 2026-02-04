@@ -78,7 +78,7 @@ export const paths = {
         rasEdit: (id: number) => `/tendering/reverse-auctions/${id}/edit`,
         results: "/tendering/results",
         resultsUpload: (tenderId: number) => `/tendering/results/upload/${tenderId}`,
-        resultsShow: (id: number) => `/tendering/results/${id}`,
+        resultsShow: (tenderId: number) => `/tendering/results/${tenderId}`,
         resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
     },
 

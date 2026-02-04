@@ -61,6 +61,10 @@ class TenderResultService extends BaseApiService {
         return this.post<TenderResult>(`/${id}/upload-result`, data);
     }
 
+    async uploadResultByTenderId(tenderId: number, data: any): Promise<TenderResult> {
+        return this.post<TenderResult>(`/upload/${tenderId}`, data);
+    }
+
     async getCounts(teamId?: number): Promise<ResultDashboardCounts> {
         try {
             const params = new URLSearchParams();

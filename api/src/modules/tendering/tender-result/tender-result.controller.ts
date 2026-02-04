@@ -67,6 +67,25 @@ export class TenderResultController {
         return this.tenderResultService.createForTender(tenderId);
     }
 
+    @Post('upload/:tenderId')
+    async uploadResultByTenderId(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Body() dto: UploadResultDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        const existingResult = await this.tenderResultService.findByTenderId(tenderId);
+        let resultId: number | null = null;
+        
+        if (existingResult) {
+            resultId = existingResult.id;
+        } else {
+            const { id } = await this.tenderResultService.getOrCreateForTender(tenderId);
+            resultId = id;
+        }
+        
+        return this.tenderResultService.uploadResult(resultId, tenderId, dto, user.sub);
+    }
+
     @Post(':id/upload-result')
     async uploadResult(
         @Param('id', ParseIntPipe) id: number,
