@@ -41,6 +41,8 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     sfms_charge_deducted: z.coerce.number().optional(),
     stamp_charge_deducted: z.coerce.number().optional(),
     other_charge_deducted: z.coerce.number().optional(),
+    bg_favouring: z.string().optional(),
+    amount: z.coerce.number().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),

@@ -17,10 +17,10 @@ import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
 import { DemandDraftActionFormSchema, type DemandDraftActionFormValues } from '../helpers/demandDraftActionForm.schema';
 import { useUpdateDemandDraftAction } from '@/hooks/api/useDemandDrafts';
-import { useCourierDashboard } from '@/modules/shared/courier/courier.hooks';
+import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
-import { useMemo } from 'react';
+import { Textarea } from '@/components/ui/textarea';
 
 const ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form (DD)' },
@@ -31,29 +31,6 @@ const ACTION_OPTIONS = [
     { value: 'request-cancellation', label: 'Send DD Cancellation Request' },
     { value: 'dd-cancellation-confirmation', label: 'DD cancelled at Branch' },
 ];
-
-const useCourierRequestOptions = () => {
-    const { data: dashboardData } = useCourierDashboard();
-
-    return useMemo(() => {
-        if (!dashboardData) return [];
-
-        const allCouriers = [
-            ...(dashboardData.pending || []),
-            ...(dashboardData.dispatched || []),
-            ...(dashboardData.notDelivered || []),
-            ...(dashboardData.delivered || []),
-            ...(dashboardData.rejected || []),
-        ];
-
-        return allCouriers
-            .filter(c => c.docketNo)
-            .map(c => ({
-                value: c.docketNo!,
-                label: c.docketNo! + (c.toOrg ? ` - ${c.toOrg}` : ''),
-            }));
-    }, [dashboardData]);
-};
 
 interface DemandDraftActionFormProps {
     instrumentId: number;
@@ -66,13 +43,10 @@ interface DemandDraftActionFormProps {
     };
 }
 
-export function DemandDraftActionForm({
-    instrumentId,
-    instrumentData,
-}: DemandDraftActionFormProps) {
+export function DemandDraftActionForm({ instrumentId, instrumentData }: DemandDraftActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateDemandDraftAction();
-    const courierRequestOptions = useCourierRequestOptions();
+    const courierOptions = useCourierOptions();
 
     const form = useForm<DemandDraftActionFormValues>({
         resolver: zodResolver(DemandDraftActionFormSchema) as Resolver<DemandDraftActionFormValues>,
@@ -92,22 +66,40 @@ export function DemandDraftActionForm({
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('proof_image')) {
-                    return; // Handle separately
+                // Skip follow-up fields - handled by different service
+                if (key === 'contacts' ||
+                    key === 'organisation_name' ||
+                    key === 'followup_start_date' ||
+                    key === 'frequency' ||
+                    key === 'stop_reason' ||
+                    key === 'proof_text' ||
+                    key === 'stop_remarks' ||
+                    key === 'proof_image') {
+                    return;
                 }
+
+                // Handle File objects (non-followup files)
+                if (value instanceof File) {
+                    formData.append(key, value);
+                    return;
+                }
+
+                // Handle arrays of Files
+                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
+                    value.forEach((file) => formData.append(key, file));
+                    return;
+                }
+
+                // Handle all other values (strings, numbers, dates, file paths, etc.)
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
                     formData.append(key, value.toISOString());
-                } else if (typeof value === 'object' && !Array.isArray(value)) {
+                } else if (typeof value === 'object') {
                     formData.append(key, JSON.stringify(value));
                 } else {
                     formData.append(key, String(value));
                 }
             });
-
-            if (values.contacts && values.contacts.length > 0) {
-                formData.append('contacts', JSON.stringify(values.contacts));
-            }
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Action submitted successfully');
@@ -122,17 +114,15 @@ export function DemandDraftActionForm({
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <FieldWrapper control={form.control} name="action" label="Action *">
-                    {(_field) => (
-                        <SelectField
-                            label="Choose What to do"
-                            control={form.control}
-                            name="action"
-                            options={ACTION_OPTIONS}
-                            placeholder="Select an option"
-                        />
-                    )}
-                </FieldWrapper>
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                    <SelectField
+                        label="Choose What to do"
+                        control={form.control}
+                        name="action"
+                        options={ACTION_OPTIONS}
+                        placeholder="Select an option"
+                    />
+                </div>
 
                 {/* Accounts Form (DD) */}
                 <ConditionalSection show={action === 'accounts-form-1'}>
@@ -161,37 +151,31 @@ export function DemandDraftActionForm({
                         {ddReq === 'Rejected' && (
                             <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
                                 {(field) => (
-                                    <Input
+                                    <Textarea
                                         {...field}
                                         placeholder="Enter reason for rejection"
+                                        className="min-h-[80px]"
                                     />
                                 )}
                             </FieldWrapper>
                         )}
 
                         {ddReq === 'Accepted' && (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="dd_date" label="DD Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="dd_no" label="DD No.">
-                                        {(field) => <Input {...field} placeholder="Enter DD number" />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <FieldWrapper control={form.control} name="req_no" label="Courier request No.">
-                                    {(_field) => (
-                                        <SelectField
-                                            label="Courier request No."
-                                            control={form.control}
-                                            name="req_no"
-                                            options={courierRequestOptions}
-                                            placeholder="Select courier request number"
-                                        />
-                                    )}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                                <FieldWrapper control={form.control} name="dd_date" label="DD Date">
+                                    {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                                 </FieldWrapper>
-                            </>
+                                <FieldWrapper control={form.control} name="dd_no" label="DD No.">
+                                    {(field) => <Input {...field} placeholder="Enter DD number" />}
+                                </FieldWrapper>
+                                <SelectField
+                                    label="Courier request No."
+                                    control={form.control}
+                                    name="req_no"
+                                    options={courierOptions}
+                                    placeholder="Select courier request number"
+                                />
+                            </div>
                         )}
                     </div>
                 </ConditionalSection>
@@ -202,27 +186,30 @@ export function DemandDraftActionForm({
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Initiate Followup</h4>
 
-                        <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
-                            {(field) => <Input {...field} placeholder="Enter organisation name" />}
-                        </FieldWrapper>
-
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                            <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
+                                {(field) => <Input {...field} placeholder="Enter organisation name" />}
+                            </FieldWrapper>
+                        </div>
                         <ContactPersonFields control={form.control} name="contacts" />
-
-                        <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                            {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                        </FieldWrapper>
-
-                        <FollowUpFrequencySelect control={form.control} name="frequency" />
-
-                        <StopReasonFields
-                            control={form.control}
-                            frequencyFieldName="frequency"
-                            stopReasonFieldName="stop_reason"
-                            proofTextFieldName="proof_text"
-                            stopRemarksFieldName="stop_remarks"
-                            proofImageFieldName="proof_image"
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                            <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                            <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
+                        <div className="col-span-3">
+                            <StopReasonFields
+                                control={form.control}
+                                frequencyFieldName="frequency"
+                                stopReasonFieldName="stop_reason"
+                                proofTextFieldName="proof_text"
+                                stopRemarksFieldName="stop_remarks"
+                                proofImageFieldName="proof_image"
+                            />
+                        </div>
                     </div>
+
                 </ConditionalSection>
 
 
@@ -231,19 +218,20 @@ export function DemandDraftActionForm({
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Returned via courier</h4>
 
-                        <FieldWrapper control={form.control} name="docket_no" label="Docket No.">
-                            {(field) => <Input {...field} placeholder="Enter docket number" />}
-                        </FieldWrapper>
-
-                        <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
-                            {(field) => (
-                                <CompactTenderFileUploader
-                                    context="dd-docket-slip"
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                />
-                            )}
-                        </FieldWrapper>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                            <FieldWrapper control={form.control} name="docket_no" label="Docket No.">
+                                {(field) => <Input {...field} placeholder="Enter docket number" />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
+                                {(field) => (
+                                    <CompactTenderFileUploader
+                                        context="dd-docket-slip"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
                     </div>
                 </ConditionalSection>
 
@@ -252,7 +240,7 @@ export function DemandDraftActionForm({
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
@@ -282,7 +270,7 @@ export function DemandDraftActionForm({
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">DD cancelled at Branch</h4>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="dd_cancellation_date" label="Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>

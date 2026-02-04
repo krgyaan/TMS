@@ -21,6 +21,8 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     utr_no: z.string().optional(),
     utr_message: z.string().optional(),
     remarks: z.string().optional(),
+    portal_name: z.string().optional(),
+    amount: z.coerce.number().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
@@ -34,6 +36,13 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 
     // Returned via Bank Transfer
     transfer_date: z.string().optional(),
+    return_reason: z.string().optional(),
+    return_remarks: z.string().optional(),
+
+    // Settled with Project Account
+    settlement_date: z.string().optional(),
+    settlement_amount: z.coerce.number().optional(),
+    settlement_reference_no: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
