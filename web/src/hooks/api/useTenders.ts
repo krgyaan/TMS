@@ -122,14 +122,32 @@ export const useTendersDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
-    
+
     // Include all filter context in query key to ensure proper cache invalidation
     // Use explicit values (including null) so React Query can properly differentiate cache entries
     const queryKey = [...tendersKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery({
         queryKey,
         queryFn: () => tenderInfosService.getDashboardCounts(teamIdParam),
         staleTime: 0, // Always refetch when query key changes to ensure counts are up-to-date
+    });
+};
+
+export const useUpdateTenderStatus = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { status: number; comment: string } }) =>
+            tenderInfosService.updateStatus(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
+            queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: tendersKey.dashboardCounts() });
+            toast.success("Tender status updated successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
     });
 };

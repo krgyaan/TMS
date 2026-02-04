@@ -75,6 +75,10 @@ class TenderInfosService extends BaseApiService {
         const queryString = search.toString();
         return this.get<any>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
+
+    async updateStatus(id: number, data: { status: number; comment: string }): Promise<TenderInfo> {
+        return this.patch<TenderInfo>(`/${id}/status`, data);
+    }
 }
 
 export const tenderInfosService = new TenderInfosService();

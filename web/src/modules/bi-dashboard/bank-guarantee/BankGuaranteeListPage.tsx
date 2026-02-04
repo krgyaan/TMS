@@ -19,7 +19,6 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import BankStatsCards from './components/BankStatsCards';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { QuickFilter } from '@/components/ui/quick-filter';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -79,6 +78,7 @@ const BankGuaranteeListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -398,7 +398,7 @@ const BankGuaranteeListPage = () => {
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
                             {/* Quick Filters (Left) - Optional, can be added per page */}
-                            
+
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">
                                 <div className="relative">

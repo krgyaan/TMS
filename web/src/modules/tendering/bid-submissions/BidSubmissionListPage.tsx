@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -20,6 +20,7 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import type { BidSubmissionDashboardRowWithTimer } from './helpers/bidSubmission.types';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
@@ -29,6 +30,10 @@ const BidSubmissionListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -76,6 +81,11 @@ const BidSubmissionListPage = () => {
 
     const bidSubmissionActions: ActionItem<BidSubmissionDashboardRowWithTimer>[] = useMemo(() => [
         {
+            label: 'Change Status',
+            onClick: (row: BidSubmissionDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
+        {
             label: 'Submit Bid',
             onClick: (row: BidSubmissionDashboardRow) => {
                 navigate(paths.tendering.bidSubmit(row.tenderId));
@@ -114,7 +124,7 @@ const BidSubmissionListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-    ], [navigate]);
+    ], [navigate, setChangeStatusModal]);
 
     const tabsConfig = useMemo(() => {
         return [
@@ -403,6 +413,15 @@ const BidSubmissionListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

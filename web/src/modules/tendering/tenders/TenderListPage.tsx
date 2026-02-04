@@ -9,7 +9,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Trash, Search } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "./components/ChangeStatusModal";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
@@ -72,6 +73,10 @@ const TenderListPage = () => {
 
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     // Handle both array (old format) and PaginatedResult (new format)
     const tenders = Array.isArray(apiResponse)
@@ -121,6 +126,11 @@ const TenderListPage = () => {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
+        },
+        {
+            label: "Change Status",
+            onClick: (row: TenderInfoWithNames) => setChangeStatusModal({ open: true, tenderId: row.id, currentStatus: row.status }),
+            icon: <RefreshCw className="h-4 w-4" />,
         },
         {
             label: "View",
@@ -358,6 +368,16 @@ const TenderListPage = () => {
                     </div>
                 </Tabs>
             </CardContent>
+
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };
