@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -39,27 +39,29 @@ export default function CostingApprovalViewPage() {
     ) || [];
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <CardTitle>Costing Sheet Details</CardTitle>
-                            <Badge variant={costingSheet.status === 'Submitted' ? 'default' : costingSheet.status === 'Approved' ? 'secondary' : 'destructive'}>
-                                {costingSheet.status}
-                            </Badge>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <CardTitle>Costing Sheet Details</CardTitle>
+                                <Badge variant={costingSheet.status === 'Submitted' ? 'default' : costingSheet.status === 'Approved' ? 'secondary' : 'destructive'}>
+                                    {costingSheet.status}
+                                </Badge>
+                            </div>
+                            <CardDescription className="mt-2">
+                                View detailed information about this costing sheet
+                            </CardDescription>
                         </div>
-                        <CardDescription className="mt-2">
-                            View detailed information about this costing sheet
-                        </CardDescription>
                     </div>
-                    <CardAction>
-                        <Button variant="outline" onClick={() => navigate(-1)}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                    </CardAction>
-                </div>
-            </CardHeader>
+                </CardHeader>
             <CardContent className="space-y-8">
                 {/* Tender Information */}
                 <div className="space-y-4">
@@ -155,7 +157,7 @@ export default function CostingApprovalViewPage() {
 
                             <div>
                                 <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-muted-foreground break-words">
                                     {costingSheet.teRemarks || '—'}
                                 </p>
                             </div>
@@ -234,7 +236,7 @@ export default function CostingApprovalViewPage() {
 
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground mb-1">TL Remarks</p>
-                                        <p className="text-sm text-muted-foreground">
+                                        <p className="text-sm text-muted-foreground break-words">
                                             {costingSheet.tlRemarks || '—'}
                                         </p>
                                     </div>
@@ -268,7 +270,7 @@ export default function CostingApprovalViewPage() {
                             Rejection Reason
                         </h4>
                         <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
-                            <p className="text-sm text-destructive">{costingSheet.rejectionReason}</p>
+                            <p className="text-sm text-destructive break-words">{costingSheet.rejectionReason}</p>
                         </div>
                     </div>
                 )}
@@ -296,5 +298,6 @@ export default function CostingApprovalViewPage() {
                 </div>
             </CardContent>
         </Card>
+        </div>
     );
 }
