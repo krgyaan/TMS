@@ -11,7 +11,7 @@ import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/a
 import type { TenderApprovalWithTimer } from './helpers/tenderApproval.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
 type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
@@ -36,6 +37,10 @@ const TenderApprovalListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -69,6 +74,16 @@ const TenderApprovalListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const approvalActions: ActionItem<any>[] = [
+        {
+            label: 'Change Status',
+            onClick: (row: any) => {
+                const tenderId = row.tenderId || row.id;
+                if (tenderId) {
+                    setChangeStatusModal({ open: true, tenderId });
+                }
+            },
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
         {
             label: 'Approve',
             onClick: (row: any) => {
@@ -301,104 +316,115 @@ const TenderApprovalListPage = () => {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Tender Approvals</CardTitle>
-                        <CardDescription className="mt-2">
-                            Review and approve tender decisions.
-                        </CardDescription>
+        <>
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Tender Approvals</CardTitle>
+                            <CardDescription className="mt-2">
+                                Review and approve tender decisions.
+                            </CardDescription>
+                        </div>
                     </div>
-                </div>
-            </CardHeader>
-            <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
-                    <TabsList className="m-auto mb-4">
-                        {tabsConfig.map((tab) => (
-                            <TabsTrigger
-                                key={tab.key}
-                                value={tab.key}
-                                className="data-[state=active]:shadow-md flex items-center gap-1"
-                            >
-                                <span className="font-semibold text-sm">{tab.name}</span>
-                                {tab.count > 0 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        {tab.count}
-                                    </Badge>
-                                )}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                </CardHeader>
+                <CardContent className="px-0">
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
+                        <TabsList className="m-auto mb-4">
+                            {tabsConfig.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.key}
+                                    value={tab.key}
+                                    className="data-[state=active]:shadow-md flex items-center gap-1"
+                                >
+                                    <span className="font-semibold text-sm">{tab.name}</span>
+                                    {tab.count > 0 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            {tab.count}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
 
-                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
-                    <div className="flex items-center gap-4 px-6 pb-4">
-                        {/* Quick Filters (Left) */}
-                        <QuickFilter options={[
-                            { label: 'This Week', value: 'this-week' },
-                            { label: 'This Month', value: 'this-month' },
-                            { label: 'This Year', value: 'this-year' },
-                        ]} value={search} onChange={(value) => setSearch(value)} />
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'This Week', value: 'this-week' },
+                                { label: 'This Month', value: 'this-month' },
+                                { label: 'This Year', value: 'this-year' },
+                            ]} value={search} onChange={(value) => setSearch(value)} />
 
-                        {/* Search Bar (Center) - Flex grow */}
-                        <div className="flex-1 flex justify-end">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
                             </div>
+
                         </div>
 
-                    </div>
-
-                    {tabsConfig.map((tab) => (
-                        <TabsContent
-                            key={tab.key}
-                            value={tab.key}
-                            className="px-0 m-0 data-[state=inactive]:hidden"
-                        >
-                            {activeTab === tab.key && (
-                                <>
-                                    {(!approvalData || approvalData.length === 0) ? (
-                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
-                                        </div>
-                                    ) : (
-                                        <DataTable
-                                            data={approvalData}
-                                            columnDefs={colDefs as ColDef<any>[]}
-                                            loading={loading}
-                                            manualPagination={true}
-                                            rowCount={totalRows}
-                                            paginationState={pagination}
-                                            onPaginationChange={setPagination}
-                                            onPageSizeChange={handlePageSizeChange}
-                                            showTotalCount={true}
-                                            showLengthChange={true}
-                                            gridOptions={{
-                                                defaultColDef: {
-                                                    editable: false,
-                                                    filter: true,
-                                                    sortable: true,
-                                                    resizable: true
-                                                },
-                                                onSortChanged: handleSortChanged,
-                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
-                                            }}
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </TabsContent>
-                    ))}
-                </Tabs>
-            </CardContent>
-        </Card>
+                        {tabsConfig.map((tab) => (
+                            <TabsContent
+                                key={tab.key}
+                                value={tab.key}
+                                className="px-0 m-0 data-[state=inactive]:hidden"
+                            >
+                                {activeTab === tab.key && (
+                                    <>
+                                        {(!approvalData || approvalData.length === 0) ? (
+                                            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                                <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
+                                            </div>
+                                        ) : (
+                                            <DataTable
+                                                data={approvalData}
+                                                columnDefs={colDefs as ColDef<any>[]}
+                                                loading={loading}
+                                                manualPagination={true}
+                                                rowCount={totalRows}
+                                                paginationState={pagination}
+                                                onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
+                                                gridOptions={{
+                                                    defaultColDef: {
+                                                        editable: false,
+                                                        filter: true,
+                                                        sortable: true,
+                                                        resizable: true
+                                                    },
+                                                    onSortChanged: handleSortChanged,
+                                                    overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
+                                                }}
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                </CardContent>
+            </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
+        </>
     );
 };
 
