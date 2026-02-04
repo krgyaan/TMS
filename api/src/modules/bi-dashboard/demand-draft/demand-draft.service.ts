@@ -14,6 +14,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { DD_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 
 @Injectable()
 export class DemandDraftService {
@@ -21,6 +22,7 @@ export class DemandDraftService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly followUpService: FollowUpService,
     ) { }
 
     private statusMap() {
@@ -236,11 +238,14 @@ export class DemandDraftService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
+            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned-courier': 3,
             'returned-bank-transfer': 4,
+            'settled': 5,
             'settled-with-project': 5,
             'request-cancellation': 6,
+            'dd-cancellation-confirmation': 7,
             'cancelled-at-branch': 7,
         };
         return actionMap[action] || 1;
@@ -276,6 +281,9 @@ export class DemandDraftService {
             }
         }
 
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
+
         const filePaths: string[] = [];
         if (files && files.length > 0) {
             for (const file of files) {
@@ -283,6 +291,33 @@ export class DemandDraftService {
                 filePaths.push(relativePath);
             }
         }
+
+        /**
+         * Get single file for a field by checking if body field exists or if it's a file path string
+         */
+        const getFileForField = (
+            fieldname: string,
+            files: Express.Multer.File[],
+            body: any,
+            fileIndexTracker: { current: number }
+        ): Express.Multer.File | null => {
+            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+                const file = files[fileIndexTracker.current];
+                fileIndexTracker.current++;
+                return file;
+            }
+            return null;
+        };
+
+        /**
+         * Get file path from body if it's a string (from TenderFileUploader)
+         */
+        const getFilePathFromBody = (fieldname: string, body: any): string | null => {
+            if (body[fieldname] && typeof body[fieldname] === 'string') {
+                return body[fieldname];
+            }
+            return null;
+        };
 
         const updateData: any = {
             action: actionNumber,
@@ -300,13 +335,22 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
             updateData.status = DD_STATUSES.COURIER_RETURN_RECEIVED;
-            if (filePaths.length > 0) {
+            // Handle docket_slip file or path
+            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = getFilePathFromBody('docket_slip', body);
+            if (docketSlipFile) {
+                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
+            } else if (filePaths.length > 0) {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === 'returned-bank-transfer') {
             updateData.status = DD_STATUSES.BANK_RETURN_COMPLETED;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
+        } else if (body.action === 'settled' || body.action === 'settled-with-project') {
+            updateData.status = DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
         } else if (body.action === 'request-cancellation') {
             updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
         } else if (body.action === 'dd-cancellation-confirmation') {
@@ -322,7 +366,14 @@ export class DemandDraftService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const ddDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-2') {
+        if (body.action === 'accounts-form-1' || body.action === 'accounts-form') {
+            // Store dd_no, dd_date, req_no when Accepted (form requires these)
+            if (body.dd_req === 'Accepted') {
+                if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
+                if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
+                if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
+            }
+        } else if (body.action === 'accounts-form-2') {
             if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
             if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
             if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
@@ -334,15 +385,30 @@ export class DemandDraftService {
 
         if (Object.keys(ddDetailsUpdate).length > 0) {
             ddDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentDdDetails)
-                .set(ddDetailsUpdate)
-                .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+
+            // Check if ddDetails record exists
+            const [existingDdDetails] = await this.db
+                .select()
+                .from(instrumentDdDetails)
+                .where(eq(instrumentDdDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingDdDetails) {
+                await this.db
+                    .update(instrumentDdDetails)
+                    .set(ddDetailsUpdate)
+                    .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+            } else {
+                // Create new ddDetails record
+                await this.db.insert(instrumentDdDetails).values({
+                    instrumentId,
+                    ...ddDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
         }
 
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,

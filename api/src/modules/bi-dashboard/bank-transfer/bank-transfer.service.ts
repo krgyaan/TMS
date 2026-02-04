@@ -230,6 +230,7 @@ export class BankTransferService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
+            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -280,17 +281,19 @@ export class BankTransferService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form') {
+        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.bt_req === 'Accepted') {
                 updateData.status = BT_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.bt_req === 'Rejected') {
                 updateData.status = BT_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            if (body.date_time) {
+            // Support both payment_datetime (from form) and date_time/payment_date (legacy)
+            const dateTime = body.payment_datetime || body.date_time || body.payment_date;
+            if (dateTime) {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    date_time: body.date_time,
+                    date_time: dateTime,
                 };
             }
         } else if (body.action === 'initiate-followup') {
@@ -308,14 +311,22 @@ export class BankTransferService {
 
         // Handle transfer details update or creation
         const transferDetailsUpdate: any = {};
-        if (body.action === 'accounts-form') {
+        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
-            if (body.payment_date) transferDetailsUpdate.transactionDate = body.payment_date;
+            // Support both payment_datetime (from form) and payment_date (legacy)
+            const paymentDate = body.payment_datetime || body.payment_date;
+            if (paymentDate) transferDetailsUpdate.transactionDate = paymentDate;
             if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
-            if (body.utr_mgs) transferDetailsUpdate.utrMsg = body.utr_mgs;
+            // Support both utr_message (from form) and utr_mgs (legacy)
+            const utrMsg = body.utr_message || body.utr_mgs;
+            if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
         } else if (body.action === 'returned') {
-            if (body.return_date) transferDetailsUpdate.returnTransferDate = body.return_date;
-            if (body.utr_num) transferDetailsUpdate.returnUtr = body.utr_num;
+            // Support both transfer_date (from form) and return_date (legacy)
+            const returnDate = body.transfer_date || body.return_date;
+            if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
+            // Support both utr_no (from form) and utr_num (legacy)
+            const returnUtr = body.utr_no || body.utr_num;
+            if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
         } else if (body.action === 'settled') {
             if (body.action === 'settled') transferDetailsUpdate.action = body.action;
         }
@@ -343,86 +354,7 @@ export class BankTransferService {
             }
         }
 
-        if (body.action === 'initiate-followup') {
-            try {
-                const [request] = await this.db
-                    .select({
-                        requestId: paymentRequests.id,
-                        tenderId: paymentRequests.tenderId,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
-                    .limit(1);
-
-                if (request) {
-                    const [tender] = await this.db
-                        .select({
-                            teamId: tenderInfos.team,
-                            teamMemberId: tenderInfos.teamMember,
-                        })
-                        .from(tenderInfos)
-                        .where(eq(tenderInfos.id, request.tenderId))
-                        .limit(1);
-
-                    if (tender) {
-                        const [team] = await this.db
-                            .select({ name: teams.name })
-                            .from(teams)
-                            .where(eq(teams.id, tender.teamId))
-                            .limit(1);
-
-                        const area = team?.name === 'AC' ? 'AC Team' : 'DC Team';
-
-                        let proofImagePath: string | null = null;
-                        if (files && files.length > 0) {
-                            const proofImage = files.find(
-                                (f) => f.fieldname === 'proof_image' || f.filename?.includes('proof')
-                            );
-                            if (proofImage) {
-                                proofImagePath = proofImage.filename;
-                            }
-                        }
-
-                        const mappedContacts = contacts
-                            .filter((contact) => contact.name && contact.name.trim().length > 0)
-                            .map((contact) => ({
-                                name: contact.name.trim(),
-                                email: contact.email || null,
-                                phone: contact.phone || null,
-                                org: contact.org || null,
-                            }));
-
-                        if (mappedContacts.length === 0) {
-                            throw new BadRequestException('At least one valid contact with name is required');
-                        }
-
-                        const followUpDto: CreateFollowUpDto = {
-                            area,
-                            partyName: body.organisation_name || '',
-                            amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: 'Bank Transfer',
-                            assignedToId: tender.teamMemberId || null,
-                            emdId: request.requestId,
-                            contacts: mappedContacts,
-                            frequency: body.frequency ? Number(body.frequency) : 1,
-                            startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
-                            attachments: [],
-                            createdById: user.id,
-                            followUpHistory: [],
-                        };
-
-                        await this.followUpService.create(followUpDto, user.id);
-                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
-                    }
-                }
-            } catch (error) {
-                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-            }
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,

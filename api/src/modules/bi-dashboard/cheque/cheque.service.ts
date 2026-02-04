@@ -273,6 +273,7 @@ export class ChequeService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
+            'accounts-form-1': 1,
             'initiate-followup': 2,
             'stop-cheque': 3,
             'paid-via-bank-transfer': 4,
@@ -312,6 +313,9 @@ export class ChequeService {
             }
         }
 
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
+
         const filePaths: string[] = [];
         if (files && files.length > 0) {
             for (const file of files) {
@@ -319,6 +323,33 @@ export class ChequeService {
                 filePaths.push(relativePath);
             }
         }
+
+        /**
+         * Get single file for a field by checking if body field exists or if it's a file path string
+         */
+        const getFileForField = (
+            fieldname: string,
+            files: Express.Multer.File[],
+            body: any,
+            fileIndexTracker: { current: number }
+        ): Express.Multer.File | null => {
+            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+                const file = files[fileIndexTracker.current];
+                fileIndexTracker.current++;
+                return file;
+            }
+            return null;
+        };
+
+        /**
+         * Get file path from body if it's a string (from TenderFileUploader)
+         */
+        const getFilePathFromBody = (fieldname: string, body: any): string | null => {
+            if (body[fieldname] && typeof body[fieldname] === 'string') {
+                return body[fieldname];
+            }
+            return null;
+        };
 
         const updateData: any = {
             action: actionNumber,
@@ -350,7 +381,13 @@ export class ChequeService {
             updateData.status = CHEQUE_STATUSES.CANCELLED_TORN;
         } else if (body.action === 'returned-courier') {
             updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
-            if (filePaths.length > 0) {
+            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = getFilePathFromBody('docket_slip', body);
+            if (docketSlipFile) {
+                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
+            } else if (filePaths.length > 0) {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === 'request-cancellation') {
@@ -370,13 +407,72 @@ export class ChequeService {
             if (body.cheque_type) chequeDetailsUpdate.reqType = body.cheque_type;
             if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
-        } else if (body.action === 'accounts-form-3') {
+        } else if (body.action === 'accounts-form-1') {
+            // Handle receiving_cheque_handed_over
+            const receivingChequeFile = getFileForField('receiving_cheque_handed_over', files, body, fileIndexTracker);
+            const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
+            if (receivingChequeFile) {
+                chequeDetailsUpdate.handover = `bi-dashboard/${receivingChequeFile.filename}`;
+            } else if (receivingChequePath) {
+                chequeDetailsUpdate.handover = receivingChequePath;
+            }
+
+            // Handle positive_pay_confirmation
+            const positivePayFile = getFileForField('positive_pay_confirmation', files, body, fileIndexTracker);
+            const positivePayPath = getFilePathFromBody('positive_pay_confirmation', body);
+            if (positivePayFile) {
+                chequeDetailsUpdate.confirmation = `bi-dashboard/${positivePayFile.filename}`;
+            } else if (positivePayPath) {
+                chequeDetailsUpdate.confirmation = positivePayPath;
+            }
+
+            // Handle remarks
+            if (body.remarks) {
+                chequeDetailsUpdate.reference = body.remarks;
+            }
+
+            // Handle cheque_images - check both files array and body for paths
+            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
             if (filePaths.length > 0 && body.cheque_images) {
                 const chequeImageIndexes = filePaths
                     .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
                     .filter(idx => idx >= 0);
                 if (chequeImageIndexes.length > 0) {
                     chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
+                }
+            } else if (chequeImagesPath) {
+                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
+                try {
+                    const parsed = JSON.parse(chequeImagesPath);
+                    if (Array.isArray(parsed)) {
+                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
+                    } else {
+                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
+                    }
+                } catch {
+                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
+                }
+            }
+        } else if (body.action === 'accounts-form-3') {
+            // Legacy action - handle cheque_images if sent
+            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
+            if (filePaths.length > 0 && body.cheque_images) {
+                const chequeImageIndexes = filePaths
+                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
+                    .filter(idx => idx >= 0);
+                if (chequeImageIndexes.length > 0) {
+                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
+                }
+            } else if (chequeImagesPath) {
+                try {
+                    const parsed = JSON.parse(chequeImagesPath);
+                    if (Array.isArray(parsed)) {
+                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
+                    } else {
+                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
+                    }
+                } catch {
+                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
                 }
             }
         } else if (body.action === 'stop-cheque') {
@@ -389,7 +485,13 @@ export class ChequeService {
             if (body.bt_transfer_date) chequeDetailsUpdate.btTransferDate = body.bt_transfer_date;
             if (body.reference) chequeDetailsUpdate.reference = body.reference;
         } else if (body.action === 'cancelled-torn') {
-            if (filePaths.length > 0 && body.cancelled_image_path) {
+            const cancelledImageFile = getFileForField('cancelled_image_path', files, body, fileIndexTracker);
+            const cancelledImagePath = getFilePathFromBody('cancelled_image_path', body);
+            if (cancelledImageFile) {
+                chequeDetailsUpdate.cancelledImagePath = `bi-dashboard/${cancelledImageFile.filename}`;
+            } else if (cancelledImagePath) {
+                chequeDetailsUpdate.cancelledImagePath = cancelledImagePath;
+            } else if (filePaths.length > 0 && body.cancelled_image_path) {
                 const cancelledImageIndex = filePaths.findIndex((path: string) => path.includes('cancelled') || body.cancelled_image_path);
                 if (cancelledImageIndex >= 0) {
                     chequeDetailsUpdate.cancelledImagePath = filePaths[cancelledImageIndex];
@@ -405,9 +507,7 @@ export class ChequeService {
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
         }
 
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,

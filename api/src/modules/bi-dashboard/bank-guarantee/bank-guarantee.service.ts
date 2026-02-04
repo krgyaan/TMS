@@ -572,6 +572,16 @@ export class BankGuaranteeService {
     }
 
     /**
+     * Get file path from body if it's a string (from TenderFileUploader)
+     */
+    private getFilePathFromBody(fieldname: string, body: any): string | null {
+        if (body[fieldname] && typeof body[fieldname] === 'string') {
+            return body[fieldname];
+        }
+        return null;
+    }
+
+    /**
      * Update instrument action with form data
      */
     async updateAction(
@@ -636,20 +646,29 @@ export class BankGuaranteeService {
         } else if (body.action === 'returned-courier') {
             updateData.status = 'RETURNED_VIA_COURIER';
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
                 updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
             }
         } else if (body.action === 'request-cancellation') {
             updateData.status = 'CANCELLATION_REQUESTED';
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
                 updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            } else if (coveringLetterPath) {
+                updateData.coveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
             updateData.status = 'BG_CANCELLED';
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
                 updateData.cancelPdf = `bi-dashboard/${cancellConfirmFile.filename}`;
+            } else if (cancellConfirmPath) {
+                updateData.cancelPdf = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             updateData.status = 'FDR_CANCELLED';
@@ -674,15 +693,31 @@ export class BankGuaranteeService {
 
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
+            const bgFormatImranPath = this.getFilePathFromBody('bg_format_imran', body);
             if (bgFormatImranFile) {
                 bgDetailsUpdate.bgFormatTe = `bi-dashboard/${bgFormatImranFile.filename}`;
+            } else if (bgFormatImranPath) {
+                bgDetailsUpdate.bgFormatTe = bgFormatImranPath;
             }
 
             // Handle prefilled_signed_bg files (multiple files)
             const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
+            const prefilledPath = this.getFilePathFromBody('prefilled_signed_bg', body);
             if (prefilledFiles.length > 0) {
                 const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
+            } else if (prefilledPath) {
+                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
+                try {
+                    const parsed = JSON.parse(prefilledPath);
+                    if (Array.isArray(parsed)) {
+                        bgDetailsUpdate.prefilledSignedBg = JSON.stringify(parsed);
+                    } else {
+                        bgDetailsUpdate.prefilledSignedBg = JSON.stringify([prefilledPath]);
+                    }
+                } catch {
+                    bgDetailsUpdate.prefilledSignedBg = JSON.stringify([prefilledPath]);
+                }
             }
         } else if (body.action === 'accounts-form-2') {
             if (body.bg_no) bgDetailsUpdate.bgNo = body.bg_no;
@@ -704,14 +739,20 @@ export class BankGuaranteeService {
 
             // Handle sfms_conf file
             const sfmsConfFile = this.getFileForField('sfms_conf', files, body, fileIndexTracker);
+            const sfmsConfPath = this.getFilePathFromBody('sfms_conf', body);
             if (sfmsConfFile) {
                 bgDetailsUpdate.sfmsConf = `bi-dashboard/${sfmsConfFile.filename}`;
+            } else if (sfmsConfPath) {
+                bgDetailsUpdate.sfmsConf = sfmsConfPath;
             }
 
             // Handle fdr_copy file
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
+            const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
             if (fdrCopyFile) {
                 bgDetailsUpdate.fdrCopy = `bi-dashboard/${fdrCopyFile.filename}`;
+            } else if (fdrCopyPath) {
+                bgDetailsUpdate.fdrCopy = fdrCopyPath;
             }
         } else if (body.action === 'request-extension') {
             // Handle modification fields only if modification_required is 'Yes'
@@ -725,8 +766,11 @@ export class BankGuaranteeService {
 
             // Handle extension letter file
             const extLetterFile = this.getFileForField('ext_letter', files, body, fileIndexTracker);
+            const extLetterPath = this.getFilePathFromBody('ext_letter', body);
             if (extLetterFile) {
                 bgDetailsUpdate.extensionLetterPath = `bi-dashboard/${extLetterFile.filename}`;
+            } else if (extLetterPath) {
+                bgDetailsUpdate.extensionLetterPath = extLetterPath;
             }
         } else if (body.action === 'returned-courier') {
             if (body.docket_no) bgDetailsUpdate.courierNo = body.docket_no;
@@ -734,13 +778,19 @@ export class BankGuaranteeService {
         } else if (body.action === 'request-cancellation') {
             if (body.cancel_remark) bgDetailsUpdate.cancelRemark = body.cancel_remark;
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
                 bgDetailsUpdate.stampCoveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            } else if (coveringLetterPath) {
+                bgDetailsUpdate.stampCoveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
                 bgDetailsUpdate.cancellConfirm = `bi-dashboard/${cancellConfirmFile.filename}`;
+            } else if (cancellConfirmPath) {
+                bgDetailsUpdate.cancellConfirm = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             if (body.bg_fdr_cancel_date) bgDetailsUpdate.bgFdrCancelDate = body.bg_fdr_cancel_date;
@@ -774,97 +824,7 @@ export class BankGuaranteeService {
             }
         }
 
-        // Create follow-up if action is initiate-followup
-        if (body.action === 'initiate-followup') {
-            try {
-                // Get payment request and tender info
-                const [paymentRequest] = await this.db
-                    .select({
-                        requestId: paymentRequests.id,
-                        tenderId: paymentRequests.tenderId,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
-                    .limit(1);
-
-                if (paymentRequest) {
-                    const [tenderInfo] = await this.db
-                        .select({
-                            teamId: tenderInfos.team,
-                            teamMemberId: tenderInfos.teamMember,
-                        })
-                        .from(tenderInfos)
-                        .where(eq(tenderInfos.id, paymentRequest.tenderId))
-                        .limit(1);
-
-                    if (tenderInfo) {
-                        // Get team name
-                        const [team] = await this.db
-                            .select({ name: teams.name })
-                            .from(teams)
-                            .where(eq(teams.id, tenderInfo.teamId))
-                            .limit(1);
-
-                        // Map team name to area format (AC → 'AC Team', Accounts → 'Accounts', others → '{team} Team')
-                        let area = 'DC Team';
-                        if (team?.name === 'AC') {
-                            area = 'AC Team';
-                        } else if (team?.name === 'Accounts') {
-                            area = 'Accounts';
-                        } else if (team?.name) {
-                            area = `${team.name} Team`;
-                        }
-
-                        // Identify proof image from files
-                        let proofImagePath: string | null = null;
-                        const proofImageFile = this.getFileForField('proof_image', files, body, fileIndexTracker);
-                        if (proofImageFile) {
-                            proofImagePath = proofImageFile.filename;
-                        }
-
-                        // Map contacts to ContactPersonDto format and filter out invalid ones
-                        const mappedContacts = contacts
-                            .filter((contact) => contact.name && contact.name.trim().length > 0)
-                            .map((contact) => ({
-                                name: contact.name.trim(),
-                                email: contact.email || null,
-                                phone: contact.phone || null,
-                                org: contact.org || null,
-                            }));
-
-                        if (mappedContacts.length === 0) {
-                            throw new BadRequestException('At least one valid contact with name is required');
-                        }
-
-                        // Create followup DTO
-                        const followUpDto: CreateFollowUpDto = {
-                            area,
-                            partyName: body.organisation_name || '',
-                            amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: 'Bank Guarantee',
-                            assignedToId: tenderInfo.teamMemberId || null,
-                            emdId: paymentRequest.requestId,
-                            contacts: mappedContacts,
-                            frequency: body.frequency ? Number(body.frequency) : 1,
-                            startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
-                            attachments: [],
-                            createdById: user.id,
-                            followUpHistory: [],
-                        };
-
-                        await this.followUpService.create(followUpDto, user.id);
-                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
-                    }
-                }
-            } catch (error) {
-                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
-            }
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,

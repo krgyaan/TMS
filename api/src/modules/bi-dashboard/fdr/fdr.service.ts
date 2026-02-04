@@ -10,10 +10,13 @@ import {
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/auth/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { FdrDashboardRow, FdrDashboardCounts } from '@/modules/bi-dashboard/fdr/helpers/fdr.types';
 import { FDR_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/dto/create-follow-up.dto';
 
 @Injectable()
 export class FdrService {
@@ -21,6 +24,7 @@ export class FdrService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly followUpService: FollowUpService,
     ) { }
 
     private statusMap() {
@@ -283,14 +287,46 @@ export class FdrService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
+            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned-courier': 3,
             'returned-bank-transfer': 4,
+            'settled': 5,
             'settled-with-project': 5,
             'request-cancellation': 6,
+            'fdr-cancellation-confirmation': 7,
             'cancelled-at-branch': 7,
         };
         return actionMap[action] || 1;
+    }
+
+    /**
+     * Get single file for a field by checking if body field exists or if it's a file path string
+     * Files are processed in order as they appear in the files array
+     */
+    private getFileForField(
+        fieldname: string,
+        files: Express.Multer.File[],
+        body: any,
+        fileIndexTracker: { current: number }
+    ): Express.Multer.File | null {
+        // Check if body has this field (indicating a file was uploaded)
+        if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+            const file = files[fileIndexTracker.current];
+            fileIndexTracker.current++;
+            return file;
+        }
+        return null;
+    }
+
+    /**
+     * Get file path from body if it's a string (from TenderFileUploader)
+     */
+    private getFilePathFromBody(fieldname: string, body: any): string | null {
+        if (body[fieldname] && typeof body[fieldname] === 'string') {
+            return body[fieldname];
+        }
+        return null;
     }
 
     async updateAction(
@@ -323,6 +359,9 @@ export class FdrService {
             }
         }
 
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
+
         const filePaths: string[] = [];
         if (files && files.length > 0) {
             for (const file of files) {
@@ -343,6 +382,37 @@ export class FdrService {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
+            // Store file paths from TenderFileUploader (strings) or files
+            const fdrFormatImranFile = this.getFileForField('fdr_format_imran', files, body, fileIndexTracker);
+            const fdrFormatImranPath = this.getFilePathFromBody('fdr_format_imran', body);
+            if (fdrFormatImranFile) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    fdr_format_imran: `bi-dashboard/${fdrFormatImranFile.filename}`,
+                };
+            } else if (fdrFormatImranPath) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    fdr_format_imran: fdrFormatImranPath,
+                };
+            }
+            // Store prefilled_signed_fdr files (can be array of paths or files)
+            if (body.prefilled_signed_fdr) {
+                try {
+                    const prefilledFiles = typeof body.prefilled_signed_fdr === 'string'
+                        ? JSON.parse(body.prefilled_signed_fdr)
+                        : body.prefilled_signed_fdr;
+                    if (Array.isArray(prefilledFiles) && prefilledFiles.length > 0) {
+                        updateData.legacyData = {
+                            ...(instrument.legacyData || {}),
+                            ...(updateData.legacyData || {}),
+                            prefilled_signed_fdr: JSON.stringify(prefilledFiles),
+                        };
+                    }
+                } catch (e) {
+                    this.logger.warn('Failed to parse prefilled_signed_fdr', e);
+                }
+            }
         } else if (body.action === 'accounts-form-2') {
             updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'accounts-form-3') {
@@ -351,31 +421,58 @@ export class FdrService {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
             updateData.status = FDR_STATUSES.COURIER_RETURN_RECEIVED;
-            if (filePaths.length > 0) {
+            // Handle docket_slip file or path
+            const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
+            if (docketSlipFile) {
+                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
+            } else if (filePaths.length > 0) {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === 'returned-bank-transfer') {
             updateData.status = FDR_STATUSES.BANK_RETURN_COMPLETED;
-        } else if (body.action === 'settled-with-project') {
+            if (body.transfer_date) updateData.transferDate = body.transfer_date;
+            if (body.utr) updateData.utr = body.utr;
+        } else if (body.action === 'settled' || body.action === 'settled-with-project') {
             updateData.status = FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
         } else if (body.action === 'request-cancellation') {
             updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
-            // Handle covering letter file
-            if (filePaths.length > 0 && body.covering_letter) {
-                const coveringLetterIndex = filePaths.findIndex((path: string) => path.includes('covering') || body.covering_letter);
-                if (coveringLetterIndex >= 0) {
-                    updateData.coveringLetter = filePaths[coveringLetterIndex];
-                }
+            // Handle covering letter file or path
+            const coveringLetterFile = this.getFileForField('covering_letter', files, body, fileIndexTracker);
+            const coveringLetterPath = this.getFilePathFromBody('covering_letter', body);
+            if (coveringLetterFile) {
+                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            } else if (coveringLetterPath) {
+                updateData.coveringLetter = coveringLetterPath;
             }
-            // Handle req_receive file
-            if (filePaths.length > 0 && body.req_receive) {
-                const reqReceiveIndex = filePaths.findIndex((path: string) => path.includes('req_receive') || body.req_receive);
-                if (reqReceiveIndex >= 0) {
-                    updateData.reqReceive = filePaths[reqReceiveIndex];
-                }
+            // Handle req_receive file or path
+            const reqReceiveFile = this.getFileForField('req_receive', files, body, fileIndexTracker);
+            const reqReceivePath = this.getFilePathFromBody('req_receive', body);
+            if (reqReceiveFile) {
+                updateData.reqReceive = `bi-dashboard/${reqReceiveFile.filename}`;
+            } else if (reqReceivePath) {
+                updateData.reqReceive = reqReceivePath;
             }
-        } else if (body.action === 'cancelled-at-branch') {
+            // Store cancellation remarks
+            if (body.cancellation_remarks) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    cancellation_remarks: body.cancellation_remarks,
+                };
+            }
+        } else if (body.action === 'fdr-cancellation-confirmation' || body.action === 'cancelled-at-branch') {
             updateData.status = FDR_STATUSES.CANCELLED_AT_BRANCH;
+            // Store cancellation details in legacyData
+            if (body.fdr_cancellation_date || body.fdr_cancellation_amount || body.fdr_cancellation_reference_no) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    fdr_cancellation_date: body.fdr_cancellation_date || null,
+                    fdr_cancellation_amount: body.fdr_cancellation_amount || null,
+                    fdr_cancellation_reference_no: body.fdr_cancellation_reference_no || null,
+                };
+            }
         }
 
         await this.db
@@ -391,6 +488,17 @@ export class FdrService {
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
+            // Store charges in legacyData (schema doesn't have charge fields)
+            if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    ...(updateData.legacyData || {}),
+                    fdr_charges: body.fdr_charges || null,
+                    sfms_charges: body.sfms_charges || null,
+                    stamp_charges: body.stamp_charges || null,
+                    other_charges: body.other_charges || null,
+                };
+            }
         } else if (body.action === 'accounts-form-2') {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
@@ -401,25 +509,183 @@ export class FdrService {
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
-            // Handle sfms_confirmation file if provided
-            if (filePaths.length > 0 && body.sfms_confirmation) {
-                const sfmsConfIndex = filePaths.findIndex((path: string) => path.includes('sfms') || body.sfms_confirmation);
-                if (sfmsConfIndex >= 0) {
-                    // Store in a way that makes sense - might need to check schema
+            // Handle sfms_confirmation file or path
+            const sfmsConfFile = this.getFileForField('sfms_confirmation', files, body, fileIndexTracker);
+            const sfmsConfPath = this.getFilePathFromBody('sfms_confirmation', body);
+            if (sfmsConfFile) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    sfms_confirmation: `bi-dashboard/${sfmsConfFile.filename}`,
+                };
+            } else if (sfmsConfPath) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    sfms_confirmation: sfmsConfPath,
+                };
+            }
+            // Store charges in legacyData
+            if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    ...(updateData.legacyData || {}),
+                    fdr_charges: body.fdr_charges || null,
+                    sfms_charges: body.sfms_charges || null,
+                    stamp_charges: body.stamp_charges || null,
+                    other_charges: body.other_charges || null,
+                };
+            }
+        } else if (body.action === 'request-extension') {
+            // Store request letter/email file or path
+            const requestLetterFile = this.getFileForField('request_letter_email', files, body, fileIndexTracker);
+            const requestLetterPath = this.getFilePathFromBody('request_letter_email', body);
+            if (requestLetterFile) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    request_letter_email: `bi-dashboard/${requestLetterFile.filename}`,
+                };
+            } else if (requestLetterPath) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    request_letter_email: requestLetterPath,
+                };
+            }
+            // Store modification fields if provided
+            if (body.modification_fields) {
+                try {
+                    const modFields = typeof body.modification_fields === 'string'
+                        ? JSON.parse(body.modification_fields)
+                        : body.modification_fields;
+                    if (Array.isArray(modFields) && modFields.length > 0) {
+                        updateData.legacyData = {
+                            ...(instrument.legacyData || {}),
+                            ...(updateData.legacyData || {}),
+                            modification_fields: JSON.stringify(modFields),
+                        };
+                    }
+                } catch (e) {
+                    this.logger.warn('Failed to parse modification_fields', e);
                 }
             }
         }
 
         if (Object.keys(fdrDetailsUpdate).length > 0) {
             fdrDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentFdrDetails)
-                .set(fdrDetailsUpdate)
-                .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+
+            // Check if fdrDetails record exists
+            const [existingFdrDetails] = await this.db
+                .select()
+                .from(instrumentFdrDetails)
+                .where(eq(instrumentFdrDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingFdrDetails) {
+                await this.db
+                    .update(instrumentFdrDetails)
+                    .set(fdrDetailsUpdate)
+                    .where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+            } else {
+                // Create new fdrDetails record
+                await this.db.insert(instrumentFdrDetails).values({
+                    instrumentId,
+                    ...fdrDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
         }
 
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
+        // Create follow-up if action is initiate-followup
+        if (body.action === 'initiate-followup') {
+            try {
+                // Get payment request and tender info
+                const [paymentRequest] = await this.db
+                    .select({
+                        requestId: paymentRequests.id,
+                        tenderId: paymentRequests.tenderId,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
+                    .limit(1);
+
+                if (paymentRequest) {
+                    const [tenderInfo] = await this.db
+                        .select({
+                            teamId: tenderInfos.team,
+                            teamMemberId: tenderInfos.teamMember,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, paymentRequest.tenderId))
+                        .limit(1);
+
+                    if (tenderInfo) {
+                        // Get team name
+                        const [team] = await this.db
+                            .select({ name: teams.name })
+                            .from(teams)
+                            .where(eq(teams.id, tenderInfo.teamId))
+                            .limit(1);
+
+                        // Map team name to area format (AC → 'AC Team', Accounts → 'Accounts', others → '{team} Team')
+                        let area = 'DC Team';
+                        if (team?.name === 'AC') {
+                            area = 'AC Team';
+                        } else if (team?.name === 'Accounts') {
+                            area = 'Accounts';
+                        } else if (team?.name) {
+                            area = `${team.name} Team`;
+                        }
+
+                        // Identify proof image from files
+                        let proofImagePath: string | null = null;
+                        const proofImageFile = this.getFileForField('proof_image', files, body, fileIndexTracker);
+                        const proofImagePathFromBody = this.getFilePathFromBody('proof_image', body);
+                        if (proofImageFile) {
+                            proofImagePath = proofImageFile.filename;
+                        } else if (proofImagePathFromBody) {
+                            proofImagePath = proofImagePathFromBody;
+                        }
+
+                        // Map contacts to ContactPersonDto format and filter out invalid ones
+                        const mappedContacts = contacts
+                            .filter((contact) => contact.name && contact.name.trim().length > 0)
+                            .map((contact) => ({
+                                name: contact.name.trim(),
+                                email: contact.email || null,
+                                phone: contact.phone || null,
+                                org: contact.org || null,
+                            }));
+
+                        if (mappedContacts.length === 0) {
+                            throw new BadRequestException('At least one valid contact with name is required');
+                        }
+
+                        // Create followup DTO
+                        const followUpDto: CreateFollowUpDto = {
+                            area,
+                            partyName: body.organisation_name || '',
+                            amount: instrument.amount ? Number(instrument.amount) : 0,
+                            followupFor: 'FDR',
+                            assignedToId: tenderInfo.teamMemberId || null,
+                            emdId: paymentRequest.requestId,
+                            contacts: mappedContacts,
+                            frequency: body.frequency ? Number(body.frequency) : 1,
+                            startFrom: body.followup_start_date || undefined,
+                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
+                            proofText: body.proof_text || null,
+                            proofImagePath: proofImagePath,
+                            stopRemarks: body.stop_remarks || null,
+                            attachments: [],
+                            createdById: user.id,
+                            followUpHistory: [],
+                        };
+
+                        await this.followUpService.create(followUpDto, user.id);
+                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
+                // Don't throw - allow the action to complete even if followup creation fails
+            }
         }
 
         return {
