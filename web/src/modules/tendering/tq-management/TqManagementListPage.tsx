@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search } from 'lucide-react';
+import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -20,6 +20,7 @@ import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqMana
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 
 const TqManagementListPage = () => {
@@ -32,6 +33,10 @@ const TqManagementListPage = () => {
     const [tqQualifiedDialogOpen, setTqQualifiedDialogOpen] = useState(false);
     const [pendingTenderId, setPendingTenderId] = useState<number | null>(null);
     const [pendingTqId, setPendingTqId] = useState<number | null>(null);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({ 
+        open: false, 
+        tenderId: null 
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -118,6 +123,11 @@ const TqManagementListPage = () => {
     };
 
     const tqManagementActions: ActionItem<TqManagementDashboardRowWithTimer>[] = useMemo(() => [
+        {
+            label: 'Change Status',
+            onClick: (row: TqManagementDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
         {
             label: 'TQ Received',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
@@ -512,6 +522,15 @@ const TqManagementListPage = () => {
                 onConfirm={handleTqQualifiedConfirm}
                 title="Mark TQ as Qualified"
                 description="This technical query has been replied. Please select whether the tender is Qualified or Disqualified."
+            />
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
             />
         </Card>
     );

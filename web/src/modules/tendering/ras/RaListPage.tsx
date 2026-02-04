@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search } from 'lucide-react';
+import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const RA_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
@@ -115,6 +116,10 @@ const ReverseAuctionListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({ 
+        open: false, 
+        tenderId: null 
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -152,6 +157,11 @@ const ReverseAuctionListPage = () => {
 
     const raActions: ActionItem<RaDashboardRow>[] = useMemo(
         () => [
+            {
+                label: 'Change Status',
+                onClick: (row: RaDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+                icon: <RefreshCw className="h-4 w-4" />,
+            },
             {
                 label: 'View Details',
                 onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.tenderId)),
@@ -433,6 +443,15 @@ const ReverseAuctionListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </>
     );
 };

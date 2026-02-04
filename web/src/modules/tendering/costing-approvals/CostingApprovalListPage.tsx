@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -20,6 +20,7 @@ import { tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const CostingApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<CostingApprovalTab>('pending');
@@ -28,6 +29,10 @@ const CostingApprovalListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -90,6 +95,11 @@ const CostingApprovalListPage = () => {
                 navigate(paths.tendering.costingApprovalView(row.costingSheetId!));
             },
             icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: "Change Status",
+            onClick: (row: CostingApprovalDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
+            icon: <RefreshCw className="h-4 w-4" />,
         },
     ], [navigate]);
 
@@ -399,6 +409,15 @@ const CostingApprovalListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

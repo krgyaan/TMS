@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search } from "lucide-react";
+import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import axiosInstance from "@/lib/axios";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 
 const CostingSheets = () => {
     const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
@@ -42,6 +43,10 @@ const CostingSheets = () => {
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
@@ -205,6 +210,11 @@ const CostingSheets = () => {
                 navigate(paths.tendering.costingSheetView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: "Change Status",
+            onClick: (row: CostingSheetDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
+            icon: <RefreshCw className="h-4 w-4" />,
         },
     ], [navigate, handleCreateCosting, isCreating]);
 
@@ -594,6 +604,15 @@ const CostingSheets = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

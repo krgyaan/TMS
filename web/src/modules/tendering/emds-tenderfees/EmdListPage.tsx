@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
@@ -63,6 +64,10 @@ const EmdsAndTenderFeesPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -235,6 +240,11 @@ const EmdsAndTenderFeesPage = () => {
             cellRenderer: (params: any) => {
                 const actions: ActionItem<PendingTenderRowWithTimer>[] = [
                     {
+                        label: 'Change Status',
+                        icon: <RefreshCw className="w-4 h-4" />,
+                        onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
+                    },
+                    {
                         label: 'View Tender',
                         icon: <EyeIcon className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
@@ -253,7 +263,7 @@ const EmdsAndTenderFeesPage = () => {
             },
             pinned: 'right',
         },
-    ], [navigate, activeTab]);
+    ], [navigate, activeTab, setChangeStatusModal]);
 
     const requestColDefs = useMemo<ColDef<PaymentRequestRowWithTimer>[]>(() => [
         tenderNameCol<PaymentRequestRowWithTimer>('tenderNo', {
@@ -363,6 +373,11 @@ const EmdsAndTenderFeesPage = () => {
                 const row = params.data!;
                 const actions: ActionItem<PaymentRequestRowWithTimer>[] = [
                     {
+                        label: 'Change Status',
+                        icon: <RefreshCw className="w-4 h-4" />,
+                        onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
+                    },
+                    {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
@@ -383,7 +398,7 @@ const EmdsAndTenderFeesPage = () => {
             },
             pinned: 'right',
         },
-    ], [navigate, activeTab]);
+    ], [navigate, activeTab, setChangeStatusModal]);
 
     const columnDefs = (activeTab === 'pending' || activeTab === 'tender-dnb') ? pendingColDefs : requestColDefs;
     const tableData = dashboardData?.data || [];
@@ -541,6 +556,15 @@ const EmdsAndTenderFeesPage = () => {
                     </div>
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

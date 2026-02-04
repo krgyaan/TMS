@@ -18,7 +18,6 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { QuickFilter } from '@/components/ui/quick-filter';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -330,7 +329,7 @@ const PayOnPortalListPage = () => {
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
                             {/* Quick Filters (Left) - Optional, can be added per page */}
-                            
+
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">
                                 <div className="relative">

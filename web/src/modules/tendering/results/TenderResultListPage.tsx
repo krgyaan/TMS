@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -80,6 +81,10 @@ const TenderResultListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({ 
+        open: false, 
+        tenderId: null 
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -116,6 +121,11 @@ const TenderResultListPage = () => {
 
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
+            {
+                label: 'Change Status',
+                icon: <RefreshCw className="h-4 w-4" />,
+                onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            },
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
@@ -440,6 +450,15 @@ const TenderResultListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </>
     );
 };
