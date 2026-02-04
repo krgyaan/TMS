@@ -43,8 +43,13 @@ class ReverseAuctionService extends BaseApiService {
         return this.get<RaDashboardResponse>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
-    async getDashboardCounts(): Promise<RaDashboardCounts> {
-        return this.get<RaDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<RaDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<RaDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 
     async getById(id: number): Promise<ReverseAuction> {
