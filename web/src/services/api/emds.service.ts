@@ -28,8 +28,13 @@ class EmdsService extends BaseApiService {
         return this.get<EmdDashboardResponse>(`${query ? `?${query}` : ''}`);
     }
 
-    async getDashboardCounts(): Promise<EmdDashboardCounts> {
-        return this.get<EmdDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<EmdDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<EmdDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 
     // Existing endpoints

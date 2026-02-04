@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { emdsService } from '@/services/api';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const paymentRequestsKey = {
     all: ['payment-requests'] as const,
@@ -50,10 +51,14 @@ export const usePaymentDashboard = (
 
 // Counts only hook (for initial tab badge rendering)
 export const usePaymentDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...paymentRequestsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery({
-        queryKey: paymentRequestsKey.dashboardCounts(),
-        queryFn: () => emdsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => emdsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };
 
