@@ -1,9 +1,9 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink } from 'lucide-react';
 import type { Rfq } from '../helpers/rfq.types';
 import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -12,20 +12,12 @@ interface RfqViewProps {
     rfq: Rfq;
     tender?: TenderInfoWithNames;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function RfqView({
     rfq,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: RfqViewProps) {
     if (isLoading) {
@@ -52,20 +44,6 @@ export function RfqView({
                     <FileText className="h-5 w-5" />
                     RFQ Details
                 </CardTitle>
-                <CardAction className='flex gap-2'>
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -185,7 +163,7 @@ export function RfqView({
                                     <TableCell className="text-sm font-medium text-muted-foreground align-top">
                                         Other Documents Needed
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         <p className="whitespace-pre-wrap">{rfq.docList}</p>
                                     </TableCell>
                                 </TableRow>
