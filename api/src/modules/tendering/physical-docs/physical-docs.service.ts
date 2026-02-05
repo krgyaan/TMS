@@ -93,7 +93,7 @@ export class PhysicalDocsService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -119,7 +119,7 @@ export class PhysicalDocsService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -148,7 +148,7 @@ export class PhysicalDocsService {
 
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         // Build tab-specific conditions
         const conditions = [...baseConditions, ...roleFilterConditions];
 
@@ -298,7 +298,7 @@ export class PhysicalDocsService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),

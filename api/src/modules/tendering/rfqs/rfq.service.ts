@@ -92,7 +92,7 @@ export class RfqsService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -118,7 +118,7 @@ export class RfqsService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -149,7 +149,7 @@ export class RfqsService {
 
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         // Build tab-specific conditions
         const conditions = [...baseConditions, ...roleFilterConditions];
 
@@ -272,63 +272,6 @@ export class RfqsService {
             .limit(limit)
             .offset(offset)
             .orderBy(orderByClause);
-
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, (typeof allStatusLogs)[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses =
-                latestStatusIds.length > 0 ? await this.db.select({ id: statuses.id, name: statuses.name }).from(statuses).where(inArray(statuses.id, latestStatusIds)) : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            const enrichedRows = rows.map(row => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    teamMember: row.teamMember || 0,
-                    teamMemberName: row.teamMemberName || "",
-                    status: row.status || 0,
-                    statusName: row.statusName || "",
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? statusNameMap.get(latestLog.newStatus) || null : null,
-                    statusRemark: latestLog?.comment || null,
-                    itemName: row.itemName || "",
-                    rfqTo: row.rfqTo || "",
-                    dueDate: row.dueDate,
-                    rfqId: row.rfqId,
-                    vendorOrganizationNames: row.vendorOrganizationNames,
-                };
-            });
-
-            return wrapPaginatedResponse(enrichedRows, total, page, limit);
-        }
 
         const data: RfqRow[] = rows.map(row => ({
             tenderId: row.tenderId,
@@ -580,7 +523,7 @@ export class RfqsService {
         total: number;
     }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
