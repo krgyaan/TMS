@@ -121,7 +121,7 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 TE Final Remark
                             </TableCell>
-                            <TableCell className="text-sm break-words" colSpan={3}>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
                                 {infoSheet.teFinalRemark || '—'}
                             </TableCell>
                         </TableRow>
@@ -129,7 +129,7 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Rejection Remarks
                             </TableCell>
-                            <TableCell className="text-sm break-words" colSpan={3}>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
                                 {formatValue(infoSheet.teRejectionRemarks)}
                             </TableCell>
                         </TableRow>

@@ -167,7 +167,7 @@ const TenderListPage = () => {
         {
             field: "teamMemberName",
             headerName: "Member",
-            width: 120,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { value, data } = params;
                 return <span title={data?.teamMemberUsername}>{value ? value : <b className="text-gray-400">Unassigned</b>}</span>;

@@ -74,9 +74,9 @@ export default function TqViewPage() {
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
-              ...tender,
-              approval: approval || null,
-          }
+            ...tender,
+            approval: approval || null,
+        }
         : null;
 
     return (
