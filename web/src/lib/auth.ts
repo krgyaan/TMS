@@ -1,4 +1,4 @@
-﻿import type { AuthUser } from "@/types/auth.types";
+import type { AuthUser } from "@/types/auth.types";
 
 const AUTH_USER_KEY = 'tms_auth_user';
 const ACTIVE_TEAM_KEY = 'tms_active_team';
