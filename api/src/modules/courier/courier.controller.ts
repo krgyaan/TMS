@@ -22,8 +22,12 @@ import { extname } from "path";
 
 import { CourierService } from "@/modules/courier/courier.service";
 import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
-import type { UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
+import { type UpdateCourierInput, UpdateCourierSchema, type UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
 import { CurrentUser } from "@/decorators/current-user.decorator";
+
+import { CreateDispatchSchema } from "./zod/dispatch-courier.schema";
+import { ZodValidationPipe } from "nestjs-zod";
+import { UpdateCourierStatusSchema } from "./zod/update-courier-status.schema";
 
 // Allowed file types
 const ALLOWED_MIME_TYPES = [
@@ -100,25 +104,23 @@ export class CourierController {
 
     @Post()
     @UseInterceptors(FilesInterceptor("courierDocs[]", 10, multerConfig))
-    create(@Body() body: CreateCourierDto, @UploadedFiles() files: Express.Multer.File[], @Req() req) {
-        return this.service.create(body, files, req.user.sub);
+    create(@Body() dto, @UploadedFiles() files: Express.Multer.File[], @Req() req) {
+        console.log("dto", dto);
+        return this.service.create(dto, files, req.user.sub);
     }
 
     @Post(":id/dispatch")
     @UseInterceptors(FileInterceptor("docketSlip", docketSlipMulterConfig))
-    createDispatch(
-        @Param("id", ParseIntPipe) id: number,
-        @Body()
-        body: {
-            courierProvider: string;
-            docketNo: string;
-            pickupDate: string;
-        },
-        @UploadedFile() file: Express.Multer.File | undefined,
-        @CurrentUser("id") userId: number
-    ) {
-        console.log("createDispatch called with body:", body);
-        return this.service.createDispatch(id, body, file, userId);
+    createDispatch(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @UploadedFile() file: Express.Multer.File | undefined, @CurrentUser("id") userId: number) {
+        const parsed = CreateDispatchSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        console.log("createDispatch parsed body:", parsed.data);
+
+        return this.service.createDispatch(id, parsed.data, file, userId);
     }
 
     // Update dispatch info
@@ -126,14 +128,19 @@ export class CourierController {
     updateDispatch(
         @Param("id", ParseIntPipe) id: number,
         @Body()
-        body: {
-            courierProvider: string;
-            docketNo: string;
-            pickupDate: string;
-        },
+        @Req()
+        req: Request,
         @CurrentUser("id") userId: number
     ) {
-        return this.service.updateDispatch(id, body, userId);
+        const parsed = CreateDispatchSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        console.log("createDispatch parsed body:", parsed.data);
+
+        return this.service.updateDispatch(id, parsed.data, userId);
     }
 
     // Get all couriers for logged-in user
@@ -173,24 +180,26 @@ export class CourierController {
     }
 
     @Put(":id")
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: UpdateCourierDto, @CurrentUser("id") userId: number) {
+    update(
+        @Param("id", ParseIntPipe) id: number,
+        @Body(new ZodValidationPipe(UpdateCourierSchema))
+        body: UpdateCourierInput,
+        @CurrentUser("id") userId: number
+    ) {
         return this.service.update(id, body, userId);
     }
 
     // Update status
     @Patch(":id/status")
     @UseInterceptors(FileInterceptor("podDoc", podMulterConfig))
-    updateStatus(
-        @Param("id", ParseIntPipe) id: number,
-        @Body()
-        body: {
-            status: number;
-            delivery_date?: string;
-            within_time?: boolean;
-        },
-        @UploadedFile() file: Express.Multer.File | undefined
-    ) {
-        return this.service.updateStatus(id, body, file);
+    updateStatus(@Param("id", ParseIntPipe) id: number, @Req() req: Request, @UploadedFile() file: Express.Multer.File | undefined) {
+        const parsed = UpdateCourierStatusSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return this.service.updateStatus(id, parsed.data, file);
     }
 
     @Delete(":id")
