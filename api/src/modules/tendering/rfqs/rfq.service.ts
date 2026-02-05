@@ -404,40 +404,66 @@ export class RfqsService {
             documents: createdDocuments,
         } as RfqDetails;
 
-        // Send email notification
-        await this.sendRfqSentEmail(data.tenderId, rfqDetails, changedBy);
-
-        // TIMER TRANSITION: Complete rfq_sent step
-        try {
-            this.logger.log(`Transitioning timers for tender ${data.tenderId} after RFQ sent`);
-
-            // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", data.tenderId.toString());
-
-            // Complete the rfq_sent step
-            const rfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent" && step.status === "IN_PROGRESS");
-
-            if (rfqSentStep) {
-                this.logger.log(`Completing rfq_sent step ${rfqSentStep.id} for tender ${data.tenderId}`);
-                await this.workflowService.completeStep(rfqSentStep.id.toString(), {
-                    userId: changedBy.toString(),
-                    notes: "RFQ sent",
-                });
-                this.logger.log(`Successfully completed rfq_sent step for tender ${data.tenderId}`);
-            } else {
-                this.logger.warn(`No active rfq_sent step found for tender ${data.tenderId}`);
-                // Try to find any rfq_sent step
-                const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent");
-                if (anyRfqSentStep) {
-                    this.logger.warn(`Found rfq_sent step ${anyRfqSentStep.id} with status ${anyRfqSentStep.status}`);
-                }
-            }
-        } catch (error) {
-            this.logger.error(`Failed to transition timers for tender ${data.tenderId} after RFQ sent:`, error);
-            // Don't fail the entire operation if timer transition fails
-        }
+        // Return immediately after transaction commits to avoid blocking the HTTP response
+        // Background operations (emails, timer transition) run asynchronously
+        this.handleBackgroundOperations(
+            data.tenderId,
+            rfqDetails,
+            changedBy
+        ).catch((error) => {
+            this.logger.error('Background operations failed:', error);
+        });
 
         return rfqDetails;
+    }
+
+    /**
+     * Handle background operations (emails, timer transition) asynchronously
+     * This runs after the HTTP response is returned to avoid blocking and timeout issues
+     */
+    private async handleBackgroundOperations(
+        tenderId: number,
+        rfqDetails: RfqDetails,
+        changedBy: number
+    ): Promise<void> {
+        try {
+            // Send email notification
+            await this.sendRfqSentEmail(tenderId, rfqDetails, changedBy);
+
+            // TIMER TRANSITION: Complete rfq_sent step
+            try {
+                this.logger.log(`Transitioning timers for tender ${tenderId} after RFQ sent`);
+
+                // Get workflow status
+                const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
+
+                // Complete the rfq_sent step
+                const rfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent" && step.status === "IN_PROGRESS");
+
+                if (rfqSentStep) {
+                    this.logger.log(`Completing rfq_sent step ${rfqSentStep.id} for tender ${tenderId}`);
+                    await this.workflowService.completeStep(rfqSentStep.id.toString(), {
+                        userId: changedBy.toString(),
+                        notes: "RFQ sent",
+                    });
+                    this.logger.log(`Successfully completed rfq_sent step for tender ${tenderId}`);
+                } else {
+                    this.logger.warn(`No active rfq_sent step found for tender ${tenderId}`);
+                    // Try to find any rfq_sent step
+                    const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent");
+                    if (anyRfqSentStep) {
+                        this.logger.warn(`Found rfq_sent step ${anyRfqSentStep.id} with status ${anyRfqSentStep.status}`);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to transition timers for tender ${tenderId} after RFQ sent:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
+        } catch (error) {
+            this.logger.error('Unexpected error in background operations:', error);
+            // Re-throw to be caught by the caller's error handler
+            throw error;
+        }
     }
 
     async update(id: number, data: UpdateRfqDto): Promise<RfqDetails> {
