@@ -8,11 +8,13 @@ import { Logger } from "winston";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { couriers } from "@/db/schemas/shared/couriers.schema";
-import { users } from "@/db//schemas/auth/users.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 
 import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
-import type { UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
-import type { DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
+import type { UpdateCourierDto, UpdateCourierInput } from "@/modules/courier/zod/update-courier.schema";
+import type { CreateDispatchInput, DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
+
+import { CreateCourierSchema } from "@/modules/courier/zod/create-courier.schema";
 
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
@@ -23,6 +25,7 @@ import { stat } from "fs";
 import { from } from "rxjs";
 
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
+import { UpdateCourierStatusInput } from "./zod/update-courier-status.schema";
 
 // Status constants
 export const COURIER_STATUS = {
@@ -279,41 +282,34 @@ export class CourierService {
 
     //Actual business logic begins from here
     async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
-        this.logger.info("Creating courier", {
-            toOrg: data.toOrg,
-            userId,
-            filesCount: files?.length ?? 0,
-        });
-
-        const deliveryDate = new Date(`${data.delDate}T00:00:00.000Z`);
-
-        if (isNaN(deliveryDate.getTime())) {
-            throw new Error(`Invalid delDate received: ${data.delDate}`);
-        }
+        const dto = CreateCourierSchema.parse(data);
+        this.logger.info("Courier DTO", { data: dto });
 
         try {
             const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
 
             const values = {
-                toOrg: data.toOrg,
-                toName: data.toName,
-                toAddr: data.toAddr,
-                toPin: data.toPin,
-                toMobile: data.toMobile,
-                empFrom: data.empFrom,
-                urgency: data.urgency,
                 userId,
-                delDate: deliveryDate,
+                toOrg: dto.toOrg,
+                toName: dto.toName,
+                toAddr: dto.toAddr,
+                toPin: dto.toPin,
+                toMobile: dto.toMobile,
+                empFrom: dto.empFrom ?? userId,
+
+                // ✅ CRITICAL: Date for timestamptz
+                delDate: dto.delDate, // already Date because of z.coerce.date()
+
+                urgency: dto.urgency,
                 courierDocs,
                 status: COURIER_STATUS.PENDING,
-                createdAt: new Date(),
-                updatedAt: new Date(),
             };
+
+            this.logger.info("Insert values", { values });
 
             const [courier] = await this.db.insert(couriers).values(values).returning();
 
             if (!courier) {
-                this.logger.error("Courier DB insert returned empty result");
                 throw new Error("Failed to create courier");
             }
 
@@ -349,10 +345,6 @@ export class CourierService {
                     },
                     googleConnection
                 );
-
-                this.logger.info("Courier request mail sent", {
-                    courierId: courier.id,
-                });
             } catch (mailError: any) {
                 this.logger.error("Courier mail failed (non-blocking)", {
                     courierId: courier.id,
@@ -370,7 +362,7 @@ export class CourierService {
         }
     }
 
-    async update(id: number, data: UpdateCourierDto, userId: number) {
+    async update(id: number, data: UpdateCourierInput, userId: number) {
         this.logger.info("Updating courier", {
             courierId: id,
             userId,
@@ -380,9 +372,7 @@ export class CourierService {
             const existing = await this.findOne(id);
 
             if (!existing) {
-                this.logger.warn("Courier not found for update", {
-                    courierId: id,
-                });
+                this.logger.warn("Courier not found for update", { courierId: id });
                 throw new NotFoundException("Courier not found");
             }
 
@@ -394,22 +384,22 @@ export class CourierService {
                 throw new ForbiddenException("Not authorized to update this courier");
             }
 
-            const updateData: Record<string, any> = { updatedAt: new Date() };
+            const updateData: Record<string, any> = {
+                updatedAt: new Date(),
+            };
 
-            if (data.toOrg !== undefined) updateData.toOrg = data.toOrg;
-            if (data.toName !== undefined) updateData.toName = data.toName;
-            if (data.toAddr !== undefined) updateData.toAddr = data.toAddr;
-            if (data.toPin !== undefined) updateData.toPin = data.toPin;
-            if (data.toMobile !== undefined) updateData.toMobile = data.toMobile;
+            if (data.toOrg !== undefined) updateData.toOrg = data.toOrg.trim();
+            if (data.toName !== undefined) updateData.toName = data.toName.trim();
+            if (data.toAddr !== undefined) updateData.toAddr = data.toAddr.trim();
+            if (data.toPin !== undefined) updateData.toPin = data.toPin.trim();
+            if (data.toMobile !== undefined) updateData.toMobile = data.toMobile.trim();
             if (data.empFrom !== undefined) updateData.empFrom = data.empFrom;
             if (data.urgency !== undefined) updateData.urgency = data.urgency;
-            if (data.delDate !== undefined) updateData.delDate = new Date(data.delDate);
+            if (data.delDate !== undefined) updateData.delDate = data.delDate; // ✅ already Date
 
             const [updated] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
 
-            this.logger.info("Courier updated successfully", {
-                courierId: id,
-            });
+            this.logger.info("Courier updated successfully", { courierId: id });
 
             return updated;
         } catch (error: any) {
@@ -422,7 +412,7 @@ export class CourierService {
     }
 
     // Update status (delivery info)
-    async updateStatus(id: number, statusData: { status: number; deliveryDate?: string; withinTime?: boolean }, file: Express.Multer.File | undefined) {
+    async updateStatus(id: number, statusData: UpdateCourierStatusInput, file: Express.Multer.File | undefined) {
         this.logger.info("Updating courier status", {
             courierId: id,
             status: statusData.status,
@@ -447,8 +437,10 @@ export class CourierService {
 
             if (statusData.status === COURIER_STATUS.DELIVERED) {
                 if (file) updateData.deliveryPod = file.filename;
-                if (statusData.deliveryDate) updateData.deliveryDate = new Date(statusData.deliveryDate);
-                if (statusData.withinTime !== undefined) updateData.withinTime = statusData.withinTime;
+
+                if (statusData.delivery_date) updateData.deliveryDate = statusData.delivery_date; // ✅ already Date
+
+                if (statusData.within_time !== undefined) updateData.withinTime = statusData.within_time; // ✅ already boolean
             }
 
             const [updated] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
@@ -492,7 +484,12 @@ export class CourierService {
     /**
      * Dispatch with optional docket slip file (POST endpoint)
      */
-    async createDispatch(id: number, dispatchData: DispatchCourierDto, file: Express.Multer.File | undefined, userId: number) {
+    async createDispatch(
+        id: number,
+        dispatchData: CreateDispatchInput, // ← use zod inferred type
+        file: Express.Multer.File | undefined,
+        userId: number
+    ) {
         this.logger.info("Creating courier dispatch", {
             courierId: id,
             userId,
@@ -503,12 +500,10 @@ export class CourierService {
             const courierCheck = await this.findOne(id);
             if (!courierCheck) throw new NotFoundException("Courier not found");
 
-            this.validateDispatchData(dispatchData);
-
             const updateData: Record<string, any> = {
                 courierProvider: dispatchData.courierProvider.trim(),
                 docketNo: dispatchData.docketNo.trim(),
-                pickupDate: new Date(dispatchData.pickupDate),
+                pickupDate: dispatchData.pickupDate, // ✅ already Date
                 status: COURIER_STATUS.DISPATCHED,
                 updatedAt: new Date(),
             };
@@ -530,7 +525,11 @@ export class CourierService {
     }
 
     // Update dispatch info without file
-    async updateDispatch(id: number, dispatchData: { courierProvider: string; docketNo: string; pickupDate: string }, userId: number) {
+    async updateDispatch(
+        id: number,
+        dispatchData: CreateDispatchInput, // zod inferred type
+        userId: number
+    ) {
         this.logger.info("Updating dispatch info", { courierId: id, userId });
 
         try {
@@ -540,9 +539,9 @@ export class CourierService {
             const [updated] = await this.db
                 .update(couriers)
                 .set({
-                    courierProvider: dispatchData.courierProvider,
-                    docketNo: dispatchData.docketNo,
-                    pickupDate: new Date(dispatchData.pickupDate),
+                    courierProvider: dispatchData.courierProvider.trim(),
+                    docketNo: dispatchData.docketNo.trim(),
+                    pickupDate: dispatchData.pickupDate, // ✅ already Date
                     status: COURIER_STATUS.DISPATCHED,
                     updatedAt: new Date(),
                 })
@@ -560,7 +559,6 @@ export class CourierService {
             throw error;
         }
     }
-
     async delete(id: number, userId: number) {
         this.logger.warn("Deleting courier", { courierId: id, userId });
 
