@@ -129,7 +129,7 @@ export class CostingSheetsService {
             // No user provided - return empty results for security
             roleFilterConditions.push(sql`1 = 0`); // Always false condition
         }
-        
+
         // Build tab-specific conditions
         const conditions = [...baseConditions, ...roleFilterConditions];
 
@@ -204,7 +204,7 @@ export class CostingSheetsService {
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
-            .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
