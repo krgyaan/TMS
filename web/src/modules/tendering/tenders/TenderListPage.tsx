@@ -167,7 +167,7 @@ const TenderListPage = () => {
         {
             field: "teamMemberName",
             headerName: "Member",
-            width: 150,
+            width: 120,
             cellRenderer: (params: any) => {
                 const { value, data } = params;
                 return <span title={data?.teamMemberUsername}>{value ? value : <b className="text-gray-400">Unassigned</b>}</span>;
@@ -178,7 +178,7 @@ const TenderListPage = () => {
             headerName: "Tender Value",
             filter: true,
             sortable: true,
-            width: 140,
+            width: 130,
             cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
         },
         {
@@ -218,7 +218,7 @@ const TenderListPage = () => {
             headerName: "Status",
             filter: true,
             sortable: true,
-            width: 180,
+            width: 150,
             cellRenderer: (params: any) => {
                 let status = params.data?.statusName;
                 return <Badge variant='outline'>
