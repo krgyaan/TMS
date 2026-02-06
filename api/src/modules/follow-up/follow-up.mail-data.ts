@@ -87,36 +87,36 @@ export class FollowupMailDataBuilder {
         };
     }
 
-    // private resolveCc(area: string) {
-    //     if (area === "DC team") {
-    //         return ["sajid@volksenergie.in", "shivani.yadav@volksenergie.in", "goyal@volksenergie.in", "kainaat@volksenergie.in"];
-    //     }
-
-    //     if (area === "AC Team") {
-    //         return ["priyanka@volksenergie.in", "ahkamul@volksenergie.in", "arathi@volksenergie.in"];
-    //     }
-
-    //     return ["admin@volksenergie.in", "coordinator@volksenergie.in"];
-    // }
-
     private resolveCc(area: string) {
-        return ["abhigaur.test@gmail.com"];
+        if (area === "DC team") {
+            return ["sajid@volksenergie.in", "shivani.yadav@volksenergie.in", "goyal@volksenergie.in", "kainaat@volksenergie.in"];
+        }
+
+        if (area === "AC Team") {
+            return ["priyanka@volksenergie.in", "ahkamul@volksenergie.in", "arathi@volksenergie.in"];
+        }
+
+        return ["admin@volksenergie.in", "coordinator@volksenergie.in"];
     }
 
-    // private async getRecipients(id: number): Promise<string[]> {
-    //     const rows = await this.db.execute(sql`
-    //         SELECT email
-    //         FROM follow_up_persons
-    //         WHERE follow_up_id = ${id}
-    //         AND email IS NOT NULL
-    //     `);
-
-    //     return rows.rows.map((r: any) => r.email as string);
+    // private resolveCc(area: string) {
+    //     return ["abhigaur.test@gmail.com"];
     // }
 
     private async getRecipients(id: number): Promise<string[]> {
-        return ["abhijeetgaur.dev@gmail.com" as string];
+        const rows = await this.db.execute(sql`
+            SELECT email
+            FROM follow_up_persons
+            WHERE follow_up_id = ${id}
+            AND email IS NOT NULL
+        `);
+
+        return rows.rows.map((r: any) => r.email as string);
     }
+
+    // private async getRecipients(id: number): Promise<string[]> {
+    //     return ["abhijeetgaur.dev@gmail.com" as string];
+    // }
 
     private async resolveInstrumentData(instrumentId: number) {
         const rows = await this.db.execute(sql`
