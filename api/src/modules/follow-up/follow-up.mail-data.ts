@@ -3,8 +3,29 @@ import { sql } from "drizzle-orm";
 import { FollowUpDetailsDto } from "./zod/update-follow-up.dto";
 import { FollowupMailBase, FollowupMailPayload } from "./zod/mail.dto";
 import { FollowupMailTemplates } from "./follow-up.mail";
+import sanitizeHtml from "sanitize-html";
 
 type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment" | "Surety Bond";
+
+export function sanitizeForEmail(rawHtml?: string | null): string {
+    if (!rawHtml) return "";
+
+    const cleaned = sanitizeHtml(rawHtml, {
+        allowedTags: ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a"],
+        allowedAttributes: { a: ["href"] },
+        allowedSchemes: ["http", "https", "mailto"],
+        transformTags: {
+            div: "p",
+            span: "p",
+        },
+        exclusiveFilter: frame => !frame.text.trim(),
+    });
+
+    return cleaned
+        .replace(/(<br\s*\/?>\s*){3,}/g, "<br><br>")
+        .replace(/<p>\s*<\/p>/g, "")
+        .trim();
+}
 
 export class FollowupMailDataBuilder {
     constructor(private db: DbInstance) {}
@@ -18,10 +39,12 @@ export class FollowupMailDataBuilder {
 
         const since = this.computeSince(fu.startFrom);
 
+        const cleanDetails = sanitizeForEmail(fu.details);
+
         const baseContext = {
             for: fu.followupFor,
             name: fu.partyName,
-            details: fu.details,
+            details: cleanDetails,
             reminder: fu.reminderCount,
             since,
         };
@@ -78,6 +101,7 @@ export class FollowupMailDataBuilder {
             startFrom: r.startFrom,
         };
     }
+
     // private resolveCc(area: string) {
     //     if (area === "DC team") {
     //         return ["sajid@volksenergie.in", "shivani.yadav@volksenergie.in", "goyal@volksenergie.in", "kainaat@volksenergie.in"];
