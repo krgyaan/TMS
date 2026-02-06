@@ -17,7 +17,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type CostingSheetDashboardRow = {
@@ -60,7 +60,7 @@ export class CostingSheetsService {
         private readonly googleDriveService: GoogleDriveService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     private determineCostingStatus(
@@ -449,35 +449,19 @@ export class CostingSheetsService {
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
 
-        // TIMER TRANSITION: Complete costing_sheets step
+        // TIMER TRANSITION: Stop costing_sheets timer
         try {
-            this.logger.log(`Transitioning timers for tender ${data.tenderId} after costing sheet submitted`);
-
-            // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', data.tenderId.toString());
-
-            // Complete the costing_sheets step
-            const costingSheetsStep = workflowStatus.steps.find(step =>
-                step.stepKey === 'costing_sheets' && step.status === 'IN_PROGRESS'
-            );
-
-            if (costingSheetsStep) {
-                this.logger.log(`Completing costing_sheets step ${costingSheetsStep.id} for tender ${data.tenderId}`);
-                await this.workflowService.completeStep(costingSheetsStep.id.toString(), {
-                    userId: data.submittedBy.toString(),
-                    notes: 'Costing sheet submitted'
-                });
-                this.logger.log(`Successfully completed costing_sheets step for tender ${data.tenderId}`);
-            } else {
-                this.logger.warn(`No active costing_sheets step found for tender ${data.tenderId}`);
-                // Try to find any costing_sheets step
-                const anyCostingSheetsStep = workflowStatus.steps.find(step => step.stepKey === 'costing_sheets');
-                if (anyCostingSheetsStep) {
-                    this.logger.warn(`Found costing_sheets step ${anyCostingSheetsStep.id} with status ${anyCostingSheetsStep.status}`);
-                }
-            }
+            this.logger.log(`Stopping timer for tender ${data.tenderId} after costing sheet submitted`);
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: data.tenderId,
+                stage: 'costing_sheets',
+                userId: data.submittedBy,
+                reason: 'Costing sheet submitted'
+            });
+            this.logger.log(`Successfully stopped costing_sheets timer for tender ${data.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to transition timers for tender ${data.tenderId} after costing sheet submitted:`, error);
+            this.logger.error(`Failed to stop timer for tender ${data.tenderId} after costing sheet submitted:`, error);
             // Don't fail the entire operation if timer transition fails
         }
 
@@ -542,36 +526,20 @@ export class CostingSheetsService {
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(costingSheet.tenderId, result, changedBy);
 
-        // TIMER TRANSITION: Complete costing_sheets step if status is 'Submitted'
+        // TIMER TRANSITION: Stop costing_sheets timer if status is 'Submitted'
         if (updateData.status === 'Submitted') {
             try {
-                this.logger.log(`Transitioning timers for tender ${costingSheet.tenderId} after costing sheet resubmitted`);
-
-                // Get workflow status
-                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', costingSheet.tenderId.toString());
-
-                // Complete the costing_sheets step
-                const costingSheetsStep = workflowStatus.steps.find(step =>
-                    step.stepKey === 'costing_sheets' && step.status === 'IN_PROGRESS'
-                );
-
-                if (costingSheetsStep) {
-                    this.logger.log(`Completing costing_sheets step ${costingSheetsStep.id} for tender ${costingSheet.tenderId}`);
-                    await this.workflowService.completeStep(costingSheetsStep.id.toString(), {
-                        userId: changedBy.toString(),
-                        notes: 'Costing sheet resubmitted'
-                    });
-                    this.logger.log(`Successfully completed costing_sheets step for tender ${costingSheet.tenderId}`);
-                } else {
-                    this.logger.warn(`No active costing_sheets step found for tender ${costingSheet.tenderId}`);
-                    // Try to find any costing_sheets step
-                    const anyCostingSheetsStep = workflowStatus.steps.find(step => step.stepKey === 'costing_sheets');
-                    if (anyCostingSheetsStep) {
-                        this.logger.warn(`Found costing_sheets step ${anyCostingSheetsStep.id} with status ${anyCostingSheetsStep.status}`);
-                    }
-                }
+                this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing sheet resubmitted`);
+                await this.timersService.stopTimer({
+                    entityType: 'TENDER',
+                    entityId: costingSheet.tenderId,
+                    stage: 'costing_sheets',
+                    userId: changedBy,
+                    reason: 'Costing sheet resubmitted'
+                });
+                this.logger.log(`Successfully stopped costing_sheets timer for tender ${costingSheet.tenderId}`);
             } catch (error) {
-                this.logger.error(`Failed to transition timers for tender ${costingSheet.tenderId} after costing sheet resubmitted:`, error);
+                this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing sheet resubmitted:`, error);
                 // Don't fail the entire operation if timer transition fails
             }
         }

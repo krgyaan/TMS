@@ -17,7 +17,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type CostingApprovalDashboardRow = {
@@ -66,7 +66,7 @@ export class CostingApprovalsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     private costingApprovalBaseQuery(select: any): any {
@@ -432,35 +432,19 @@ export class CostingApprovalsService {
         // Send email notification
         await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
 
-        // TIMER TRANSITION: Complete costing_approval step
+        // TIMER TRANSITION: Stop costing_approval timer
         try {
-            this.logger.log(`Transitioning timers for tender ${costingSheet.tenderId} after costing approval`);
-
-            // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', costingSheet.tenderId.toString());
-
-            // Complete the costing_approval step
-            const costingApprovalStep = workflowStatus.steps.find(step =>
-                step.stepKey === 'costing_approval' && step.status === 'IN_PROGRESS'
-            );
-
-            if (costingApprovalStep) {
-                this.logger.log(`Completing costing_approval step ${costingApprovalStep.id} for tender ${costingSheet.tenderId}`);
-                await this.workflowService.completeStep(costingApprovalStep.id.toString(), {
-                    userId: userId.toString(),
-                    notes: 'Costing approved'
-                });
-                this.logger.log(`Successfully completed costing_approval step for tender ${costingSheet.tenderId}`);
-            } else {
-                this.logger.warn(`No active costing_approval step found for tender ${costingSheet.tenderId}`);
-                // Try to find any costing_approval step
-                const anyCostingApprovalStep = workflowStatus.steps.find(step => step.stepKey === 'costing_approval');
-                if (anyCostingApprovalStep) {
-                    this.logger.warn(`Found costing_approval step ${anyCostingApprovalStep.id} with status ${anyCostingApprovalStep.status}`);
-                }
-            }
+            this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing approval`);
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: costingSheet.tenderId,
+                stage: 'costing_approval',
+                userId: userId,
+                reason: 'Costing approved'
+            });
+            this.logger.log(`Successfully stopped costing_approval timer for tender ${costingSheet.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to transition timers for tender ${costingSheet.tenderId} after costing approval:`, error);
+            this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing approval:`, error);
             // Don't fail the entire operation if timer transition fails
         }
 
