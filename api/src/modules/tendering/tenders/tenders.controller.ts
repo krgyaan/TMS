@@ -4,13 +4,14 @@ import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema } from './dto/tender.dto';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 
 @Controller('tenders')
 export class TenderInfoController {
     constructor(
         private readonly tenderInfosService: TenderInfosService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard/counts')
@@ -64,15 +65,10 @@ export class TenderInfoController {
 
         const tendersWithTimers = await Promise.all(
             tenders.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                timer = await this.workflowService.getTimerForStep('TENDER', tender.id, 'tender_info');
-                if (!timer.hasTimer) {
-                    timer = null;
-                }
-
+                const timer = await this.timersService.getTimer('TENDER', tender.id, 'tender_info');
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'tender_info')
                 };
             })
         );
@@ -146,10 +142,8 @@ export class TenderInfoController {
     @Get(':id/timer')
     async getTenderTimer(@Param('id') id: string) {
         try {
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', id);
-            const currentStep = workflowStatus.steps.find(step => step.status === 'IN_PROGRESS');
-
-            if (!currentStep || !currentStep.timerState) {
+            const timerId = parseInt(id, 10);
+            if (Number.isNaN(timerId)) {
                 return {
                     hasTimer: false,
                     stepKey: null,
@@ -159,17 +153,19 @@ export class TenderInfoController {
                 };
             }
 
-            const timerState = currentStep.timerState;
-            const remainingSeconds = timerState.remainingMs ? Math.floor(timerState.remainingMs / 1000) : 0;
+            const timer = await this.timersService.getTimer('TENDER', timerId, 'tender_info');
 
+            const transformedTimer = transformTimerForFrontend(timer, 'tender_info');
+
+            // transformedTimer is now always an object (never null)
             return {
-                hasTimer: true,
-                stepKey: timerState.stepKey,
-                stepName: timerState.stepName,
-                remainingSeconds,
-                status: timerState.timerStatus,
-                deadline: timerState.scheduledEndAt,
-                allocatedHours: timerState.totalAllocatedMs ? timerState.totalAllocatedMs / (1000 * 60 * 60) : null,
+                hasTimer: transformedTimer.status !== 'NOT_STARTED',
+                stepKey: transformedTimer.stepName,
+                stepName: transformedTimer.stepName,
+                remainingSeconds: transformedTimer.remainingSeconds,
+                status: transformedTimer.status,
+                deadline: timer?.deadlineAt || null,
+                allocatedHours: timer?.allocatedTimeMs ? timer.allocatedTimeMs / (1000 * 60 * 60) : null,
             };
         } catch (error) {
             return {
@@ -204,7 +200,7 @@ export class TenderInfoController {
         );
 
         return timers.reduce((acc, timer) => {
-            acc[timer.stepKey] = timer;
+            acc[timer.hasTimer ? timer.stepKey || 'no_timer' : 'no_timer'] = timer;
             return acc;
         }, {} as Record<string, any>);
     }

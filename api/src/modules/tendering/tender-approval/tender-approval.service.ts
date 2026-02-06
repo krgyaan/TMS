@@ -1,27 +1,26 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { eq, and, asc, desc, sql, or, inArray, isNull } from "drizzle-orm";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { tenderStatusHistory } from "@db/schemas/tendering/tender-status-history.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { tenderIncompleteFields } from "@db/schemas/tendering/tender-incomplete-fields.schema";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
-import { EmailService } from "@/modules/email/email.service";
-import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { WorkflowService } from "@/modules/timers/services/workflow.service";
-import { TenderInfoSheetsService } from "../info-sheets/info-sheets.service";
-import { stepInstances } from "@/db/schemas/workflow/workflows.schema";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { eq, and, asc, desc, sql, or, inArray, isNull } from 'drizzle-orm';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -62,9 +61,9 @@ export class TenderApprovalService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
-        private readonly tenderInfoSheetsService: TenderInfoSheetsService
-    ) {}
+        private readonly timersService: TimersService,
+        private readonly tenderInfoSheetsService: TenderInfoSheetsService,
+    ) { }
 
     /**
      * Build role-based filter conditions for tender queries
@@ -491,26 +490,21 @@ export class TenderApprovalService {
             // TIMER TRANSITION
             this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
 
-            // 1. Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
-
-            // 2. Complete the tender_approval step
-            const tenderApprovalStep = workflowStatus.steps.find(step => step.stepKey === "tender_approval" && step.status === "IN_PROGRESS");
-
-            if (tenderApprovalStep) {
-                this.logger.log(`Completing tender_approval step ${tenderApprovalStep.id} for tender ${tenderId}`);
-                await this.workflowService.completeStep(tenderApprovalStep.id.toString(), {
-                    userId: changedBy.toString(),
-                    notes: "Tender approved",
+            // 1. Stop the tender_approval timer
+            try {
+                await this.timersService.stopTimer({
+                    entityType: 'TENDER',
+                    entityId: tenderId,
+                    stage: 'tender_approval',
+                    userId: changedBy,
+                    reason: 'Tender approved'
                 });
-            } else {
-                this.logger.warn(`No active tender_approval step found for tender ${tenderId}`);
+                this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
+            } catch (error) {
+                this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
             }
 
-            // 3. Get updated workflow status
-            const updatedWorkflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
-
-            // 4. Get tender and info sheet data
+            // 2. Get tender and info sheet data
             const tender = await this.tenderInfosService.findById(tenderId);
             const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
 
@@ -518,74 +512,68 @@ export class TenderApprovalService {
                 throw new NotFoundException(`Tender or info sheet not found for tender ${tenderId}`);
             }
 
-            // 5. Find steps that should be started based on tender configuration
-            const stepsToStart = updatedWorkflowStatus.steps.filter(step => {
-                // Check if step should be started based on tender configuration
-                if (step.stepKey === "rfq_sent" && tender.rfqTo && tender.rfqTo !== "0") {
-                    return step.status === "PENDING";
-                }
-                if (step.stepKey === "emd_requested" && (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1")) {
-                    return step.status === "PENDING";
-                }
-                if (step.stepKey === "physical_docs" && infoSheet.physicalDocsRequired === "YES") {
-                    return step.status === "PENDING";
-                }
-                if (step.stepKey === "document_checklist" || step.stepKey === "costing_sheets") {
-                    return step.status === "PENDING";
-                }
-                return false;
-            });
+            // 3. Determine which timers should be started based on tender configuration
+            const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
 
-            this.logger.log(`Found ${stepsToStart.length} steps to start after approval for tender ${tenderId}`, {
-                steps: stepsToStart.map(step => step.stepKey),
-            });
+            if (tender.rfqTo && tender.rfqTo !== '0') {
+                stagesToStart.push({ stage: 'rfq_sent' });
+            }
+            if (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1') {
+                stagesToStart.push({ stage: 'emd_requested' });
+            }
+            if (infoSheet.physicalDocsRequired === 'YES') {
+                stagesToStart.push({ stage: 'physical_docs' });
+            }
+            // Always start these timers
+            stagesToStart.push({ stage: 'document_checklist' });
+            stagesToStart.push({ stage: 'costing_sheets' });
 
-            // 6. Update timer configurations for negative countdown timers
+            // 4. Configure negative countdown timers if due date exists
             if (tender.dueDate) {
                 const dueDate = new Date(tender.dueDate);
-                this.logger.log(`Tender due date: ${dueDate.toISOString()}`);
-
-                for (const step of stepsToStart) {
-                    if (step.stepKey === "document_checklist" || step.stepKey === "costing_sheets") {
-                        const hoursBeforeDeadline = step.stepKey === "document_checklist" ? -72 : -72;
-                        const cutoffDate = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
-
-                        this.logger.log(`Updating ${step.stepKey} step ${step.id} with deadline ${cutoffDate.toISOString()}`);
-
-                        try {
-                            await this.db
-                                .update(stepInstances)
-                                .set({
-                                    customDeadline: cutoffDate,
-                                    timerConfig: {
-                                        ...step.timerConfig,
-                                        type: "NEGATIVE_COUNTDOWN",
-                                        hoursBeforeDeadline: hoursBeforeDeadline,
-                                    },
-                                })
-                                .where(eq(stepInstances.id, step.id));
-
-                            this.logger.log(`Successfully updated timer config for step ${step.stepKey}`);
-                        } catch (error) {
-                            this.logger.error(`Failed to update timer config for step ${step.stepKey}:`, error);
-                        }
+                for (const item of stagesToStart) {
+                    if (item.stage === 'document_checklist' || item.stage === 'costing_sheets') {
+                        const hoursBeforeDeadline = -72;
+                        const deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                        item.timerConfig = {
+                            type: 'NEGATIVE_COUNTDOWN',
+                            hoursBeforeDeadline: hoursBeforeDeadline
+                        };
+                        // Note: deadlineAt will be set when starting the timer
                     }
                 }
-            } else {
-                this.logger.warn(`No due date set for tender ${tenderId}, cannot configure negative countdown timers`);
             }
 
-            // 7. Start all eligible steps
-            for (const step of stepsToStart) {
+            this.logger.log(`Found ${stagesToStart.length} timers to start after approval for tender ${tenderId}`, {
+                stages: stagesToStart.map(item => item.stage)
+            });
+
+            // 5. Start all eligible timers
+            for (const item of stagesToStart) {
                 try {
-                    this.logger.log(`Starting step ${step.stepKey} (${step.id}) for tender ${tenderId}`);
-                    await this.workflowService.startStep(step.id.toString(), {
-                        stepKey: step.stepKey,
-                        assignedToUserId: step.assignedToUserId?.toString(),
-                    });
-                    this.logger.log(`Successfully started step ${step.stepKey} for tender ${tenderId}`);
+                    this.logger.log(`Starting timer for stage ${item.stage} for tender ${tenderId}`);
+                    const timerInput: any = {
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: item.stage,
+                        userId: changedBy,
+                        timerConfig: item.timerConfig || {
+                            type: 'FIXED_DURATION',
+                            durationHours: 24
+                        }
+                    };
+
+                    // Set deadline for negative countdown timers
+                    if (tender.dueDate && item.timerConfig?.type === 'NEGATIVE_COUNTDOWN') {
+                        const dueDate = new Date(tender.dueDate);
+                        const hoursBeforeDeadline = item.timerConfig.hoursBeforeDeadline || -72;
+                        timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                    }
+
+                    await this.timersService.startTimer(timerInput);
+                    this.logger.log(`Successfully started timer for stage ${item.stage} for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.error(`Failed to start step ${step.stepKey} for tender ${tenderId}:`, error);
+                    this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
                 }
             }
 

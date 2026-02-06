@@ -14,14 +14,16 @@ import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/
 import type { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
     private readonly logger = new Logger(CostingApprovalsController.name);
     constructor(
         private readonly costingApprovalsService: CostingApprovalsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -50,12 +52,9 @@ export class CostingApprovalsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'costing_approval');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'costing_approval');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -65,7 +64,7 @@ export class CostingApprovalsController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'costing_approval')
                 };
             })
         );

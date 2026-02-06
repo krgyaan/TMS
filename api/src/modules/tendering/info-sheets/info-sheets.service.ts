@@ -21,7 +21,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { websites } from '@db/schemas/master/websites.schema';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
@@ -39,7 +39,7 @@ export class TenderInfoSheetsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     async findByTenderId(
@@ -359,71 +359,35 @@ export class TenderInfoSheetsService {
             try {
                 this.logger.log(`Transitioning timers for tender ${tenderId}`);
 
-                // Get workflow status
-                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-
-                // Debug: Log all steps
-                this.logger.debug(`Current workflow steps for tender ${tenderId}:`, {
-                    steps: workflowStatus.steps.map(step => ({
-                        stepKey: step.stepKey,
-                        status: step.status,
-                        timerStatus: step.timerStatus,
-                        id: step.id
-                    }))
-                });
-
-                // 1. Complete the tender_info step
-                const tenderInfoStep = workflowStatus.steps.find(step =>
-                    step.stepKey === 'tender_info' && step.status === 'IN_PROGRESS'
-                );
-
-                if (tenderInfoStep) {
-                    this.logger.log(`Completing tender_info step ${tenderInfoStep.id} for tender ${tenderId}`);
-                    await this.workflowService.completeStep(tenderInfoStep.id.toString(), {
-                        userId: changedBy.toString(),
-                        notes: 'Tender info sheet completed'
+                // 1. Stop the tender_info timer
+                try {
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_info',
+                        userId: changedBy,
+                        reason: 'Tender info sheet completed'
                     });
-                } else {
-                    this.logger.warn(`No active tender_info step found for tender ${tenderId}`);
-                    // Try to find any tender_info step
-                    const anyTenderInfoStep = workflowStatus.steps.find(step => step.stepKey === 'tender_info');
-                    if (anyTenderInfoStep) {
-                        this.logger.warn(`Found tender_info step ${anyTenderInfoStep.id} with status ${anyTenderInfoStep.status}`);
-                    }
+                    this.logger.log(`Successfully stopped tender_info timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to stop tender_info timer for tender ${tenderId}:`, error);
                 }
 
-                // 2. Verify tender_approval step was started
-                const updatedWorkflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-                const tenderApprovalStep = updatedWorkflowStatus.steps.find(step =>
-                    step.stepKey === 'tender_approval' && step.status === 'IN_PROGRESS'
-                );
-
-                if (!tenderApprovalStep) {
-                    this.logger.warn(`tender_approval step not automatically started for tender ${tenderId}`);
-
-                    // Fallback: Manually start the step if automatic transition failed
-                    const pendingApprovalStep = updatedWorkflowStatus.steps.find(step =>
-                        step.stepKey === 'tender_approval' && step.status === 'PENDING'
-                    );
-
-                    if (pendingApprovalStep) {
-                        this.logger.log(`Manually starting tender_approval step ${pendingApprovalStep.id} for tender ${tenderId}`);
-                        await this.workflowService.startStep(pendingApprovalStep.id.toString(), {
-                            stepKey: 'tender_approval',
-                            assignedToUserId: pendingApprovalStep.assignedToUserId?.toString()
-                        });
-                    } else {
-                        this.logger.error(`No pending tender_approval step found for tender ${tenderId}`);
-                        // Try to find any tender_approval step
-                        const anyApprovalStep = updatedWorkflowStatus.steps.find(step => step.stepKey === 'tender_approval');
-                        if (anyApprovalStep) {
-                            this.logger.error(`Found tender_approval step ${anyApprovalStep.id} with status ${anyApprovalStep.status}`);
-                        } else {
-                            this.logger.error(`No tender_approval step found at all for tender ${tenderId}`);
+                // 2. Start the tender_approval timer
+                try {
+                    await this.timersService.startTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_approval',
+                        userId: changedBy,
+                        timerConfig: {
+                            type: 'FIXED_DURATION',
+                            durationHours: 24
                         }
-                    }
-                } else {
-                    this.logger.log(`tender_approval step ${tenderApprovalStep.id} successfully started for tender ${tenderId}`);
+                    });
+                    this.logger.log(`Successfully started tender_approval timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to start tender_approval timer for tender ${tenderId}:`, error);
                 }
 
                 this.logger.log(`Successfully transitioned timers for tender ${tenderId}`);

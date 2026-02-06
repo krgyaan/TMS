@@ -21,7 +21,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export interface PendingTenderRow {
@@ -214,7 +214,7 @@ export class EmdsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     async getDashboardData(
@@ -259,7 +259,7 @@ export class EmdsService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
             if (user.roleId === 1 || user.roleId === 2) {
                 // Super User or Admin: Show all, respect teamId filter if provided
@@ -286,7 +286,7 @@ export class EmdsService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -1043,37 +1043,21 @@ export class EmdsService {
                 }
             }
 
-            // TIMER TRANSITION: Complete emd_requested step if EMD was requested
+            // TIMER TRANSITION: Stop emd_requested timer if EMD was requested
             // Only for TMS requests with valid tenderId
             if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
                 try {
-                    this.logger.log(`Transitioning timers for tender ${tenderId} after EMD requested`);
-
-                    // Get workflow status
-                    const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-
-                    // Complete the emd_requested step
-                    const emdRequestedStep = workflowStatus.steps.find(step =>
-                        step.stepKey === 'emd_requested' && step.status === 'IN_PROGRESS'
-                    );
-
-                    if (emdRequestedStep) {
-                        this.logger.log(`Completing emd_requested step ${emdRequestedStep.id} for tender ${tenderId}`);
-                        await this.workflowService.completeStep(emdRequestedStep.id.toString(), {
-                            userId: userId.toString(),
-                            notes: 'EMD requested'
-                        });
-                        this.logger.log(`Successfully completed emd_requested step for tender ${tenderId}`);
-                    } else {
-                        this.logger.warn(`No active emd_requested step found for tender ${tenderId}`);
-                        // Try to find any emd_requested step
-                        const anyEmdRequestedStep = workflowStatus.steps.find(step => step.stepKey === 'emd_requested');
-                        if (anyEmdRequestedStep) {
-                            this.logger.warn(`Found emd_requested step ${anyEmdRequestedStep.id} with status ${anyEmdRequestedStep.status}`);
-                        }
-                    }
+                    this.logger.log(`Stopping timer for tender ${tenderId} after EMD requested`);
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'emd_requested',
+                        userId: userId,
+                        reason: 'EMD requested'
+                    });
+                    this.logger.log(`Successfully stopped emd_requested timer for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.error(`Failed to transition timers for tender ${tenderId} after EMD requested:`, error);
+                    this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
                     // Don't fail the entire operation if timer transition fails
                 }
             }
@@ -1866,7 +1850,7 @@ export class EmdsService {
         recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
     ) {
         try {
-            await this.emailService.sendTenderEmail({
+            const result = await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType,
                 fromUserId,
@@ -1876,6 +1860,15 @@ export class EmdsService {
                 template,
                 data,
             });
+
+            if (!result.success) {
+                this.logger.error(
+                    `Failed to send email for tender ${tenderId}: ${result.error || 'Unknown error'}. ` +
+                    `Event: ${eventType}, Template: ${template}, FromUserId: ${fromUserId}`
+                );
+            } else {
+                this.logger.debug(`Email sent successfully for tender ${tenderId}, emailLogId: ${result.emailLogId}`);
+            }
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
             // Don't throw - email failure shouldn't break main operation

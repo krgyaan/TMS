@@ -17,7 +17,9 @@ import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 
 
 @Controller('physical-docs')
@@ -25,7 +27,7 @@ export class PhysicalDocsController {
     private readonly logger = new Logger(PhysicalDocsController.name);
     constructor(
         private readonly physicalDocsService: PhysicalDocsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -54,12 +56,9 @@ export class PhysicalDocsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'physical_docs');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'physical_docs');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -69,7 +68,7 @@ export class PhysicalDocsController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'physical_docs')
                 };
             })
         );

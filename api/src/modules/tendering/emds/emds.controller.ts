@@ -4,7 +4,9 @@ import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSch
 import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 
 // Extend Express Request to include user
 interface AuthenticatedRequest extends Request {
@@ -21,7 +23,7 @@ export class EmdsController {
     private readonly logger = new Logger(EmdsController.name);
     constructor(
         private readonly emdsService: EmdsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('/')
@@ -47,12 +49,9 @@ export class EmdsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'emd_requested');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'emd_requested');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -62,7 +61,7 @@ export class EmdsController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'emd_requested')
                 };
             })
         );

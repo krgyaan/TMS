@@ -20,7 +20,7 @@ import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { Logger } from "@nestjs/common";
 import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { WorkflowService } from "@/modules/timers/services/workflow.service";
+import { TimersService } from "@/modules/timers/timers.service";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 export type RfqFilters = {
@@ -84,8 +84,8 @@ export class RfqsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService
-    ) {}
+        private readonly timersService: TimersService
+    ) { }
 
     /**
      * Build role-based filter conditions for tender queries
@@ -430,33 +430,19 @@ export class RfqsService {
             // Send email notification
             await this.sendRfqSentEmail(tenderId, rfqDetails, changedBy);
 
-            // TIMER TRANSITION: Complete rfq_sent step
+            // TIMER TRANSITION: Stop rfq_sent timer
             try {
-                this.logger.log(`Transitioning timers for tender ${tenderId} after RFQ sent`);
-
-                // Get workflow status
-                const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
-
-                // Complete the rfq_sent step
-                const rfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent" && step.status === "IN_PROGRESS");
-
-                if (rfqSentStep) {
-                    this.logger.log(`Completing rfq_sent step ${rfqSentStep.id} for tender ${tenderId}`);
-                    await this.workflowService.completeStep(rfqSentStep.id.toString(), {
-                        userId: changedBy.toString(),
-                        notes: "RFQ sent",
-                    });
-                    this.logger.log(`Successfully completed rfq_sent step for tender ${tenderId}`);
-                } else {
-                    this.logger.warn(`No active rfq_sent step found for tender ${tenderId}`);
-                    // Try to find any rfq_sent step
-                    const anyRfqSentStep = workflowStatus.steps.find(step => step.stepKey === "rfq_sent");
-                    if (anyRfqSentStep) {
-                        this.logger.warn(`Found rfq_sent step ${anyRfqSentStep.id} with status ${anyRfqSentStep.status}`);
-                    }
-                }
+                this.logger.log(`Stopping timer for tender ${tenderId} after RFQ sent`);
+                await this.timersService.stopTimer({
+                    entityType: 'TENDER',
+                    entityId: tenderId,
+                    stage: 'rfq_sent',
+                    userId: changedBy,
+                    reason: 'RFQ sent'
+                });
+                this.logger.log(`Successfully stopped rfq_sent timer for tender ${tenderId}`);
             } catch (error) {
-                this.logger.error(`Failed to transition timers for tender ${tenderId} after RFQ sent:`, error);
+                this.logger.error(`Failed to stop timer for tender ${tenderId} after RFQ sent:`, error);
                 // Don't fail the entire operation if timer transition fails
             }
         } catch (error) {
@@ -689,10 +675,10 @@ export class RfqsService {
         // Format due date
         const dueDate = rfqDetails.dueDate
             ? new Date(rfqDetails.dueDate).toLocaleDateString("en-IN", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-              })
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            })
             : "Not specified";
 
         // Check document types

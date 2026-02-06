@@ -3,7 +3,9 @@ import { TenderApprovalService, type TenderApprovalFilters } from '@/modules/ten
 import { TenderApprovalPayloadSchema, type TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 import { Logger } from '@nestjs/common';
 
 @Controller('tender-approvals')
@@ -11,7 +13,7 @@ export class TenderApprovalController {
     private readonly logger = new Logger(TenderApprovalController.name);
     constructor(
         private readonly tenderApprovalService: TenderApprovalService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -40,12 +42,9 @@ export class TenderApprovalController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'tender_approval');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'tender_approval');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -55,7 +54,7 @@ export class TenderApprovalController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'tender_approval')
                 };
             })
         );
