@@ -7,26 +7,6 @@ import sanitizeHtml from "sanitize-html";
 
 type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment" | "Surety Bond";
 
-export function sanitizeForEmail(rawHtml?: string | null): string {
-    if (!rawHtml) return "";
-
-    const cleaned = sanitizeHtml(rawHtml, {
-        allowedTags: ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a"],
-        allowedAttributes: { a: ["href"] },
-        allowedSchemes: ["http", "https", "mailto"],
-        transformTags: {
-            div: "p",
-            span: "p",
-        },
-        exclusiveFilter: frame => !frame.text.trim(),
-    });
-
-    return cleaned
-        .replace(/(<br\s*\/?>\s*){3,}/g, "<br><br>")
-        .replace(/<p>\s*<\/p>/g, "")
-        .trim();
-}
-
 export class FollowupMailDataBuilder {
     constructor(private db: DbInstance) {}
 
@@ -39,7 +19,12 @@ export class FollowupMailDataBuilder {
 
         const since = this.computeSince(fu.startFrom);
 
-        const cleanDetails = sanitizeForEmail(fu.details);
+        const cleanDetails = sanitizeHtml(fu.details, {
+            allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "table", "tbody", "tr", "td"]),
+            allowedAttributes: {
+                "*": ["style", "href", "src"],
+            },
+        });
 
         const baseContext = {
             for: fu.followupFor,
