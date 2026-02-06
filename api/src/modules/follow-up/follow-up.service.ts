@@ -586,6 +586,11 @@ export class FollowUpService {
                 return;
             }
 
+            this.logger.debug("Mail Payload", {
+                followUpId: id,
+                payload
+            });
+
             this.logger.debug("Mail payload built", {
                 followUpId: id,
                 toCount: payload.to?.length ?? 0,
