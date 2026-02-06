@@ -50,24 +50,31 @@ export class CostingApprovalsController {
             search,
         }, user, parseNumber(teamId));
         // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                let timer: TimerWithComputed | null = null;
-                try {
-                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'costing_approval');
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const dataWithTimers = await Promise.all(
+        //     result.data.map(async (tender) => {
+        //         let timer: TimerWithComputed | null = null;
+        //         try {
+        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'costing_approval');
+        //         } catch (error) {
+        //             this.logger.error(
+        //                 `Failed to get timer for tender ${tender.tenderId}:`,
+        //                 error
+        //             );
+        //         }
 
-                return {
-                    ...tender,
-                    timer: transformTimerForFrontend(timer, 'costing_approval')
-                };
-            })
-        );
+        //         return {
+        //             ...tender,
+        //             timer: transformTimerForFrontend(timer, 'costing_approval')
+        //         };
+        //     })
+        // );
+        const dataWithTimers = result.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'costing_approval')
+            };
+        });
 
         return {
             ...result,

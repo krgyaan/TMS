@@ -54,24 +54,31 @@ export class RfqsController {
             search,
         });
         // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                let timer: TimerWithComputed | null = null;
-                try {
-                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'rfq_sent');
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const dataWithTimers = await Promise.all(
+        //     result.data.map(async (tender) => {
+        //         let timer: TimerWithComputed | null = null;
+        //         try {
+        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'rfq_sent');
+        //         } catch (error) {
+        //             this.logger.error(
+        //                 `Failed to get timer for tender ${tender.tenderId}:`,
+        //                 error
+        //             );
+        //         }
 
-                return {
-                    ...tender,
-                    timer: transformTimerForFrontend(timer, 'rfq_sent')
-                };
-            })
-        );
+        //         return {
+        //             ...tender,
+        //             timer: transformTimerForFrontend(timer, 'rfq_sent')
+        //         };
+        //     })
+        // );
+        const dataWithTimers = result.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'rfq_sent')
+            };
+        });
 
         return {
             ...result,

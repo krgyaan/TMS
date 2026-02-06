@@ -63,15 +63,22 @@ export class TenderInfoController {
             user,
         });
 
-        const tendersWithTimers = await Promise.all(
-            tenders.data.map(async (tender) => {
-                const timer = await this.timersService.getTimer('TENDER', tender.id, 'tender_info');
-                return {
-                    ...tender,
-                    timer: transformTimerForFrontend(timer, 'tender_info')
-                };
-            })
-        );
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const tendersWithTimers = await Promise.all(
+        //     tenders.data.map(async (tender) => {
+        //         const timer = await this.timersService.getTimer('TENDER', tender.id, 'tender_info');
+        //         return {
+        //             ...tender,
+        //             timer: transformTimerForFrontend(timer, 'tender_info')
+        //         };
+        //     })
+        // );
+        const tendersWithTimers = tenders.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'tender_info')
+            };
+        });
 
         return {
             ...tenders,
@@ -141,41 +148,49 @@ export class TenderInfoController {
 
     @Get(':id/timer')
     async getTenderTimer(@Param('id') id: string) {
-        try {
-            const timerId = parseInt(id, 10);
-            if (Number.isNaN(timerId)) {
-                return {
-                    hasTimer: false,
-                    stepKey: null,
-                    stepName: null,
-                    remainingSeconds: 0,
-                    status: 'NOT_STARTED',
-                };
-            }
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // try {
+        //     const timerId = parseInt(id, 10);
+        //     if (Number.isNaN(timerId)) {
+        //         return {
+        //             hasTimer: false,
+        //             stepKey: null,
+        //             stepName: null,
+        //             remainingSeconds: 0,
+        //             status: 'NOT_STARTED',
+        //         };
+        //     }
 
-            const timer = await this.timersService.getTimer('TENDER', timerId, 'tender_info');
+        //     const timer = await this.timersService.getTimer('TENDER', timerId, 'tender_info');
 
-            const transformedTimer = transformTimerForFrontend(timer, 'tender_info');
+        //     const transformedTimer = transformTimerForFrontend(timer, 'tender_info');
 
-            // transformedTimer is now always an object (never null)
-            return {
-                hasTimer: transformedTimer.status !== 'NOT_STARTED',
-                stepKey: transformedTimer.stepName,
-                stepName: transformedTimer.stepName,
-                remainingSeconds: transformedTimer.remainingSeconds,
-                status: transformedTimer.status,
-                deadline: timer?.deadlineAt || null,
-                allocatedHours: timer?.allocatedTimeMs ? timer.allocatedTimeMs / (1000 * 60 * 60) : null,
-            };
-        } catch (error) {
-            return {
-                hasTimer: false,
-                stepKey: null,
-                stepName: null,
-                remainingSeconds: 0,
-                status: 'NOT_STARTED',
-            };
-        }
+        //     // transformedTimer is now always an object (never null)
+        //     return {
+        //         hasTimer: transformedTimer.status !== 'NOT_STARTED',
+        //         stepKey: transformedTimer.stepName,
+        //         stepName: transformedTimer.stepName,
+        //         remainingSeconds: transformedTimer.remainingSeconds,
+        //         status: transformedTimer.status,
+        //         deadline: timer?.deadlineAt || null,
+        //         allocatedHours: timer?.allocatedTimeMs ? timer.allocatedTimeMs / (1000 * 60 * 60) : null,
+        //     };
+        // } catch (error) {
+        //     return {
+        //         hasTimer: false,
+        //         stepKey: null,
+        //         stepName: null,
+        //         remainingSeconds: 0,
+        //         status: 'NOT_STARTED',
+        //     };
+        // }
+        return {
+            hasTimer: false,
+            stepKey: null,
+            stepName: null,
+            remainingSeconds: 0,
+            status: 'NOT_STARTED',
+        };
     }
 
     @Get('timers')

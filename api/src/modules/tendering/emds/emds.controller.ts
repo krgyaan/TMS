@@ -47,24 +47,31 @@ export class EmdsController {
             parsed.search
         );
         // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                let timer: TimerWithComputed | null = null;
-                try {
-                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'emd_requested');
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const dataWithTimers = await Promise.all(
+        //     result.data.map(async (tender) => {
+        //         let timer: TimerWithComputed | null = null;
+        //         try {
+        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'emd_requested');
+        //         } catch (error) {
+        //             this.logger.error(
+        //                 `Failed to get timer for tender ${tender.tenderId}:`,
+        //                 error
+        //             );
+        //         }
 
-                return {
-                    ...tender,
-                    timer: transformTimerForFrontend(timer, 'emd_requested')
-                };
-            })
-        );
+        //         return {
+        //             ...tender,
+        //             timer: transformTimerForFrontend(timer, 'emd_requested')
+        //         };
+        //     })
+        // );
+        const dataWithTimers = result.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'emd_requested')
+            };
+        });
 
         return {
             ...result,
