@@ -9,7 +9,7 @@ export const FOLLOWUP_WINDOWS: FollowupWindow[] = [
     //testing the followups - dangerous
     // { hour: new Date().getHours(), minute: new Date().getMinutes() + 1, days: [0, 1, 2, 3, 4, 5, 6], frequency: 1 },
     // Daily — 10:10 Mon–Sat
-    { hour: 10, minute: 48, days: [1, 2, 3, 4, 5, 6], frequency: 1 },
+    { hour: 10, minute: 50, days: [1, 2, 3, 4, 5, 6], frequency: 1 },
     // Alternate — 10:15 Mon–Sat
     { hour: 10, minute: 53, days: [1, 2, 3, 4, 5, 6], frequency: 2 },
     // Weekly — Monday 10:20
