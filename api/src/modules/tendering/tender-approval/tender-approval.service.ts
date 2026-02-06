@@ -1,34 +1,34 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc, sql, or, inArray, isNull } from 'drizzle-orm';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
-import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
-import { stepInstances } from '@/db/schemas';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { Inject, Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { eq, and, asc, desc, sql, or, inArray, isNull } from "drizzle-orm";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { tenderStatusHistory } from "@db/schemas/tendering/tender-status-history.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { tenderIncompleteFields } from "@db/schemas/tendering/tender-incomplete-fields.schema";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { Logger } from "@nestjs/common";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { WorkflowService } from "@/modules/timers/services/workflow.service";
+import { TenderInfoSheetsService } from "../info-sheets/info-sheets.service";
+import { stepInstances } from "@/db/schemas/workflow/workflows.schema";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 export type TenderApprovalFilters = {
-    tlStatus?: '0' | '1' | '2' | '3' | number;
+    tlStatus?: "0" | "1" | "2" | "3" | number;
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     search?: string;
 };
 
@@ -63,8 +63,8 @@ export class TenderApprovalService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly workflowService: WorkflowService,
-        private readonly tenderInfoSheetsService: TenderInfoSheetsService,
-    ) { }
+        private readonly tenderInfoSheetsService: TenderInfoSheetsService
+    ) {}
 
     /**
      * Build role-based filter conditions for tender queries
@@ -107,17 +107,17 @@ export class TenderApprovalService {
     async getDashboardData(
         user?: ValidatedUser,
         teamId?: number,
-        tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb",
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string }
     ): Promise<PaginatedResult<TenderRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const activeTab = tabKey || 'pending';
+        const activeTab = tabKey || "pending";
 
         // Validate tab key
-        if (!['pending', 'accepted', 'rejected', 'tender-dnb'].includes(activeTab)) {
+        if (!["pending", "accepted", "rejected", "tender-dnb"].includes(activeTab)) {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
@@ -133,23 +133,14 @@ export class TenderApprovalService {
         // Tab-specific conditions
         let tabConditions: any[] = [];
         tabConditions.push(...roleFilterConditions);
-        if (activeTab === 'pending') {
-            tabConditions.push(
-                or(
-                    eq(tenderInfos.tlStatus, 0),
-                    eq(tenderInfos.tlStatus, 3),
-                    isNull(tenderInfos.tlStatus)
-                )
-            );
-        } else if (activeTab === 'accepted') {
+        if (activeTab === "pending") {
+            tabConditions.push(or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)));
+        } else if (activeTab === "accepted") {
             tabConditions.push(eq(tenderInfos.tlStatus, 1));
-        } else if (activeTab === 'rejected') {
+        } else if (activeTab === "rejected") {
             tabConditions.push(eq(tenderInfos.tlStatus, 2));
-        } else if (activeTab === 'tender-dnb') {
-            tabConditions.push(
-                inArray(tenderInfos.status, [8, 34]),
-                inArray(tenderInfos.tlStatus, [1, 2, 3])
-            );
+        } else if (activeTab === "tender-dnb") {
+            tabConditions.push(inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3]));
         }
 
         // Search conditions
@@ -172,44 +163,45 @@ export class TenderApprovalService {
         const whereClause = and(...allConditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy || (activeTab === 'pending' ? 'dueDate' : activeTab === 'accepted' ? 'approvalDate' : activeTab === 'rejected' ? 'rejectionDate' : 'statusChangeDate');
-        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : 'desc');
+        const sortBy =
+            filters?.sortBy || (activeTab === "pending" ? "dueDate" : activeTab === "accepted" ? "approvalDate" : activeTab === "rejected" ? "rejectionDate" : "statusChangeDate");
+        const sortOrder = filters?.sortOrder || (activeTab === "pending" ? "asc" : "desc");
         let orderByClause: any = asc(tenderInfos.dueDate); // Default
 
         if (sortBy) {
-            const sortFn = sortOrder === 'desc' ? desc : asc;
+            const sortFn = sortOrder === "desc" ? desc : asc;
             switch (sortBy) {
-                case 'tenderNo':
+                case "tenderNo":
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
-                case 'tenderName':
+                case "tenderName":
                     orderByClause = sortFn(tenderInfos.tenderName);
                     break;
-                case 'teamMemberName':
+                case "teamMemberName":
                     orderByClause = sortFn(users.name);
                     break;
-                case 'dueDate':
+                case "dueDate":
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'approvalDate':
+                case "approvalDate":
                     orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
-                case 'rejectionDate':
+                case "rejectionDate":
                     orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
-                case 'statusChangeDate':
+                case "statusChangeDate":
                     orderByClause = sortFn(tenderInfos.updatedAt);
                     break;
-                case 'gstValues':
+                case "gstValues":
                     orderByClause = sortFn(tenderInfos.gstValues);
                     break;
-                case 'itemName':
+                case "itemName":
                     orderByClause = sortFn(items.name);
                     break;
-                case 'statusName':
+                case "statusName":
                     orderByClause = sortFn(statuses.name);
                     break;
-                case 'tlStatus':
+                case "tlStatus":
                     orderByClause = sortFn(tenderInfos.tlStatus);
                     break;
                 default:
@@ -241,10 +233,7 @@ export class TenderApprovalService {
             .innerJoin(users, eq(tenderInfos.teamMember, users.id))
             .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
             .innerJoin(items, eq(tenderInfos.item, items.id))
-            .innerJoin(
-                tenderInformation,
-                eq(tenderInformation.tenderId, tenderInfos.id)
-            )
+            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -259,10 +248,7 @@ export class TenderApprovalService {
             .innerJoin(users, eq(tenderInfos.teamMember, users.id))
             .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
             .innerJoin(items, eq(tenderInfos.item, items.id))
-            .innerJoin(
-                tenderInformation,
-                eq(tenderInformation.tenderId, tenderInfos.id)
-            );
+            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id));
 
         // Add search joins to count query if search is used
         if (filters?.search) {
@@ -286,30 +272,13 @@ export class TenderApprovalService {
         ];
 
         // Build conditions for each tab
-        const pendingConditions = [
-            ...baseConditions,
-            or(
-                eq(tenderInfos.tlStatus, 0),
-                eq(tenderInfos.tlStatus, 3),
-                isNull(tenderInfos.tlStatus)
-            )
-        ];
+        const pendingConditions = [...baseConditions, or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus))];
 
-        const acceptedConditions = [
-            ...baseConditions,
-            eq(tenderInfos.tlStatus, 1)
-        ];
+        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1)];
 
-        const rejectedConditions = [
-            ...baseConditions,
-            eq(tenderInfos.tlStatus, 2)
-        ];
+        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2)];
 
-        const tenderDnbConditions = [
-            ...baseConditions,
-            inArray(tenderInfos.status, [8, 34]),
-            inArray(tenderInfos.tlStatus, [1, 2, 3])
-        ];
+        const tenderDnbConditions = [...baseConditions, inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3])];
 
         // Count for each tab
         const [pendingCount, acceptedCount, rejectedCount, tenderDnbCount] = await Promise.all([
@@ -323,7 +292,7 @@ export class TenderApprovalService {
             pending: pendingCount,
             accepted: acceptedCount,
             rejected: rejectedCount,
-            'tender-dnb': tenderDnbCount,
+            "tender-dnb": tenderDnbCount,
             total: pendingCount + acceptedCount + rejectedCount + tenderDnbCount,
         };
     }
@@ -335,10 +304,7 @@ export class TenderApprovalService {
             .innerJoin(users, eq(tenderInfos.teamMember, users.id))
             .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
             .innerJoin(items, eq(tenderInfos.item, items.id))
-            .innerJoin(
-                tenderInformation,
-                eq(tenderInformation.tenderId, tenderInfos.id)
-            )
+            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause);
 
         const [result] = await countQuery;
@@ -374,9 +340,9 @@ export class TenderApprovalService {
 
         const rfqToArray = data.rfqTo
             ? data.rfqTo
-                .split(',')
-                .map(Number)
-                .filter((n) => !isNaN(n))
+                  .split(",")
+                  .map(Number)
+                  .filter(n => !isNaN(n))
             : [];
 
         // Fetch incomplete fields
@@ -398,10 +364,7 @@ export class TenderApprovalService {
     }
 
     async getByTenderIdWithDetails(tenderId: number) {
-        const [approvalData, tenderDetails] = await Promise.all([
-            this.getByTenderId(tenderId),
-            this.tenderInfosService.getTenderForApproval(tenderId),
-        ]);
+        const [approvalData, tenderDetails] = await Promise.all([this.getByTenderId(tenderId), this.tenderInfosService.getTenderForApproval(tenderId)]);
 
         return {
             ...approvalData,
@@ -423,32 +386,29 @@ export class TenderApprovalService {
         };
 
         let newStatus: number | null = null;
-        let statusComment: string = '';
+        let statusComment: string = "";
 
         // Clear incomplete fields for statuses other than '3'
-        if (payload.tlStatus !== '3') {
-            await this.db
-                .delete(tenderIncompleteFields)
-                .where(eq(tenderIncompleteFields.tenderId, tenderId));
+        if (payload.tlStatus !== "3") {
+            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
         }
 
-        if (payload.tlStatus === '1') {
+        if (payload.tlStatus === "1") {
             // Approved - Status 3
-            const rfqToString = payload.rfqTo?.join(',') || '';
+            const rfqToString = payload.rfqTo?.join(",") || "";
 
             updateData.rfqTo = rfqToString;
             updateData.processingFeeMode = payload.processingFeeMode ?? null;
             updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
             updateData.emdMode = payload.emdMode ?? null;
             updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
-            updateData.approveFinanceDocSelection =
-                payload.approveFinanceDocSelection ?? null;
+            updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
 
             updateData.tlRejectionRemarks = null;
             updateData.oemNotAllowed = null;
             updateData.status = 3; // Tender Info approved
             newStatus = 3;
-            statusComment = 'Tender info approved';
+            statusComment = "Tender info approved";
 
             // Update tender values from info sheet
             const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
@@ -464,7 +424,7 @@ export class TenderApprovalService {
                     updateData.emd = String(infoSheet.emdAmount);
                 }
             }
-        } else if (payload.tlStatus === '2') {
+        } else if (payload.tlStatus === "2") {
             // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
             updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
             updateData.oemNotAllowed = payload.oemNotAllowed;
@@ -472,7 +432,7 @@ export class TenderApprovalService {
             if (payload.tenderStatus) {
                 updateData.status = payload.tenderStatus;
                 newStatus = payload.tenderStatus;
-                statusComment = 'Tender rejected';
+                statusComment = "Tender rejected";
             }
 
             updateData.rfqTo = null;
@@ -481,7 +441,7 @@ export class TenderApprovalService {
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
-        } else if (payload.tlStatus === '3') {
+        } else if (payload.tlStatus === "3") {
             // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
             updateData.rfqTo = null;
@@ -494,53 +454,36 @@ export class TenderApprovalService {
             updateData.oemNotAllowed = null;
             updateData.status = 29; // Tender Info sheet Incomplete
             newStatus = 29;
-            statusComment = 'Tender info sheet incomplete';
+            statusComment = "Tender info sheet incomplete";
 
             // Delete existing incomplete fields
-            await this.db
-                .delete(tenderIncompleteFields)
-                .where(eq(tenderIncompleteFields.tenderId, tenderId));
+            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
 
             // Insert new incomplete fields
             if (payload.incompleteFields && payload.incompleteFields.length > 0) {
-                const incompleteFieldsData = payload.incompleteFields.map(
-                    (field) => ({
-                        tenderId,
-                        fieldName: field.fieldName,
-                        comment: field.comment,
-                        status: 'pending' as const,
-                    })
-                );
+                const incompleteFieldsData = payload.incompleteFields.map(field => ({
+                    tenderId,
+                    fieldName: field.fieldName,
+                    comment: field.comment,
+                    status: "pending" as const,
+                }));
 
-                await this.db
-                    .insert(tenderIncompleteFields)
-                    .values(incompleteFieldsData);
+                await this.db.insert(tenderIncompleteFields).values(incompleteFieldsData);
             }
         }
 
         // Update tender and track status change in transaction
-        await this.db.transaction(async (tx) => {
-            await tx
-                .update(tenderInfos)
-                .set(updateData)
-                .where(eq(tenderInfos.id, tenderId))
-                .returning();
+        await this.db.transaction(async tx => {
+            await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
 
             // Track status change if status was updated
             if (newStatus !== null && newStatus !== prevStatus) {
-                await this.tenderStatusHistoryService.trackStatusChange(
-                    tenderId,
-                    newStatus,
-                    changedBy,
-                    prevStatus,
-                    statusComment,
-                    tx
-                );
+                await this.tenderStatusHistoryService.trackStatusChange(tenderId, newStatus, changedBy, prevStatus, statusComment, tx);
             }
         });
 
         // Send email notification for approval/rejection/review
-        if (payload.tlStatus === '1' || payload.tlStatus === '2' || payload.tlStatus === '3') {
+        if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
             await this.sendApprovalEmail(tenderId, payload, changedBy);
         }
 
@@ -549,25 +492,23 @@ export class TenderApprovalService {
             this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
 
             // 1. Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
+            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
 
             // 2. Complete the tender_approval step
-            const tenderApprovalStep = workflowStatus.steps.find(step =>
-                step.stepKey === 'tender_approval' && step.status === 'IN_PROGRESS'
-            );
+            const tenderApprovalStep = workflowStatus.steps.find(step => step.stepKey === "tender_approval" && step.status === "IN_PROGRESS");
 
             if (tenderApprovalStep) {
                 this.logger.log(`Completing tender_approval step ${tenderApprovalStep.id} for tender ${tenderId}`);
                 await this.workflowService.completeStep(tenderApprovalStep.id.toString(), {
                     userId: changedBy.toString(),
-                    notes: 'Tender approved'
+                    notes: "Tender approved",
                 });
             } else {
                 this.logger.warn(`No active tender_approval step found for tender ${tenderId}`);
             }
 
             // 3. Get updated workflow status
-            const updatedWorkflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
+            const updatedWorkflowStatus = await this.workflowService.getWorkflowStatus("TENDER", tenderId.toString());
 
             // 4. Get tender and info sheet data
             const tender = await this.tenderInfosService.findById(tenderId);
@@ -580,23 +521,23 @@ export class TenderApprovalService {
             // 5. Find steps that should be started based on tender configuration
             const stepsToStart = updatedWorkflowStatus.steps.filter(step => {
                 // Check if step should be started based on tender configuration
-                if (step.stepKey === 'rfq_sent' && tender.rfqTo && tender.rfqTo !== '0') {
-                    return step.status === 'PENDING';
+                if (step.stepKey === "rfq_sent" && tender.rfqTo && tender.rfqTo !== "0") {
+                    return step.status === "PENDING";
                 }
-                if (step.stepKey === 'emd_requested' && (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1')) {
-                    return step.status === 'PENDING';
+                if (step.stepKey === "emd_requested" && (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1")) {
+                    return step.status === "PENDING";
                 }
-                if (step.stepKey === 'physical_docs' && infoSheet.physicalDocsRequired === 'YES') {
-                    return step.status === 'PENDING';
+                if (step.stepKey === "physical_docs" && infoSheet.physicalDocsRequired === "YES") {
+                    return step.status === "PENDING";
                 }
-                if (step.stepKey === 'document_checklist' || step.stepKey === 'costing_sheets') {
-                    return step.status === 'PENDING';
+                if (step.stepKey === "document_checklist" || step.stepKey === "costing_sheets") {
+                    return step.status === "PENDING";
                 }
                 return false;
             });
 
             this.logger.log(`Found ${stepsToStart.length} steps to start after approval for tender ${tenderId}`, {
-                steps: stepsToStart.map(step => step.stepKey)
+                steps: stepsToStart.map(step => step.stepKey),
             });
 
             // 6. Update timer configurations for negative countdown timers
@@ -605,8 +546,8 @@ export class TenderApprovalService {
                 this.logger.log(`Tender due date: ${dueDate.toISOString()}`);
 
                 for (const step of stepsToStart) {
-                    if (step.stepKey === 'document_checklist' || step.stepKey === 'costing_sheets') {
-                        const hoursBeforeDeadline = step.stepKey === 'document_checklist' ? -72 : -72;
+                    if (step.stepKey === "document_checklist" || step.stepKey === "costing_sheets") {
+                        const hoursBeforeDeadline = step.stepKey === "document_checklist" ? -72 : -72;
                         const cutoffDate = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
 
                         this.logger.log(`Updating ${step.stepKey} step ${step.id} with deadline ${cutoffDate.toISOString()}`);
@@ -618,9 +559,9 @@ export class TenderApprovalService {
                                     customDeadline: cutoffDate,
                                     timerConfig: {
                                         ...step.timerConfig,
-                                        type: 'NEGATIVE_COUNTDOWN',
-                                        hoursBeforeDeadline: hoursBeforeDeadline
-                                    }
+                                        type: "NEGATIVE_COUNTDOWN",
+                                        hoursBeforeDeadline: hoursBeforeDeadline,
+                                    },
                                 })
                                 .where(eq(stepInstances.id, step.id));
 
@@ -640,7 +581,7 @@ export class TenderApprovalService {
                     this.logger.log(`Starting step ${step.stepKey} (${step.id}) for tender ${tenderId}`);
                     await this.workflowService.startStep(step.id.toString(), {
                         stepKey: step.stepKey,
-                        assignedToUserId: step.assignedToUserId?.toString()
+                        assignedToUserId: step.assignedToUserId?.toString(),
                     });
                     this.logger.log(`Successfully started step ${step.stepKey} for tender ${tenderId}`);
                 } catch (error) {
@@ -689,11 +630,7 @@ export class TenderApprovalService {
     /**
      * Send approval/rejection email
      */
-    private async sendApprovalEmail(
-        tenderId: number,
-        payload: TenderApprovalPayload,
-        changedBy: number
-    ) {
+    private async sendApprovalEmail(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
@@ -701,22 +638,18 @@ export class TenderApprovalService {
         if (!assignee) return;
 
         // Get Team Leader name
-        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
-        let tlName = 'Team Leader';
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole("Team Leader", tender.team);
+        let tlName = "Team Leader";
         if (teamLeaderEmails.length > 0) {
-            const [tlUser] = await this.db
-                .select({ name: users.name })
-                .from(users)
-                .where(eq(users.email, teamLeaderEmails[0]))
-                .limit(1);
+            const [tlUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.email, teamLeaderEmails[0])).limit(1);
             if (tlUser?.name) {
                 tlName = tlUser.name;
             }
         }
 
-        const isBidApproved = payload.tlStatus === '1';
-        const isRejected = payload.tlStatus === '2';
-        const isReview = payload.tlStatus === '3';
+        const isBidApproved = payload.tlStatus === "1";
+        const isRejected = payload.tlStatus === "2";
+        const isReview = payload.tlStatus === "3";
 
         // Generate links (TODO: Update with actual frontend URLs)
         const emdLink = `#/tendering/emds?tenderId=${tenderId}`;
@@ -724,35 +657,35 @@ export class TenderApprovalService {
         const rfqLink = `#/tendering/rfqs?tenderId=${tenderId}`;
 
         // Get vendor names from rfqTo
-        let vendor = 'Selected Vendors';
+        let vendor = "Selected Vendors";
         if (payload.rfqTo && payload.rfqTo.length > 0) {
             // TODO: Fetch vendor organization names from rfqTo IDs
             vendor = `${payload.rfqTo.length} vendor(s)`;
         }
 
         // Get physical docs requirement
-        const phyDocs = 'As per tender requirements'; // TODO: Get from tender data if available
+        const phyDocs = "As per tender requirements"; // TODO: Get from tender data if available
 
         // Map document IDs to names
         const technicalDocMap: Record<string, string> = {
-            '1': 'Technical Specification Document',
-            '2': 'Product Catalog',
-            '3': 'Test Certificates',
-            '4': 'Quality Certifications (ISO, etc.)',
-            '5': 'OEM Authorization',
-            '6': 'Similar Work Experience Certificates',
-            '7': 'Installation Manual',
+            "1": "Technical Specification Document",
+            "2": "Product Catalog",
+            "3": "Test Certificates",
+            "4": "Quality Certifications (ISO, etc.)",
+            "5": "OEM Authorization",
+            "6": "Similar Work Experience Certificates",
+            "7": "Installation Manual",
         };
 
         const financialDocMap: Record<string, string> = {
-            '1': 'Balance Sheet (Last 3 Years)',
-            '2': 'Profit & Loss Statement',
-            '3': 'Income Tax Returns',
-            '4': 'GST Registration Certificate',
-            '5': 'PAN Card',
-            '6': 'Audited Financial Statements',
-            '7': 'Bank Solvency Certificate',
-            '8': 'Working Capital Certificate',
+            "1": "Balance Sheet (Last 3 Years)",
+            "2": "Profit & Loss Statement",
+            "3": "Income Tax Returns",
+            "4": "GST Registration Certificate",
+            "5": "PAN Card",
+            "6": "Audited Financial Statements",
+            "7": "Bank Solvency Certificate",
+            "8": "Working Capital Certificate",
         };
 
         const mapDocIdsToNames = (ids: string[] | undefined, map: Record<string, string>): string[] => {
@@ -768,52 +701,44 @@ export class TenderApprovalService {
             isBidApproved,
             isRejected,
             isReview,
-            remarks: payload.tlRejectionRemarks || '',
-            rej_remark: payload.tlRejectionRemarks || '',
+            remarks: payload.tlRejectionRemarks || "",
+            rej_remark: payload.tlRejectionRemarks || "",
             emdLink,
             tenderFeesLink,
             rfqLink,
-            processingFeeMode: payload.processingFeeMode || 'Not specified',
-            tenderFeesMode: payload.tenderFeeMode || 'Not specified',
-            emdMode: payload.emdMode || 'Not specified',
+            processingFeeMode: payload.processingFeeMode || "Not specified",
+            tenderFeesMode: payload.tenderFeeMode || "Not specified",
+            emdMode: payload.emdMode || "Not specified",
             vendor,
             phyDocs,
-            pqrApproved: payload.approvePqrSelection === '1',
-            finApproved: payload.approveFinanceDocSelection === '1',
-            alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(', ') : '',
-            alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(', ') : '',
+            pqrApproved: payload.approvePqrSelection === "1",
+            finApproved: payload.approveFinanceDocSelection === "1",
+            alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(", ") : "",
+            alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(", ") : "",
             tlName,
         };
 
-        const template = isBidApproved ? 'tender-approved-by-tl' : (isReview ? 'tender-rejected-by-tl' : 'tender-rejected-by-tl');
+        const template = isBidApproved ? "tender-approved-by-tl" : isReview ? "tender-rejected-by-tl" : "tender-rejected-by-tl";
         let subject: string;
         let eventType: string;
 
         if (isBidApproved) {
             subject = `Tender Approved - ${tender.tenderName}`;
-            eventType = 'tender.approved';
+            eventType = "tender.approved";
         } else if (isReview) {
             subject = `Tender Needs Review - ${tender.tenderName}`;
-            eventType = 'tender.review';
+            eventType = "tender.review";
         } else {
             subject = `Tender Rejected - ${tender.tenderName}`;
-            eventType = 'tender.rejected';
+            eventType = "tender.rejected";
         }
 
-        await this.sendEmail(
-            eventType,
-            tenderId,
-            changedBy,
-            subject,
-            template,
-            emailData,
-            {
-                to: [{ type: 'user', userId: tender.teamMember }],
-                cc: [
-                    { type: 'role', role: 'Admin', teamId: tender.team },
-                    { type: 'role', role: 'Coordinator', teamId: tender.team },
-                ],
-            }
-        );
+        await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
+            to: [{ type: "user", userId: tender.teamMember }],
+            cc: [
+                { type: "role", role: "Admin", teamId: tender.team },
+                { type: "role", role: "Coordinator", teamId: tender.team },
+            ],
+        });
     }
 }
