@@ -1,11 +1,5 @@
 import { BaseApiService } from './base.service';
-import type {
-    CreateTenderRequest,
-    TenderInfo,
-    TenderInfoWithNames,
-    UpdateTenderRequest,
-    TenderListParams,
-} from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import type { CreateTenderRequest, TenderInfo, TenderInfoWithNames, UpdateTenderRequest, TenderListParams } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class TenderInfosService extends BaseApiService {

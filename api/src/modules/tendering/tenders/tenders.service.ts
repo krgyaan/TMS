@@ -17,7 +17,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type TenderListFilters = {
@@ -41,7 +41,7 @@ export class TenderInfosService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
@@ -502,23 +502,27 @@ export class TenderInfosService {
         // Send email notification
         await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
 
-        // START TIMER: Add this code to start the workflow and timers
+        // START TIMER: Start the initial tender_info timer
         try {
-            this.logger.log(`Starting workflow for tender ${newTender.id}`);
-            const workflowResult = await this.workflowService.startWorkflow({
-                workflowCode: 'TENDERING_WF',
+            this.logger.log(`Starting timer for tender ${newTender.id}`);
+            await this.timersService.startTimer({
                 entityType: 'TENDER',
-                entityId: newTender.id.toString(),
+                entityId: newTender.id as number,
+                stage: 'tender_info',
+                userId: createdBy,
+                timerConfig: {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24
+                },
                 metadata: {
                     createdBy,
                     tenderNo: newTender.tenderNo,
                     dueDate: newTender.dueDate
                 }
             });
-
-            this.logger.log(`Started workflow for tender ${newTender.id} with ${workflowResult.stepsStarted} steps`);
+            this.logger.log(`Started timer for tender ${newTender.id}`);
         } catch (error) {
-            this.logger.error(`Failed to start workflow for tender ${newTender.id}:`, error);
+            this.logger.error(`Failed to start timer for tender ${newTender.id}:`, error);
         }
 
         return newTender;
