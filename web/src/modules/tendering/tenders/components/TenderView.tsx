@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, ExternalLink } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderViewProps {
     tender: TenderInfoWithNames;
@@ -13,11 +15,34 @@ interface TenderViewProps {
     className?: string;
 }
 
+/**
+ * Parse documents field from JSON string to array of file paths
+ */
+const parseDocuments = (documents: string | null): string[] => {
+    if (!documents) return [];
+    try {
+        const parsed = JSON.parse(documents);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Extract filename from file path
+ */
+const getFileName = (filePath: string): string => {
+    // Handle paths like "tender-documents/filename.pdf" or just "filename.pdf"
+    const parts = filePath.split('/');
+    return parts[parts.length - 1] || filePath;
+};
+
 export function TenderView({
     tender,
     isLoading = false,
     className = '',
 }: TenderViewProps) {
+    const documents = parseDocuments(tender.documents);
     if (isLoading) {
         return (
             <Card className={className}>
@@ -188,6 +213,43 @@ export function TenderView({
                                     </TableCell>
                                 </TableRow>
                             </>
+                        )}
+
+                        {/* Documents */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Documents ({documents.length})
+                            </TableCell>
+                        </TableRow>
+                        {documents.length > 0 ? (
+                            documents.map((filePath, index) => (
+                                <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Document {index + 1}
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={2}>
+                                        <span className="text-xs text-muted-foreground font-mono break-all">
+                                            {getFileName(filePath)}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
+                                        >
+                                            <ExternalLink className="h-4 w-4 mr-1" />
+                                            View
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm text-muted-foreground" colSpan={4}>
+                                    No documents uploaded
+                                </TableCell>
+                            </TableRow>
                         )}
                     </TableBody>
                 </Table>
