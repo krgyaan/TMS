@@ -1,14 +1,4 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    Query,
-    Logger
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
 import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
 import type {
     CreateTqReceivedDto,
@@ -20,14 +10,16 @@ import type {
 } from './dto/tq-management.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 
 @Controller('tq-management')
 export class TqManagementController {
     private readonly logger = new Logger(TqManagementController.name);
     constructor(
         private readonly tqManagementService: TqManagementService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -60,12 +52,9 @@ export class TqManagementController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'tq_replied');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'tq_replied');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -75,7 +64,7 @@ export class TqManagementController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'tq_replied')
                 };
             })
         );

@@ -185,4 +185,4 @@ import { LoggerModule } from "@/logger/logger.module";
         AllExceptionsFilter,
     ],
 })
-export class AppModule {}
+export class AppModule { }
