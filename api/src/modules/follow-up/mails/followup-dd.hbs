@@ -1,32 +1,32 @@
 <div style="font-family: Arial, sans-serif;">
     'Days Outstanding: '
-    {{$since}}
+    {{since}}
     <br />
-    {{$reminder}}
+    {{reminder}}
     <br />
 
-    <p>Dear {{$name}},</p>
+    <p>Dear {{name}},</p>
 
     <p>
         The status of the Tender no.
-        {{$tenderNo}}, project name
-        {{$projectName}}, is
-        {{$status}}. Please initiate the process of releasing the EMD, Rs.
-        {{$amount}}
+        {{tenderNo}}, project name
+        {{projectName}}, is
+        {{status}}. Please initiate the process of releasing the EMD, Rs.
+        {{amount}}
         submitted against the tender. The details of the EMD submitted are as follows:
     </p>
 
     <ul>
-        <li>Date: {{$date}}</li>
-        <li>DD no.: {{$ddNo}}</li>
-        <li>Amount: Rs. {{$amount}}</li>
+        <li>Date: {{date}}</li>
+        <li>DD no.: {{ddNo}}</li>
+        <li>Amount: Rs. {{amount}}</li>
     </ul>
 
     <p>Please transfer the amount to the below-mentioned account details:</p>
     <ul>
         <li>Account Name: Volks Energie Pvt. Ltd.</li>
-        <li>Account No.: {{$accountNo}}</li>
-        <li>IFSC Code: {{$ifscCode}}</li>
+        <li>Account No.: {{accountNo}}</li>
+        <li>IFSC Code: {{ifscCode}}</li>
     </ul>
 
     <p>Also please find the Cancelled cheque and the bank-approved mandate form as reference.</p>
