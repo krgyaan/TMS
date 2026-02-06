@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentChecklistsService, type DocumentChecklistFilters } from '@/modules/tendering/checklists/document-checklists.service';
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { TimerWithComputed } from '@/modules/timers/timer.types';
+import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -11,7 +13,7 @@ export class DocumentChecklistsController {
     private readonly logger = new Logger(DocumentChecklistsController.name);
     constructor(
         private readonly documentChecklistsService: DocumentChecklistsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -40,12 +42,9 @@ export class DocumentChecklistsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
+                let timer: TimerWithComputed | null = null;
                 try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'document_checklist');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
+                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'document_checklist');
                 } catch (error) {
                     this.logger.error(
                         `Failed to get timer for tender ${tender.tenderId}:`,
@@ -55,7 +54,7 @@ export class DocumentChecklistsController {
 
                 return {
                     ...tender,
-                    timer
+                    timer: transformTimerForFrontend(timer, 'document_checklist')
                 };
             })
         );

@@ -17,7 +17,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 type TenderDocumentChecklistDashboardRow = {
@@ -50,8 +50,8 @@ export class DocumentChecklistsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
-        private readonly workflowService: WorkflowService
-    ) {}
+        private readonly timersService: TimersService
+    ) { }
 
     /**
      * Get dashboard data by tab
@@ -306,12 +306,12 @@ export class DocumentChecklistsService {
                 .then(r => Number(r[0]?.count || 0)),
             dnbStatusIds.length > 0
                 ? this.db
-                      .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                      .from(tenderInfos)
-                      .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                      .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
-                      .where(and(...tenderDnbConditions))
-                      .then(r => Number(r[0]?.count || 0))
+                    .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                    .from(tenderInfos)
+                    .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                    .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+                    .where(and(...tenderDnbConditions))
+                    .then(r => Number(r[0]?.count || 0))
                 : Promise.resolve(0),
         ]);
 
@@ -337,9 +337,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: createDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: createDocumentChecklistDto.extraDocuments
                     ? createDocumentChecklistDto.extraDocuments.map(doc => ({
-                          name: doc.name ?? "",
-                          path: doc.path ?? "",
-                      }))
+                        name: doc.name ?? "",
+                        path: doc.path ?? "",
+                    }))
                     : null,
             })
             .returning();
@@ -354,37 +354,24 @@ export class DocumentChecklistsService {
             // Continue execution - email failure shouldn't break the main operation
         }
 
-        // TIMER TRANSITION: Complete document_checklist step
+        // TIMER TRANSITION: Stop document_checklist timer
         try {
-            this.logger.log(`Transitioning timers for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted`);
+            this.logger.log(`Stopping timer for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted`);
 
             // Get tender to find team member for userId
             const tender = await this.tenderInfosService.findById(createDocumentChecklistDto.tenderId);
             const userId = tender?.teamMember || 1; // Use team member or default to 1
 
-            // Get workflow status
-            const workflowStatus = await this.workflowService.getWorkflowStatus("TENDER", createDocumentChecklistDto.tenderId.toString());
-
-            // Complete the document_checklist step
-            const documentChecklistStep = workflowStatus.steps.find(step => step.stepKey === "document_checklist" && step.status === "IN_PROGRESS");
-
-            if (documentChecklistStep) {
-                this.logger.log(`Completing document_checklist step ${documentChecklistStep.id} for tender ${createDocumentChecklistDto.tenderId}`);
-                await this.workflowService.completeStep(documentChecklistStep.id.toString(), {
-                    userId: userId.toString(),
-                    notes: "Document checklist submitted",
-                });
-                this.logger.log(`Successfully completed document_checklist step for tender ${createDocumentChecklistDto.tenderId}`);
-            } else {
-                this.logger.warn(`No active document_checklist step found for tender ${createDocumentChecklistDto.tenderId}`);
-                // Try to find any document_checklist step
-                const anyDocumentChecklistStep = workflowStatus.steps.find(step => step.stepKey === "document_checklist");
-                if (anyDocumentChecklistStep) {
-                    this.logger.warn(`Found document_checklist step ${anyDocumentChecklistStep.id} with status ${anyDocumentChecklistStep.status}`);
-                }
-            }
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: createDocumentChecklistDto.tenderId,
+                stage: 'document_checklist',
+                userId: userId,
+                reason: 'Document checklist submitted'
+            });
+            this.logger.log(`Successfully stopped document_checklist timer for tender ${createDocumentChecklistDto.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to transition timers for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted:`, error);
+            this.logger.error(`Failed to stop timer for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted:`, error);
             // Don't fail the entire operation if timer transition fails
         }
 
@@ -398,9 +385,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: updateDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: updateDocumentChecklistDto.extraDocuments
                     ? updateDocumentChecklistDto.extraDocuments.map(doc => ({
-                          name: doc.name ?? "",
-                          path: doc.path ?? "",
-                      }))
+                        name: doc.name ?? "",
+                        path: doc.path ?? "",
+                    }))
                     : null,
                 updatedAt: new Date(),
             })
