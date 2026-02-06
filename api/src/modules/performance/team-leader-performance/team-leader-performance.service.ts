@@ -4,10 +4,9 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { PerformanceQueryDto } from "../tender-executive-performance/zod/performance-query.dto";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { timer } from "@db/schemas/workflow/timer.schema";
 import { tenderResults } from "@/db/schemas/tendering/tender-result.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
-import { stepInstances } from "@db/schemas/workflow/workflows.schema";
+import { timerTrackers } from "@db/schemas/workflow/timer.schema";
 import { TenderListQuery } from "../tender-executive-performance/zod/tender.dto";
 import { TenderOutcomeStatus } from "../tender-executive-performance/zod/stage-performance.type";
 import { users } from "@db/schemas/auth/users.schema";
@@ -74,7 +73,7 @@ export class TeamLeaderPerformanceService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
-    ) {}
+    ) { }
 
     /* =====================================================
        CONTEXT
@@ -134,12 +133,12 @@ export class TeamLeaderPerformanceService {
 
         const timers = await this.db
             .select()
-            .from(stepInstances)
+            .from(timerTrackers)
             .where(
                 and(
-                    inArray(stepInstances.entityId, tenderIds),
+                    inArray(timerTrackers.entityId, tenderIds),
                     inArray(
-                        stepInstances.stepKey,
+                        timerTrackers.stage,
                         TL_STAGES.map(s => s.timerName)
                     )
                 )
@@ -147,7 +146,7 @@ export class TeamLeaderPerformanceService {
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
-            timerMap.set(`${t.entityId}:${t.stepKey}`, t);
+            timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
 
         /* ----------------------------------------
@@ -169,10 +168,10 @@ export class TeamLeaderPerformanceService {
                 let endTime: Date | null = null;
 
                 if (timerRow) {
-                    startTime = timerRow.actualStartAt ?? null;
-                    endTime = timerRow.actualEndAt ?? null;
+                    startTime = timerRow.startedAt ?? null;
+                    endTime = timerRow.endedAt ?? null;
 
-                    if (timerRow.status === "COMPLETED" && endTime) {
+                    if (timerRow.status === "completed" && endTime) {
                         completed = true;
                         onTime = deadline ? endTime <= deadline : null;
                     } else if (deadline) {
@@ -274,8 +273,8 @@ export class TeamLeaderPerformanceService {
                     stage.stageKey === "tender_approval"
                         ? { approvalType: "Tender Approval" }
                         : stage.stageKey === "costing_sheet_approval"
-                          ? { approvalType: "Costing Sheet Approval" }
-                          : {},
+                            ? { approvalType: "Costing Sheet Approval" }
+                            : {},
             };
 
             /* ---------- NOT APPLICABLE ---------- */

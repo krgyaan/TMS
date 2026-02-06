@@ -4,7 +4,7 @@ import { PerformanceQueryDto } from "./zod/performance-query.dto";
 import { StagePerformance } from "./zod/stage-performance.type";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 // import { timer } from "@db/schemas/workflow/timer.schema";
-import { stepInstances } from "@db/schemas/workflow/workflows.schema";
+import { timerTrackers } from "@db/schemas/workflow/timer.schema";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { STAGE_CONFIG } from "../config/stage-config";
@@ -87,7 +87,7 @@ export class TenderExecutiveService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
-    ) {}
+    ) { }
 
     /**
      * STEP 1:
@@ -143,12 +143,12 @@ export class TenderExecutiveService {
 
         const timers = await this.db
             .select()
-            .from(stepInstances)
-            .where(and(eq(stepInstances.assignedToUserId, userId), inArray(stepInstances.entityId, tenderIds), inArray(stepInstances.stepKey, timerNames)));
+            .from(timerTrackers)
+            .where(and(eq(timerTrackers.assignedUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
-            timerMap.set(`${t.entityId}:${t.stepKey}`, t);
+            timerMap.set(`${t.entityId}:${t.stage}`, t);
         }
 
         /* =====================================================
@@ -197,12 +197,12 @@ export class TenderExecutiveService {
                     const timerRow = timerMap.get(`${tender.id}:${stage.timerName}`);
 
                     if (timerRow) {
-                        startTime = timerRow.actualStartAt;
-                        endTime = timerRow.actualEndAt ?? null;
+                        startTime = timerRow.startedAt;
+                        endTime = timerRow.endedAt ?? null;
                         const deadline = stage.resolveDeadline(tender);
                         const now = new Date();
 
-                        if (timerRow.status === "COMPLETED" && endTime) {
+                        if (timerRow.status === "completed" && endTime) {
                             completed = true;
                             onTime = deadline ? endTime <= deadline : null;
                         } else {
