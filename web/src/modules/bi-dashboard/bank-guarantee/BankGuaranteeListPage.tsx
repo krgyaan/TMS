@@ -114,29 +114,20 @@ const BankGuaranteeListPage = () => {
     const bgData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: BankGuaranteeDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: BankGuaranteeDashboardRow) => {
-        navigate(paths.bi.bankGuaranteeAction(row.id), { state: row });
-    }, [navigate]);
-
     const bgActions: ActionItem<BankGuaranteeDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<BankGuaranteeDashboardRow>[]>(

@@ -126,29 +126,20 @@ const FdrListPage = () => {
     const fdrData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: FdrDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: FdrDashboardRow) => {
-        navigate(paths.bi.fdrAction(row.id), { state: row });
-    }, [navigate]);
-
     const fdrActions: ActionItem<FdrDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<FdrDashboardRow>[]>(

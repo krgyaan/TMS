@@ -108,29 +108,20 @@ const PayOnPortalListPage = () => {
     const popData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: PayOnPortalDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: PayOnPortalDashboardRow) => {
-        navigate(paths.bi.payOnPortalAction(row.id), { state: row });
-    }, [navigate]);
-
     const popActions: ActionItem<PayOnPortalDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<PayOnPortalDashboardRow>[]>(

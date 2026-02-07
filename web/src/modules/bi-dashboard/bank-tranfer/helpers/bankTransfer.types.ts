@@ -11,6 +11,7 @@ export type BankTransferDashboardFilters = {
 
 export interface BankTransferDashboardRow {
     id: number;
+    requestId: number;
     date: Date | null;
     teamMember: string | null;
     utrNo: string | null;
