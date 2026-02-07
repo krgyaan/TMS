@@ -18,7 +18,8 @@ export const tendersKey = {
 export const useTenders = (
     activeTab?: string,
     category?: string,
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 }
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { queryParams: teamParams, teamId, userId, dataScope } = useTeamFilter();
 
@@ -28,7 +29,9 @@ export const useTenders = (
         ...teamParams,
         page: pagination.page,
         limit: pagination.limit,
-        search: pagination.search
+        search: pagination.search,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
 
     const queryKeyFilters = {
@@ -38,6 +41,7 @@ export const useTenders = (
         userId,
         dataScope,
         ...pagination,
+        ...sort,
     };
 
     return useQuery<PaginatedResult<TenderInfoWithNames>>({

@@ -69,6 +69,7 @@ const TenderListPage = () => {
         activeTab,
         getCategoryForTab(activeTab),
         { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
     const deleteTender = useDeleteTender();
@@ -175,6 +176,7 @@ const TenderListPage = () => {
         },
         {
             field: "gstValues",
+            colId: "gstValues",
             headerName: "Tender Value",
             filter: true,
             sortable: true,
@@ -183,6 +185,7 @@ const TenderListPage = () => {
         },
         {
             field: "tenderFees",
+            colId: "tenderFees",
             headerName: "Tender Fee",
             filter: true,
             sortable: true,
@@ -191,6 +194,7 @@ const TenderListPage = () => {
         },
         {
             field: "emd",
+            colId: "emd",
             headerName: "EMD",
             filter: true,
             sortable: true,
@@ -199,18 +203,13 @@ const TenderListPage = () => {
         },
         {
             field: "dueDate",
+            colId: "dueDate",
             headerName: "Due Date",
             filter: true,
             sortable: true,
             width: 150,
             cellRenderer: (params: { value: string | Date }) => {
                 return params.value ? formatDateTime(params.value) : "-";
-            },
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
             },
         },
         {

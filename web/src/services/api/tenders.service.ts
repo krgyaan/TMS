@@ -35,6 +35,12 @@ class TenderInfosService extends BaseApiService {
             if (params.limit) {
                 search.set('limit', String(params.limit));
             }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
 
         const queryString = search.toString();
