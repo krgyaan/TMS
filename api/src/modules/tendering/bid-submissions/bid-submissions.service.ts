@@ -240,9 +240,9 @@ export class BidSubmissionsService {
             .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+            .offset(offset);
 
         // Map rows
         const mappedRows = rows.map((row) => {

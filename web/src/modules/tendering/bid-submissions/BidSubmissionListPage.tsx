@@ -171,21 +171,16 @@ const BidSubmissionListPage = () => {
             colId: 'dueDate',
             headerName: 'Due Date & Time',
             width: 160,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
+            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'emdAmount',
+            colId: 'emdAmount',
             headerName: 'EMD',
             width: 120,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
@@ -198,7 +193,7 @@ const BidSubmissionListPage = () => {
             colId: 'finalCosting',
             headerName: 'Final Costing',
             width: 130,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.finalCosting;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
