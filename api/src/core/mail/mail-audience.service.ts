@@ -6,6 +6,7 @@ import { userRoles } from "@db/schemas/auth/user-roles.schema";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { id } from "zod/v4/locales";
 
 @Injectable()
 export class MailAudienceService {
@@ -20,5 +21,11 @@ export class MailAudienceService {
         const result = await this.db.select({ email: users.email }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(conditions);
 
         return result.map(r => r.email);
+    }
+
+    async getCoo(): Promise<typeof users.$inferSelect> {
+        const [user] = await this.db.select().from(users).where(eq(users.id, 7));
+
+        return user;
     }
 }

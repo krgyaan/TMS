@@ -433,29 +433,60 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
             {/* Upload Proof Dialog */}
             <Dialog open={addProofOpen} onOpenChange={setAddProofOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Upload Proof</DialogTitle>
-                        <DialogDescription>Select one or more files to upload as proof documents.</DialogDescription>
+                        <DialogTitle className="text-xl">Upload Proof Documents</DialogTitle>
+                        <DialogDescription>Drag & drop files here or click to browse. Supported: images and PDF.</DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={submitAddProof} className="space-y-4">
-                        <div className="space-y-2">
-                            <Input type="file" multiple accept="image/*,.pdf" onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))} />
-                            {filesToUpload.length > 0 && (
-                                <p className="text-xs ">
-                                    {filesToUpload.length} {filesToUpload.length === 1 ? "file" : "files"} selected
-                                </p>
-                            )}
-                        </div>
+                    <form onSubmit={submitAddProof} className="space-y-6">
+                        {/* Dropzone */}
+                        <label
+                            htmlFor="proof-upload"
+                            className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:bg-muted/50 transition"
+                        >
+                            <div className="text-muted-foreground">
+                                <p className="font-medium">Click to upload files here</p>
+                                <p className="text-xs mt-1">PNG, JPG, PDF allowed</p>
+                            </div>
 
-                        <div className="flex justify-end gap-2">
+                            <Input
+                                id="proof-upload"
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))}
+                            />
+                        </label>
+
+                        {/* Selected files preview */}
+                        {filesToUpload.length > 0 && (
+                            <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-3 bg-muted/30">
+                                <p className="text-sm font-medium">
+                                    {filesToUpload.length} file{filesToUpload.length > 1 && "s"} selected
+                                </p>
+
+                                <ul className="text-xs space-y-1">
+                                    {filesToUpload.map((file, idx) => (
+                                        <li key={idx} className="flex justify-between items-center bg-background px-2 py-1 rounded border">
+                                            <span className="truncate">{file.name}</span>
+                                            <span className="text-muted-foreground ml-2">{(file.size / 1024).toFixed(1)} KB</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 pt-2">
                             <Button type="button" variant="outline" onClick={() => setAddProofOpen(false)}>
                                 Cancel
                             </Button>
+
                             <Button type="submit" disabled={filesToUpload.length === 0 || uploadProofsMutation.isPending}>
                                 {uploadProofsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                Upload
+                                Upload Files
                             </Button>
                         </div>
                     </form>
