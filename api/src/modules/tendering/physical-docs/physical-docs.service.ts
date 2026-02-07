@@ -270,9 +270,9 @@ export class PhysicalDocsService {
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+            .offset(offset);
 
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,

@@ -109,14 +109,17 @@ const EmdsAndTenderFeesPage = () => {
         }),
         {
             field: 'gstValues',
+            colId: 'gstValues',
             headerName: 'Tender Value',
             width: 130,
             cellRenderer: (params: any) => {
                 return <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>;
             },
+            sortable: true,
         },
         {
             field: 'emd',
+            colId: 'emd',
             headerName: 'EMD',
             width: 100,
             cellRenderer: (params: any) => {
@@ -133,9 +136,11 @@ const EmdsAndTenderFeesPage = () => {
                     </Tooltip>
                 );
             },
+            sortable: true,
         },
         {
             field: 'tenderFee',
+            colId: 'tenderFee',
             headerName: 'Tender Fee',
             width: 120,
             cellRenderer: (params: any) => {
@@ -152,9 +157,11 @@ const EmdsAndTenderFeesPage = () => {
                     </Tooltip>
                 );
             },
+            sortable: true,
         },
         {
             field: 'processingFee',
+            colId: 'processingFee',
             headerName: 'Processing Fee',
             width: 140,
             cellRenderer: (params: any) => {
@@ -171,6 +178,7 @@ const EmdsAndTenderFeesPage = () => {
                     </Tooltip>
                 );
             },
+            sortable: true,
         },
         {
             field: 'teamMember',
@@ -181,6 +189,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'dueDate',
+            colId: 'dueDate',
             headerName: 'Due Date',
             width: 140,
             cellRenderer: (params: any) => {
@@ -194,12 +203,7 @@ const EmdsAndTenderFeesPage = () => {
                     </span>
                 );
             },
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
+            sortable: true,
         },
         {
             field: 'statusName',
@@ -286,6 +290,7 @@ const EmdsAndTenderFeesPage = () => {
         },
         {
             field: 'amountRequired',
+            colId: 'amountRequired',
             headerName: 'Amount',
             width: 100,
             cellRenderer: (params: any) =>
@@ -294,6 +299,7 @@ const EmdsAndTenderFeesPage = () => {
                 ) : (
                     <span className="text-gray-400">—</span>
                 ),
+            sortable: true,
         },
         {
             field: 'requestType',

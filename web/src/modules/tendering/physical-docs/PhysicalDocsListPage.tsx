@@ -124,15 +124,9 @@ const PhysicalDocsListPage = () => {
             colId: 'physicalDocsDeadline',
             headerName: 'Physical Docs Deadline',
             width: 160,
-            valueGetter: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
+            cellRenderer: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'courierAddress',
