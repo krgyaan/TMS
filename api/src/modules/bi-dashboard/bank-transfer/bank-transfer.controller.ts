@@ -43,6 +43,11 @@ export class BankTransferController {
         return this.bankTransferService.getDashboardCounts();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.bankTransferService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

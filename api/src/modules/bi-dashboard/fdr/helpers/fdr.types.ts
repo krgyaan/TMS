@@ -1,5 +1,6 @@
 export interface FdrDashboardRow {
     id: number;
+    requestId: number;
     fdrCreationDate: Date | null;
     fdrNo: string | null;
     beneficiaryName: string | null;

@@ -10,6 +10,7 @@ import {
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
@@ -150,6 +151,7 @@ export class BankGuaranteeService {
         const rows = await this.db
             .select({
                 id: paymentInstruments.id,
+                requestId: paymentRequests.id,
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
@@ -206,6 +208,7 @@ export class BankGuaranteeService {
 
             return {
                 id: row.id,
+                requestId: row.requestId,
                 bgDate,
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
@@ -832,5 +835,144 @@ export class BankGuaranteeService {
             action: body.action,
             actionNumber,
         };
+    }
+
+    async getById(id: number) {
+        const [result] = await this.db
+            .select({
+                // Payment Instrument fields
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                validityDate: paymentInstruments.validityDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                coveringLetter: paymentInstruments.coveringLetter,
+                extraPdfPaths: paymentInstruments.extraPdfPaths,
+                createdAt: paymentInstruments.createdAt,
+                updatedAt: paymentInstruments.updatedAt,
+
+                // Payment Request fields
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                requestType: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                requestDueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestPurpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                requestStatus: paymentRequests.status,
+                requestRemarks: paymentRequests.remarks,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestUpdatedAt: paymentRequests.updatedAt,
+
+                // BG Details - all fields
+                bgDetailsId: instrumentBgDetails.id,
+                bgNo: instrumentBgDetails.bgNo,
+                bgDate: instrumentBgDetails.bgDate,
+                claimExpiryDateBg: instrumentBgDetails.claimExpiryDate,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                bankName: instrumentBgDetails.bankName,
+                cashMarginPercent: instrumentBgDetails.cashMarginPercent,
+                fdrMarginPercent: instrumentBgDetails.fdrMarginPercent,
+                stampCharges: instrumentBgDetails.stampCharges,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
+                extendedAmount: instrumentBgDetails.extendedAmount,
+                extendedValidityDate: instrumentBgDetails.extendedValidityDate,
+                extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
+                extendedBankName: instrumentBgDetails.extendedBankName,
+                extensionLetterPath: instrumentBgDetails.extensionLetterPath,
+                cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
+                prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                bgNeeds: instrumentBgDetails.bgNeeds,
+                bgPurpose: instrumentBgDetails.bgPurpose,
+                bgSoftCopy: instrumentBgDetails.bgSoftCopy,
+                bgPo: instrumentBgDetails.bgPo,
+                bgClientUser: instrumentBgDetails.bgClientUser,
+                bgClientCp: instrumentBgDetails.bgClientCp,
+                bgClientFin: instrumentBgDetails.bgClientFin,
+                bgBankAcc: instrumentBgDetails.bgBankAcc,
+                bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                courierNo: instrumentBgDetails.courierNo,
+                stampCharge: instrumentBgDetails.stampCharge,
+                extensionLetter: instrumentBgDetails.extensionLetter,
+                newBgClaim: instrumentBgDetails.newBgClaim,
+                approveBg: instrumentBgDetails.approveBg,
+                bgFormatTe: instrumentBgDetails.bgFormatTe,
+                bgFormatTl: instrumentBgDetails.bgFormatTl,
+                sfmsConf: instrumentBgDetails.sfmsConf,
+                fdrAmt: instrumentBgDetails.fdrAmt,
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrCopy: instrumentBgDetails.fdrCopy,
+                fdrNo: instrumentBgDetails.fdrNo,
+                fdrValidity: instrumentBgDetails.fdrValidity,
+                fdrRoi: instrumentBgDetails.fdrRoi,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
+                newStampChargeDeducted: instrumentBgDetails.newStampChargeDeducted,
+                stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
+                cancelRemark: instrumentBgDetails.cancelRemark,
+                cancellConfirm: instrumentBgDetails.cancellConfirm,
+                bgFdrCancelDate: instrumentBgDetails.bgFdrCancelDate,
+                bgFdrCancelAmount: instrumentBgDetails.bgFdrCancelAmount,
+                bgFdrCancelRefNo: instrumentBgDetails.bgFdrCancelRefNo,
+                bg2Remark: instrumentBgDetails.bg2Remark,
+                reasonReq: instrumentBgDetails.reasonReq,
+                bgDetailsCreatedAt: instrumentBgDetails.createdAt,
+                bgDetailsUpdatedAt: instrumentBgDetails.updatedAt,
+
+                // Tender Info fields
+                tenderName: tenderInfos.tenderName,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusId: tenderInfos.status,
+                tenderOrganizationId: tenderInfos.organization,
+                tenderItemId: tenderInfos.item,
+                tenderTeamMember: tenderInfos.teamMember,
+
+                // Status fields
+                tenderStatusName: statuses.name,
+
+                // User fields
+                requestedByName: users.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentRequests.id, id),
+                eq(paymentInstruments.instrumentType, 'BG'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Request with ID ${id} not found`);
+        }
+
+        return result;
     }
 }

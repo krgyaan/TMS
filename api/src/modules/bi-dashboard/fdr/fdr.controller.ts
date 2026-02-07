@@ -43,6 +43,11 @@ export class FdrController {
         return this.fdrService.getDashboardCounts();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.fdrService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

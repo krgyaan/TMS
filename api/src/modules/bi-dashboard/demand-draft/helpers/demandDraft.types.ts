@@ -1,5 +1,6 @@
 export interface DemandDraftDashboardRow {
     id: number;
+    requestId: number;
     ddCreationDate: Date | null;
     ddNo: string | null;
     beneficiaryName: string | null;
