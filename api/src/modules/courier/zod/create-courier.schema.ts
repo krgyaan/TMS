@@ -8,7 +8,7 @@ export const CreateCourierSchema = z.object({
     toPin: z.string().min(1, "Pin code is required").max(255),
     toMobile: z.string().min(1, "Mobile number is required").max(255),
 
-    empFrom: z.coerce.number().int().positive("Please select an employee").optional(),
+    empFrom: z.coerce.number().int().positive("Please select an employee"),
 
     // keep it, but optional
     delDate: z.coerce.date(),
