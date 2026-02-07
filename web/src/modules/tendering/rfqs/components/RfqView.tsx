@@ -9,7 +9,7 @@ import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/te
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface RfqViewProps {
-    rfq: Rfq;
+    rfq: Rfq | null;
     tender?: TenderInfoWithNames;
     isLoading?: boolean;
     className?: string;
@@ -23,14 +23,33 @@ export function RfqView({
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!rfq) {
+        return (
+            <Card className={className}>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        RFQ
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No RFQ available for this tender yet.</p>
                     </div>
                 </CardContent>
             </Card>

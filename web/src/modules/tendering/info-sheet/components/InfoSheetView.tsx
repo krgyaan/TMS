@@ -57,15 +57,13 @@ export const InfoSheetView = ({
     if (isLoading) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>
-                        <Skeleton className="h-6 w-48" />
-                    </CardTitle>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                            <Skeleton key={idx} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <Skeleton key={idx} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -76,11 +74,17 @@ export const InfoSheetView = ({
     if (!infoSheet) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>Tender Info Sheet</CardTitle>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Tender Info Sheet
+                    </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">No info sheet available for this tender.</p>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No info sheet available for this tender.</p>
+                    </div>
                 </CardContent>
             </Card>
         )
@@ -591,7 +595,7 @@ export const InfoSheetView = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Courier Address
                                     </TableCell>
-                                    <TableCell className="text-sm break-words" colSpan={3}>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
                                         {infoSheet.courierAddress}
                                     </TableCell>
                                 </TableRow>

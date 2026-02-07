@@ -1,36 +1,57 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { paths } from "@/app/routes/paths";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
+import { paths } from "@/app/routes/paths";
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
 import { RfqView } from './components/RfqView';
+import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
+import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
+import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 export default function RfqShowPage() {
     const navigate = useNavigate();
-    const { id } = useParams<{ id: string }>();
-    const parsedId = id ? Number(id) : NaN;
-    const tenderId = Number.isNaN(parsedId) ? null : parsedId;
+    const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
 
+    if (!tenderIdParam) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Invalid Tender ID.</AlertDescription>
+            </Alert>
+        );
+    }
+
+    const tenderId = Number(tenderIdParam);
     const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: rfqData, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId);
 
-    const isLoading = tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || rfqLoading;
+    const isLoading = tenderLoading || approvalLoading || rfqLoading;
 
-    if (!tenderId || tenderError || (!tenderLoading && !tender)) {
+    if (tenderError || (!tenderLoading && !tender)) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -49,11 +70,17 @@ export default function RfqShowPage() {
         );
     }
 
+    if (isLoading) {
+        return <Skeleton className="h-[800px]" />;
+    }
+
     // Combine tender and approval into TenderWithRelations
-    const tenderWithRelations: TenderWithRelations = {
-        ...tender!,
-        approval: approval || null,
-    };
+    const tenderWithRelations: TenderWithRelations | null = tender
+        ? {
+            ...tender,
+            approval: approval || null,
+        }
+        : null;
 
     return (
         <div className="space-y-6">
@@ -64,69 +91,89 @@ export default function RfqShowPage() {
                 </Button>
             </div>
             <Tabs defaultValue="tender-details" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-3 gap-2">
+                <TabsList className="grid w-fit grid-cols-7 gap-2">
                     <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="rfq">RFQ</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
+                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
+                    <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
+                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
                 </TabsList>
 
                 {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
                 <TabsContent value="tender-details" className="space-y-6">
-                    <TenderView
-                        tender={tenderWithRelations}
-                        isLoading={isLoading}
-                    />
-                    {infoSheetLoading ? (
-                        <InfoSheetView isLoading />
-                    ) : infoSheet ? (
-                        <InfoSheetView infoSheet={infoSheet} />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>
-                                No info sheet exists for this tender yet.
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    <TenderApprovalView
-                        tender={tenderWithRelations}
-                        isLoading={isLoading}
-                    />
-                </TabsContent>
-
-                {/* Physical Docs */}
-                <TabsContent value="physical-docs">
-                    {physicalDocLoading ? (
-                        <PhysicalDocsView isLoading={true} physicalDoc={null} />
-                    ) : physicalDoc ? (
-                        <PhysicalDocsView physicalDoc={physicalDoc} />
-                    ) : (
-                        <PhysicalDocsView isLoading={false} physicalDoc={null} />
-                    )}
-                </TabsContent>
-
-                {/* RFQ */}
-                <TabsContent value="rfq">
-                    {rfqLoading ? (
-                        <RfqView
-                            rfq={null as any}
-                            tender={tender!}
-                            isLoading={true}
-                        />
-                    ) : rfqData ? (
-                        <RfqView
-                            rfq={rfqData}
-                            tender={tender!}
+                    {tenderWithRelations ? (
+                        <TenderView
+                            tender={tenderWithRelations}
                             isLoading={isLoading}
                         />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>
-                                No RFQ exists for this tender yet.
-                            </AlertDescription>
+                            <AlertDescription>Tender information not available.</AlertDescription>
                         </Alert>
                     )}
+                    <InfoSheetView
+                        infoSheet={infoSheet || null}
+                        isLoading={infoSheetLoading}
+                    />
+                    {tenderWithRelations && (
+                        <TenderApprovalView
+                            tender={tenderWithRelations}
+                            isLoading={isLoading}
+                        />
+                    )}
+                </TabsContent>
+
+                {/* Physical Docs */}
+                <TabsContent value="physical-docs">
+                    <PhysicalDocsView
+                        physicalDoc={physicalDoc || null}
+                        isLoading={physicalDocLoading}
+                    />
+                </TabsContent>
+
+                {/* RFQ */}
+                <TabsContent value="rfq">
+                    <RfqView
+                        rfq={rfqData || null}
+                        tender={tender || undefined}
+                        isLoading={rfqLoading}
+                    />
+                </TabsContent>
+
+                {/* EMD & Tender Fees */}
+                <TabsContent value="emds-tenderfees">
+                    <EmdTenderFeeShow
+                        paymentRequests={paymentRequests || null}
+                        tender={tender || null}
+                        isLoading={paymentRequestsLoading}
+                    />
+                </TabsContent>
+
+                {/* Document Checklist */}
+                <TabsContent value="document-checklist">
+                    <DocumentChecklistView
+                        checklist={documentChecklist || null}
+                        isLoading={documentChecklistLoading}
+                    />
+                </TabsContent>
+
+                {/* Costing Details */}
+                <TabsContent value="costing-details">
+                    <CostingSheetView
+                        costingSheet={costingSheet || null}
+                        isLoading={costingSheetLoading}
+                    />
+                </TabsContent>
+
+                {/* Bid Submission */}
+                <TabsContent value="bid-submission">
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission || null}
+                        isLoading={bidSubmissionLoading}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

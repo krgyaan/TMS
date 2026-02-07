@@ -89,13 +89,13 @@ export function TenderApprovalView({
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -106,15 +106,16 @@ export function TenderApprovalView({
     if (!approval) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
                         Tender Approval
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                        No approval information available yet.
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Clock className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No approval information available yet.</p>
                     </div>
                 </CardContent>
             </Card>
