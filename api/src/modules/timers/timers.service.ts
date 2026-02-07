@@ -422,10 +422,10 @@ export class TimersService {
                     const actualElapsedMs = endedMs - startedMs - timer.totalPausedDurationMs;
                     remainingTimeMs = effectiveAllocatedTimeMs - actualElapsedMs;
 
-                    this.logger.debug(`Completed timer ${timer.id}: deadlineAt equals endedAt, using fallback calculation. remainingTimeMs=${remainingTimeMs}`);
+                    // this.logger.debug(`Completed timer ${timer.id}: deadlineAt equals endedAt, using fallback calculation. remainingTimeMs=${remainingTimeMs}`);
                 } else {
                     remainingTimeMs = diffMs;
-                    this.logger.debug(`Completed timer ${timer.id}: deadlineAt=${timer.deadlineAt}, endedAt=${timer.endedAt}, remainingTimeMs=${remainingTimeMs}`);
+                    // this.logger.debug(`Completed timer ${timer.id}: deadlineAt=${timer.deadlineAt}, endedAt=${timer.endedAt}, remainingTimeMs=${remainingTimeMs}`);
                 }
             } else if (timer.endedAt && timer.startedAt) {
                 // Fallback: calculate from allocated time
@@ -435,10 +435,10 @@ export class TimersService {
                 remainingTimeMs = effectiveAllocatedTimeMs - actualElapsedMs;
 
                 // Debug logging for fallback calculation
-                this.logger.debug(`Completed timer ${timer.id} (fallback): startedAt=${timer.startedAt}, endedAt=${timer.endedAt}, allocatedTimeMs=${effectiveAllocatedTimeMs}, elapsedMs=${actualElapsedMs}, remainingTimeMs=${remainingTimeMs}`);
+                // this.logger.debug(`Completed timer ${timer.id} (fallback): startedAt=${timer.startedAt}, endedAt=${timer.endedAt}, allocatedTimeMs=${effectiveAllocatedTimeMs}, elapsedMs=${actualElapsedMs}, remainingTimeMs=${remainingTimeMs}`);
             } else {
                 remainingTimeMs = 0;
-                this.logger.debug(`Completed timer ${timer.id}: Missing deadlineAt or endedAt, setting remainingTimeMs=0`);
+                // this.logger.debug(`Completed timer ${timer.id}: Missing deadlineAt or endedAt, setting remainingTimeMs=0`);
             }
         } else if (timer.deadlineAt && (timer.status === 'running' || timer.status === 'paused')) {
             // Use deadlineAt if available for running/paused timers
