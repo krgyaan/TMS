@@ -296,10 +296,7 @@ export class CourierService {
                 toPin: dto.toPin,
                 toMobile: dto.toMobile,
                 empFrom: dto.empFrom ?? userId,
-
-                // ✅ CRITICAL: Date for timestamptz
-                delDate: dto.delDate, // already Date because of z.coerce.date()
-
+                delDate: dto.delDate,
                 urgency: dto.urgency,
                 courierDocs,
                 status: COURIER_STATUS.PENDING,
@@ -317,9 +314,13 @@ export class CourierService {
                 courierId: courier.id,
             });
 
+            if (!dto.empFrom) {
+                this.logger.warn("Emp From not found while sending courier create mail.");
+            }
+
             // ===== MAIL SIDE EFFECT (non-blocking for courier creation) =====
             try {
-                const googleConnection = await this.googleService.getSanitizedGoogleConnection(57);
+                const googleConnection = await this.googleService.getSanitizedGoogleConnection(dto.empFrom);
 
                 if (!googleConnection) {
                     this.logger.warn("Google connection missing, mail skipped", {
@@ -328,8 +329,12 @@ export class CourierService {
                     return courier;
                 }
 
-                const toMail = await this.mailAudience.getEmailsByRoleId(4);
-                const ccMail = await this.mailAudience.getEmailsByRoleId(1);
+                let toEmailsList = await this.mailAudience.getEmailsByRoleId(4, 8);
+
+                let ccMail = await this.mailAudience.getEmailsByRoleId(2);
+
+                this.logger.info("To Email List", { toEmailsList });
+                this.logger.info("CC Email List", { ccMail });
 
                 await this.mailerService.sendMail(
                     CourierMailTemplates.COURIER_REQUEST,
@@ -338,7 +343,7 @@ export class CourierService {
                         dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
                     },
                     {
-                        to: toMail,
+                        to: toEmailsList,
                         cc: ccMail,
                         subject: "Courier Dispatch Request",
                         attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
@@ -426,9 +431,10 @@ export class CourierService {
                 throw new NotFoundException("Courier not found");
             }
 
-            const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.userId)).limit(1);
+            const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.empFrom)).limit(1);
+            const [coo] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
 
-            const googleConnection = await this.googleService.getSanitizedGoogleConnection(user.userId);
+            const googleConnection = await this.googleService.getSanitizedGoogleConnection(coo.id);
 
             const updateData: Record<string, any> = {
                 status: statusData.status,
@@ -447,6 +453,13 @@ export class CourierService {
 
             this.logger.info("Courier status updated in DB", { courierId: id });
 
+            let [to] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
+            let toEmailsList = to.email;
+            let ccMail = await this.mailAudience.getEmailsByRoleId(2);
+
+            this.logger.info("To Email List", { toEmailsList });
+            this.logger.info("CC Email List", { ccMail });
+
             // ===== Mail side effect (non-blocking) =====
             if (statusData.status === COURIER_STATUS.DELIVERED && googleConnection) {
                 try {
@@ -454,8 +467,8 @@ export class CourierService {
                         CourierMailTemplates.COURIER_STATUS_UPDATE,
                         { ...updated, fromName: user.name },
                         {
-                            to: ["abhijeetgaur.dev@gmail.com"],
-                            cc: ["dietcodeco@gmail.com"],
+                            to: [toEmailsList],
+                            cc: ccMail,
                             subject: `Courier sent to ${updated.toOrg}`,
                             attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
                         },
@@ -514,6 +527,43 @@ export class CourierService {
 
             this.logger.info("Courier dispatch saved", { courierId: id });
 
+            //MAILING LIST
+            const from = await this.mailAudience.getCoo();
+
+            const googleConnection = await this.googleService.getSanitizedGoogleConnection(from.id);
+
+            let [to] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
+            let toEmailsList = to.email;
+
+            let ccMail = await this.mailAudience.getEmailsByRoleId(2);
+
+            this.logger.info("To Email List", { toEmailsList });
+            this.logger.info("CC Email List", { ccMail });
+
+            // ===== Mail side effect (non-blocking) =====
+            if (googleConnection) {
+                try {
+                    await this.mailerService.sendMail(
+                        CourierMailTemplates.COURIER_DISPATCH,
+                        { ...courier, fromName: from.name },
+                        {
+                            to: [toEmailsList],
+                            cc: ccMail,
+                            subject: `Courier sent to ${courier.toOrg}`,
+                            attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                        },
+                        googleConnection
+                    );
+
+                    this.logger.info("Courier delivery mail sent", { courierId: id });
+                } catch (mailErr: any) {
+                    this.logger.error("Delivery mail failed (non-blocking)", {
+                        courierId: id,
+                        error: mailErr.message,
+                    });
+                }
+            }
+
             return courier;
         } catch (error: any) {
             this.logger.error("Failed to create dispatch", {
@@ -559,6 +609,7 @@ export class CourierService {
             throw error;
         }
     }
+
     async delete(id: number, userId: number) {
         this.logger.warn("Deleting courier", { courierId: id, userId });
 
