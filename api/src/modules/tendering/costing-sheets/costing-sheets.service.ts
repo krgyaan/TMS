@@ -238,9 +238,9 @@ export class CostingSheetsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+            .offset(offset);
 
         const data = rows.map((row) => ({
             tenderId: row.tenderId,

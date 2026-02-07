@@ -146,15 +146,9 @@ const CostingApprovalListPage = () => {
             headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
+            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'emdAmount',
@@ -162,7 +156,7 @@ const CostingApprovalListPage = () => {
             headerName: 'EMD',
             flex: 1,
             minWidth: 100,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
@@ -185,7 +179,7 @@ const CostingApprovalListPage = () => {
             headerName: 'TE Final Price',
             flex: 1,
             minWidth: 130,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.submittedFinalPrice;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
