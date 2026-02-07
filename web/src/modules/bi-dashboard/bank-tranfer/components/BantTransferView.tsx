@@ -223,7 +223,7 @@ export function BankTransferView({
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                    <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                                         Reason
                                     </TableCell>
                                     <TableCell className="text-sm break-words" colSpan={3}>
@@ -234,7 +234,7 @@ export function BankTransferView({
                         )}
                         {data.remarks && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                                     Remarks
                                 </TableCell>
                                 <TableCell className="text-sm break-words" colSpan={3}>

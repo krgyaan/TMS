@@ -90,7 +90,7 @@ export function FdrView({
                             <TableCell className="text-sm">
                                 {data.purpose || data.requestPurpose || '—'}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
+                            <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                                 Favouring
                             </TableCell>
                             <TableCell className="text-sm">

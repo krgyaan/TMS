@@ -167,7 +167,7 @@ export function DemandDraftView({
                             <TableCell className="text-sm">
                                 {data.payableAt || '—'}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
+                            <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                                 Favouring
                             </TableCell>
                             <TableCell className="text-sm">

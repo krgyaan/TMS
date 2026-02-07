@@ -84,7 +84,7 @@ export function BankGuaranteeView({
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Beneficiary Name
                             </TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                 {data.beneficiaryName || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
@@ -346,7 +346,7 @@ export function BankGuaranteeView({
                                     <TableCell className="text-sm">
                                         {data.courierNo || '—'}
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                    <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                                         Courier Address
                                     </TableCell>
                                     <TableCell className="text-sm">
