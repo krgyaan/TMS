@@ -159,25 +159,19 @@ const TenderApprovalListPage = () => {
             headerName: 'Due Date/Time',
             width: 150,
             colId: 'dueDate',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 if (!params.data?.dueDate) return '—';
                 return formatDateTime(params.data.dueDate);
             },
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'gstValues',
             headerName: 'Tender Value',
             width: 130,
             colId: 'gstValues',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
                 return formatINR(value);
@@ -190,7 +184,7 @@ const TenderApprovalListPage = () => {
             headerName: 'EMD',
             width: 100,
             colId: 'emd',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.emd;
                 if (value === null || value === undefined) return '—';
                 return formatINR(value);

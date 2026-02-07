@@ -38,6 +38,8 @@ export class TenderInfoController {
         @Query('search') search?: string,
         @Query('teamId') teamId?: string,
         @Query('assignedTo') assignedTo?: string,
+        @Query('sortBy') sortBy?: string,
+        @Query('sortOrder') sortOrder?: string,
     ) {
         const toNumArray = (v?: string) =>
             (v ?? '')
@@ -60,6 +62,8 @@ export class TenderInfoController {
             search,
             teamId: parseNumber(teamId),
             assignedTo: parseNumber(assignedTo),
+            sortBy,
+            sortOrder: sortOrder as 'asc' | 'desc' | undefined,
             user,
         });
 

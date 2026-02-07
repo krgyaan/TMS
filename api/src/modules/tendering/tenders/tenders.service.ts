@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, notInArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, notInArray, sql, desc, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
@@ -29,6 +29,8 @@ export type TenderListFilters = {
     search?: string;
     teamId?: number;
     assignedTo?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
     user?: ValidatedUser;
 };
 
@@ -438,14 +440,55 @@ export class TenderInfosService {
         const [countResult] = await countQuery.where(whereClause);
         const total = Number(countResult?.count || 0);
 
-        // 3. Get Data (Paginated)
+        // 3. Determine sorting
+        let orderByClause = desc(tenderInfos.createdAt); // Default sort
+
+        if (filters?.sortBy) {
+            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'dueDate':
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'tenderFees':
+                    orderByClause = sortFn(tenderInfos.tenderFees);
+                    break;
+                case 'emd':
+                    orderByClause = sortFn(tenderInfos.emd);
+                    break;
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'statusName':
+                    orderByClause = sortFn(statuses.name);
+                    break;
+                case 'itemName':
+                    orderByClause = sortFn(items.name);
+                    break;
+                case 'organizationName':
+                    orderByClause = sortFn(organizations.name);
+                    break;
+                default:
+                    orderByClause = sortFn(tenderInfos.createdAt);
+            }
+        }
+
+        // 4. Get Data (Paginated) - Sort BEFORE pagination
         const rows = await this.getBaseQueryBuilder()
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(desc(tenderInfos.createdAt));
+            .offset(offset);
 
-        // 4. Map Data
+        // 5. Map Data
         const data = rows.map((row) =>
             this.mapJoinedRow({
                 tenderInfos: row.tenderInfos,
