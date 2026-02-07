@@ -61,6 +61,19 @@ export const usePayOnPortalDashboardCounts = () => {
     return query;
 };
 
+export const usePayOnPortalDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: payOnPortalsKey.detail(id),
+        queryFn: async () => {
+            const result = await payOnPortalsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdatePayOnPortalAction = () => {
     const queryClient = useQueryClient();
 

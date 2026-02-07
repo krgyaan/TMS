@@ -61,6 +61,19 @@ export const useFdrDashboardCounts = () => {
     return query;
 };
 
+export const useFdrDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: fdrsKey.detail(id),
+        queryFn: async () => {
+            const result = await fdrsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateFdrAction = () => {
     const queryClient = useQueryClient();
 
