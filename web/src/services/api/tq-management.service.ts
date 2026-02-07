@@ -30,6 +30,9 @@ class TqManagementService extends BaseApiService {
             if (filters.sortOrder) {
                 search.set('sortOrder', filters.sortOrder);
             }
+            if (filters.search) {
+                search.set('search', filters.search);
+            }
         }
 
         const queryString = search.toString();
@@ -49,6 +52,8 @@ class TqManagementService extends BaseApiService {
     }
 
     async createTqReceived(data: CreateTqReceivedDto): Promise<TenderQuery> {
+        console.log('Creating TQ received:', data);
+        console.log('this:', this);
         return this.post<TenderQuery>('/received', data);
     }
 
@@ -72,8 +77,13 @@ class TqManagementService extends BaseApiService {
         return this.patch<TenderQuery>(`/${tqId}/qualified`, { qualified });
     }
 
-    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
-        return this.get<TqManagementDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<TqManagementDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<TqManagementDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

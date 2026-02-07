@@ -37,6 +37,8 @@ export const paths = {
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
         emdsTenderFees: "/tendering/emds-tenderfees",
         emdsTenderFeesCreate: (tenderId: number | string) => `/tendering/emds-tenderfees/create/${tenderId}`,
+        oldEmdsTenderFeesCreate: () => `/tendering/emds-tenderfees/old-entries/create`,
+        biOtherThanEmdsCreate: () => `/tendering/emds-tenderfees/bi-other-than-emds/create`,
         emdsTenderFeesEdit: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}/edit`,
         emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
         checklists: "/tendering/document-checklists",
@@ -59,7 +61,7 @@ export const paths = {
         bidEdit: (bidSubmissionId: number) => `/tendering/bid-submissions/edit/${bidSubmissionId}`,
         bidMarkMissed: (tenderId: number) => `/tendering/bid-submissions/mark-missed/${tenderId}`,
         bidEditMissed: (bidSubmissionId: number) => `/tendering/bid-submissions/edit-missed/${bidSubmissionId}`,
-        bidView: (bidSubmissionId: number) => `/tendering/bid-submissions/view/${bidSubmissionId}`,
+        bidView: (tenderId: number) => `/tendering/bid-submissions/view/${tenderId}`,
         tqManagement: "/tendering/tq-management",
         tqReceived: (tenderId: number) => `/tendering/tq-management/received/${tenderId}`,
         tqEditReceived: (tqId: number) => `/tendering/tq-management/edit-received/${tqId}`,
@@ -72,11 +74,11 @@ export const paths = {
         ras: "/tendering/reverse-auctions",
         rasSchedule: (tenderId: number) => `/tendering/reverse-auctions/schedule/${tenderId}`,
         rasUploadResult: (raId: number) => `/tendering/reverse-auctions/upload-result/${raId}`,
-        rasShow: (id: number) => `/tendering/reverse-auctions/${id}`,
+        rasShow: (tenderId: number) => `/tendering/reverse-auctions/${tenderId}`,
         rasEdit: (id: number) => `/tendering/reverse-auctions/${id}/edit`,
         results: "/tendering/results",
         resultsUpload: (tenderId: number) => `/tendering/results/upload/${tenderId}`,
-        resultsShow: (id: number) => `/tendering/results/${id}`,
+        resultsShow: (tenderId: number) => `/tendering/results/${tenderId}`,
         resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
     },
 
@@ -85,6 +87,10 @@ export const paths = {
         workOrder: "/operations/work-order",
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
+
+        projectDashboard: "/operations/project-dashboard",
+        raisePoForm: "/operations/project-dashboard/purchase-order/create",
+        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
     },
 
     // ==================== SERVICES ====================
@@ -98,11 +104,23 @@ export const paths = {
     // ==================== BI DASHBOARD ====================
     bi: {
         demandDraft: "/bi-dashboard/demand-draft",
+        demandDraftView: (requestId: number) => `/bi-dashboard/demand-draft/details/${requestId}`,
+        demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
+        fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         cheque: "/bi-dashboard/cheque",
+        chequeView: (requestId: number) => `/bi-dashboard/cheque/details/${requestId}`,
+        chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
+        bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
+        bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
+        bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
+        bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
+        payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
+        payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
     },
 
     // ==================== ACCOUNTS ====================

@@ -13,6 +13,32 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+// Helper to extract document names from objects or return strings as-is
+const extractDocumentNames = (val: (string | { id?: number; documentName: string } | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
+    if (!val || !Array.isArray(val)) return [];
+    return val
+        .map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                // For document objects, prefer documentName over id
+                if ('documentName' in item && item.documentName != null) {
+                    return String(item.documentName);
+                }
+                // Fallback to id, value, or first string/number property
+                if ('id' in item && item.id != null) return String(item.id);
+                if ('value' in item && item.value != null) return String(item.value);
+                // Fallback: try to find first string/number property
+                for (const [, value] of Object.entries(item)) {
+                    if (typeof value === 'string' || typeof value === 'number') {
+                        return String(value);
+                    }
+                }
+            }
+            return item != null ? String(item) : null;
+        })
+        .filter((item): item is string => item !== null && item !== undefined && item !== 'undefined' && String(item).trim().length > 0);
+};
+
 const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
     return val
@@ -197,8 +223,8 @@ export const mapResponseToForm = (
         orderValue3: toNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
-        technicalWorkOrders: toStringArray(data.technicalWorkOrders),
-        commercialDocuments: toStringArray(data.commercialDocuments),
+        technicalWorkOrders: extractDocumentNames(data.technicalWorkOrders),
+        commercialDocuments: extractDocumentNames(data.commercialDocuments),
 
         avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
         avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),

@@ -3,6 +3,7 @@ import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, 
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
+import { useTeamFilter } from '@/hooks/useTeamFilter'
 
 export const physicalDocsKey = {
     all: ['physical-docs'] as const,
@@ -98,9 +99,13 @@ export const useUpdatePhysicalDoc = () => {
 };
 
 export const usePhysicalDocsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...physicalDocsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<PhysicalDocsDashboardCounts>({
-        queryKey: physicalDocsKey.dashboardCounts(),
-        queryFn: () => physicalDocsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => physicalDocsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };

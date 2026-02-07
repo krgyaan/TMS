@@ -146,6 +146,9 @@ importers:
       lucide-react:
         specifier: ^0.542.0
         version: 0.542.0(react@19.1.1)
+      ms:
+        specifier: ^2.1.3
+        version: 2.1.3
       prosemirror-view:
         specifier: ^1.41.3
         version: 1.41.3

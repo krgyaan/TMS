@@ -50,6 +50,11 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getDashboardCardStats();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

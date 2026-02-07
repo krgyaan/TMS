@@ -8,6 +8,7 @@ import type {
     UploadRaResultDto,
 } from '@/modules/tendering/ras/helpers/reverseAuction.types';
 import { reverseAuctionService } from '@/services/api/reverse-auction.service';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const reverseAuctionsKey = {
     all: ['reverse-auctions'] as const,
@@ -44,10 +45,14 @@ export const useReverseAuctionDashboard = (
 
 // Fetch only counts (for badges)
 export const useReverseAuctionDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...reverseAuctionsKey.counts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery<RaDashboardCounts>({
-        queryKey: reverseAuctionsKey.counts(),
-        queryFn: () => reverseAuctionService.getDashboardCounts(),
-        staleTime: 30000, // 30 seconds - counts don't need to be as fresh as data
+        queryKey,
+        queryFn: () => reverseAuctionService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
         retry: 2,
     });
 };
@@ -61,15 +66,23 @@ export const useReverseAuction = (id: number) => {
     });
 };
 
+// Fetch RA by tenderId
+export const useReverseAuctionByTender = (tenderId: number) => {
+    return useQuery<ReverseAuction>({
+        queryKey: [...reverseAuctionsKey.details(), 'byTender', tenderId],
+        queryFn: () => reverseAuctionService.getByTenderId(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
 // Schedule RA mutation
 export const useScheduleRa = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(id, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: ScheduleRaDto }) => reverseAuctionService.scheduleRa(tenderId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
-            // Explicitly invalidate dashboard counts to ensure they refresh
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
         },
     });
@@ -80,7 +93,7 @@ export const useUploadRaResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(id, data),
+        mutationFn: ({ raId, data }: { raId: number; data: UploadRaResultDto }) => reverseAuctionService.uploadResult(raId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh

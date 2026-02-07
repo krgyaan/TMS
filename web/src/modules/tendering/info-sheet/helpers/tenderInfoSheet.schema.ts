@@ -124,7 +124,7 @@ export const TenderInformationFormSchema = z.object({
     clients: z.array(z.object({
         clientName: z.string().min(1, 'Client name is required'),
         clientDesignation: z.string().optional(),
-        clientMobile: z.string().max(50).optional(),
+        clientMobile: z.string().max(200).optional(),
         clientEmail: z.string().email('Invalid email').optional().or(z.literal('')),
     })).min(1, 'At least one client is required'),
 

@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search } from 'lucide-react';
+import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -17,6 +17,9 @@ import type { RaDashboardRow, RaDashboardTab } from '@/modules/tendering/ras/hel
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const RA_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
@@ -112,10 +115,19 @@ const ReverseAuctionListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -135,7 +147,7 @@ const ReverseAuctionListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useReverseAuctionDashboardCounts();
@@ -143,34 +155,27 @@ const ReverseAuctionListPage = () => {
     const raData = response?.data || [];
     const totalRows = response?.meta?.total || raData.length;
 
-    const handleViewDetails = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasShow(row.id));
-    }, [navigate]);
-
-    const handleScheduleRa = useCallback((row: RaDashboardRow) => {
-        navigate(paths.tendering.rasSchedule(row.tenderId));
-    }, [navigate]);
-
-    const handleUploadResult = useCallback((row: RaDashboardRow) => {
-        if (row.id) navigate(paths.tendering.rasUploadResult(row.id));
-    }, [navigate]);
-
     const raActions: ActionItem<RaDashboardRow>[] = useMemo(
         () => [
             {
+                label: 'Change Status',
+                onClick: (row: RaDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+                icon: <RefreshCw className="h-4 w-4" />,
+            },
+            {
                 label: 'View Details',
-                onClick: handleViewDetails,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.tenderId)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Schedule RA',
-                onClick: handleScheduleRa,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasSchedule(row.tenderId)),
                 icon: <Calendar className="h-4 w-4" />,
                 visible: (row) => row.raStatus === RA_STATUS.UNDER_EVALUATION,
             },
             {
                 label: 'Upload RA Result',
-                onClick: handleUploadResult,
+                onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasUploadResult(row.id)),
                 icon: <Upload className="h-4 w-4" />,
                 visible: (row) =>
                     [RA_STATUS.RA_SCHEDULED, RA_STATUS.RA_STARTED, RA_STATUS.RA_ENDED].includes(
@@ -178,7 +183,7 @@ const ReverseAuctionListPage = () => {
                     ),
             },
         ],
-        [handleViewDetails, handleScheduleRa, handleUploadResult]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<RaDashboardRow>[]>(
@@ -201,7 +206,7 @@ const ReverseAuctionListPage = () => {
                 colId: 'tenderValue',
                 headerName: 'Tender Value',
                 width: 130,
-                valueGetter: (params) => {
+                cellRenderer: (params: any) => {
                     const value = params.data?.tenderValue;
                     if (!value) return '—';
                     return formatINR(parseFloat(value));
@@ -222,8 +227,8 @@ const ReverseAuctionListPage = () => {
                 field: 'bidSubmissionDate',
                 colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
-                width: 170,
-                valueGetter: (params) =>
+                width: 150,
+                cellRenderer: (params: any) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
                         : '—',
@@ -234,29 +239,27 @@ const ReverseAuctionListPage = () => {
                 field: 'raStartTime',
                 colId: 'raStartTime',
                 headerName: 'RA Start Time',
-                width: 170,
-                valueGetter: (params) =>
+                width: 150,
+                cellRenderer: (params: any) =>
                     params.data?.raStartTime ? formatDateTime(params.data.raStartTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raEndTime',
                 colId: 'raEndTime',
                 headerName: 'RA End Time',
-                width: 170,
-                valueGetter: (params) =>
+                width: 150,
+                cellRenderer: (params: any) =>
                     params.data?.raEndTime ? formatDateTime(params.data.raEndTime) : '—',
                 sortable: true,
                 filter: true,
-                hide: activeTab === 'under-evaluation',
             },
             {
                 field: 'raStatus',
                 colId: 'raStatus',
                 headerName: 'RA Status',
-                width: 160,
+                width: 130,
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
@@ -264,16 +267,6 @@ const ReverseAuctionListPage = () => {
                     if (!status) return '—';
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
                 },
-            },
-            {
-                field: 'result',
-                colId: 'result',
-                headerName: 'Result',
-                width: 100,
-                valueGetter: (params) => params.data?.result || '—',
-                sortable: true,
-                filter: true,
-                hide: activeTab !== 'completed',
             },
             {
                 headerName: 'Actions',
@@ -344,18 +337,6 @@ const ReverseAuctionListPage = () => {
                                 Manage reverse auctions for tenders with RA applicable.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -363,7 +344,7 @@ const ReverseAuctionListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as RaDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -378,6 +359,31 @@ const ReverseAuctionListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'This Week', value: 'this-week' },
+                                { label: 'This Month', value: 'this-month' },
+                                { label: 'This Year', value: 'this-year' },
+                            ]} value={search} onChange={(value) => setSearch(value)} />
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -397,6 +403,9 @@ const ReverseAuctionListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -416,6 +425,15 @@ const ReverseAuctionListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </>
     );
 };

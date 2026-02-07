@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderResultService } from '@/services/api/tender-result.service';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type {
     ResultDashboardResponse,
     ResultDashboardRow,
@@ -29,7 +30,14 @@ export const useResultDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = {
+        tab: filters?.tab,
+        page: filters?.page,
+        limit: filters?.limit,
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<ResultDashboardRow>>({
         queryKey: tenderResultKey.list(queryKeyFilters),
@@ -49,15 +57,18 @@ export const useResultDashboard = (
 };
 
 export const useResultDashboardCounts = () => {
-    const query = useQuery<ResultDashboardCounts>({
-        queryKey: tenderResultKey.counts(),
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
+
+    return useQuery<ResultDashboardCounts>({
+        queryKey,
         queryFn: async () => {
-            const result = await tenderResultService.getCounts();
+            const result = await tenderResultService.getCounts(teamIdParam);
             return result;
         },
+        staleTime: 0,
     });
-
-    return query;
 };
 
 // Fetch single result by ID
@@ -73,7 +84,17 @@ export const useTenderResult = (id: number | null) => {
 export const useTenderResultByTenderId = (tenderId: number | null) => {
     return useQuery<TenderResult | null>({
         queryKey: tenderId ? tenderResultKey.byTender(tenderId) : tenderResultKey.byTender(0),
-        queryFn: () => tenderResultService.getByTenderId(tenderId!),
+        queryFn: async () => {
+            try {
+                return await tenderResultService.getByTenderId(tenderId!);
+            } catch (error: any) {
+                // Handle 404 gracefully - return null if resource doesn't exist
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
         enabled: !!tenderId,
     });
 };
@@ -83,11 +104,11 @@ export const useUploadResult = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UploadResultFormPageProps }) =>
-            tenderResultService.uploadResult(id, data),
+        mutationFn: ({ tenderId, data }: { tenderId: number; data: any }) =>
+            tenderResultService.uploadResultByTenderId(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
-            queryClient.invalidateQueries({ queryKey: tenderResultKey.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });
             queryClient.invalidateQueries({ queryKey: tenderResultKey.counts() });
             toast.success("Result uploaded successfully");
         },

@@ -1,15 +1,14 @@
-import { useEffect } from 'react';
 import { type Control, useWatch } from 'react-hook-form';
 import { FieldWrapper } from './FieldWrapper';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FileUploadField } from './FileUploadField';
+import SelectField from './SelectField';
 
-export const STOP_REASON_LABELS: Record<number, string> = {
-    1: 'Party Angry / Not Interested',
-    2: 'Objective Achieved',
-    3: 'Not Reachable',
-    4: 'Other',
+export const STOP_REASON_LABELS: Record<string, string> = {
+    '1': 'The person is getting angry/or has requested to stop',
+    '2': 'Followup Objective achieved',
+    '3': 'External Followup Initiated',
+    '4': 'Remarks',
 };
 
 interface StopReasonFieldsProps<TFieldValues extends Record<string, any>> {
@@ -38,29 +37,16 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
     }
 
     return (
-        <div className="space-y-4">
-            <FieldWrapper control={control} name={stopReasonFieldName as any} label="Stop Reason">
-                {(field) => (
-                    <Select
-                        value={field.value != null ? String(field.value) : undefined}
-                        onValueChange={(val) => field.onChange(Number(val))}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select reason" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(STOP_REASON_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                    {label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                )}
-            </FieldWrapper>
-
+        <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-4">
+            <SelectField
+                control={control}
+                name={stopReasonFieldName as any}
+                label="Stop Reason"
+                options={Object.entries(STOP_REASON_LABELS).map(([value, label]) => ({ value, label }))}
+                placeholder="Select reason"
+            />
             {/* Proof Details (when stopReason = 2) */}
-            {stopReason === 2 && (
+            {stopReason === '2' && (
                 <>
                     <FieldWrapper control={control} name={proofTextFieldName as any} label="Proof Details">
                         {(field) => (
@@ -84,7 +70,7 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
             )}
 
             {/* Remarks (when stopReason = 4) */}
-            {stopReason === 4 && (
+            {stopReason === '4' && (
                 <FieldWrapper control={control} name={stopRemarksFieldName as any} label="Remarks">
                     {(field) => (
                         <Textarea {...field} placeholder="Enter remarks..." className="min-h-[80px]" />

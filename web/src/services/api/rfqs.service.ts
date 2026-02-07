@@ -55,8 +55,13 @@ class RfqsService extends BaseApiService {
         return this.delete<void>(`/${id}`);
     }
 
-    async getDashboardCounts(): Promise<any> {
-        return this.get<any>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<any> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<any>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

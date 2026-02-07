@@ -1,9 +1,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useReverseAuction } from '@/hooks/api/useReverseAuctions';
+import { useReverseAuctionByTender } from '@/hooks/api/useReverseAuctions';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
@@ -25,31 +26,30 @@ import { BidSubmissionView } from '@/modules/tendering/bid-submissions/component
 import { RaShow } from './components/RaShow';
 
 export default function RaShowPage() {
-    const { id } = useParams<{ id: string }>();
+    const { tenderId } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
 
-    if (!id) {
+    if (!tenderId) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Invalid RA ID.</AlertDescription>
+                <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
         );
     }
 
-    const raId = Number(id);
-    const { data: ra, isLoading: raLoading, error: raError } = useReverseAuction(raId);
-    const tenderId = ra?.tenderId;
+    const tenderIdNum = Number(tenderId);
+    const { data: ra, isLoading: raLoading, error: raError } = useReverseAuctionByTender(tenderIdNum);
 
     // Fetch all related tender data
-    const { data: tender, isLoading: tenderLoading } = useTender(tenderId!);
-    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId!);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId!);
-    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId!);
-    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId!);
-    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
-    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId!);
-    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId!);
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderIdNum);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderIdNum);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderIdNum);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderIdNum);
+    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderIdNum);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderIdNum);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderIdNum);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderIdNum);
 
     const isLoading = raLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading || costingSheetLoading || bidSubmissionLoading;
 
@@ -58,7 +58,7 @@ export default function RaShowPage() {
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Failed to load RA details. Please try again later.
+                    Failed to load reverse auction details. Please try again later.
                 </AlertDescription>
             </Alert>
         );
@@ -68,41 +68,39 @@ export default function RaShowPage() {
         return <Skeleton className="h-[800px]" />;
     }
 
-    if (!ra) {
-        return <div>RA not found</div>;
-    }
-
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
-              ...tender,
-              approval: approval || null,
-          }
+            ...tender,
+            approval: approval || null,
+        }
         : null;
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="ra-management" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-9 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.ras)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-7 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
-                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
-                    <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD</TabsTrigger>
+                    <TabsTrigger value="document-checklist">Checklist</TabsTrigger>
+                    <TabsTrigger value="costing-details">Costing</TabsTrigger>
                     <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
-                    <TabsTrigger value="ra-management">RA Management</TabsTrigger>
+                    <TabsTrigger value="ra-management">Reverse Auction</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     {tenderWithRelations ? (
                         <TenderView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
                     ) : (
                         <Alert>
@@ -110,10 +108,6 @@ export default function RaShowPage() {
                             <AlertDescription>Tender information not available.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
@@ -124,22 +118,11 @@ export default function RaShowPage() {
                             <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
-                    {tenderWithRelations ? (
+                    {tenderWithRelations && (
                         <TenderApprovalView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender approval information not available.</AlertDescription>
-                        </Alert>
                     )}
                 </TabsContent>
 
@@ -168,8 +151,6 @@ export default function RaShowPage() {
                     <DocumentChecklistView
                         checklist={documentChecklist}
                         isLoading={documentChecklistLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -178,8 +159,6 @@ export default function RaShowPage() {
                     <CostingSheetView
                         costingSheet={costingSheet}
                         isLoading={isLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -188,11 +167,7 @@ export default function RaShowPage() {
                     {bidSubmissionLoading ? (
                         <BidSubmissionView bidSubmission={null} isLoading />
                     ) : bidSubmission ? (
-                        <BidSubmissionView
-                            bidSubmission={bidSubmission}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
+                        <BidSubmissionView bidSubmission={bidSubmission} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -206,10 +181,6 @@ export default function RaShowPage() {
                     <RaShow
                         ra={ra as any}
                         isLoading={raLoading}
-                        showEditButton={true}
-                        showBackButton={true}
-                        onEdit={() => navigate(paths.tendering.rasEdit(raId))}
-                        onBack={() => navigate(paths.tendering.ras)}
                     />
                 </TabsContent>
             </Tabs>

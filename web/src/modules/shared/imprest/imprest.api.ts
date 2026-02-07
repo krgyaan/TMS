@@ -31,24 +31,28 @@ export interface CreateImprestInput {
 export const createImprest = async ({ data, files }: { data: CreateImprestInput; files: File[] }) => {
     const formData = new FormData();
 
-    //append the form data
+    // Append form fields
     Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
             formData.append(key, String(value));
         }
     });
 
+    // Append files
     files.forEach(file => {
         formData.append("files", file);
     });
 
-    console.log("Creating imprest with data:", formData);
+    for (const [key, value] of formData.entries()) {
+        console.log("FD:", key, value);
+    }
 
     const res = await api.post("/employee-imprest", formData, {
         headers: {
             "Content-Type": "multipart/form-data",
         },
     });
+
     return res.data;
 };
 

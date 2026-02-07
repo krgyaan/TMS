@@ -11,6 +11,7 @@ export type ChequeDashboardFilters = {
 
 export interface ChequeDashboardRow {
     id: number;
+    requestId: number;
     date: Date | null;
     chequeNo: string | null;
     payeeName: string | null;

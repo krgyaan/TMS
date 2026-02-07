@@ -9,6 +9,7 @@ import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
 import { tenderQueryItems } from '@db/schemas/tendering';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -17,6 +18,7 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -63,9 +65,46 @@ export class TqManagementService {
     ) { }
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
+
+    /**
      * Get dashboard data by tab
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         filters?: {
             page?: number;
@@ -87,6 +126,10 @@ export class TqManagementService {
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
+
         // Latest TQ per tender (using subquery to get latest per tender)
         const latestTq = this.db.$with('latest_tq').as(
             this.db
@@ -103,7 +146,7 @@ export class TqManagementService {
                         SELECT tq2.id
                         FROM ${tenderQueries} tq2
                         WHERE tq2.tender_id = ${tenderQueries.tenderId}
-                        ORDER BY tq2.created_at DESC, tq2.id DESC
+                        ORDER BY tq2.updated_at DESC, tq2.created_at DESC, tq2.id DESC
                         LIMIT 1
                     )`
                 )
@@ -144,17 +187,19 @@ export class TqManagementService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Search
+        // Search - search across all rendered columns
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr}`,
+                sql`${latestTq.tqSubmissionDeadline}::text ILIKE ${searchStr}`,
+                sql`${latestTq.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -271,12 +316,15 @@ export class TqManagementService {
         return wrapPaginatedResponse(result, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<TqManagementDashboardCounts> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(bidSubmissions.status, 'Bid Submitted'),
+            ...roleFilterConditions,
         ];
 
         // Get all tenders matching base conditions
@@ -307,16 +355,17 @@ export class TqManagementService {
             };
         }
 
-        // Get all TQ records for these tenders, ordered by createdAt DESC
+        // Get all TQ records for these tenders, ordered by updatedAt DESC to prioritize recently updated TQs
         const allTqs = await this.db
             .select({
                 tenderId: tenderQueries.tenderId,
                 status: tenderQueries.status,
                 createdAt: tenderQueries.createdAt,
+                updatedAt: tenderQueries.updatedAt,
             })
             .from(tenderQueries)
             .where(inArray(tenderQueries.tenderId, tenderIds))
-            .orderBy(desc(tenderQueries.createdAt));
+            .orderBy(desc(tenderQueries.updatedAt), desc(tenderQueries.createdAt));
 
         // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
         const statusMap = new Map<number, TenderQueryStatus>();
@@ -664,6 +713,11 @@ export class TqManagementService {
             return updated[0];
         });
 
+        // Send email notification only when qualified
+        if (qualified) {
+            await this.sendTqQualifiedEmail(tenderId, userId);
+        }
+
         return result;
     }
 
@@ -707,6 +761,19 @@ export class TqManagementService {
         }
 
         return tqRecord;
+    }
+
+    /**
+     * Get accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
     }
 
     /**
@@ -799,15 +866,23 @@ export class TqManagementService {
             coordinator: coordinatorName,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.received',
             tenderId,
             receivedBy,
-            `TQ Received: ${tender.tenderNo}`,
+            `TQ Received - ${tender.tenderName}`,
             'tq-received',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }
@@ -876,15 +951,87 @@ export class TqManagementService {
             teName: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.replied',
             tenderId,
             repliedBy,
-            `TQ Replied: ${tender.tenderNo}`,
+            `TQ Replied - ${tender.tenderName}`,
             'tq-replied',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+            }
+        );
+    }
+
+    /**
+     * Send TQ qualified email
+     */
+    private async sendTqQualifiedEmail(
+        tenderId: number,
+        qualifiedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get coordinator name
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', tender.team);
+        let coordinatorName = 'Coordinator';
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            if (coordinatorUser?.name) {
+                coordinatorName = coordinatorUser.name;
+            }
+        }
+
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            te: teUser.name,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            dueDate,
+            coordinator: coordinatorName,
+        };
+
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
+        await this.sendEmail(
+            'tq.qualified',
+            tenderId,
+            qualifiedBy,
+            `TQ Qualified - ${tender.tenderName}`,
+            'tq-qualified',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }
@@ -937,15 +1084,22 @@ export class TqManagementService {
             te_name: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.missed',
             tenderId,
             changedBy,
-            `TQ Missed: ${tender.tenderNo}`,
+            `TQ Missed - ${tender.tenderName}`,
             'tq-missed',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }

@@ -73,6 +73,7 @@ export interface ResultDashboardRow {
     raApplicable: boolean;
     reverseAuctionId: number | null;
     emdDetails: EmdDetails | null;
+    technicallyQualified: string | null;
 }
 
 export interface ResultDashboardCounts {

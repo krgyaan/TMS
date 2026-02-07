@@ -1,5 +1,7 @@
 export type TenderFileContext =
     | 'tender-documents'
+    | 'bg-format-files'
+    | 'bg-po-files'
     | 'emds'
     | 'tender-fees'
     | 'physical-docs'
@@ -17,9 +19,38 @@ export type TenderFileContext =
     | 'tender-results'
     | 'checklists'
     | 'tq-management'
-    | 'reverse-auctions'
-    | 'ra-screenshots'
-    | 'result-screenshots';
+    | 'screenshot_qualified_parties'
+    | 'screenshot_decrements'
+    | 'final_result_screenshot'
+    | 'result-screenshots'
+    | 'bg-format-imran'
+    | 'bg-prefilled-signed'
+    | 'bg-sfms-conf'
+    | 'bg-fdr-copy'
+    | 'bg-ext-letter'
+    | 'bg-docket-slip'
+    | 'bg-stamp-covering-letter'
+    | 'bg-cancell-confirm'
+    | 'fdr-format-imran'
+    | 'fdr-prefilled-signed'
+    | 'fdr-sfms-confirmation'
+    | 'fdr-request-letter-email'
+    | 'fdr-docket-slip'
+    | 'fdr-covering-letter'
+    | 'fdr-req-receive'
+    | 'dd-format-imran'
+    | 'dd-prefilled-signed'
+    | 'dd-request-letter-email'
+    | 'dd-docket-slip'
+    | 'dd-covering-letter'
+    | 'cheque-format-imran'
+    | 'cheque-prefilled-signed'
+    | 'cheque-images'
+    | 'cheque-docket-slip'
+    | 'cheque-covering-letter'
+    | 'cheque-cancelled-image'
+    | 'cheque-receiving-handed-over'
+    | 'cheque-positive-pay-confirmation';
 
 export interface FileConfig {
     maxFiles: number;
@@ -54,10 +85,30 @@ const ARCHIVES = [MIME.ZIP, MIME.RAR];
 
 export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     'tender-documents': {
-        maxFiles: 10,
+        maxFiles: 5,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-format-files': {
+        maxFiles: 5,
+        maxSizeBytes: MB(20),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.doc', '.docx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-po-files': {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.doc', '.docx'],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,
@@ -233,9 +284,9 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
-    'reverse-auctions': {
-        maxFiles: 1,
-        maxSizeBytes: MB(5),
+    'screenshot_qualified_parties': {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
         compressImages: true,
@@ -243,8 +294,18 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
-    'ra-screenshots': {
-        maxFiles: 3,
+    'screenshot_decrements': {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'final_result_screenshot': {
+        maxFiles: 2,
         maxSizeBytes: MB(8),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
@@ -256,6 +317,290 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     'result-screenshots': {
         maxFiles: 2,
         maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    // Bank Guarantee file contexts
+    'bg-format-imran': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-prefilled-signed': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-sfms-conf': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-fdr-copy': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-ext-letter': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-docket-slip': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-stamp-covering-letter': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'bg-cancell-confirm': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    // FDR file contexts
+    'fdr-format-imran': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-prefilled-signed': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-sfms-confirmation': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-request-letter-email': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-docket-slip': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-covering-letter': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'fdr-req-receive': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    // Demand Draft file contexts
+    'dd-format-imran': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'dd-prefilled-signed': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'dd-request-letter-email': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'dd-docket-slip': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'dd-covering-letter': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    // Cheque file contexts
+    'cheque-format-imran': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-prefilled-signed': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-images': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-docket-slip': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-covering-letter': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-cancelled-image': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-receiving-handed-over': {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'cheque-positive-pay-confirmation': {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
         compressImages: true,

@@ -28,6 +28,7 @@ const mysqlEmdFdrs = mysqlTable('emd_fdrs', {
     fdr_amt: varchar('fdr_amt', { length: 255 }),
     fdr_expiry: varchar('fdr_expiry', { length: 255 }),
     fdr_needs: varchar('fdr_needs', { length: 255 }),
+    fdr_purpose: varchar('fdr_purpose', { length: 255 }),
     courier_deadline: int('courier_deadline'),
     courier_add: varchar('courier_add', { length: 255 }),
     fdr_no: varchar('fdr_no', { length: 200 }),
@@ -63,7 +64,7 @@ const mysqlEmdDemandDrafts = mysqlTable('emd_demand_drafts', {
     dd_needs: varchar('dd_needs', { length: 255 }),
     dd_purpose: varchar('dd_purpose', { length: 255 }),
     courier_add: varchar('courier_add', { length: 255 }),
-    courier_deadline: varchar('courier_deadline', { length: 20 }),
+    courier_deadline: int('courier_deadline'),
     action: int('action'),
     status: varchar('status', { length: 100 }),
     dd_date: date('dd_date'),
@@ -98,7 +99,7 @@ const mysqlEmdBgs = mysqlTable('emd_bgs', {
     bg_purpose: varchar('bg_purpose', { length: 255 }),
     bg_stamp: varchar('bg_stamp', { length: 255 }),
     bg_courier_addr: varchar('bg_courier_addr', { length: 255 }),
-    bg_courier_deadline: varchar('bg_courier_deadline', { length: 20 }),
+    bg_courier_deadline: int('bg_courier_deadline'),
     bg_soft_copy: varchar('bg_soft_copy', { length: 255 }),
     bg_po: varchar('bg_po', { length: 255 }),
     bg_client_user: varchar('bg_client_user', { length: 255 }),
@@ -187,6 +188,7 @@ const mysqlEmdCheques = mysqlTable('emd_cheques', {
 const mysqlBankTransfers = mysqlTable('bank_transfers', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
+    purpose: varchar('purpose', { length: 255 }),
     bt_amount: varchar('bt_amount', { length: 200 }),
     bt_acc_name: varchar('bt_acc_name', { length: 255 }),
     bt_acc: varchar('bt_acc', { length: 255 }),
@@ -207,6 +209,7 @@ const mysqlBankTransfers = mysqlTable('bank_transfers', {
 const mysqlPayOnPortals = mysqlTable('pay_on_portals', {
     id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
     emd_id: bigint('emd_id', { mode: 'number' }),
+    purpose: varchar('purpose', { length: 255 }),
     portal: varchar('portal', { length: 255 }),
     is_netbanking: varchar('is_netbanking', { length: 255 }),
     is_debit: varchar('is_debit', { length: 255 }),
@@ -228,6 +231,7 @@ import {
     instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails,
     instrumentTransferDetails
 } from '@db/schemas/tendering/emds.schema';
+import { tenderInfos, users } from '@/db/schemas';
 
 // Configuration
 const CONFIG = {
@@ -317,6 +321,7 @@ class MigrationEngine {
     private pgDb: ReturnType<typeof pgDrizzle>;
     private mysqlPool: mysql2.Pool;
     private mysqlDb: ReturnType<typeof mysqlDrizzle>;
+    private userCache: Map<string, number> = new Map(); // Cache for user name -> user ID lookups
 
     constructor() {
         this.pgClient = new Client({ connectionString: CONFIG.postgres });
@@ -336,7 +341,6 @@ class MigrationEngine {
         console.log('🔌 Connections closed.');
     }
 
-    // PHASE 1: CLEAN SLATE
     async cleanDatabase() {
         console.log('\n🧹 Cleaning PostgreSQL Database (Clean Slate)...');
         const tables = [
@@ -351,174 +355,6 @@ class MigrationEngine {
         console.log('   ✓ All target tables truncated.');
     }
 
-    // PHASE 2: PARENT REQUESTS
-    async migrateRequests() {
-        console.log('\n🚀 Migrating Payment Requests (EMDs)...');
-        const rows = await this.mysqlDb.select().from(mysqlEmds);
-        let success = 0;
-
-        for (const row of rows) {
-            try {
-                // Force ID insertion to preserve legacy ID
-                await this.pgDb.insert(paymentRequests).values({
-                    id: row.id,
-                    tenderId: row.tender_id || 0,
-                    type: (row.type as any) || 'TMS',
-                    tenderNo: row.tender_no || 'NA',
-                    projectName: Parsers.string(row.project_name, 500),
-                    purpose: 'EMD',
-                    amountRequired: '0.00', // Will update later
-                    dueDate: Parsers.date(row.due_date),
-                    requestedBy: Parsers.string(row.requested_by, 200),
-                    status: 'Pending',
-                    legacyEmdId: row.id, // Redundant but good for tracing
-                    createdAt: Parsers.date(row.created_at) || new Date(),
-                    updatedAt: Parsers.date(row.updated_at) || new Date()
-                });
-                success++;
-            } catch (e) {
-                logError('emds', row.id, e);
-            }
-        }
-        console.log(`   ✓ Migrated ${success}/${rows.length} Requests.`);
-    }
-
-    // PHASE 3: STANDALONE INSTRUMENTS (FDR, DD, BG, BT, Portal)
-    async migrateInstrument(
-        type: 'FDR' | 'DD' | 'BG' | 'Bank Transfer' | 'Portal Payment',
-        sourceTable: any,
-        detailTable: any,
-        mapperFn: (row: any, instId: number) => any,
-        legacyIdCol: 'legacyFdrId' | 'legacyDdId' | 'legacyBgId' | 'legacyBtId' | 'legacyPortalId'
-    ) {
-        console.log(`\n🚀 Migrating ${type}...`);
-        const rows = await this.mysqlDb.select().from(sourceTable);
-        let success = 0;
-
-        for (const row of rows) {
-            try {
-                // 1. Validate Parent Exists
-                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, row.emd_id));
-
-                if (parentCheck.length === 0) {
-                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
-                }
-
-                const mappedStatus = StatusMapper.map(type === 'Bank Transfer' ? 'BT' : type, row.status, row.action);
-
-                // 2. Insert Base Instrument
-                const [inst] = await this.pgDb.insert(paymentInstruments).values({
-                    requestId: row.emd_id,
-                    instrumentType: type,
-                    amount: Parsers.amount(row.amount || row.fdr_amt || row.dd_amt || row.bg_amt || row.bt_amount),
-                    status: mappedStatus,
-                    currentStage: StatusMapper.getStage(mappedStatus),
-                    action: Number(row.action) || 0,
-                    favouring: Parsers.string(row.fdr_favour || row.dd_favour || row.bg_favour || row.cheque_favour, 500),
-                    payableAt: Parsers.string(row.fdr_payable || row.dd_payable, 500),
-                    issueDate: Parsers.dateString(row.fdr_date || row.dd_date || row.bg_date || row.date),
-                    expiryDate: Parsers.dateString(row.fdr_expiry || row.bg_expiry),
-                    utr: Parsers.string(row.utr || row.utr_num, 255),
-                    remarks: Parsers.string(row.remarks || row.fdr_remark, 500),
-                    [legacyIdCol]: row.id, // CRITICAL: Save MySQL ID for lookup later
-                    legacyData: { original_status: row.status },
-                    createdAt: Parsers.date(row.created_at) || new Date(),
-                    updatedAt: Parsers.date(row.updated_at) || new Date()
-                }).returning({ id: paymentInstruments.id });
-
-                // 3. Insert Specific Details
-                const detailData = mapperFn(row, inst.id);
-                if (detailData) {
-                    await this.pgDb.insert(detailTable).values(detailData);
-                }
-
-                success++;
-            } catch (e) {
-                logError(type, row.id, e);
-            }
-        }
-        console.log(`   ✓ Migrated ${success}/${rows.length} ${type}s.`);
-    }
-
-    // PHASE 4: DEPENDENT INSTRUMENTS (Cheques)
-    async migrateCheques() {
-        console.log('\n🔗 Migrating Cheques (With Dependencies)...');
-        const rows = await this.mysqlDb.select().from(mysqlEmdCheques);
-        let success = 0;
-
-        for (const row of rows) {
-            try {
-                // 1. Validate Parent
-                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, row.emd_id as number));
-                if (parentCheck.length === 0) throw new Error(`Parent EMD ID ${row.emd_id} not found.`);
-
-                // 2. Resolve Dependencies (The Safe Way: Query Postgres)
-                let linkedDdId: number | null = null;
-                let linkedFdrId: number | null = null;
-
-                if (row.dd_id) {
-                    const dd = await this.pgDb.select({ id: paymentInstruments.id })
-                        .from(paymentInstruments)
-                        .where(eq(paymentInstruments.legacyDdId, row.dd_id))
-                        .limit(1);
-                    if (dd.length > 0) linkedDdId = dd[0].id;
-                    else console.warn(`      ⚠ Cheque ${row.id}: Linked DD ${row.dd_id} missing. Setting NULL.`);
-                }
-
-                if (row.fdr_id) {
-                    const fdr = await this.pgDb.select({ id: paymentInstruments.id })
-                        .from(paymentInstruments)
-                        .where(eq(paymentInstruments.legacyFdrId, row.fdr_id))
-                        .limit(1);
-                    if (fdr.length > 0) linkedFdrId = fdr[0].id;
-                    else console.warn(`      ⚠ Cheque ${row.id}: Linked FDR ${row.fdr_id} missing. Setting NULL.`);
-                }
-
-                const mappedStatus = StatusMapper.map('CHEQUE', row.status, row.action);
-
-                // 3. Insert Instrument
-                const [inst] = await this.pgDb.insert(paymentInstruments).values({
-                    requestId: row.emd_id as number,
-                    instrumentType: 'Cheque',
-                    amount: Parsers.amount(row.cheque_amt || row.amount),
-                    status: mappedStatus,
-                    currentStage: StatusMapper.getStage(mappedStatus),
-                    favouring: Parsers.string(row.cheque_favour, 500),
-                    issueDate: Parsers.dateString(row.cheque_date),
-                    action: Number(row.action) || 0,
-                    remarks: Parsers.string(row.remarks, 500),
-                    legacyChequeId: row.id,
-                    createdAt: Parsers.date(row.created_at) || new Date(),
-                    updatedAt: Parsers.date(row.updated_at) || new Date()
-                }).returning({ id: paymentInstruments.id });
-
-                // 4. Insert Details
-                await this.pgDb.insert(instrumentChequeDetails).values({
-                    instrumentId: inst.id,
-                    chequeNo: Parsers.string(row.cheque_no, 20),
-                    chequeDate: Parsers.dateString(row.cheque_date),
-                    bankName: Parsers.string(row.cheque_bank, 255),
-                    linkedDdId: linkedDdId, // Resolved ID
-                    linkedFdrId: linkedFdrId, // Resolved ID
-                    reqType: Parsers.string(row.req_type, 50),
-                    chequeReason: Parsers.string(row.cheque_reason),
-                    dueDate: Parsers.dateString(row.duedate),
-                    amount: Parsers.amount(row.amount)
-                });
-
-                success++;
-            } catch (e) {
-                logError('Cheque', row.id, e);
-            }
-        }
-        console.log(`   ✓ Migrated ${success}/${rows.length} Cheques.`);
-    }
-
-    // PHASE 5: RECONCILIATION & CLEANUP
     async postProcess() {
         console.log('\n⚖️  Running Post-Migration Updates...');
 
@@ -543,84 +379,599 @@ class MigrationEngine {
         console.log('   ✓ Post-processing complete.');
     }
 
-    // MAIN RUNNER
+    // Helper method to lookup user ID by name
+    private async lookupUserIdByName(name: string | null | undefined): Promise<number> {
+        // Default user ID if name is missing or empty
+        if (!name || !name.trim()) {
+            return 8;
+        }
+
+        const trimmedName = name.trim();
+
+        // Check cache first
+        if (this.userCache.has(trimmedName)) {
+            return this.userCache.get(trimmedName)!;
+        }
+
+        // Query database for user
+        try {
+            const userResult = await this.pgDb
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.name, trimmedName))
+                .limit(1);
+
+            if (userResult.length > 0 && userResult[0].id) {
+                const userId = userResult[0].id;
+                // Cache the result
+                this.userCache.set(trimmedName, userId);
+                return userId;
+            } else {
+                // User not found, use default and log warning
+                console.warn(`⚠️  User not found for name "${trimmedName}", using default user ID 8`);
+                this.userCache.set(trimmedName, 8);
+                return 8;
+            }
+        } catch (e) {
+            console.error(`❌ Error looking up user "${trimmedName}":`, e);
+            this.userCache.set(trimmedName, 8);
+            return 8;
+        }
+    }
+
+    // 1. Migrate Payment Requests (emds)
+    async migratePaymentRequests() {
+        console.log('\n🚀 Migrating Payment Requests (EMDs)...');
+        const rows = await this.mysqlDb.select().from(mysqlEmds);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Lookup user ID by name
+                const requestedById = await this.lookupUserIdByName(row.requested_by);
+
+                await this.pgDb.insert(paymentRequests).values({
+                    id: row.id,
+                    tenderId: row.tender_id || 0,
+                    type: (row.type as any) || 'TMS',
+                    tenderNo: row.tender_no || 'NA',
+                    projectName: Parsers.string(row.project_name, 500),
+                    purpose: 'EMD', // Default purpose for EMDs
+                    amountRequired: '0.00', // Will update later
+                    dueDate: row.due_date || null,
+                    requestedBy: requestedById,
+                    status: 'Pending',
+                    legacyEmdId: row.id,
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                });
+                success++;
+            } catch (e) {
+                logError('emds', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} Payment Requests.`);
+    }
+
+    // 2. Migrate FDRs (emd_fdrs)
+    async migrateFdrs() {
+        console.log('\n🚀 Migrating FDRs...');
+        const rows = await this.mysqlDb.select().from(mysqlEmdFdrs);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
+                }
+
+                const mappedStatus = StatusMapper.map('FDR', row.status, row.action);
+
+                // Insert base instrument
+                const [inst] = await this.pgDb.insert(paymentInstruments).values({
+                    requestId: row.emd_id as number,
+                    instrumentType: 'FDR',
+                    purpose: row.fdr_purpose as any,
+                    amount: Parsers.amount(row.fdr_amt),
+                    status: mappedStatus,
+                    action: Number(row.action) || 0,
+                    favouring: Parsers.string(row.fdr_favour, 500),
+                    payableAt: Parsers.string(row.fdr_payable, 500),
+                    issueDate: Parsers.dateString(row.fdr_date),
+                    expiryDate: Parsers.dateString(row.fdr_expiry),
+                    utr: Parsers.string(row.utr, 255),
+                    docketNo: Parsers.string(row.docket_no, 255),
+                    courierAddress: Parsers.string(row.courier_add),
+                    courierDeadline: row.courier_deadline || 0,
+                    generatedPdf: Parsers.string(row.generated_fdr, 500),
+                    cancelPdf: Parsers.string(row.fdrcancel_pdf, 500),
+                    docketSlip: Parsers.string(row.docket_slip, 500),
+                    coveringLetter: Parsers.string(row.covering_letter, 500),
+                    reqNo: Parsers.string(row.req_no, 200),
+                    reqReceive: Parsers.string(row.req_receive, 500),
+                    referenceNo: Parsers.string(row.reference_no, 200),
+                    transferDate: Parsers.dateString(row.transfer_date),
+                    cancelledDate: Parsers.dateString(row.date),
+                    amountCredited: Parsers.amount(row.amount),
+                    legacyFdrId: row.id,
+                    legacyData: { original_status: row.status },
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                }).returning({ id: paymentInstruments.id });
+
+                // Insert FDR details
+                await this.pgDb.insert(instrumentFdrDetails).values({
+                    instrumentId: inst.id,
+                    fdrNo: Parsers.string(row.fdr_no),
+                    fdrDate: Parsers.dateString(row.fdr_date),
+                    fdrSource: Parsers.string(row.fdr_source, 200),
+                    fdrExpiryDate: Parsers.dateString(row.fdr_expiry),
+                    fdrNeeds: Parsers.string(row.fdr_needs, 255),
+                    fdrRemark: Parsers.string(row.fdr_remark)
+                });
+
+                success++;
+            } catch (e) {
+                logError('FDR', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} FDRs.`);
+    }
+
+    // 3. Migrate Demand Drafts (emd_demand_drafts) - Fixed version
+    async migrateDemandDrafts() {
+        console.log('\n🚀 Migrating Demand Drafts...');
+        const rows = await this.mysqlDb.select().from(mysqlEmdDemandDrafts);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb
+                    .select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found`);
+                }
+
+                const mappedStatus = StatusMapper.map('DD', row.status, row.action);
+
+                // Parse DD date once
+                const ddDate = row.dd_date
+                    ? Parsers.dateString(row.dd_date) || null
+                    : null;
+
+                // Skip rows with no meaningful DD data
+                if (
+                    !row.dd_no &&
+                    !ddDate &&
+                    !row.dd_purpose &&
+                    !row.remarks
+                ) {
+                    throw new Error('No usable DD data');
+                }
+
+                // Insert base instrument
+                const [inst] = await this.pgDb
+                    .insert(paymentInstruments)
+                    .values({
+                        requestId: row.emd_id as number,
+                        instrumentType: 'DD',
+                        purpose: row.dd_purpose as any,
+                        amount: Parsers.amount(row.dd_amt || '0'),
+                        status: mappedStatus,
+                        action: Number(row.action) || 0,
+                        favouring: Parsers.string(row.dd_favour, 500),
+                        payableAt: Parsers.string(row.dd_payable, 500) || null,
+                        issueDate: ddDate,
+                        docketNo: Parsers.string(row.docket_no, 255) || null,
+                        courierAddress: Parsers.string(row.courier_add) || null,
+                        courierDeadline: row.courier_deadline || null,
+                        generatedPdf: Parsers.string(row.generated_dd, 500) || null,
+                        cancelPdf: Parsers.string(row.ddcancel_pdf, 500) || null,
+                        docketSlip: Parsers.string(row.docket_slip, 500) || null,
+                        reqNo: row.req_no || null,
+                        referenceNo: Parsers.string(row.reference_no, 200) || null,
+                        transferDate: Parsers.dateString(row.transfer_date) || null,
+                        cancelledDate: Parsers.dateString(row.date) || null,
+                        amountCredited: Parsers.amount(row.amount) || null,
+                        legacyDdId: row.id,
+                        legacyData: { original_status: row.status },
+                        createdAt: Parsers.date(row.created_at) || new Date(),
+                        updatedAt: Parsers.date(row.updated_at) || new Date()
+                    })
+                    .returning({ id: paymentInstruments.id, legacyDdId: paymentInstruments.legacyDdId });
+
+                if (!inst?.id) {
+                    console.warn('⚠️ Skipping DD: instrument not created', {
+                        legacyId: `${row.id} - ${row.dd_no} - ${row.emd_id}`
+                    });
+                    continue;
+                }
+
+                const ddNo = Number.isFinite(Number(row.dd_no)) ? Number(row.dd_no) : null;
+                const reqNo = Number.isFinite(Number(row.req_no)) ? Number(row.req_no) : null;
+                const ddNeeds = Number.isFinite(Number(row.dd_needs)) ? Number(row.dd_needs) : null;
+
+                // Insert DD details
+                await this.pgDb.insert(instrumentDdDetails).values({
+                    instrumentId: inst.id,
+                    ddNo: ddNo ? String(ddNo) : null,
+                    ddDate: row.dd_date ? Parsers.dateString(row.dd_date) : null,
+                    reqNo: reqNo ? String(reqNo) : null,
+                    ddNeeds: ddNeeds ? String(ddNeeds) : null,
+                    ddPurpose: row.dd_purpose as any,
+                    ddRemarks: Parsers.string(row.remarks) || null,
+                });
+
+                success++;
+            } catch (e: any) {
+                console.error('❌ DD MIGRATION FAILED', {
+                    legacyId: row.id,
+                    code: e.code,
+                    message: e.message,
+                    detail: e.detail
+                });
+            }
+        }
+
+        console.log(`   ✓ Migrated ${success}/${rows.length} Demand Drafts.`);
+    }
+
+    // 4. Migrate Bank Guarantees (emd_bgs) - Fixed version
+    async migrateBankGuarantees() {
+        console.log('\n🚀 Migrating Bank Guarantees...');
+        const rows = await this.mysqlDb.select().from(mysqlEmdBgs);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
+                }
+
+                const mappedStatus = StatusMapper.map('BG', row.status, row.action);
+
+                // Insert base instrument
+                const [inst] = await this.pgDb.insert(paymentInstruments).values({
+                    requestId: row.emd_id as number,
+                    instrumentType: 'BG',
+                    purpose: row.bg_purpose as any,
+                    amount: Parsers.amount(row.bg_amt),
+                    status: mappedStatus,
+                    action: Number(row.action) || 0,
+                    favouring: Parsers.string(row.bg_favour, 500) || null,
+                    issueDate: Parsers.dateString(row.bg_date) || null,
+                    expiryDate: Parsers.dateString(row.bg_expiry) || null,
+                    validityDate: Parsers.dateString(row.bg_validity) || null,
+                    claimExpiryDate: Parsers.dateString(row.claim_expiry) || null,
+                    docketNo: Parsers.string(row.docket_no, 255) || null,
+                    courierAddress: Parsers.string(row.bg_courier_addr) || null,
+                    courierDeadline: row.bg_courier_deadline ? Number(row.bg_courier_deadline) : null,
+                    docketSlip: Parsers.string(row.docket_slip, 500) || null,
+                    extensionRequestPdf: Parsers.string(row.request_extension_pdf, 500) || null,
+                    cancellationRequestPdf: Parsers.string(row.request_cancellation_pdf, 500) || null,
+                    legacyBgId: row.id,
+                    legacyData: { original_status: row.status },
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                }).returning({ id: paymentInstruments.id });
+
+                // Parse all numeric fields - ensure they're numbers or null
+                const cashMarginPercent = row.bg_cont_percent ? Parsers.amount(row.bg_cont_percent) : null;
+                const fdrMarginPercent = row.bg_fdr_percent ? Parsers.amount(row.bg_fdr_percent) : null;
+                const stampChargesDeducted = row.stamp_charge_deducted ? Parsers.amount(row.stamp_charge_deducted) : null;
+                const sfmsChargesDeducted = row.sfms_charge_deducted ? Parsers.amount(row.sfms_charge_deducted) : null;
+                const otherChargesDeducted = row.other_charge_deducted ? Parsers.amount(row.other_charge_deducted) : null;
+                const newStampChargeDeducted = row.new_stamp_charge_deducted ? Parsers.amount(row.new_stamp_charge_deducted) : null;
+                const extendedAmount = row.new_bg_amt ? Parsers.amount(row.new_bg_amt) : null;
+                const fdrAmt = row.fdr_amt ? Parsers.amount(row.fdr_amt) : null;
+                const fdrPer = row.fdr_per ? Parsers.amount(row.fdr_per) : null;
+                const fdrRoi = row.fdr_roi ? Parsers.amount(row.fdr_roi) : null;
+                const bgChargeDeducted = row.bg_charge_deducted ? Parsers.amount(row.bg_charge_deducted) : null;
+                const bgFdrCancelAmount = row.bg_fdr_cancel_amount ? Parsers.amount(row.bg_fdr_cancel_amount) : null;
+
+                // Insert BG details
+                await this.pgDb.insert(instrumentBgDetails).values({
+                    instrumentId: inst.id,
+                    bgNo: Parsers.string(row.bg_no) || null,
+                    bgDate: Parsers.dateString(row.bg_date) || null,
+                    bankName: row.bg_bank,
+                    validityDate: Parsers.dateString(row.bg_validity) || null,
+                    claimExpiryDate: Parsers.dateString(row.claim_expiry) || null,
+                    beneficiaryName: Parsers.string(row.bg_favour, 500) || null,
+                    beneficiaryAddress: Parsers.string(row.bg_address) || null,
+                    cashMarginPercent: cashMarginPercent,
+                    fdrMarginPercent: fdrMarginPercent,
+                    stampCharges: row.bg_stamp ? Parsers.amount(row.bg_stamp) : null,
+                    stampChargesDeducted: stampChargesDeducted,
+                    sfmsChargesDeducted: sfmsChargesDeducted,
+                    otherChargesDeducted: otherChargesDeducted,
+                    newStampChargeDeducted: newStampChargeDeducted,
+                    extendedAmount: extendedAmount,
+                    extendedBankName: Parsers.string(row.new_bg_bank_name, 300) || null,
+                    extensionLetterPath: Parsers.string(row.request_extension_pdf, 500) || null,
+                    cancellationLetterPath: Parsers.string(row.request_cancellation_pdf, 500) || null,
+                    prefilledSignedBg: row.prefilled_signed_bg || null,
+                    bgNeeds: Parsers.string(row.bg_needs, 255) || null,
+                    bgPurpose: Parsers.string(row.bg_purpose, 255) || null,
+                    bgSoftCopy: Parsers.string(row.bg_soft_copy, 255) || null,
+                    bgPo: Parsers.string(row.bg_po, 255) || null,
+                    bgClientUser: Parsers.string(row.bg_client_user, 255) || null,
+                    bgClientCp: Parsers.string(row.bg_client_cp, 255) || null,
+                    bgClientFin: Parsers.string(row.bg_client_fin, 255) || null,
+                    bgBankAcc: Parsers.string(row.bg_bank_acc, 255) || null,
+                    bgBankIfsc: Parsers.string(row.bg_bank_ifsc, 255) || null,
+                    courierNo: Parsers.string(row.courier_no, 255) || null,
+                    stampCharge: row.bg_stamp ? Parsers.amount(row.bg_stamp) : null,
+                    extensionLetter: Parsers.string(row.ext_letter, 500) || null,
+                    newBgClaim: row.new_bg_claim ? Parsers.amount(row.new_bg_claim) : null,
+                    approveBg: Parsers.string(row.approve_bg, 255) || null,
+                    bgFormatTe: Parsers.string(row.bg_format_te, 255) || null,
+                    bgFormatTl: Parsers.string(row.bg_format_tl, 255) || null,
+                    sfmsConf: Parsers.string(row.sfms_conf, 255) || null,
+                    fdrAmt: fdrAmt,
+                    fdrPer: fdrPer,
+                    fdrCopy: Parsers.string(row.fdr_copy, 255) || null,
+                    fdrNo: Parsers.string(row.fdr_no, 255) || null,
+                    fdrValidity: Parsers.dateString(row.fdr_validity) || null,
+                    fdrRoi: fdrRoi,
+                    bgChargeDeducted: bgChargeDeducted,
+                    stampCoveringLetter: Parsers.string(row.stamp_covering_letter, 255) || null,
+                    cancelRemark: row.cancel_remark || null,
+                    cancellConfirm: row.cancell_confirm || null,
+                    bgFdrCancelDate: Parsers.string(row.bg_fdr_cancel_date, 255) || null,
+                    bgFdrCancelAmount: bgFdrCancelAmount,
+                    bgFdrCancelRefNo: Parsers.string(row.bg_fdr_cancel_ref_no, 255) || null,
+                    bg2Remark: row.bg2_remark || null,
+                    reasonReq: row.reason_req || null
+                });
+
+                success++;
+            } catch (e) {
+                logError('BG', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} Bank Guarantees.`);
+    }
+
+    // 5. Migrate Cheques (emd_cheques)
+    async migrateCheques() {
+        console.log('\n🚀 Migrating Cheques...');
+        const rows = await this.mysqlDb.select().from(mysqlEmdCheques);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
+                }
+
+                // Resolve linked DD and FDR IDs
+                let linkedDdId: number | null = null;
+                let linkedFdrId: number | null = null;
+
+                if (row.dd_id) {
+                    const dd = await this.pgDb.select({ id: paymentInstruments.id })
+                        .from(paymentInstruments)
+                        .where(eq(paymentInstruments.legacyDdId, row.dd_id))
+                        .limit(1);
+                    if (dd.length > 0) linkedDdId = dd[0].id;
+                }
+
+                if (row.fdr_id) {
+                    const fdr = await this.pgDb.select({ id: paymentInstruments.id })
+                        .from(paymentInstruments)
+                        .where(eq(paymentInstruments.legacyFdrId, row.fdr_id))
+                        .limit(1);
+                    if (fdr.length > 0) linkedFdrId = fdr[0].id;
+                }
+
+                const mappedStatus = StatusMapper.map('CHEQUE', row.status, row.action);
+
+                // Insert base instrument
+                const [inst] = await this.pgDb.insert(paymentInstruments).values({
+                    requestId: row.emd_id as number,
+                    instrumentType: 'Cheque',
+                    purpose: row.cheque_reason as any,
+                    amount: Parsers.amount(row.cheque_amt),
+                    status: mappedStatus,
+                    favouring: Parsers.string(row.cheque_favour, 500),
+                    issueDate: Parsers.dateString(row.cheque_date),
+                    action: Number(row.action) || 0,
+                    utr: Parsers.string(row.utr, 255),
+                    referenceNo: Parsers.string(row.reference, 200),
+                    transferDate: Parsers.dateString(row.transfer_date),
+                    legacyChequeId: row.id,
+                    legacyData: { original_status: row.status },
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                }).returning({ id: paymentInstruments.id });
+
+                // Insert cheque details
+                await this.pgDb.insert(instrumentChequeDetails).values({
+                    instrumentId: inst.id,
+                    chequeNo: Parsers.string(row.cheque_no, 50),
+                    chequeDate: Parsers.dateString(row.cheque_date),
+                    bankName: Parsers.string(row.cheque_bank, 300),
+                    chequeImagePath: Parsers.string(row.cheque_img, 500),
+                    cancelledImagePath: Parsers.string(row.cancelled_img, 500),
+                    linkedDdId: linkedDdId,
+                    linkedFdrId: linkedFdrId,
+                    reqType: Parsers.string(row.req_type, 255),
+                    chequeNeeds: Parsers.string(row.cheque_needs, 255),
+                    chequeReason: Parsers.string(row.cheque_reason, 255),
+                    dueDate: Parsers.dateString(row.duedate),
+                    transferDate: Parsers.dateString(row.transfer_date),
+                    btTransferDate: Parsers.dateString(row.bt_transfer_date),
+                    handover: Parsers.string(row.handover, 200),
+                    confirmation: Parsers.string(row.confirmation, 200),
+                    reference: Parsers.string(row.reference, 200),
+                    stopReasonText: row.stop_reason_text,
+                    amount: Parsers.amount(row.amount)
+                });
+
+                success++;
+            } catch (e) {
+                logError('Cheque', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} Cheques.`);
+    }
+
+    // 6. Migrate Bank Transfers (bank_transfers)
+    async migrateBankTransfers() {
+        console.log('\n🚀 Migrating Bank Transfers...');
+        const rows = await this.mysqlDb.select().from(mysqlBankTransfers);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
+                }
+
+                const mappedStatus = StatusMapper.map('Bank Transfer', row.status, row.action);
+
+                // Insert base instrument
+                const [inst] = await this.pgDb.insert(paymentInstruments).values({
+                    requestId: row.emd_id as number,
+                    instrumentType: 'Bank Transfer',
+                    purpose: row.purpose as any,
+                    amount: Parsers.amount(row.bt_amount),
+                    status: mappedStatus,
+                    action: Number(row.action) || 0,
+                    utr: Parsers.string(row.utr || row.utr_num, 255),
+                    transferDate: Parsers.dateString(row.transfer_date),
+                    legacyBtId: row.id,
+                    legacyData: { original_status: row.status },
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                }).returning({ id: paymentInstruments.id });
+
+                // Insert transfer details
+                await this.pgDb.insert(instrumentTransferDetails).values({
+                    instrumentId: inst.id,
+                    accountName: Parsers.string(row.bt_acc_name, 500),
+                    accountNumber: Parsers.string(row.bt_acc, 50),
+                    ifsc: Parsers.string(row.bt_ifsc, 20),
+                    utrNum: Parsers.string(row.utr_num, 500),
+                    transactionDate: Parsers.date(row.date_time),
+                    utrMsg: row.utr_msg,
+                    returnUtr: Parsers.string(row.utr, 500),
+                    returnTransferDate: row.transfer_date ? Parsers.dateString(row.transfer_date) : null,
+                    reason: row.reason,
+                    remarks: Parsers.string(row.remarks, 200)
+                });
+
+                success++;
+            } catch (e) {
+                logError('Bank Transfer', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} Bank Transfers.`);
+    }
+
+    // 7. Migrate Portal Payments (pay_on_portals)
+    async migratePortalPayments() {
+        console.log('\n🚀 Migrating Portal Payments...');
+        const rows = await this.mysqlDb.select().from(mysqlPayOnPortals);
+        let success = 0;
+
+        for (const row of rows) {
+            try {
+                // Validate parent exists
+                const parentCheck = await this.pgDb.select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, row.emd_id as number));
+
+                if (parentCheck.length === 0) {
+                    throw new Error(`Parent EMD ID ${row.emd_id} not found in Postgres.`);
+                }
+
+                const mappedStatus = StatusMapper.map('Portal Payment', row.status, row.action);
+
+                // Insert base instrument
+                const [inst] = await this.pgDb.insert(paymentInstruments).values({
+                    requestId: row.emd_id as number,
+                    instrumentType: 'Portal Payment',
+                    purpose: row.purpose as any,
+                    amount: Parsers.amount(row.amount),
+                    status: mappedStatus,
+                    action: Number(row.action) || 0,
+                    utr: Parsers.string(row.utr || row.utr_num, 255),
+                    transferDate: Parsers.dateString(row.transfer_date),
+                    legacyPortalId: row.id,
+                    legacyData: { original_status: row.status },
+                    createdAt: Parsers.date(row.created_at) || new Date(),
+                    updatedAt: Parsers.date(row.updated_at) || new Date()
+                }).returning({ id: paymentInstruments.id });
+
+                // Insert transfer details
+                await this.pgDb.insert(instrumentTransferDetails).values({
+                    instrumentId: inst.id,
+                    portalName: Parsers.string(row.portal, 200),
+                    paymentMethod: (row.is_netbanking === 'yes') ? 'Netbanking' : 'Debit Card',
+                    utrNum: Parsers.string(row.utr_num, 500),
+                    transactionDate: Parsers.date(row.date_time),
+                    isNetbanking: row.is_netbanking,
+                    isDebit: row.is_debit,
+                    returnUtr: Parsers.string(row.utr, 500),
+                    returnTransferDate: row.transfer_date ? Parsers.dateString(row.transfer_date) : null,
+                    reason: row.reason,
+                    remarks: Parsers.string(row.remarks, 200)
+                });
+
+                success++;
+            } catch (e) {
+                logError('Portal Payment', row.id, e);
+            }
+        }
+        console.log(`   ✓ Migrated ${success}/${rows.length} Portal Payments.`);
+    }
+
+    // Main runner with all migration steps
     async run() {
         try {
             await this.init();
 
-            // 1. Clean
+            // 1. Clean database
             await this.cleanDatabase();
 
-            // 2. Base
-            await this.migrateRequests();
+            // 2. Migrate base payment requests
+            await this.migratePaymentRequests();
 
-            // 3. Instruments (Independent)
-
-            // FDR
-            await this.migrateInstrument('FDR', mysqlEmdFdrs, instrumentFdrDetails,
-                (row, id) => ({
-                    instrumentId: id,
-                    fdrNo: Parsers.string(row.fdr_no),
-                    fdrDate: Parsers.dateString(row.fdr_date),
-                    fdrSource: Parsers.string(row.fdr_source),
-                    fdrExpiryDate: Parsers.dateString(row.fdr_expiry),
-                    fdrRemark: Parsers.string(row.fdr_remark)
-                }), 'legacyFdrId'
-            );
-
-            // DD
-            await this.migrateInstrument('DD', mysqlEmdDemandDrafts, instrumentDdDetails,
-                (row, id) => ({
-                    instrumentId: id,
-                    ddNo: Parsers.string(row.dd_no),
-                    ddDate: Parsers.dateString(row.dd_date),
-                    ddPurpose: Parsers.string(row.dd_purpose),
-                    ddRemarks: Parsers.string(row.remarks)
-                }), 'legacyDdId'
-            );
-
-            // BG
-            await this.migrateInstrument('BG', mysqlEmdBgs, instrumentBgDetails,
-                (row, id) => ({
-                    instrumentId: id,
-                    bgNo: Parsers.string(row.bg_no),
-                    bgDate: Parsers.dateString(row.bg_date),
-                    bankName: Parsers.string(row.bg_bank || row.bg_bank_name),
-                    beneficiaryName: Parsers.string(row.bg_favour),
-                    validityDate: Parsers.dateString(row.bg_validity || row.bg_expiry),
-                    claimExpiryDate: Parsers.dateString(row.bg_claim || row.claim_expiry),
-                    cashMarginPercent: Parsers.amount(row.bg_cont_percent),
-                    bgPurpose: Parsers.string(row.bg_purpose)
-                }), 'legacyBgId'
-            );
-
-            // Bank Transfers
-            await this.migrateInstrument('Bank Transfer', mysqlBankTransfers, instrumentTransferDetails,
-                (row, id) => ({
-                    instrumentId: id,
-                    accountName: Parsers.string(row.bt_acc_name),
-                    accountNumber: Parsers.string(row.bt_acc),
-                    ifsc: Parsers.string(row.bt_ifsc),
-                    transactionId: Parsers.string(row.utr || row.utr_num),
-                    transactionDate: Parsers.date(row.date_time || row.transfer_date)
-                }), 'legacyBtId'
-            );
-
-            // Portal
-            await this.migrateInstrument('Portal Payment', mysqlPayOnPortals, instrumentTransferDetails,
-                (row, id) => ({
-                    instrumentId: id,
-                    portalName: Parsers.string(row.portal),
-                    paymentMethod: (row.is_netbanking === 'yes') ? 'Netbanking' : 'Debit Card',
-                    transactionId: Parsers.string(row.utr || row.utr_num),
-                    transactionDate: Parsers.date(row.date_time)
-                }), 'legacyPortalId'
-            );
-
-            // 4. Instruments (Dependent)
+            // 3. Migrate all instrument types
+            await this.migrateFdrs();
+            await this.migrateDemandDrafts();
+            await this.migrateBankGuarantees();
+            await this.migrateBankTransfers();
+            await this.migratePortalPayments();
             await this.migrateCheques();
 
-            // 5. Cleanup
+            // 4. Post-processing
             await this.postProcess();
 
         } catch (error) {

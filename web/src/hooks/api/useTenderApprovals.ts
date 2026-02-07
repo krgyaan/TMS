@@ -3,6 +3,7 @@ import { tenderApprovalsService } from '@/services/api/tender-approvals.service'
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts, TenderApprovalFilters } from '@/types/api.types';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const tenderApprovalsKey = {
     all: ['tender-approvals'] as const,
@@ -19,6 +20,10 @@ export const useTenderApprovals = (
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const params: TenderApprovalFilters = {
         ...(tabKey && { tabKey }),
         page: pagination.page,
@@ -32,11 +37,14 @@ export const useTenderApprovals = (
         tabKey,
         ...pagination,
         ...sort,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<TenderApprovalRow>>({
         queryKey: tenderApprovalsKey.list(queryKeyFilters),
-        queryFn: () => tenderApprovalsService.getAll(params),
+        queryFn: () => tenderApprovalsService.getAll(params, teamIdParam),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
                 return previousData;
@@ -89,9 +97,13 @@ export const useUpdateTenderApproval = () => {
 };
 
 export const useTenderApprovalsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...tenderApprovalsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<TenderApprovalDashboardCounts>({
-        queryKey: tenderApprovalsKey.dashboardCounts(),
-        queryFn: () => tenderApprovalsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => tenderApprovalsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };

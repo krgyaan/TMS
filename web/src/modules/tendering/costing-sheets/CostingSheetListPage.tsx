@@ -9,22 +9,29 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide-react";
+import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { CostingSheetDashboardRow, CostingSheetDashboardRowWithTimer, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
+import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import { tenderNameCol } from "@/components/data-grid/columns";
 import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import axiosInstance from "@/lib/axios";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 
 const CostingSheets = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
 
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
@@ -35,6 +42,11 @@ const CostingSheets = () => {
         suggestedName?: string;
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
@@ -42,7 +54,7 @@ const CostingSheets = () => {
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -55,9 +67,13 @@ const CostingSheets = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
-        activeTab as TabKey,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -122,11 +138,39 @@ const CostingSheets = () => {
         }
     }, [duplicateInfo, createSheetWithNameMutation]);
 
-    const handleConnectDrive = useCallback(() => {
-        // Redirect to Google OAuth with Drive scopes
-        const authUrl = `${import.meta.env.VITE_API_URL}/integrations/google/drive-auth-url`;
-        window.location.href = authUrl;
-    }, []);
+    const handleConnectDrive = useCallback(async () => {
+        if (isConnectingDrive) return;
+
+        setIsConnectingDrive(true);
+        try {
+            // Fetch the OAuth URL from the API
+            const response = await axiosInstance.get('/integrations/google/drive-auth-url');
+            const data = response.data;
+
+            // Check if user already has scopes
+            if (data.hasScopes) {
+                toast.success('Google Drive is already connected');
+                setConnectDriveOpen(false);
+                return;
+            }
+
+            // Extract the OAuth URL from the response
+            if (data.url && typeof data.url === 'string') {
+                // Redirect to Google OAuth
+                window.location.href = data.url;
+            } else {
+                throw new Error('Invalid response from server: missing OAuth URL');
+            }
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.message ||
+                error?.message ||
+                'Failed to connect Google Drive. Please try again.';
+            toast.error(errorMessage);
+            console.error('Failed to get Google Drive auth URL:', error);
+        } finally {
+            setIsConnectingDrive(false);
+        }
+    }, [isConnectingDrive]);
 
     const costingSheetActions: ActionItem<CostingSheetDashboardRowWithTimer>[] = useMemo(() => [
         {
@@ -167,22 +211,27 @@ const CostingSheets = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
+        {
+            label: "Change Status",
+            onClick: (row: CostingSheetDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
     ], [navigate, handleCreateCosting, isCreating]);
 
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'pending' as CostingSheetTab,
                 name: 'Costing Sheet Pending',
                 count: counts?.pending || 0,
             },
             {
-                key: 'submitted' as TabKey,
+                key: 'submitted' as CostingSheetTab,
                 name: 'Costing Sheet Submitted',
                 count: counts?.submitted || 0,
             },
             {
-                key: 'tender-dnb' as TabKey,
+                key: 'tender-dnb' as CostingSheetTab,
                 name: 'Tender DNB',
                 count: counts?.['tender-dnb'] || 0,
             },
@@ -209,7 +258,7 @@ const CostingSheets = () => {
             colId: 'dueDate',
             headerName: 'Due Date',
             width: 140,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
+            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
         },
@@ -218,7 +267,7 @@ const CostingSheets = () => {
             colId: 'emdAmount',
             headerName: 'EMD',
             width: 100,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.emdAmount;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
@@ -227,23 +276,10 @@ const CostingSheets = () => {
             filter: true,
         },
         {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            width: 120,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            width: 120,
+            width: 150,
             sortable: true,
             filter: true,
             cellRenderer: (params: any) => {
@@ -270,21 +306,8 @@ const CostingSheets = () => {
             colId: 'submittedFinalPrice',
             headerName: 'Final Price',
             width: 130,
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'submittedBudgetPrice',
-            colId: 'submittedBudgetPrice',
-            headerName: 'Budget',
-            width: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedBudgetPrice;
                 if (!value) return '—';
                 return formatINR(parseFloat(value));
             },
@@ -316,7 +339,7 @@ const CostingSheets = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -398,8 +421,8 @@ const CostingSheets = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-                    <TabsList className="m-auto">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingSheetTab)}>
+                    <TabsList className="m-auto mb-4">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -415,6 +438,31 @@ const CostingSheets = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -443,6 +491,9 @@ const CostingSheets = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -482,11 +533,15 @@ const CostingSheets = () => {
                         </ul>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConnectDriveOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConnectDriveOpen(false)}
+                            disabled={isConnectingDrive}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleConnectDrive}>
-                            Connect Google Drive
+                        <Button onClick={handleConnectDrive} disabled={isConnectingDrive}>
+                            {isConnectingDrive ? 'Connecting...' : 'Connect Google Drive'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -543,6 +598,15 @@ const CostingSheets = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

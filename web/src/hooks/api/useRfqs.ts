@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
 import { vendorOrganizationsService } from "@/services/api";
 import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 
 export const rfqsKey = {
     all: ["rfqs"] as const,
@@ -119,9 +120,13 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
 };
 
 export const useRfqsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...rfqsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery({
-        queryKey: rfqsKey.dashboardCounts(),
-        queryFn: () => rfqsService.getDashboardCounts(),
-        staleTime: 30000,
+        queryKey,
+        queryFn: () => rfqsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };

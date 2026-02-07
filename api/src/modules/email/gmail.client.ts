@@ -7,6 +7,7 @@ import { DRIZZLE } from '@db/database.module';
 import { oauthAccounts, emailLabels, emailThreads } from '@/db/schemas';
 import { ResolvedEmail, SendResult } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
+import * as fs from 'fs';
 
 
 type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
@@ -181,8 +182,77 @@ export class GmailClient {
      * Build RFC 2822 MIME message
      */
     private buildMimeMessage(email: ResolvedEmail): string {
-        const boundary = `----=_Part_${Date.now()}`;
+        const textBody = this.htmlToText(email.htmlBody);
+        const hasAttachments = email.attachments && email.attachments.length > 0;
 
+        // If no attachments, use simple multipart/alternative
+        if (!hasAttachments) {
+            const boundary = `----=_Part_${Date.now()}`;
+            const headers = this.buildHeaders(email, `multipart/alternative; boundary="${boundary}"`);
+
+            const parts = [
+                headers.join('\r\n'),
+                `--${boundary}`,
+                'Content-Type: text/plain; charset=UTF-8',
+                '',
+                textBody,
+                `--${boundary}`,
+                'Content-Type: text/html; charset=UTF-8',
+                '',
+                email.htmlBody,
+                `--${boundary}--`,
+            ];
+
+            return parts.join('\r\n');
+        }
+
+        // With attachments, use multipart/mixed with nested multipart/alternative
+        const mixedBoundary = `----=_Mixed_${Date.now()}`;
+        const altBoundary = `----=_Alternative_${Date.now()}`;
+
+        const headers = this.buildHeaders(email, `multipart/mixed; boundary="${mixedBoundary}"`);
+
+        const parts: string[] = [
+            headers.join('\r\n'),
+            `--${mixedBoundary}`,
+            `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+            '',
+            `--${altBoundary}`,
+            'Content-Type: text/plain; charset=UTF-8',
+            '',
+            textBody,
+            `--${altBoundary}`,
+            'Content-Type: text/html; charset=UTF-8',
+            '',
+            email.htmlBody,
+            `--${altBoundary}--`,
+        ];
+
+        // Add attachments
+        for (const attachment of email.attachments!) {
+            const fileContent = fs.readFileSync(attachment.path);
+            const base64Content = fileContent.toString('base64');
+            const mimeType = this.getMimeType(attachment.filename);
+
+            parts.push(
+                `--${mixedBoundary}`,
+                `Content-Type: ${mimeType}; name="${attachment.filename}"`,
+                'Content-Disposition: attachment; filename="' + attachment.filename + '"',
+                'Content-Transfer-Encoding: base64',
+                '',
+                base64Content,
+            );
+        }
+
+        parts.push(`--${mixedBoundary}--`);
+
+        return parts.join('\r\n');
+    }
+
+    /**
+     * Build email headers
+     */
+    private buildHeaders(email: ResolvedEmail, contentType: string): string[] {
         const headers = [
             `From: ${email.fromEmail}`,
             `To: ${email.toEmails.join(', ')}`,
@@ -202,25 +272,30 @@ export class GmailClient {
         }
 
         headers.push('MIME-Version: 1.0');
-        headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-        headers.push('');
+        headers.push(`Content-Type: ${contentType}`);
 
-        const textBody = this.htmlToText(email.htmlBody);
+        return headers;
+    }
 
-        const parts = [
-            headers.join('\r\n'),
-            `--${boundary}`,
-            'Content-Type: text/plain; charset=UTF-8',
-            '',
-            textBody,
-            `--${boundary}`,
-            'Content-Type: text/html; charset=UTF-8',
-            '',
-            email.htmlBody,
-            `--${boundary}--`,
-        ];
-
-        return parts.join('\r\n');
+    /**
+     * Get MIME type for file
+     */
+    private getMimeType(filename: string): string {
+        const ext = filename.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+            pdf: 'application/pdf',
+            doc: 'application/msword',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            xls: 'application/vnd.ms-excel',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            png: 'image/png',
+            gif: 'image/gif',
+            txt: 'text/plain',
+            csv: 'text/csv',
+        };
+        return mimeTypes[ext || ''] || 'application/octet-stream';
     }
 
     /**

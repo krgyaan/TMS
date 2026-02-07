@@ -2,32 +2,40 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
+
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
 
 import { employeeImprests } from "@db/schemas/shared";
 
-import { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
-import { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 
 @Injectable()
 export class EmployeeImprestService {
     constructor(
         @Inject(DRIZZLE)
-        private readonly db: DbInstance
+        private readonly db: DbInstance,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
     ) {}
 
     /* ----------------------------- CREATE ----------------------------- */
-    async create(data: CreateEmployeeImprestDto, files: Express.Multer.File[], userId: number) {
+    async create(data: CreateEmployeeImprestDto, files: Express.Multer.File[]) {
+        // console.log(userId);
+
         const result = await this.db
             .insert(employeeImprests)
             .values({
                 ...data,
-                userId, // override client input
                 invoiceProof: files.map(f => f.filename), // store filenames of uploaded files
             })
             .returning();
 
+        console.log(result);
         return result[0];
     }
 
@@ -54,16 +62,27 @@ export class EmployeeImprestService {
             throw new ForbiddenException("Not authorized");
         }
 
-        const result = await this.db
-            .update(employeeImprests)
-            .set({
-                ...data,
-                updatedAt: new Date(),
-            })
-            .where(eq(employeeImprests.id, id))
-            .returning();
+        const updateData: Record<string, any> = {
+            updatedAt: new Date(),
+        };
 
-        return result[0];
+        // Only real columns from employee_imprests
+        if (data.partyName !== undefined) updateData.partyName = data.partyName;
+        if (data.projectName !== undefined) updateData.projectName = data.projectName;
+        if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+        if (data.teamId !== undefined) updateData.teamId = data.teamId;
+        if (data.amount !== undefined) updateData.amount = data.amount;
+        if (data.remark !== undefined) updateData.remark = data.remark;
+
+        if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
+        if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
+        if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
+        if (data.status !== undefined) updateData.status = data.status;
+        if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
+
+        const [updated] = await this.db.update(employeeImprests).set(updateData).where(eq(employeeImprests.id, id)).returning();
+
+        return updated;
     }
 
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
