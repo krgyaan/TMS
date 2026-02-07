@@ -61,6 +61,19 @@ export const useDemandDraftDashboardCounts = () => {
     return query;
 };
 
+export const useDemandDraftDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: demandDraftsKey.detail(id),
+        queryFn: async () => {
+            const result = await demandDraftsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateDemandDraftAction = () => {
     const queryClient = useQueryClient();
 

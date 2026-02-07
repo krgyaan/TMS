@@ -449,17 +449,17 @@ export class CostingSheetsService {
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
 
-        // TIMER TRANSITION: Stop costing_sheets timer
+        // TIMER TRANSITION: Stop costing_sheet timer
         try {
             this.logger.log(`Stopping timer for tender ${data.tenderId} after costing sheet submitted`);
             await this.timersService.stopTimer({
                 entityType: 'TENDER',
                 entityId: data.tenderId,
-                stage: 'costing_sheets',
+                stage: 'costing_sheet',
                 userId: data.submittedBy,
                 reason: 'Costing sheet submitted'
             });
-            this.logger.log(`Successfully stopped costing_sheets timer for tender ${data.tenderId}`);
+            this.logger.log(`Successfully stopped costing_sheet timer for tender ${data.tenderId}`);
         } catch (error) {
             this.logger.error(`Failed to stop timer for tender ${data.tenderId} after costing sheet submitted:`, error);
             // Don't fail the entire operation if timer transition fails
@@ -526,18 +526,18 @@ export class CostingSheetsService {
         // Send email notification
         await this.sendCostingSheetSubmittedEmail(costingSheet.tenderId, result, changedBy);
 
-        // TIMER TRANSITION: Stop costing_sheets timer if status is 'Submitted'
+        // TIMER TRANSITION: Stop costing_sheet timer if status is 'Submitted'
         if (updateData.status === 'Submitted') {
             try {
                 this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing sheet resubmitted`);
                 await this.timersService.stopTimer({
                     entityType: 'TENDER',
                     entityId: costingSheet.tenderId,
-                    stage: 'costing_sheets',
+                    stage: 'costing_sheet',
                     userId: changedBy,
                     reason: 'Costing sheet resubmitted'
                 });
-                this.logger.log(`Successfully stopped costing_sheets timer for tender ${costingSheet.tenderId}`);
+                this.logger.log(`Successfully stopped costing_sheet timer for tender ${costingSheet.tenderId}`);
             } catch (error) {
                 this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing sheet resubmitted:`, error);
                 // Don't fail the entire operation if timer transition fails
@@ -619,7 +619,7 @@ export class CostingSheetsService {
             return {
                 success: false,
                 isDuplicate: true,
-                message: `A costing sheet with name "${sheetName}" already exists in the ${new Date().getFullYear()} folder.`,
+                message: `A costing sheet with name "${sheetName}" already exists in the folder.`,
                 existingSheetUrl: duplicateCheck.existingSheetUrl,
                 suggestedName: duplicateCheck.suggestedName,
             };

@@ -61,6 +61,19 @@ export const useChequeDashboardCounts = () => {
     return query;
 };
 
+export const useChequeDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: chequesKey.detail(id),
+        queryFn: async () => {
+            const result = await chequesService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateChequeAction = () => {
     const queryClient = useQueryClient();
 

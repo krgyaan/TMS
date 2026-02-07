@@ -61,6 +61,19 @@ export const useBankTransferDashboardCounts = () => {
     return query;
 };
 
+export const useBankTransferDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: bankTransfersKey.detail(id),
+        queryFn: async () => {
+            const result = await bankTransfersService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateBankTransferAction = () => {
     const queryClient = useQueryClient();
     console.log('Action Form called');

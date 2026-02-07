@@ -18,8 +18,7 @@ import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tende
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
-import type { TimerWithComputed } from '@/modules/timers/timer.types';
-import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 
 @Controller('physical-docs')
@@ -54,31 +53,15 @@ export class PhysicalDocsController {
             search,
         });
         // Add timer data to each tender
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // const dataWithTimers = await Promise.all(
-        //     result.data.map(async (tender) => {
-        //         let timer: TimerWithComputed | null = null;
-        //         try {
-        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'physical_docs');
-        //         } catch (error) {
-        //             this.logger.error(
-        //                 `Failed to get timer for tender ${tender.tenderId}:`,
-        //                 error
-        //             );
-        //         }
-
-        //         return {
-        //             ...tender,
-        //             timer: transformTimerForFrontend(timer, 'physical_docs')
-        //         };
-        //     })
-        // );
-        const dataWithTimers = result.data.map((tender) => {
-            return {
-                ...tender,
-                timer: transformTimerForFrontend(null, 'physical_docs')
-            };
-        });
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'physical_docs');
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
 
         return {
             ...result,

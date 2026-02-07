@@ -157,6 +157,7 @@ export class FdrService {
         const baseQuery = this.db
             .select({
                 id: paymentInstruments.id,
+                requestId: paymentRequests.id,
                 fdrCreationDate: instrumentFdrDetails.fdrDate,
                 fdrNo: instrumentFdrDetails.fdrNo,
                 beneficiaryName: paymentInstruments.favouring,
@@ -201,6 +202,7 @@ export class FdrService {
 
         const data: FdrDashboardRow[] = rows.map(row => ({
             id: row.id,
+            requestId: row.requestId,
             fdrCreationDate: row.fdrCreationDate ? new Date(row.fdrCreationDate) : null,
             fdrNo: row.fdrNo,
             beneficiaryName: row.beneficiaryName,
@@ -636,5 +638,97 @@ export class FdrService {
             action: body.action,
             actionNumber,
         };
+    }
+
+    async getById(id: number) {
+        const [result] = await this.db
+            .select({
+                // Payment Instrument fields
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                validityDate: paymentInstruments.validityDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                coveringLetter: paymentInstruments.coveringLetter,
+                extraPdfPaths: paymentInstruments.extraPdfPaths,
+                createdAt: paymentInstruments.createdAt,
+                updatedAt: paymentInstruments.updatedAt,
+
+                // Payment Request fields
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                requestType: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                requestDueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestPurpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                requestStatus: paymentRequests.status,
+                requestRemarks: paymentRequests.remarks,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestUpdatedAt: paymentRequests.updatedAt,
+
+                // FDR Details - all fields
+                fdrDetailsId: instrumentFdrDetails.id,
+                fdrNo: instrumentFdrDetails.fdrNo,
+                fdrDate: instrumentFdrDetails.fdrDate,
+                fdrSource: instrumentFdrDetails.fdrSource,
+                roi: instrumentFdrDetails.roi,
+                marginPercent: instrumentFdrDetails.marginPercent,
+                fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                fdrRemark: instrumentFdrDetails.fdrRemark,
+                fdrDetailsCreatedAt: instrumentFdrDetails.createdAt,
+                fdrDetailsUpdatedAt: instrumentFdrDetails.updatedAt,
+
+                // Tender Info fields
+                tenderName: tenderInfos.tenderName,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusId: tenderInfos.status,
+                tenderOrganizationId: tenderInfos.organization,
+                tenderItemId: tenderInfos.item,
+                tenderTeamMember: tenderInfos.teamMember,
+
+                // Status fields
+                tenderStatusName: statuses.name,
+
+                // User fields
+                requestedByName: users.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentRequests.id, id),
+                eq(paymentInstruments.instrumentType, 'FDR'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Request with ID ${id} not found`);
+        }
+
+        return result;
     }
 }

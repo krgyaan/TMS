@@ -355,47 +355,46 @@ export class TenderInfoSheetsService {
             // Send email notification
             await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
-            // TIMER TRANSITION: Stop tender_info timer and start tender_approval timer
-            // COMMENTED OUT: Timer functionality temporarily disabled
-            // try {
-            //     this.logger.log(`Transitioning timers for tender ${tenderId}`);
+            // TIMER TRANSITION: Stop tender_info_sheet timer and start tender_approval timer
+            try {
+                this.logger.log(`Transitioning timers for tender ${tenderId}`);
 
-            //     // 1. Stop the tender_info timer
-            //     try {
-            //         await this.timersService.stopTimer({
-            //             entityType: 'TENDER',
-            //             entityId: tenderId,
-            //             stage: 'tender_info',
-            //             userId: changedBy,
-            //             reason: 'Tender info sheet completed'
-            //         });
-            //         this.logger.log(`Successfully stopped tender_info timer for tender ${tenderId}`);
-            //     } catch (error) {
-            //         this.logger.warn(`Failed to stop tender_info timer for tender ${tenderId}:`, error);
-            //     }
+                // 1. Stop the tender_info_sheet timer
+                try {
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_info_sheet',
+                        userId: changedBy,
+                        reason: 'Tender info sheet completed'
+                    });
+                    this.logger.log(`Successfully stopped tender_info_sheet timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to stop tender_info_sheet timer for tender ${tenderId}:`, error);
+                }
 
-            //     // 2. Start the tender_approval timer
-            //     try {
-            //         await this.timersService.startTimer({
-            //             entityType: 'TENDER',
-            //             entityId: tenderId,
-            //             stage: 'tender_approval',
-            //             userId: changedBy,
-            //             timerConfig: {
-            //                 type: 'FIXED_DURATION',
-            //                 durationHours: 24
-            //             }
-            //         });
-            //         this.logger.log(`Successfully started tender_approval timer for tender ${tenderId}`);
-            //     } catch (error) {
-            //         this.logger.warn(`Failed to start tender_approval timer for tender ${tenderId}:`, error);
-            //     }
+                // 2. Start the tender_approval timer
+                try {
+                    await this.timersService.startTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_approval',
+                        userId: changedBy,
+                        timerConfig: {
+                            type: 'FIXED_DURATION',
+                            durationHours: 24
+                        }
+                    });
+                    this.logger.log(`Successfully started tender_approval timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to start tender_approval timer for tender ${tenderId}:`, error);
+                }
 
-            //     this.logger.log(`Successfully transitioned timers for tender ${tenderId}`);
-            // } catch (error) {
-            //     this.logger.error(`Failed to transition timers for tender ${tenderId}:`, error);
-            //     // Don't fail the entire operation if timer transition fails
-            // }
+                this.logger.log(`Successfully transitioned timers for tender ${tenderId}`);
+            } catch (error) {
+                this.logger.error(`Failed to transition timers for tender ${tenderId}:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
 
 
             return result;

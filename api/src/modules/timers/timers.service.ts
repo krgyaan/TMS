@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { eq, and, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import { timerTrackers, timerEvents } from '@db/schemas/workflow/timer.schema';
@@ -8,6 +8,8 @@ import type { DbInstance } from '@/db';
 
 @Injectable()
 export class TimersService {
+    private readonly logger = new Logger(TimersService.name);
+
     constructor(@Inject(DRIZZLE) private db: DbInstance) { }
 
     async startTimer(input: StartTimerInput): Promise<TimerWithComputed> {
@@ -388,25 +390,65 @@ export class TimersService {
         let remainingTimeMs = effectiveAllocatedTimeMs;
         let currentPauseDurationMs = 0;
 
-        if (timer.startedAt) {
-            if (timer.status === 'paused' && timer.pausedAt) {
-                currentPauseDurationMs = now - new Date(timer.pausedAt).getTime();
-            }
+        if (timer.status === 'paused' && timer.pausedAt) {
+            currentPauseDurationMs = now - new Date(timer.pausedAt).getTime();
+        }
 
+        if (timer.startedAt) {
             elapsedTimeMs = now - new Date(timer.startedAt).getTime()
                 - timer.totalPausedDurationMs
                 - currentPauseDurationMs;
-
-            remainingTimeMs = Math.max(0, effectiveAllocatedTimeMs - elapsedTimeMs);
         }
 
+        // Calculate remaining time
         if (timer.status === 'completed' || timer.status === 'cancelled') {
             if (timer.endedAt && timer.startedAt) {
                 elapsedTimeMs = new Date(timer.endedAt).getTime()
                     - new Date(timer.startedAt).getTime()
                     - timer.totalPausedDurationMs;
             }
-            remainingTimeMs = 0;
+            // Calculate actual remaining time at completion (can be positive or negative)
+            if (timer.deadlineAt && timer.endedAt) {
+                // Use deadlineAt to get exact remaining time at completion
+                const deadlineMs = new Date(timer.deadlineAt).getTime();
+                const endedMs = new Date(timer.endedAt).getTime();
+                const diffMs = deadlineMs - endedMs;
+
+                // If deadlineAt equals endedAt (or very close, within 1 second), it might have been set during migration
+                // In that case, fall back to calculating from allocated time
+                if (Math.abs(diffMs) < 1000 && timer.startedAt) {
+                    // Fallback: calculate from allocated time
+                    const startedMs = new Date(timer.startedAt).getTime();
+                    const actualElapsedMs = endedMs - startedMs - timer.totalPausedDurationMs;
+                    remainingTimeMs = effectiveAllocatedTimeMs - actualElapsedMs;
+
+                    // this.logger.debug(`Completed timer ${timer.id}: deadlineAt equals endedAt, using fallback calculation. remainingTimeMs=${remainingTimeMs}`);
+                } else {
+                    remainingTimeMs = diffMs;
+                    // this.logger.debug(`Completed timer ${timer.id}: deadlineAt=${timer.deadlineAt}, endedAt=${timer.endedAt}, remainingTimeMs=${remainingTimeMs}`);
+                }
+            } else if (timer.endedAt && timer.startedAt) {
+                // Fallback: calculate from allocated time
+                const endedMs = new Date(timer.endedAt).getTime();
+                const startedMs = new Date(timer.startedAt).getTime();
+                const actualElapsedMs = endedMs - startedMs - timer.totalPausedDurationMs;
+                remainingTimeMs = effectiveAllocatedTimeMs - actualElapsedMs;
+
+                // Debug logging for fallback calculation
+                // this.logger.debug(`Completed timer ${timer.id} (fallback): startedAt=${timer.startedAt}, endedAt=${timer.endedAt}, allocatedTimeMs=${effectiveAllocatedTimeMs}, elapsedMs=${actualElapsedMs}, remainingTimeMs=${remainingTimeMs}`);
+            } else {
+                remainingTimeMs = 0;
+                // this.logger.debug(`Completed timer ${timer.id}: Missing deadlineAt or endedAt, setting remainingTimeMs=0`);
+            }
+        } else if (timer.deadlineAt && (timer.status === 'running' || timer.status === 'paused')) {
+            // Use deadlineAt if available for running/paused timers
+            // The deadlineAt already accounts for pauses (extended when paused)
+            // If currently paused, add the current pause duration back
+            const deadlineMs = new Date(timer.deadlineAt).getTime();
+            remainingTimeMs = Math.max(0, deadlineMs - now + currentPauseDurationMs);
+        } else if (timer.startedAt) {
+            // Fallback to allocatedTimeMs calculation
+            remainingTimeMs = Math.max(0, effectiveAllocatedTimeMs - elapsedTimeMs);
         }
 
         const progressPercent = effectiveAllocatedTimeMs > 0

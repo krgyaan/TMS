@@ -4,8 +4,7 @@ import { TenderApprovalPayloadSchema, type TenderApprovalPayload } from '@/modul
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
-import type { TimerWithComputed } from '@/modules/timers/timer.types';
-import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { Logger } from '@nestjs/common';
 
 @Controller('tender-approvals')
@@ -40,31 +39,15 @@ export class TenderApprovalController {
             search,
         });
         // Add timer data to each tender
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // const dataWithTimers = await Promise.all(
-        //     result.data.map(async (tender) => {
-        //         let timer: TimerWithComputed | null = null;
-        //         try {
-        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'tender_approval');
-        //         } catch (error) {
-        //             this.logger.error(
-        //                 `Failed to get timer for tender ${tender.tenderId}:`,
-        //                 error
-        //             );
-        //         }
-
-        //         return {
-        //             ...tender,
-        //             timer: transformTimerForFrontend(timer, 'tender_approval')
-        //         };
-        //     })
-        // );
-        const dataWithTimers = result.data.map((tender) => {
-            return {
-                ...tender,
-                timer: transformTimerForFrontend(null, 'tender_approval')
-            };
-        });
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'tender_approval');
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
 
         return {
             ...result,

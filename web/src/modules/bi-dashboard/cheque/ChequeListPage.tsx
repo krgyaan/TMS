@@ -122,29 +122,20 @@ const ChequeListPage = () => {
     const chequeData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: ChequeDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: ChequeDashboardRow) => {
-        navigate(paths.bi.chequeAction(row.id), { state: row });
-    }, [navigate]);
-
     const chequeActions: ActionItem<ChequeDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<ChequeDashboardRow>[]>(

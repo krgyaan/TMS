@@ -430,17 +430,17 @@ export class RfqsService {
             // Send email notification
             await this.sendRfqSentEmail(tenderId, rfqDetails, changedBy);
 
-            // TIMER TRANSITION: Stop rfq_sent timer
+            // TIMER TRANSITION: Stop rfq timer
             try {
                 this.logger.log(`Stopping timer for tender ${tenderId} after RFQ sent`);
                 await this.timersService.stopTimer({
                     entityType: 'TENDER',
                     entityId: tenderId,
-                    stage: 'rfq_sent',
+                    stage: 'rfq',
                     userId: changedBy,
                     reason: 'RFQ sent'
                 });
-                this.logger.log(`Successfully stopped rfq_sent timer for tender ${tenderId}`);
+                this.logger.log(`Successfully stopped rfq timer for tender ${tenderId}`);
             } catch (error) {
                 this.logger.error(`Failed to stop timer for tender ${tenderId} after RFQ sent:`, error);
                 // Don't fail the entire operation if timer transition fails

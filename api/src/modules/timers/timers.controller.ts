@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { TimersService } from './timers.service';
 import type { StartTimerInput, TimerActionInput, ExtendTimerInput } from './timer.types';
+import { getFrontendTimer } from './timer-helper';
 
 @Controller('timers')
 export class TimersController {
@@ -69,6 +70,15 @@ export class TimersController {
         @Param('entityId', ParseIntPipe) entityId: number,
     ) {
         return this.timersService.getActiveTimers(entityType, entityId);
+    }
+
+    @Get(':entityType/:entityId/frontend')
+    async getFrontendTimerEndpoint(
+        @Param('entityType') entityType: string,
+        @Param('entityId', ParseIntPipe) entityId: number,
+        @Query('stage') stage?: string,
+    ) {
+        return getFrontendTimer(this.timersService, entityType, entityId, stage);
     }
 
     @Get(':entityType/:entityId/:stage/events')

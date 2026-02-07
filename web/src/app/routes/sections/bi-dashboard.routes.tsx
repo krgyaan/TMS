@@ -16,6 +16,13 @@ const BI_ChequeAction = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeA
 const BI_PayOnPortalAction = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalActionPage'));
 const BI_BankTransferAction = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferActionPage'));
 
+const BI_DemandDraftDetails = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftDetailsPage'));
+const BI_FDRDetails = lazy(() => import('@/modules/bi-dashboard/fdr/FdrDetailsPage'));
+const BI_ChequeDetails = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeDetailsPage'));
+const BI_BankGuaranteeDetails = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeDetailsPage'));
+const BI_BankTransferDetails = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferDetailsPage'));
+const BI_PayOnPortalDetails = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalDetailsPage'));
+
 export default function BIDashboardRoutes() {
     return (
         <Routes>
@@ -31,6 +38,12 @@ export default function BIDashboardRoutes() {
             <Route path="cheque/action/:id" element={<RouteWrapper><BI_ChequeAction /></RouteWrapper>} />
             <Route path="pay-on-portal/action/:id" element={<RouteWrapper><BI_PayOnPortalAction /></RouteWrapper>} />
             <Route path="bank-transfer/action/:id" element={<RouteWrapper><BI_BankTransferAction /></RouteWrapper>} />
+            <Route path="demand-draft/details/:id" element={<RouteWrapper><BI_DemandDraftDetails /></RouteWrapper>} />
+            <Route path="fdr/details/:id" element={<RouteWrapper><BI_FDRDetails /></RouteWrapper>} />
+            <Route path="cheque/details/:id" element={<RouteWrapper><BI_ChequeDetails /></RouteWrapper>} />
+            <Route path="bank-guarantee/details/:id" element={<RouteWrapper><BI_BankGuaranteeDetails /></RouteWrapper>} />
+            <Route path="bank-transfer/details/:id" element={<RouteWrapper><BI_BankTransferDetails /></RouteWrapper>} />
+            <Route path="pay-on-portal/details/:id" element={<RouteWrapper><BI_PayOnPortalDetails /></RouteWrapper>} />
         </Routes>
     );
 }

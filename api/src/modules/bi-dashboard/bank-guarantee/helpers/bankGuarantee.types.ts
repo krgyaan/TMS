@@ -1,5 +1,6 @@
 export interface BankGuaranteeDashboardRow {
     id: number;
+    requestId: number;
     bgDate: Date | null;
     bgNo: string | null;
     beneficiaryName: string | null;

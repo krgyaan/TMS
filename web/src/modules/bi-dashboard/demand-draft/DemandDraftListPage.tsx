@@ -108,29 +108,20 @@ const DemandDraftListPage = () => {
     const ddData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: DemandDraftDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: DemandDraftDashboardRow) => {
-        navigate(paths.bi.demandDraftAction(row.id), { state: row });
-    }, [navigate]);
-
     const ddActions: ActionItem<DemandDraftDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.demandDraftView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.demandDraftAction(row.id))
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<DemandDraftDashboardRow>[]>(

@@ -5,7 +5,7 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema } from './dto/tender.dto';
 import { TimersService } from '@/modules/timers/timers.service';
-import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 @Controller('tenders')
 export class TenderInfoController {
@@ -63,22 +63,15 @@ export class TenderInfoController {
             user,
         });
 
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // const tendersWithTimers = await Promise.all(
-        //     tenders.data.map(async (tender) => {
-        //         const timer = await this.timersService.getTimer('TENDER', tender.id, 'tender_info');
-        //         return {
-        //             ...tender,
-        //             timer: transformTimerForFrontend(timer, 'tender_info')
-        //         };
-        //     })
-        // );
-        const tendersWithTimers = tenders.data.map((tender) => {
-            return {
-                ...tender,
-                timer: transformTimerForFrontend(null, 'tender_info')
-            };
-        });
+        const tendersWithTimers = await Promise.all(
+            tenders.data.map(async (tender) => {
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.id, 'tender_info_sheet');
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
 
         return {
             ...tenders,
@@ -146,53 +139,6 @@ export class TenderInfoController {
         );
     }
 
-    @Get(':id/timer')
-    async getTenderTimer(@Param('id') id: string) {
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // try {
-        //     const timerId = parseInt(id, 10);
-        //     if (Number.isNaN(timerId)) {
-        //         return {
-        //             hasTimer: false,
-        //             stepKey: null,
-        //             stepName: null,
-        //             remainingSeconds: 0,
-        //             status: 'NOT_STARTED',
-        //         };
-        //     }
-
-        //     const timer = await this.timersService.getTimer('TENDER', timerId, 'tender_info');
-
-        //     const transformedTimer = transformTimerForFrontend(timer, 'tender_info');
-
-        //     // transformedTimer is now always an object (never null)
-        //     return {
-        //         hasTimer: transformedTimer.status !== 'NOT_STARTED',
-        //         stepKey: transformedTimer.stepName,
-        //         stepName: transformedTimer.stepName,
-        //         remainingSeconds: transformedTimer.remainingSeconds,
-        //         status: transformedTimer.status,
-        //         deadline: timer?.deadlineAt || null,
-        //         allocatedHours: timer?.allocatedTimeMs ? timer.allocatedTimeMs / (1000 * 60 * 60) : null,
-        //     };
-        // } catch (error) {
-        //     return {
-        //         hasTimer: false,
-        //         stepKey: null,
-        //         stepName: null,
-        //         remainingSeconds: 0,
-        //         status: 'NOT_STARTED',
-        //     };
-        // }
-        return {
-            hasTimer: false,
-            stepKey: null,
-            stepName: null,
-            remainingSeconds: 0,
-            status: 'NOT_STARTED',
-        };
-    }
-
     @Get('timers')
     async getMultipleTenderTimers(@Query('ids') ids: string) {
         const idArray = ids.split(',').map(id => id.trim());
@@ -200,7 +146,41 @@ export class TenderInfoController {
         const timers = await Promise.all(
             idArray.map(async id => {
                 try {
-                    return await this.getTenderTimer(id);
+                    const timerId = parseInt(id, 10);
+                    if (Number.isNaN(timerId)) {
+                        return {
+                            tenderId: id,
+                            hasTimer: false,
+                            stepKey: null,
+                            stepName: null,
+                            remainingSeconds: 0,
+                            status: 'NOT_STARTED',
+                        };
+                    }
+                    // Get all timers for this tender
+                    const timerArray = await getFrontendTimer(this.timersService, 'TENDER', timerId);
+                    // Convert array response to single timer format for backward compatibility
+                    // Use the first active timer, or first timer if none are active
+                    if (Array.isArray(timerArray) && timerArray.length > 0) {
+                        const activeTimer = timerArray.find(t => t.status === 'RUNNING' || t.status === 'PAUSED') || timerArray[0];
+                        return {
+                            hasTimer: activeTimer.status !== 'NOT_STARTED',
+                            stepKey: activeTimer.stepName,
+                            stepName: activeTimer.stepName,
+                            remainingSeconds: activeTimer.remainingSeconds,
+                            status: activeTimer.status,
+                            deadline: activeTimer.deadline,
+                            allocatedHours: activeTimer.allocatedHours,
+                        };
+                    }
+                    return {
+                        tenderId: id,
+                        hasTimer: false,
+                        stepKey: null,
+                        stepName: null,
+                        remainingSeconds: 0,
+                        status: 'NOT_STARTED',
+                    };
                 } catch (error) {
                     return {
                         tenderId: id,

@@ -75,6 +75,19 @@ export const useBankGuaranteeCardStats = () => {
     return query;
 };
 
+export const useBankGuaranteeDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: bankGuaranteesKey.detail(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateBankGuaranteeAction = () => {
     const queryClient = useQueryClient();
 

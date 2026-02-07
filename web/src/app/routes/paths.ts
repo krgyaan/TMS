@@ -104,16 +104,22 @@ export const paths = {
     // ==================== BI DASHBOARD ====================
     bi: {
         demandDraft: "/bi-dashboard/demand-draft",
+        demandDraftView: (requestId: number) => `/bi-dashboard/demand-draft/details/${requestId}`,
         demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
         fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         cheque: "/bi-dashboard/cheque",
+        chequeView: (requestId: number) => `/bi-dashboard/cheque/details/${requestId}`,
         chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
+        bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
         bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
+        bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
         bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
+        payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
         payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
     },
 
