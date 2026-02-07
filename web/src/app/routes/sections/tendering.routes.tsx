@@ -76,15 +76,15 @@ export default function TenderingRoutes() {
             <Route path="info-sheet/edit/:tenderId" element={<RouteWrapper><InfoSheet_Edit /></RouteWrapper>} />
             <Route path="tender-approval" element={<RouteWrapper><Tendering_TenderApproval /></RouteWrapper>} />
             <Route path="tender-approval/create/:tenderId" element={<RouteWrapper><Tendering_TenderApproval_Create /></RouteWrapper>} />
-            <Route path="tender-approval/:id" element={<RouteWrapper><Tendering_TenderApproval_Show /></RouteWrapper>} />
+            <Route path="tender-approval/:tenderId" element={<RouteWrapper><Tendering_TenderApproval_Show /></RouteWrapper>} />
             <Route path="physical-docs" element={<RouteWrapper><Tendering_PhysicalDocs /></RouteWrapper>} />
-            <Route path="physical-docs/create/:id" element={<RouteWrapper><Tendering_PhysicalDocs_Create /></RouteWrapper>} />
-            <Route path="physical-docs/:id/edit" element={<RouteWrapper><Tendering_PhysicalDocs_Edit /></RouteWrapper>} />
-            <Route path="physical-docs/:id" element={<RouteWrapper><Tendering_PhysicalDocs_Show /></RouteWrapper>} />
+            <Route path="physical-docs/create/:tenderId" element={<RouteWrapper><Tendering_PhysicalDocs_Create /></RouteWrapper>} />
+            <Route path="physical-docs/:tenderId/edit" element={<RouteWrapper><Tendering_PhysicalDocs_Edit /></RouteWrapper>} />
+            <Route path="physical-docs/:tenderId" element={<RouteWrapper><Tendering_PhysicalDocs_Show /></RouteWrapper>} />
             <Route path="rfqs" element={<RouteWrapper><Tendering_RFQs /></RouteWrapper>} />
-            <Route path="rfqs/create/:id" element={<RouteWrapper><Tendering_RFQs_Create /></RouteWrapper>} />
-            <Route path="rfqs/:id/edit" element={<RouteWrapper><Tendering_RFQs_Edit /></RouteWrapper>} />
-            <Route path="rfqs/:id" element={<RouteWrapper><Tendering_RFQs_Show /></RouteWrapper>} />
+            <Route path="rfqs/create/:tenderId" element={<RouteWrapper><Tendering_RFQs_Create /></RouteWrapper>} />
+            <Route path="rfqs/:tenderId/edit" element={<RouteWrapper><Tendering_RFQs_Edit /></RouteWrapper>} />
+            <Route path="rfqs/:tenderId" element={<RouteWrapper><Tendering_RFQs_Show /></RouteWrapper>} />
             <Route path="emds-tenderfees" element={<RouteWrapper><Tendering_EMD /></RouteWrapper>} />
             <Route path="emds-tenderfees/create/:tenderId" element={<RouteWrapper><Tendering_EMD_Create /></RouteWrapper>} />
             <Route path="emds-tenderfees/:id/edit" element={<RouteWrapper><Tendering_EMD_Edit /></RouteWrapper>} />
@@ -94,9 +94,9 @@ export default function TenderingRoutes() {
             <Route path="emds-tenderfees/bi-other-than-emds/create" element={<RouteWrapper><Tendering_BiOtherThanEmd_Create /></RouteWrapper>} />
             <Route path="document-checklists/create/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Create /></RouteWrapper>} />
             <Route path="document-checklists/edit/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Edit /></RouteWrapper>} />
-            <Route path="document-checklists/:id" element={<RouteWrapper><Tendering_DocumentChecklist_Show /></RouteWrapper>} />
+            <Route path="document-checklists/:tenderId" element={<RouteWrapper><Tendering_DocumentChecklist_Show /></RouteWrapper>} />
             <Route path="costing-sheets" element={<RouteWrapper><Tendering_CostingSheets /></RouteWrapper>} />
-            <Route path="costing-sheets/:id" element={<RouteWrapper><Tendering_CostingSheetShow /></RouteWrapper>} />
+            <Route path="costing-sheets/:tenderId" element={<RouteWrapper><Tendering_CostingSheetShow /></RouteWrapper>} />
             <Route path="costing-sheets/submit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetSubmit /></RouteWrapper>} />
             <Route path="costing-sheets/edit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetEdit /></RouteWrapper>} />
             <Route path="costing-sheets/resubmit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetResubmit /></RouteWrapper>} />
