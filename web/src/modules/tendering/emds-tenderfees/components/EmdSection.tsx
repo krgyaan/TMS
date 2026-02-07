@@ -4,7 +4,6 @@ import { Label } from '@/components/ui/label';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useFormContext, useWatch } from 'react-hook-form';

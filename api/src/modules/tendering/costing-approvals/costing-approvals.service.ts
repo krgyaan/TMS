@@ -432,17 +432,17 @@ export class CostingApprovalsService {
         // Send email notification
         await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
 
-        // TIMER TRANSITION: Stop costing_approval timer
+        // TIMER TRANSITION: Stop costing_sheet_approval timer
         try {
             this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing approval`);
             await this.timersService.stopTimer({
                 entityType: 'TENDER',
                 entityId: costingSheet.tenderId,
-                stage: 'costing_approval',
+                stage: 'costing_sheet_approval',
                 userId: userId,
                 reason: 'Costing approved'
             });
-            this.logger.log(`Successfully stopped costing_approval timer for tender ${costingSheet.tenderId}`);
+            this.logger.log(`Successfully stopped costing_sheet_approval timer for tender ${costingSheet.tenderId}`);
         } catch (error) {
             this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing approval:`, error);
             // Don't fail the entire operation if timer transition fails

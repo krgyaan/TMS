@@ -13,8 +13,7 @@ import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dt
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
-import type { TimerWithComputed } from '@/modules/timers/timer.types';
-import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { Logger } from '@nestjs/common';
 
 @Controller('bid-submissions')
@@ -49,41 +48,18 @@ export class BidSubmissionsController {
             search,
         });
         // Add timer data to each tender
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // const dataWithTimers = await Promise.all(
-        //     result.data.map(async (tender) => {
-        //         let timer: TimerWithComputed | null = null;
-        //         try {
-        //             this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
-        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'bid_submission');
-                    
-        //             if (timer) {
-        //                 this.logger.debug(`Timer found for tender ${tender.tenderId}: id=${timer.id}, status=${timer.status}, remaining=${timer.remainingTimeMs}ms`);
-        //             } else {
-        //                 this.logger.debug(`No timer found for tender ${tender.tenderId}, stage bid_submission`);
-        //             }
-        //         } catch (error) {
-        //             this.logger.error(
-        //                 `Error fetching timer for tender ${tender.tenderId}:`,
-        //                 error
-        //             );
-        //         }
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'bid_submission');
+                this.logger.debug(`Timer for tender ${tender.tenderId}: ${JSON.stringify(timer)}`);
 
-        //         const transformed = transformTimerForFrontend(timer, 'bid_submission');
-        //         this.logger.debug(`Transformed timer for tender ${tender.tenderId}: ${JSON.stringify(transformed)}`);
-
-        //         return {
-        //             ...tender,
-        //             timer: transformed
-        //         };
-        //     })
-        // );
-        const dataWithTimers = result.data.map((tender) => {
-            return {
-                ...tender,
-                timer: transformTimerForFrontend(null, 'bid_submission')
-            };
-        });
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
 
         return {
             ...result,

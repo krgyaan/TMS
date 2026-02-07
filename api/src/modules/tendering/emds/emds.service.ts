@@ -1043,25 +1043,24 @@ export class EmdsService {
                 }
             }
 
-            // TIMER TRANSITION: Stop emd_requested timer if EMD was requested
-            // COMMENTED OUT: Timer functionality temporarily disabled
+            // TIMER TRANSITION: Stop emd_request timer if EMD was requested
             // Only for TMS requests with valid tenderId
-            // if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
-            //     try {
-            //         this.logger.log(`Stopping timer for tender ${tenderId} after EMD requested`);
-            //         await this.timersService.stopTimer({
-            //             entityType: 'TENDER',
-            //             entityId: tenderId,
-            //             stage: 'emd_requested',
-            //             userId: userId,
-            //             reason: 'EMD requested'
-            //         });
-            //         this.logger.log(`Successfully stopped emd_requested timer for tender ${tenderId}`);
-            //     } catch (error) {
-            //         this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
-            //         // Don't fail the entire operation if timer transition fails
-            //     }
-            // }
+            if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
+                try {
+                    this.logger.log(`Stopping timer for tender ${tenderId} after EMD requested`);
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'emd_request',
+                        userId: userId,
+                        reason: 'EMD requested'
+                    });
+                    this.logger.log(`Successfully stopped emd_request timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
+                    // Don't fail the entire operation if timer transition fails
+                }
+            }
         } catch (error) {
             this.logger.error('Unexpected error in background operations:', error);
             // Re-throw to be caught by the caller's error handler

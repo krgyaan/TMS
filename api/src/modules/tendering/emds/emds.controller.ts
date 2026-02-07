@@ -5,8 +5,7 @@ import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
-import type { TimerWithComputed } from '@/modules/timers/timer.types';
-import { transformTimerForFrontend } from '@/modules/timers/timer-transform';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 // Extend Express Request to include user
 interface AuthenticatedRequest extends Request {
@@ -47,31 +46,15 @@ export class EmdsController {
             parsed.search
         );
         // Add timer data to each tender
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // const dataWithTimers = await Promise.all(
-        //     result.data.map(async (tender) => {
-        //         let timer: TimerWithComputed | null = null;
-        //         try {
-        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'emd_requested');
-        //         } catch (error) {
-        //             this.logger.error(
-        //                 `Failed to get timer for tender ${tender.tenderId}:`,
-        //                 error
-        //             );
-        //         }
-
-        //         return {
-        //             ...tender,
-        //             timer: transformTimerForFrontend(timer, 'emd_requested')
-        //         };
-        //     })
-        // );
-        const dataWithTimers = result.data.map((tender) => {
-            return {
-                ...tender,
-                timer: transformTimerForFrontend(null, 'emd_requested')
-            };
-        });
+        const dataWithTimers = await Promise.all(
+            result.data.map(async (tender) => {
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'emd_request');
+                return {
+                    ...tender,
+                    timer
+                };
+            })
+        );
 
         return {
             ...result,

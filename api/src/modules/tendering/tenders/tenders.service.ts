@@ -502,29 +502,28 @@ export class TenderInfosService {
         // Send email notification
         await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
 
-        // START TIMER: Start the initial tender_info timer
-        // COMMENTED OUT: Timer functionality temporarily disabled
-        // try {
-        //     this.logger.log(`Starting timer for tender ${newTender.id}`);
-        //     await this.timersService.startTimer({
-        //         entityType: 'TENDER',
-        //         entityId: newTender.id as number,
-        //         stage: 'tender_info',
-        //         userId: createdBy,
-        //         timerConfig: {
-        //             type: 'FIXED_DURATION',
-        //             durationHours: 24
-        //         },
-        //         metadata: {
-        //             createdBy,
-        //             tenderNo: newTender.tenderNo,
-        //             dueDate: newTender.dueDate
-        //         }
-        //     });
-        //     this.logger.log(`Started timer for tender ${newTender.id}`);
-        // } catch (error) {
-        //     this.logger.error(`Failed to start timer for tender ${newTender.id}:`, error);
-        // }
+        // START TIMER: Start the initial tender_info_sheet timer
+        try {
+            this.logger.log(`Starting timer for tender ${newTender.id}`);
+            await this.timersService.startTimer({
+                entityType: 'TENDER',
+                entityId: newTender.id as number,
+                stage: 'tender_info_sheet',
+                userId: createdBy,
+                timerConfig: {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24
+                },
+                metadata: {
+                    createdBy,
+                    tenderNo: newTender.tenderNo,
+                    dueDate: newTender.dueDate
+                }
+            });
+            this.logger.log(`Started timer for tender ${newTender.id}`);
+        } catch (error) {
+            this.logger.error(`Failed to start timer for tender ${newTender.id}:`, error);
+        }
 
         return newTender;
     }
