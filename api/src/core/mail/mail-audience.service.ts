@@ -24,7 +24,7 @@ export class MailAudienceService {
     }
 
     async getCoo(): Promise<typeof users.$inferSelect> {
-        const [user] = await this.db.select().from(users).where(eq(users.id, 7));
+        const [user] = await this.db.select().from(users).where(eq(users.id, 64));
 
         return user;
     }
