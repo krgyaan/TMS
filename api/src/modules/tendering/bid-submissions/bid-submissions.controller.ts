@@ -49,34 +49,41 @@ export class BidSubmissionsController {
             search,
         });
         // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                let timer: TimerWithComputed | null = null;
-                try {
-                    this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
-                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'bid_submission');
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const dataWithTimers = await Promise.all(
+        //     result.data.map(async (tender) => {
+        //         let timer: TimerWithComputed | null = null;
+        //         try {
+        //             this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
+        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'bid_submission');
                     
-                    if (timer) {
-                        this.logger.debug(`Timer found for tender ${tender.tenderId}: id=${timer.id}, status=${timer.status}, remaining=${timer.remainingTimeMs}ms`);
-                    } else {
-                        this.logger.debug(`No timer found for tender ${tender.tenderId}, stage bid_submission`);
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Error fetching timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+        //             if (timer) {
+        //                 this.logger.debug(`Timer found for tender ${tender.tenderId}: id=${timer.id}, status=${timer.status}, remaining=${timer.remainingTimeMs}ms`);
+        //             } else {
+        //                 this.logger.debug(`No timer found for tender ${tender.tenderId}, stage bid_submission`);
+        //             }
+        //         } catch (error) {
+        //             this.logger.error(
+        //                 `Error fetching timer for tender ${tender.tenderId}:`,
+        //                 error
+        //             );
+        //         }
 
-                const transformed = transformTimerForFrontend(timer, 'bid_submission');
-                this.logger.debug(`Transformed timer for tender ${tender.tenderId}: ${JSON.stringify(transformed)}`);
+        //         const transformed = transformTimerForFrontend(timer, 'bid_submission');
+        //         this.logger.debug(`Transformed timer for tender ${tender.tenderId}: ${JSON.stringify(transformed)}`);
 
-                return {
-                    ...tender,
-                    timer: transformed
-                };
-            })
-        );
+        //         return {
+        //             ...tender,
+        //             timer: transformed
+        //         };
+        //     })
+        // );
+        const dataWithTimers = result.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'bid_submission')
+            };
+        });
 
         return {
             ...result,

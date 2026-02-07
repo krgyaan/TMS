@@ -486,102 +486,104 @@ export class TenderApprovalService {
             await this.sendApprovalEmail(tenderId, payload, changedBy);
         }
 
-        try {
-            // TIMER TRANSITION
-            this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
+        // TIMER TRANSITION
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // try {
+        //     // TIMER TRANSITION
+        //     this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
 
-            // 1. Stop the tender_approval timer
-            try {
-                await this.timersService.stopTimer({
-                    entityType: 'TENDER',
-                    entityId: tenderId,
-                    stage: 'tender_approval',
-                    userId: changedBy,
-                    reason: 'Tender approved'
-                });
-                this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
-            } catch (error) {
-                this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
-            }
+        //     // 1. Stop the tender_approval timer
+        //     try {
+        //         await this.timersService.stopTimer({
+        //             entityType: 'TENDER',
+        //             entityId: tenderId,
+        //             stage: 'tender_approval',
+        //             userId: changedBy,
+        //             reason: 'Tender approved'
+        //         });
+        //         this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
+        //     } catch (error) {
+        //         this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
+        //     }
 
-            // 2. Get tender and info sheet data
-            const tender = await this.tenderInfosService.findById(tenderId);
-            const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+        //     // 2. Get tender and info sheet data
+        //     const tender = await this.tenderInfosService.findById(tenderId);
+        //     const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
 
-            if (!tender || !infoSheet) {
-                throw new NotFoundException(`Tender or info sheet not found for tender ${tenderId}`);
-            }
+        //     if (!tender || !infoSheet) {
+        //         throw new NotFoundException(`Tender or info sheet not found for tender ${tenderId}`);
+        //     }
 
-            // 3. Determine which timers should be started based on tender configuration
-            const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
+        //     // 3. Determine which timers should be started based on tender configuration
+        //     const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
 
-            if (tender.rfqTo && tender.rfqTo !== '0') {
-                stagesToStart.push({ stage: 'rfq_sent' });
-            }
-            if (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1') {
-                stagesToStart.push({ stage: 'emd_requested' });
-            }
-            if (infoSheet.physicalDocsRequired === 'YES') {
-                stagesToStart.push({ stage: 'physical_docs' });
-            }
-            // Always start these timers
-            stagesToStart.push({ stage: 'document_checklist' });
-            stagesToStart.push({ stage: 'costing_sheets' });
+        //     if (tender.rfqTo && tender.rfqTo !== '0') {
+        //         stagesToStart.push({ stage: 'rfq_sent' });
+        //     }
+        //     if (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1') {
+        //         stagesToStart.push({ stage: 'emd_requested' });
+        //     }
+        //     if (infoSheet.physicalDocsRequired === 'YES') {
+        //         stagesToStart.push({ stage: 'physical_docs' });
+        //     }
+        //     // Always start these timers
+        //     stagesToStart.push({ stage: 'document_checklist' });
+        //     stagesToStart.push({ stage: 'costing_sheets' });
 
-            // 4. Configure negative countdown timers if due date exists
-            if (tender.dueDate) {
-                const dueDate = new Date(tender.dueDate);
-                for (const item of stagesToStart) {
-                    if (item.stage === 'document_checklist' || item.stage === 'costing_sheets') {
-                        const hoursBeforeDeadline = -72;
-                        const deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
-                        item.timerConfig = {
-                            type: 'NEGATIVE_COUNTDOWN',
-                            hoursBeforeDeadline: hoursBeforeDeadline
-                        };
-                        // Note: deadlineAt will be set when starting the timer
-                    }
-                }
-            }
+        //     // 4. Configure negative countdown timers if due date exists
+        //     if (tender.dueDate) {
+        //         const dueDate = new Date(tender.dueDate);
+        //         for (const item of stagesToStart) {
+        //             if (item.stage === 'document_checklist' || item.stage === 'costing_sheets') {
+        //                 const hoursBeforeDeadline = -72;
+        //                 const deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+        //                 item.timerConfig = {
+        //                     type: 'NEGATIVE_COUNTDOWN',
+        //                     hoursBeforeDeadline: hoursBeforeDeadline
+        //                 };
+        //                 // Note: deadlineAt will be set when starting the timer
+        //             }
+        //         }
+        //     }
 
-            this.logger.log(`Found ${stagesToStart.length} timers to start after approval for tender ${tenderId}`, {
-                stages: stagesToStart.map(item => item.stage)
-            });
+        //     this.logger.log(`Found ${stagesToStart.length} timers to start after approval for tender ${tenderId}`, {
+        //         stages: stagesToStart.map(item => item.stage)
+        //     });
 
-            // 5. Start all eligible timers
-            for (const item of stagesToStart) {
-                try {
-                    this.logger.log(`Starting timer for stage ${item.stage} for tender ${tenderId}`);
-                    const timerInput: any = {
-                        entityType: 'TENDER',
-                        entityId: tenderId,
-                        stage: item.stage,
-                        userId: changedBy,
-                        timerConfig: item.timerConfig || {
-                            type: 'FIXED_DURATION',
-                            durationHours: 24
-                        }
-                    };
+        //     // 5. Start all eligible timers
+        //     for (const item of stagesToStart) {
+        //         try {
+        //             this.logger.log(`Starting timer for stage ${item.stage} for tender ${tenderId}`);
+        //             const timerInput: any = {
+        //                 entityType: 'TENDER',
+        //                 entityId: tenderId,
+        //                 stage: item.stage,
+        //                 userId: changedBy,
+        //                 timerConfig: item.timerConfig || {
+        //                     type: 'FIXED_DURATION',
+        //                     durationHours: 24
+        //                 }
+        //             };
 
-                    // Set deadline for negative countdown timers
-                    if (tender.dueDate && item.timerConfig?.type === 'NEGATIVE_COUNTDOWN') {
-                        const dueDate = new Date(tender.dueDate);
-                        const hoursBeforeDeadline = item.timerConfig.hoursBeforeDeadline || -72;
-                        timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
-                    }
+        //             // Set deadline for negative countdown timers
+        //             if (tender.dueDate && item.timerConfig?.type === 'NEGATIVE_COUNTDOWN') {
+        //                 const dueDate = new Date(tender.dueDate);
+        //                 const hoursBeforeDeadline = item.timerConfig.hoursBeforeDeadline || -72;
+        //                 timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+        //             }
 
-                    await this.timersService.startTimer(timerInput);
-                    this.logger.log(`Successfully started timer for stage ${item.stage} for tender ${tenderId}`);
-                } catch (error) {
-                    this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
-                }
-            }
+        //             await this.timersService.startTimer(timerInput);
+        //             this.logger.log(`Successfully started timer for stage ${item.stage} for tender ${tenderId}`);
+        //         } catch (error) {
+        //             this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
+        //         }
+        //     }
 
-            this.logger.log(`Successfully transitioned timers after approval for tender ${tenderId}`);
-        } catch (error) {
-            this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
-            // Don't fail the entire operation if timer transition fails
-        }
+        //     this.logger.log(`Successfully transitioned timers after approval for tender ${tenderId}`);
+        // } catch (error) {
+        //     this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
+        //     // Don't fail the entire operation if timer transition fails
+        // }
 
         return this.getByTenderId(tenderId);
     }

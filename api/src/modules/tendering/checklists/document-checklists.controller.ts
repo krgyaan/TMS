@@ -40,24 +40,31 @@ export class DocumentChecklistsController {
             search,
         }, user, parseNumber(teamId));
         // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                let timer: TimerWithComputed | null = null;
-                try {
-                    timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'document_checklist');
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+        // COMMENTED OUT: Timer functionality temporarily disabled
+        // const dataWithTimers = await Promise.all(
+        //     result.data.map(async (tender) => {
+        //         let timer: TimerWithComputed | null = null;
+        //         try {
+        //             timer = await this.timersService.getTimer('TENDER', tender.tenderId, 'document_checklist');
+        //         } catch (error) {
+        //             this.logger.error(
+        //                 `Failed to get timer for tender ${tender.tenderId}:`,
+        //                 error
+        //             );
+        //         }
 
-                return {
-                    ...tender,
-                    timer: transformTimerForFrontend(timer, 'document_checklist')
-                };
-            })
-        );
+        //         return {
+        //             ...tender,
+        //             timer: transformTimerForFrontend(timer, 'document_checklist')
+        //         };
+        //     })
+        // );
+        const dataWithTimers = result.data.map((tender) => {
+            return {
+                ...tender,
+                timer: transformTimerForFrontend(null, 'document_checklist')
+            };
+        });
 
         return {
             ...result,
