@@ -269,9 +269,9 @@ export class RfqsService {
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+            .offset(offset);
 
         const data: RfqRow[] = rows.map(row => ({
             tenderId: row.tenderId,

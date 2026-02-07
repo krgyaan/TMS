@@ -81,9 +81,9 @@ const TenderResultListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
-    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({ 
-        open: false, 
-        tenderId: null 
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
     });
 
     useEffect(() => {
@@ -169,25 +169,19 @@ const TenderResultListPage = () => {
                 headerName: 'Bid Submission',
                 width: 150,
                 colId: 'bidSubmissionDate',
-                valueGetter: (params) =>
+                cellRenderer: (params: any) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
                         : '—',
                 sortable: true,
                 filter: true,
-                comparator: (dateA, dateB) => {
-                    if (!dateA && !dateB) return 0;
-                    if (!dateA) return 1;
-                    if (!dateB) return -1;
-                    return new Date(dateA).getTime() - new Date(dateB).getTime();
-                },
             },
             {
                 field: 'finalPrice',
                 headerName: 'Final Price',
                 width: 120,
                 colId: 'finalPrice',
-                valueGetter: (params) => {
+                cellRenderer: (params: any) => {
                     const value = params.data?.finalPrice || params.data?.tenderValue;
                     if (!value) return '—';
                     return formatINR(parseFloat(value));

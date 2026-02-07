@@ -262,15 +262,9 @@ const TqManagementListPage = () => {
             headerName: 'Bid Submission',
             width: 150,
             colId: 'bidSubmissionDate',
-            valueGetter: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
+            cellRenderer: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'statusName',
@@ -286,15 +280,9 @@ const TqManagementListPage = () => {
             headerName: 'TQ Deadline',
             width: 150,
             colId: 'tqSubmissionDeadline',
-            valueGetter: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
+            cellRenderer: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
         },
         {
             field: 'tqStatus',
