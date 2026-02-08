@@ -80,7 +80,12 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const updateRfq = useUpdateRfq();
 
     // const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
-    const { data: allVendorOrganizations, isLoading: isLoadingVendors } = useVendorOrganizationsWithRelations();
+    const { data: allVendorOrganizations, isLoading: isLoadingVendors, error: vendorOrgsError } = useVendorOrganizationsWithRelations();
+
+    // Debug logging
+    console.log('allVendorOrganizations:', allVendorOrganizations);
+    console.log('isLoadingVendors:', isLoadingVendors);
+    console.log('vendorOrgsError:', vendorOrgsError);
 
     const isEditMode = !!initialData;
     const isSubmitting = createRfq.isPending || updateRfq.isPending;
@@ -273,7 +278,11 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
 
     // Helper to get options for dropdowns
     // const vendorOrgOptions = allowedVendors?.map(v => ({ label: v.name, value: String(v.id) })) || [];
-    const vendorOrgOptions = allVendorOrganizations?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+    const vendorOrgOptions = useMemo(() => {
+        const options = allVendorOrganizations?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+        console.log('vendorOrgOptions:', options);
+        return options;
+    }, [allVendorOrganizations]);
 
     return (
         <Card>
@@ -429,6 +438,24 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 </Button>
                             </div>
                             <Separator />
+
+                            {/* Error handling for vendor organizations */}
+                            {vendorOrgsError && (
+                                <Alert variant="destructive">
+                                    <AlertDescription>
+                                        Error loading vendor organizations: {vendorOrgsError instanceof Error ? vendorOrgsError.message : 'Unknown error'}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {/* Loading state indicator */}
+                            {isLoadingVendors && (
+                                <Alert>
+                                    <AlertDescription>
+                                        Loading vendor organizations...
+                                    </AlertDescription>
+                                </Alert>
+                            )}
 
                             {vendorFields.length === 0 && (
                                 <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
