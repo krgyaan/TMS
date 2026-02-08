@@ -23,7 +23,8 @@ import { NumberInput } from '@/components/form/NumberInput';
 
 // Hooks & Types
 import { useCreateRfq, useUpdateRfq } from '@/hooks/api/useRfqs';
-import { useRfqVendors } from '@/hooks/api/useRfqs';
+// import { useRfqVendors } from '@/hooks/api/useRfqs';
+import { useVendorOrganizationsWithRelations } from '@/hooks/api/useVendorOrganizations';
 import type { Rfq, RfqDashboardRow } from '../helpers/rfq.types';
 import { Input } from '@/components/ui/input';
 
@@ -78,7 +79,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const createRfq = useCreateRfq();
     const updateRfq = useUpdateRfq();
 
-    const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
+    // const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
+    const { data: allVendorOrganizations, isLoading: isLoadingVendors } = useVendorOrganizationsWithRelations();
 
     const isEditMode = !!initialData;
     const isSubmitting = createRfq.isPending || updateRfq.isPending;
@@ -141,14 +143,29 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     }, [isEditMode, initialDueDate, form]);
 
     useEffect(() => {
-        if (initialData && allowedVendors) {
+        if (initialData && allVendorOrganizations) {
             // Map flat requestedVendor string ("101,102") back to structured rows
             const currentVendorIds = (initialData.requestedVendor || '').split(',').filter(Boolean);
 
             // Group IDs by Organization to rebuild the UI rows
             const reconstructedRows: FormValues['vendorRows'] = [];
 
-            allowedVendors.forEach(org => {
+            // if (initialData && allowedVendors) {
+            //     allowedVendors.forEach(org => {
+            //         const personsInThisOrg = org.persons
+            //             .filter(p => currentVendorIds.includes(String(p.id)))
+            //             .map(p => String(p.id));
+
+            //         if (personsInThisOrg.length > 0) {
+            //             reconstructedRows.push({
+            //                 orgId: String(org.id),
+            //                 personIds: personsInThisOrg
+            //             });
+            //         }
+            //     });
+            // }
+
+            allVendorOrganizations.forEach(org => {
                 const personsInThisOrg = org.persons
                     .filter(p => currentVendorIds.includes(String(p.id)))
                     .map(p => String(p.id));
@@ -195,7 +212,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                 miiFormatPaths: miiFormatDocs,
             });
         }
-    }, [initialData, allowedVendors, form]);
+    }, [initialData, allVendorOrganizations, form]);
 
     // Reset personIds when orgId changes for any vendor row
     useEffect(() => {
@@ -255,7 +272,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     };
 
     // Helper to get options for dropdowns
-    const vendorOrgOptions = allowedVendors?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+    // const vendorOrgOptions = allowedVendors?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+    const vendorOrgOptions = allVendorOrganizations?.map(v => ({ label: v.name, value: String(v.id) })) || [];
 
     return (
         <Card>
@@ -422,7 +440,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 {vendorFields.map((field, index) => {
                                     // Logic to filter Person dropdown based on Org selection for THIS specific row
                                     const currentOrgId = form.watch(`vendorRows.${index}.orgId`);
-                                    const selectedOrg = allowedVendors?.find(v => String(v.id) === currentOrgId);
+                                    // const selectedOrg = allowedVendors?.find(v => String(v.id) === currentOrgId);
+                                    const selectedOrg = allVendorOrganizations?.find(v => String(v.id) === currentOrgId);
                                     const personOptions = selectedOrg?.persons.map(p => ({
                                         label: p.name,
                                         value: String(p.id)

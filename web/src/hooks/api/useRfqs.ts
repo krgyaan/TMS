@@ -123,7 +123,7 @@ export const useRfqsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...rfqsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery({
         queryKey,
         queryFn: () => rfqsService.getDashboardCounts(teamIdParam),

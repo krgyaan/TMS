@@ -16,14 +16,11 @@ export interface RfqDashboardRow {
     itemName: string;
     rfqTo: string;
     teamMemberName: string;
-    status: number;
-    statusName: string;
-    latestStatus: number | null;
-    latestStatusName: string | null;
-    statusRemark: string | null;
+    status?: number;
+    statusName?: string;
     dueDate: Date;
     rfqId: number | null;
-    vendorOrganizationNames: string | null;
+    // vendorOrganizationNames: string | null;
 }
 
 export interface RfqDashboardRowWithTimer extends RfqDashboardRow {
