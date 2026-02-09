@@ -55,7 +55,7 @@ export const paths = {
         costingApprove: (costingSheetId: number) => `/tendering/costing-approvals/approve/${costingSheetId}`,
         costingReject: (costingSheetId: number) => `/tendering/costing-approvals/reject/${costingSheetId}`,
         costingEditApproval: (costingSheetId: number) => `/tendering/costing-approvals/edit/${costingSheetId}`,
-        costingApprovalView: (costingSheetId: number) => `/tendering/costing-approvals/view/${costingSheetId}`,
+        costingApprovalView: (tenderId: number) => `/tendering/costing-approvals/view/${tenderId}`,
         bidSubmissions: "/tendering/bid-submissions",
         bidSubmit: (tenderId: number) => `/tendering/bid-submissions/submit/${tenderId}`,
         bidEdit: (bidSubmissionId: number) => `/tendering/bid-submissions/edit/${bidSubmissionId}`,

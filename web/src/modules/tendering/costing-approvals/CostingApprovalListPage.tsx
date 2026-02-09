@@ -92,7 +92,7 @@ const CostingApprovalListPage = () => {
         {
             label: 'View Details',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingApprovalView(row.costingSheetId!));
+                navigate(paths.tendering.costingApprovalView(row.tenderId!));
             },
             icon: <Eye className="h-4 w-4" />,
         },

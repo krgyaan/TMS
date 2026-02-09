@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useCostingApprovalById } from '@/hooks/api/useCostingApprovals';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
@@ -27,53 +26,50 @@ import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/P
 import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
 
 export default function CostingApprovalViewPage() {
-    const { id } = useParams<{ id: string }>();
+    const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
 
-    if (!id) {
+    if (!tenderIdParam) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Invalid Costing Sheet ID.</AlertDescription>
+                <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
         );
     }
 
-    const costingSheetId = Number(id);
-    const { data: costingSheet, isLoading: costingLoading, error: costingError } = useCostingApprovalById(costingSheetId);
-    const tenderId = costingSheet?.tenderId;
-
-    // Fetch all related tender data
-    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
+    const tenderId = Number(tenderIdParam);
+    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
     const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
-    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId ?? 0);
-    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId ?? 0);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId);
     const { data: vendorOrganizations } = useVendorOrganizations();
 
-    const isLoading = costingLoading || tenderLoading || approvalLoading;
-
-    if (costingError) {
+    if (tenderError) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Failed to load costing sheet. You may not have permission to access this resource.
+                    Failed to load tender. You may not have permission to access this resource.
                 </AlertDescription>
             </Alert>
         );
     }
 
-    if (isLoading) {
+    if (tenderLoading || costingSheetLoading) {
         return <Skeleton className="h-[800px]" />;
     }
 
-    if (!costingSheet || !tender) {
+    if (tenderError || (!tenderLoading && !tender)) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -91,7 +87,7 @@ export default function CostingApprovalViewPage() {
         : null;
 
     const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
-        costingSheet.oemVendorIds?.includes(vo.id)
+        costingSheet?.oemVendorIds?.includes(vo.id) || false
     ) || [];
 
     return (
@@ -107,9 +103,10 @@ export default function CostingApprovalViewPage() {
                     <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="rfq">RFQ</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
-                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
-                    <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD</TabsTrigger>
+                    <TabsTrigger value="document-checklist"> Checklist</TabsTrigger>
+                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
+                    <TabsTrigger value="costing-details">Costing</TabsTrigger>
                 </TabsList>
 
                 {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
@@ -117,7 +114,7 @@ export default function CostingApprovalViewPage() {
                     {tenderWithRelations ? (
                         <TenderView
                             tender={tenderWithRelations}
-                            isLoading={isLoading}
+                            isLoading={tenderLoading || approvalLoading}
                         />
                     ) : (
                         <Alert>
@@ -132,7 +129,7 @@ export default function CostingApprovalViewPage() {
                     {tenderWithRelations && (
                         <TenderApprovalView
                             tender={tenderWithRelations}
-                            isLoading={isLoading}
+                            isLoading={tenderLoading || approvalLoading}
                         />
                     )}
                 </TabsContent>
@@ -171,6 +168,14 @@ export default function CostingApprovalViewPage() {
                     />
                 </TabsContent>
 
+                {/* Bid Submission */}
+                <TabsContent value="bid-submission">
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission || null}
+                        isLoading={bidSubmissionLoading}
+                    />
+                </TabsContent>
+
                 {/* Costing Details */}
                 <TabsContent value="costing-details">
                     <Card>
@@ -179,8 +184,8 @@ export default function CostingApprovalViewPage() {
                                 <div>
                                     <div className="flex items-center gap-3">
                                         <CardTitle>Costing Sheet Details</CardTitle>
-                                        <Badge variant={costingSheet.status === 'Submitted' ? 'default' : costingSheet.status === 'Approved' ? 'secondary' : 'destructive'}>
-                                            {costingSheet.status}
+                                        <Badge variant={costingSheet?.status === 'Submitted' ? 'default' : costingSheet?.status === 'Approved' ? 'secondary' : 'destructive'}>
+                                            {costingSheet?.status}
                                         </Badge>
                                     </div>
                                     <CardDescription className="mt-2">
@@ -198,27 +203,27 @@ export default function CostingApprovalViewPage() {
                                 <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
                                     <div>
                                         <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                                        <p className="text-base font-semibold">{tender.tenderNo}</p>
+                                        <p className="text-base font-semibold">{tender?.tenderNo}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                                        <p className="text-base font-semibold">{tender.teamMemberName || '—'}</p>
+                                        <p className="text-base font-semibold">{tender?.teamMemberName || '—'}</p>
                                     </div>
                                     <div className="md:col-span-2">
                                         <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                        <p className="text-base font-semibold">{tender.tenderName}</p>
+                                        <p className="text-base font-semibold">{tender?.tenderName}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-muted-foreground">Due Date</p>
                                         <p className="text-base font-semibold">
-                                            {tender.dueDate ? formatDateTime(tender.dueDate as Date) : '—'}
+                                            {tender?.dueDate ? formatDateTime(tender.dueDate as Date) : '—'}
                                         </p>
                                     </div>
-                                    {costingSheet.googleSheetUrl && (
+                                    {costingSheet?.googleSheetUrl && (
                                         <div>
                                             <p className="text-sm font-medium text-muted-foreground">Google Sheet</p>
                                             <a
-                                                href={costingSheet.googleSheetUrl}
+                                                href={costingSheet?.googleSheetUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-base font-semibold text-primary hover:underline inline-flex items-center gap-1"
@@ -249,7 +254,7 @@ export default function CostingApprovalViewPage() {
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
                                             <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                                {costingSheet.submittedFinalPrice
+                                                {costingSheet?.submittedFinalPrice
                                                     ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
                                                     : '—'}
                                             </p>
@@ -258,7 +263,7 @@ export default function CostingApprovalViewPage() {
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
                                             <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                                {costingSheet.submittedReceiptPrice
+                                                {costingSheet?.submittedReceiptPrice
                                                     ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
                                                     : '—'}
                                             </p>
@@ -267,7 +272,7 @@ export default function CostingApprovalViewPage() {
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
                                             <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                                {costingSheet.submittedBudgetPrice
+                                                {costingSheet?.submittedBudgetPrice
                                                     ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
                                                     : '—'}
                                             </p>
@@ -276,7 +281,7 @@ export default function CostingApprovalViewPage() {
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
                                             <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                                {costingSheet.submittedGrossMargin
+                                                {costingSheet?.submittedGrossMargin
                                                     ? `${costingSheet.submittedGrossMargin}%`
                                                     : '—'}
                                             </p>
@@ -285,15 +290,15 @@ export default function CostingApprovalViewPage() {
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
                                             <p className="text-sm text-muted-foreground break-words">
-                                                {costingSheet.teRemarks || '—'}
+                                                {costingSheet?.teRemarks || '—'}
                                             </p>
                                         </div>
 
-                                        {costingSheet.submittedAt && (
+                                        {costingSheet?.submittedAt && (
                                             <div>
                                                 <p className="text-xs font-medium text-muted-foreground mb-1">Submitted At</p>
                                                 <p className="text-sm text-muted-foreground">
-                                                    {formatDateTime(costingSheet.submittedAt)}
+                                                    {formatDateTime(costingSheet?.submittedAt)}
                                                 </p>
                                             </div>
                                         )}
@@ -308,12 +313,12 @@ export default function CostingApprovalViewPage() {
                                             </h5>
                                         </div>
 
-                                        {costingSheet.status === 'Approved' ? (
+                                        {costingSheet?.status === 'Approved' ? (
                                             <>
                                                 <div>
                                                     <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
                                                     <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                                        {costingSheet.finalPrice
+                                                        {costingSheet?.finalPrice
                                                             ? formatINR(parseFloat(costingSheet.finalPrice))
                                                             : '—'}
                                                     </p>
@@ -322,7 +327,7 @@ export default function CostingApprovalViewPage() {
                                                 <div>
                                                     <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
                                                     <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                                        {costingSheet.receiptPrice
+                                                        {costingSheet?.receiptPrice
                                                             ? formatINR(parseFloat(costingSheet.receiptPrice))
                                                             : '—'}
                                                     </p>
@@ -331,7 +336,7 @@ export default function CostingApprovalViewPage() {
                                                 <div>
                                                     <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
                                                     <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                                        {costingSheet.budgetPrice
+                                                        {costingSheet?.budgetPrice
                                                             ? formatINR(parseFloat(costingSheet.budgetPrice))
                                                             : '—'}
                                                     </p>
@@ -340,7 +345,7 @@ export default function CostingApprovalViewPage() {
                                                 <div>
                                                     <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
                                                     <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                                        {costingSheet.grossMargin
+                                                        {costingSheet?.grossMargin
                                                             ? `${costingSheet.grossMargin}%`
                                                             : '—'}
                                                     </p>
@@ -364,15 +369,15 @@ export default function CostingApprovalViewPage() {
                                                 <div>
                                                     <p className="text-xs font-medium text-muted-foreground mb-1">TL Remarks</p>
                                                     <p className="text-sm text-muted-foreground break-words">
-                                                        {costingSheet.tlRemarks || '—'}
+                                                        {costingSheet?.tlRemarks || '—'}
                                                     </p>
                                                 </div>
 
-                                                {costingSheet.approvedAt && (
+                                                {costingSheet?.approvedAt && (
                                                     <div>
                                                         <p className="text-xs font-medium text-muted-foreground mb-1">Approved At</p>
                                                         <p className="text-sm text-muted-foreground">
-                                                            {formatDateTime(costingSheet.approvedAt)}
+                                                            {formatDateTime(costingSheet?.approvedAt)}
                                                         </p>
                                                     </div>
                                                 )}
@@ -380,7 +385,7 @@ export default function CostingApprovalViewPage() {
                                         ) : (
                                             <div className="flex items-center justify-center h-full">
                                                 <p className="text-sm text-muted-foreground">
-                                                    {costingSheet.status === 'Submitted'
+                                                    {costingSheet?.status === 'Submitted'
                                                         ? 'Awaiting approval'
                                                         : 'Not approved yet'}
                                                 </p>
@@ -391,13 +396,13 @@ export default function CostingApprovalViewPage() {
                             </div>
 
                             {/* Rejection Reason (if rejected) */}
-                            {costingSheet.status === 'Rejected/Redo' && costingSheet.rejectionReason && (
+                            {costingSheet?.status === 'Rejected/Redo' && costingSheet?.rejectionReason && (
                                 <div className="space-y-4">
                                     <h4 className="font-semibold text-base text-destructive border-b pb-2">
                                         Rejection Reason
                                     </h4>
                                     <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
-                                        <p className="text-sm text-destructive break-words">{costingSheet.rejectionReason}</p>
+                                        <p className="text-sm text-destructive break-words">{costingSheet?.rejectionReason}</p>
                                     </div>
                                 </div>
                             )}
@@ -407,18 +412,18 @@ export default function CostingApprovalViewPage() {
                                 <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
                                     Back to List
                                 </Button>
-                                {costingSheet.status === 'Submitted' && (
+                                {costingSheet?.status === 'Submitted' && (
                                     <>
-                                        <Button variant="outline" onClick={() => navigate(paths.tendering.costingReject(costingSheetId))}>
+                                        <Button variant="outline" onClick={() => navigate(paths.tendering.costingReject(costingSheet?.id))}>
                                             Reject
                                         </Button>
-                                        <Button onClick={() => navigate(paths.tendering.costingApprove(costingSheetId))}>
+                                        <Button onClick={() => navigate(paths.tendering.costingApprove(costingSheet?.id ?? 0))}>
                                             Approve
                                         </Button>
                                     </>
                                 )}
-                                {costingSheet.status === 'Approved' && (
-                                    <Button onClick={() => navigate(paths.tendering.costingEditApproval(costingSheetId))}>
+                                {costingSheet?.status === 'Approved' && (
+                                    <Button onClick={() => navigate(paths.tendering.costingEditApproval(costingSheet?.id ?? 0))}>
                                         Edit Approval
                                     </Button>
                                 )}

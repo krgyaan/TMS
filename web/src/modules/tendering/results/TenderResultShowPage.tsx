@@ -80,10 +80,6 @@ export default function TenderResultShowPage() {
         return <Skeleton className="h-[800px]" />;
     }
 
-    if (!result) {
-        return <div>Result not found</div>;
-    }
-
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
@@ -108,8 +104,8 @@ export default function TenderResultShowPage() {
     const resultDataForShow = {
         ...result,
         bidSubmissionDate: bidSubmission?.submissionDatetime || null,
-        finalPrice: result.tenderValue || tender?.gstValues || null,
-        resultStatus: result.status || '',
+        finalPrice: result?.tenderValue || tender?.gstValues || null,
+        resultStatus: result?.status || '',
         emdDetails,
     };
 

@@ -101,7 +101,7 @@ export default function TenderingRoutes() {
             <Route path="costing-sheets/edit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetEdit /></RouteWrapper>} />
             <Route path="costing-sheets/resubmit/:tenderId" element={<RouteWrapper><Tendering_CostingSheetResubmit /></RouteWrapper>} />
             <Route path="costing-approvals" element={<RouteWrapper><CostingApprovalListPage /></RouteWrapper>} />
-            <Route path="costing-approvals/:id" element={<RouteWrapper><CostingApprovalViewPage /></RouteWrapper>} />
+            <Route path="costing-approvals/view/:tenderId" element={<RouteWrapper><CostingApprovalViewPage /></RouteWrapper>} />
             <Route path="costing-approvals/approve/:id" element={<RouteWrapper><CostingApprovePage /></RouteWrapper>} />
             <Route path="costing-approvals/reject/:id" element={<RouteWrapper><CostingRejectPage /></RouteWrapper>} />
             <Route path="costing-approvals/edit/:id" element={<RouteWrapper><CostingEditApprovalPage /></RouteWrapper>} />

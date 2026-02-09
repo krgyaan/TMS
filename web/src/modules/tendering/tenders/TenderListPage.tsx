@@ -134,7 +134,7 @@ const TenderListPage = () => {
             icon: <RefreshCw className="h-4 w-4" />,
         },
         {
-            label: "View",
+            label: "View Details",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
