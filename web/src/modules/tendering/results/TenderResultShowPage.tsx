@@ -10,6 +10,7 @@ import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
@@ -20,6 +21,7 @@ import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
+import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
@@ -50,6 +52,7 @@ export default function TenderResultShowPage() {
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderIdNum);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderIdNum);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderIdNum);
+    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderIdNum);
     const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderIdNum);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderIdNum);
     const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderIdNum);
@@ -60,7 +63,7 @@ export default function TenderResultShowPage() {
         raApplicable && reverseAuctionId ? reverseAuctionId : 0
     );
 
-    const isLoading = resultLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading || costingSheetLoading || bidSubmissionLoading || (raApplicable && raLoading);
+    const isLoading = resultLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || rfqLoading || requestsLoading || documentChecklistLoading || costingSheetLoading || bidSubmissionLoading || (raApplicable && raLoading);
 
     if (resultError) {
         return (
@@ -110,7 +113,7 @@ export default function TenderResultShowPage() {
         emdDetails,
     };
 
-    // Determine number of tabs (7 if no RA, 8 if RA exists)
+    // Determine number of tabs (8 if no RA, 9 if RA exists)
     const hasRa = raApplicable && reverseAuctionId && ra;
 
     return (
@@ -122,9 +125,10 @@ export default function TenderResultShowPage() {
                 </Button>
             </div>
             <Tabs defaultValue="tender-details" className="space-y-4">
-                <TabsList className={`grid w-fit ${hasRa ? 'grid-cols-8' : 'grid-cols-7'} gap-2`}>
+                <TabsList className={`grid w-fit ${hasRa ? 'grid-cols-9' : 'grid-cols-8'} gap-2`}>
                     <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
+                    <TabsTrigger value="rfq">RFQ</TabsTrigger>
                     <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
                     <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
                     <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
@@ -146,16 +150,10 @@ export default function TenderResultShowPage() {
                             <AlertDescription>Tender information not available.</AlertDescription>
                         </Alert>
                     )}
-                    {infoSheetLoading ? (
-                        <InfoSheetView isLoading />
-                    ) : infoSheet ? (
-                        <InfoSheetView infoSheet={infoSheet} />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
-                        </Alert>
-                    )}
+                    <InfoSheetView
+                        infoSheet={infoSheet || null}
+                        isLoading={infoSheetLoading}
+                    />
                     {tenderWithRelations && (
                         <TenderApprovalView
                             tender={tenderWithRelations}
@@ -166,13 +164,19 @@ export default function TenderResultShowPage() {
 
                 {/* Physical Docs */}
                 <TabsContent value="physical-docs">
-                    {physicalDocLoading ? (
-                        <PhysicalDocsView isLoading={true} physicalDoc={null} />
-                    ) : physicalDoc ? (
-                        <PhysicalDocsView physicalDoc={physicalDoc} />
-                    ) : (
-                        <PhysicalDocsView isLoading={false} physicalDoc={null} />
-                    )}
+                    <PhysicalDocsView
+                        physicalDoc={physicalDoc || null}
+                        isLoading={physicalDocLoading}
+                    />
+                </TabsContent>
+
+                {/* RFQ */}
+                <TabsContent value="rfq">
+                    <RfqView
+                        rfq={rfq || null}
+                        tender={tender || undefined}
+                        isLoading={rfqLoading}
+                    />
                 </TabsContent>
 
                 {/* EMD & Tender Fees */}
@@ -180,14 +184,14 @@ export default function TenderResultShowPage() {
                     <EmdTenderFeeShow
                         paymentRequests={paymentRequests || null}
                         tender={tender || null}
-                        isLoading={isLoading}
+                        isLoading={requestsLoading}
                     />
                 </TabsContent>
 
                 {/* Document Checklist */}
                 <TabsContent value="document-checklist">
                     <DocumentChecklistView
-                        checklist={documentChecklist}
+                        checklist={documentChecklist || null}
                         isLoading={documentChecklistLoading}
                     />
                 </TabsContent>
@@ -195,23 +199,17 @@ export default function TenderResultShowPage() {
                 {/* Costing Details */}
                 <TabsContent value="costing-details">
                     <CostingSheetView
-                        costingSheet={costingSheet}
-                        isLoading={isLoading}
+                        costingSheet={costingSheet || null}
+                        isLoading={costingSheetLoading}
                     />
                 </TabsContent>
 
                 {/* Bid Submission */}
                 <TabsContent value="bid-submission">
-                    {bidSubmissionLoading ? (
-                        <BidSubmissionView bidSubmission={null} isLoading />
-                    ) : bidSubmission ? (
-                        <BidSubmissionView bidSubmission={bidSubmission} />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>No bid submission exists for this tender yet.</AlertDescription>
-                        </Alert>
-                    )}
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission || null}
+                        isLoading={bidSubmissionLoading}
+                    />
                 </TabsContent>
 
                 {/* RA Management - Conditional */}
