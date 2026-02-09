@@ -99,7 +99,7 @@ export default function CostingApprovalViewPage() {
                 </Button>
             </div>
             <Tabs defaultValue="tender-details" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-6 gap-2">
+                <TabsList className="grid w-fit grid-cols-7 gap-2">
                     <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="rfq">RFQ</TabsTrigger>
