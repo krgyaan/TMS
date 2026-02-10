@@ -108,6 +108,14 @@ const navMain: NavGroup[] = [
         ],
     },
     {
+        title: "Document Dashboard",
+        icon: FileSearch,
+        items: [
+            { title: "PQR", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
+            { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
+        ],
+    },
+    {
         title: "CRM",
         icon: Users,
         items: [
