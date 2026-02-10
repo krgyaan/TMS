@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, like } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
@@ -104,11 +104,11 @@ export class PqrService {
         if (search) {
             conditions.push(
                 or(
-                    like(pqrDocuments.projectName, `%${search}%`),
-                    like(pqrDocuments.item, `%${search}%`),
-                    like(pqrDocuments.teamName, `%${search}%`),
-                    like(pqrDocuments.value, `%${search}%`),
-                    like(pqrDocuments.remarks, `%${search}%`),
+                    ilike(pqrDocuments.projectName, `%${search}%`),
+                    ilike(pqrDocuments.item, `%${search}%`),
+                    ilike(pqrDocuments.teamName, `%${search}%`),
+                    ilike(pqrDocuments.value, `%${search}%`),
+                    ilike(pqrDocuments.remarks, `%${search}%`),
                 ) as never,
             );
         }

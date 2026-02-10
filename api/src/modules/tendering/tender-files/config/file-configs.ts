@@ -654,7 +654,7 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     'finance-document': {
-        maxFiles: 2,
+        maxFiles: 5,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],

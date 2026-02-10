@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, like } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
@@ -79,9 +79,9 @@ export class FinanceDocumentsService {
         if (search) {
             conditions.push(
                 or(
-                    like(financeDocuments.documentName, `%${search}%`),
-                    like(financeDocuments.documentType, `%${search}%`),
-                    like(financeDocuments.financialYear, `%${search}%`),
+                    ilike(financeDocuments.documentName, `%${search}%`),
+                    ilike(financeDocuments.documentType, `%${search}%`),
+                    ilike(financeDocuments.financialYear, `%${search}%`),
                 ) as never,
             );
         }
