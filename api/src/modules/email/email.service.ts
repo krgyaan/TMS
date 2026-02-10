@@ -273,6 +273,7 @@ export class EmailService {
 
             // Send via Gmail
             const result = await this.gmail.send(fromUserId, resolved);
+            console.log("result", result);
 
             if (result.success) {
                 // Update log as sent
@@ -286,7 +287,8 @@ export class EmailService {
                     })
                     .where(eq(emailLogs.id, emailLogId));
 
-                // Save thread info
+                // Save thread info - this will also keep DB in sync if we had to fall back
+                // to a new Gmail thread after an invalid/stale threadId.
                 if (isNewThread && result.threadId) {
                     await this.gmail.saveThreadInfo(
                         referenceType,
@@ -303,13 +305,18 @@ export class EmailService {
             } else {
                 throw new Error(result.error);
             }
-        } catch (error) {
-            this.logger.error(`Email ${emailLogId} failed:`, error.message);
+        } catch (error: any) {
+            const errorMessage = error?.message || String(error);
+            const hadThreadId = !!resolved.threadId;
+
+            this.logger.error(
+                `Email ${emailLogId} failed for ref=${referenceType}:${referenceId} (hadThreadId=${hadThreadId}): ${errorMessage}`,
+            );
 
             // Update log as failed
             await this.db
                 .update(emailLogs)
-                .set({ status: 'failed', errorMessage: error.message })
+                .set({ status: 'failed', errorMessage })
                 .where(eq(emailLogs.id, emailLogId));
         }
     }
@@ -357,6 +364,7 @@ export class EmailService {
 
         // Generate label path
         const labelPath = this.generateTenderLabelPath(teamName, tenderName);
+        console.log("labelPath", labelPath);
 
         return this.send({
             referenceType: 'tender',

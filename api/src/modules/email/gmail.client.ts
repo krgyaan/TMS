@@ -140,9 +140,9 @@ export class GmailClient {
             return { success: false, error: 'No valid OAuth token. Please re-authenticate.' };
         }
 
-        try {
+        const attemptSend = async (emailForSend: ResolvedEmail, includeThread: boolean) => {
             // Build MIME message
-            const mimeMessage = this.buildMimeMessage(email);
+            const mimeMessage = this.buildMimeMessage(emailForSend);
             const encodedMessage = Buffer.from(mimeMessage)
                 .toString('base64')
                 .replace(/\+/g, '-')
@@ -155,9 +155,9 @@ export class GmailClient {
                 requestBody: { raw: encodedMessage },
             };
 
-            // Add thread ID if replying
-            if (email.threadId) {
-                sendParams.requestBody!.threadId = email.threadId;
+            // Add thread ID if replying and explicitly allowed
+            if (includeThread && emailForSend.threadId) {
+                sendParams.requestBody!.threadId = emailForSend.threadId;
             }
 
             const response = await gmail.users.messages.send(sendParams as any);
@@ -167,14 +167,82 @@ export class GmailClient {
             this.logger.log(`Email sent: ${messageId || 'No message ID'}`);
 
             // Apply label
-            if (email.labelPath && messageId) {
-                await this.applyLabel(gmail, userId, messageId, email.labelPath);
+            if (emailForSend.labelPath && messageId) {
+                await this.applyLabel(gmail, userId, messageId, emailForSend.labelPath);
             }
 
-            return { success: true, messageId: messageId || undefined, threadId: threadId || undefined };
-        } catch (error) {
-            this.logger.error('Gmail send failed:', error.message);
-            return { success: false, error: error.message };
+            return { success: true, messageId: messageId || undefined, threadId: threadId || undefined } as SendResult;
+        };
+
+        try {
+            // First attempt: include thread information (if any)
+            return await attemptSend(email, true);
+        } catch (error: any) {
+            const baseMessage = error?.message || String(error);
+            const code = (error as any)?.code;
+            const responseData = (error as any)?.response?.data;
+            const apiError = responseData?.error;
+            const apiErrorMessage =
+                typeof apiError === 'string'
+                    ? apiError
+                    : apiError?.message || apiError?.status || '';
+
+            const combinedMessage = apiErrorMessage || baseMessage;
+
+            // Log structured error details for debugging
+            this.logger.error(
+                `Gmail send failed: code=${code ?? 'unknown'} message=${combinedMessage}`,
+            );
+            if (responseData) {
+                this.logger.debug(`Gmail send error response: ${JSON.stringify(responseData)}`);
+            }
+
+            const messageForCheck = `${baseMessage} ${apiErrorMessage || ''}`.toLowerCase();
+            const isNotFoundError =
+                code === 404 ||
+                code === '404' ||
+                messageForCheck.includes('requested entity was not found') ||
+                messageForCheck.includes('not found');
+
+            // If Gmail reports that the referenced thread was not found, retry once without threadId
+            if (email.threadId && isNotFoundError) {
+                this.logger.warn(
+                    `Gmail send failed due to invalid or stale threadId="${email.threadId}". Retrying without threadId to start a new conversation.`,
+                );
+
+                try {
+                    const emailWithoutThread: ResolvedEmail = {
+                        ...email,
+                        threadId: undefined,
+                        inReplyTo: undefined,
+                    };
+                    return await attemptSend(emailWithoutThread, false);
+                } catch (retryError: any) {
+                    const retryMessage = retryError?.message || String(retryError);
+                    const retryCode = (retryError as any)?.code;
+                    const retryResponseData = (retryError as any)?.response?.data;
+                    const retryApiError = retryResponseData?.error;
+                    const retryApiErrorMessage =
+                        typeof retryApiError === 'string'
+                            ? retryApiError
+                            : retryApiError?.message || retryApiError?.status || '';
+
+                    const finalMessage = retryApiErrorMessage || retryMessage || combinedMessage;
+
+                    this.logger.error(
+                        `Gmail retry without threadId failed: code=${retryCode ?? 'unknown'} message=${finalMessage}`,
+                    );
+                    if (retryResponseData) {
+                        this.logger.debug(
+                            `Gmail retry error response: ${JSON.stringify(retryResponseData)}`,
+                        );
+                    }
+
+                    return { success: false, error: finalMessage || 'Gmail send failed.' };
+                }
+            }
+
+            return { success: false, error: combinedMessage || 'Gmail send failed.' };
         }
     }
 
