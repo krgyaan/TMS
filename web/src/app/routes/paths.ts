@@ -271,4 +271,16 @@ export const paths = {
         imprestVoucher: (id: number) => `/shared/imprests/voucher/${id}`,
         imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
     },
+
+    // ==================== DOCUMENT DASHBOARD ====================
+    documentDashboard: {
+        pqr: "/document-dashboard/pqr",
+        pqrCreate: "/document-dashboard/pqr/create",
+        pqrEdit: (id: number | string) => `/document-dashboard/pqr/${id}/edit`,
+        pqrView: (id: number | string) => `/document-dashboard/pqr/${id}`,
+        financeDocument: "/document-dashboard/finance-document",
+        financeDocumentCreate: "/document-dashboard/finance-document/create",
+        financeDocumentEdit: (id: number | string) => `/document-dashboard/finance-document/${id}/edit`,
+        financeDocumentView: (id: number | string) => `/document-dashboard/finance-document/${id}`,
+    },
 };
