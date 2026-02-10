@@ -9,6 +9,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/form/DateInput";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { ArrowLeft, Save } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { MasterProjectFormSchema } from "../helpers/masterProject.schema";
@@ -42,7 +43,7 @@ interface MasterProjectFormProps {
 export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps) {
     const navigate = useNavigate();
 
-    const teamOptions = useTeamOptions();
+    const teamOptions = useTeamOptions([1, 2, 7]);
     const organizationOptions = useOrganizationOptions();
     const itemOptions = useItemOptions();
     const locationOptions = useLocationOptions();
@@ -62,6 +63,13 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
         defaultValues: initialValues,
     });
 
+    const watchTeamId = form.watch("teamId");
+    const watchOrganisationId = form.watch("organisationId");
+    const watchItemId = form.watch("itemId");
+    const watchLocationId = form.watch("locationId");
+    const watchPoNo = form.watch("poNo");
+    const watchPoDate = form.watch("poDate");
+
     useEffect(() => {
         form.reset(initialValues);
     }, [form, initialValues]);
@@ -72,6 +80,81 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
         const option = teamOptions.find(t => Number(t.id) === teamId);
         return option?.name ?? "";
     };
+
+    const getFinancialYear = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const f =
+            month >= 4
+                ? year.toString().slice(-2)
+                : (year - 1).toString().slice(-2);
+        const next = (parseInt(f, 10) + 1).toString().padStart(2, "0");
+        return `${f}${next}`;
+    };
+
+    const parseDmy = (value: string): Date | null => {
+        const [dd, mm, yyyy] = value.split("-");
+        const day = Number(dd);
+        const month = Number(mm);
+        const year = Number(yyyy);
+        if (!day || !month || !year) return null;
+        const d = new Date(year, month - 1, day);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const { projectCodePreview, projectNamePreview } = useMemo(() => {
+        try {
+            const teamName =
+                teamOptions.find(t => t.id === String(watchTeamId))?.name ?? "";
+            const organisationName =
+                organizationOptions.find(o => Number(o.id) === watchOrganisationId)?.name ?? "";
+            const itemName =
+                itemOptions.find(i => Number(i.id) === watchItemId)?.name ?? "";
+            const locationOption = locationOptions.find(l => Number(l.id) === watchLocationId);
+            const locationCode = locationOption?.name ?? "";
+            const locationName = locationOption?.name ?? "";
+
+            let yearSegment = "";
+            if (watchPoDate) {
+                const parsed = parseDmy(watchPoDate);
+                if (parsed) {
+                    yearSegment = getFinancialYear(parsed);
+                }
+            }
+
+            const poSuffix = (watchPoNo ?? "").toString().slice(-4);
+
+            const hasAllCore =
+                !!teamName &&
+                !!organisationName &&
+                !!itemName &&
+                !!locationCode &&
+                !!yearSegment &&
+                !!poSuffix;
+
+            if (!hasAllCore) {
+                return { projectCodePreview: "", projectNamePreview: "" };
+            }
+
+            const code = `${teamName}/${yearSegment}/${organisationName}/${locationCode}/${itemName}/${poSuffix}`;
+            const name = `${organisationName} ${locationName} ${itemName}`;
+
+            return { projectCodePreview: code, projectNamePreview: name };
+        } catch {
+            return { projectCodePreview: "", projectNamePreview: "" };
+        }
+    }, [
+        teamOptions,
+        organizationOptions,
+        itemOptions,
+        locationOptions,
+        watchTeamId,
+        watchOrganisationId,
+        watchItemId,
+        watchLocationId,
+        watchPoNo,
+        watchPoDate,
+    ]);
 
     const handleSubmit: SubmitHandler<MasterProjectFormValues> = async values => {
         const teamName = getSelectedTeamName(values.teamId);
@@ -113,7 +196,7 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid gap-4 md:grid-cols-3 items-start">
                             <SelectField
                                 control={form.control}
                                 name="teamId"
@@ -171,32 +254,6 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
 
                             <FieldWrapper
                                 control={form.control}
-                                name="poDocument"
-                                label="PO Document (URL or path)"
-                            >
-                                {field => (
-                                    <Input
-                                        {...field}
-                                        placeholder="PO document"
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper
-                                control={form.control}
-                                name="performanceCertificate"
-                                label="Performance Certificate"
-                            >
-                                {field => (
-                                    <Input
-                                        {...field}
-                                        placeholder="Performance certificate"
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper
-                                control={form.control}
                                 name="performanceDate"
                                 label="Performance Date"
                             >
@@ -204,19 +261,6 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                     <DateInput
                                         {...field}
                                         placeholder="dd-mm-yyyy"
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper
-                                control={form.control}
-                                name="completionDocument"
-                                label="Completion Document"
-                            >
-                                {field => (
-                                    <Input
-                                        {...field}
-                                        placeholder="Completion document"
                                     />
                                 )}
                             </FieldWrapper>
@@ -262,31 +306,74 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
 
                             <FieldWrapper
                                 control={form.control}
-                                name="tenderId"
-                                label="Tender ID"
+                                name="poDocument"
+                                label="PO Document"
                             >
                                 {field => (
-                                    <Input
-                                        {...field}
-                                        type="number"
-                                        placeholder="Tender ID"
+                                    <TenderFileUploader
+                                        context="pqr-po"
+                                        value={field.value ?? []}
+                                        onChange={paths => field.onChange(paths)}
+                                        disabled={isSubmitting}
                                     />
                                 )}
                             </FieldWrapper>
 
                             <FieldWrapper
                                 control={form.control}
-                                name="enquiryId"
-                                label="Enquiry ID"
+                                name="performanceCertificate"
+                                label="Performance Certificate"
                             >
                                 {field => (
-                                    <Input
-                                        {...field}
-                                        type="number"
-                                        placeholder="Enquiry ID"
+                                    <TenderFileUploader
+                                        context="pqr-performance-certificate"
+                                        value={field.value ?? []}
+                                        onChange={paths => field.onChange(paths)}
+                                        disabled={isSubmitting}
                                     />
                                 )}
                             </FieldWrapper>
+
+
+                            <FieldWrapper
+                                control={form.control}
+                                name="completionDocument"
+                                label="Completion Document"
+                            >
+                                {field => (
+                                    <TenderFileUploader
+                                        context="pqr-completion"
+                                        value={field.value ?? []}
+                                        onChange={paths => field.onChange(paths)}
+                                        disabled={isSubmitting}
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="flex flex-col space-y-1.5">
+                                <label className="text-sm font-medium text-muted-foreground">
+                                    Project Code (auto-generated)
+                                </label>
+                                <Input
+                                    value={projectCodePreview}
+                                    readOnly
+                                    disabled
+                                    placeholder="Will be generated from team, PO, organization, item, and location"
+                                />
+                            </div>
+                            <div className="flex flex-col space-y-1.5">
+                                <label className="text-sm font-medium text-muted-foreground">
+                                    Project Name (auto-generated)
+                                </label>
+                                <Input
+                                    value={projectNamePreview}
+                                    readOnly
+                                    disabled
+                                    placeholder="Will be generated from organization, item, and location"
+                                />
+                            </div>
                         </div>
 
                         <div className="flex justify-end gap-2 pt-6 border-t">

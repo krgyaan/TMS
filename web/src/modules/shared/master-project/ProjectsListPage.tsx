@@ -72,19 +72,11 @@ const ProjectsListPage = () => {
     const colDefs = useMemo<ColDef<MasterProjectListRow>[]>(
         () => [
             {
-                field: "id",
-                colId: "id",
-                headerName: "ID",
-                width: 80,
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: "teamName",
                 colId: "teamName",
                 headerName: "Team",
                 flex: 1,
-                minWidth: 120,
+                minWidth: 80,
                 valueGetter: params => params.data?.teamName ?? "—",
                 sortable: true,
                 filter: true,
@@ -142,17 +134,6 @@ const ProjectsListPage = () => {
                 filter: true,
             },
             {
-                field: "completionDate",
-                colId: "completionDate",
-                headerName: "Completion Date",
-                flex: 1,
-                minWidth: 130,
-                cellRenderer: (params: { data?: MasterProjectListRow }) =>
-                    params.data?.completionDate ? formatDate(params.data.completionDate) : "—",
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: "organizationName",
                 colId: "organizationName",
                 headerName: "Organization",
@@ -167,7 +148,7 @@ const ProjectsListPage = () => {
                 colId: "itemName",
                 headerName: "Item",
                 flex: 1,
-                minWidth: 140,
+                minWidth: 100,
                 valueGetter: params => params.data?.itemName ?? "—",
                 sortable: true,
                 filter: true,
@@ -177,7 +158,7 @@ const ProjectsListPage = () => {
                 colId: "locationName",
                 headerName: "Location",
                 flex: 1,
-                minWidth: 140,
+                minWidth: 100,
                 valueGetter: params => params.data?.locationName ?? "—",
                 sortable: true,
                 filter: true,

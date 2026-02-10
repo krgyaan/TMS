@@ -91,18 +91,18 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid gap-4 md:grid-cols-3 items-start">
                             <SelectField
                                 control={form.control}
                                 name="teamName"
-                                label="Team Name**"
+                                label="Team Name"
                                 options={teamOptions}
                                 placeholder="Select Option"
                             />
                             <FieldWrapper
                                 control={form.control}
                                 name="projectName"
-                                label="Project Name**"
+                                label="Project Name"
                             >
                                 {(field) => (
                                     <Input
@@ -114,7 +114,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             <FieldWrapper
                                 control={form.control}
                                 name="value"
-                                label="Value**"
+                                label="Value"
                             >
                                 {(field) => (
                                     <NumberInput
@@ -126,7 +126,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             <FieldWrapper
                                 control={form.control}
                                 name="item"
-                                label="Item**"
+                                label="Item"
                             >
                                 {(field) => (
                                     <Input
@@ -138,7 +138,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             <FieldWrapper
                                 control={form.control}
                                 name="poDate"
-                                label="PO date**"
+                                label="PO date"
                             >
                                 {(field) => (
                                     <DateInput
@@ -147,7 +147,32 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="uploadPo" label="Upload PO**">
+
+                            <FieldWrapper
+                                control={form.control}
+                                name="sapGemPoDate"
+                                label="SAP/GEM PO date"
+                            >
+                                {(field) => (
+                                    <DateInput
+                                        {...field}
+                                        placeholder="dd-mm-yyyy"
+                                    />
+                                )}
+                            </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="completionDate"
+                                label="Completion date"
+                            >
+                                {(field) => (
+                                    <DateInput
+                                        {...field}
+                                        placeholder="dd-mm-yyyy"
+                                    />
+                                )}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="uploadPo" label="Upload PO">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="pqr-po"
@@ -157,19 +182,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper
-                                control={form.control}
-                                name="sapGemPoDate"
-                                label="SAP/GEM PO date**"
-                            >
-                                {(field) => (
-                                    <DateInput
-                                        {...field}
-                                        placeholder="dd-mm-yyyy"
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="uploadSapGemPo" label="Upload SAP/GEM PO**">
+                            <FieldWrapper control={form.control} name="uploadSapGemPo" label="Upload SAP/GEM PO">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="pqr-sap-gem-po"
@@ -179,19 +192,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper
-                                control={form.control}
-                                name="completionDate"
-                                label="Completion date**"
-                            >
-                                {(field) => (
-                                    <DateInput
-                                        {...field}
-                                        placeholder="dd-mm-yyyy"
-                                    />
-                                )}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="uploadCompletion" label="Upload Completion**">
+                            <FieldWrapper control={form.control} name="uploadCompletion" label="Upload Completion">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="pqr-completion"
@@ -201,7 +202,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="uploadPerformanceCertificate" label="Upload Performance Certificate**">
+                            <FieldWrapper control={form.control} name="uploadPerformanceCertificate" label="Upload Performance Certificate">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="pqr-performance-certificate"
@@ -211,20 +212,20 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="remarks"
+                                label="Remarks"
+                            >
+                                {(field) => (
+                                    <Textarea
+                                        {...field}
+                                        placeholder="Enter remarks..."
+                                        className="min-h-[100px]"
+                                    />
+                                )}
+                            </FieldWrapper>
                         </div>
-                        <FieldWrapper
-                            control={form.control}
-                            name="remarks"
-                            label="Remarks *"
-                        >
-                            {(field) => (
-                                <Textarea
-                                    {...field}
-                                    placeholder="Enter remarks..."
-                                    className="min-h-[100px]"
-                                />
-                            )}
-                        </FieldWrapper>
 
                         {/* Form Actions */}
                         <div className="flex justify-end gap-2 pt-6 border-t">

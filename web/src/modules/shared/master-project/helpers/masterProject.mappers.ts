@@ -8,15 +8,15 @@ import type {
 
 export const buildDefaultValues = (): MasterProjectFormValues => ({
     teamId: undefined as any,
-    organisationId: null,
+    organisationId: undefined as any,
     itemId: undefined as any,
-    locationId: null,
+    locationId: undefined as any,
     poNo: "",
     poDate: "",
-    poDocument: "",
-    performanceCertificate: "",
+    poDocument: [],
+    performanceCertificate: [],
     performanceDate: "",
-    completionDocument: "",
+    completionDocument: [],
     completionDate: "",
     sapPoDate: "",
     sapPoNo: "",
@@ -26,6 +26,8 @@ export const buildDefaultValues = (): MasterProjectFormValues => ({
 
 const toStringOrEmpty = (v: string | null | undefined): string => (v ?? "") as string;
 
+const firstPath = (paths: string[]): string | null => (paths && paths.length > 0 ? paths[0] : null);
+
 export const mapResponseToForm = (
     existing: MasterProjectResponse | MasterProjectListRow | null,
 ): MasterProjectFormValues => {
@@ -33,19 +35,19 @@ export const mapResponseToForm = (
         return buildDefaultValues();
     }
 
-    const row = existing as MasterProjectListRow & { teamId?: number };
+    const row = existing as MasterProjectListRow & { teamId?: number | null };
 
     return {
-        teamId: (row as any).teamId ?? undefined,
-        organisationId: row.organisationId,
+        teamId: (row as any).teamId ?? 0,
+        organisationId: row.organisationId ?? 0,
         itemId: row.itemId,
-        locationId: row.locationId,
+        locationId: row.locationId ?? 0,
         poNo: toStringOrEmpty(row.poNo),
         poDate: toStringOrEmpty(row.poDate),
-        poDocument: toStringOrEmpty(row.poDocument),
-        performanceCertificate: toStringOrEmpty(row.performanceCertificate),
+        poDocument: row.poDocument ? [row.poDocument] : [],
+        performanceCertificate: row.performanceCertificate ? [row.performanceCertificate] : [],
         performanceDate: toStringOrEmpty(row.performanceDate),
-        completionDocument: toStringOrEmpty(row.completionDocument),
+        completionDocument: row.completionDocument ? [row.completionDocument] : [],
         completionDate: toStringOrEmpty(row.completionDate),
         sapPoDate: toStringOrEmpty(row.sapPoDate),
         sapPoNo: toStringOrEmpty(row.sapPoNo),
@@ -63,11 +65,11 @@ export const mapFormToCreatePayload = (
     itemId: values.itemId,
     locationId: values.locationId ?? null,
     poNo: values.poNo || null,
-    poDocument: values.poDocument || null,
+    poDocument: firstPath(values.poDocument),
     poDate: values.poDate || null,
-    performanceCertificate: values.performanceCertificate || null,
+    performanceCertificate: firstPath(values.performanceCertificate),
     performanceDate: values.performanceDate || null,
-    completionDocument: values.completionDocument || null,
+    completionDocument: firstPath(values.completionDocument),
     completionDate: values.completionDate || null,
     sapPoDate: values.sapPoDate || null,
     sapPoNo: values.sapPoNo || null,
@@ -86,11 +88,11 @@ export const mapFormToUpdatePayload = (
     itemId: values.itemId,
     locationId: values.locationId ?? null,
     poNo: values.poNo || null,
-    poDocument: values.poDocument || null,
+    poDocument: firstPath(values.poDocument),
     poDate: values.poDate || null,
-    performanceCertificate: values.performanceCertificate || null,
+    performanceCertificate: firstPath(values.performanceCertificate),
     performanceDate: values.performanceDate || null,
-    completionDocument: values.completionDocument || null,
+    completionDocument: firstPath(values.completionDocument),
     completionDate: values.completionDate || null,
     sapPoDate: values.sapPoDate || null,
     sapPoNo: values.sapPoNo || null,

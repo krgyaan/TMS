@@ -84,7 +84,7 @@ export class EmailService {
      * Resolve attachment file paths
      */
     private resolveAttachments(input: { files: string[]; baseDir?: string }): Array<{ filename: string; path: string }> {
-        const uploadsRoot = join(process.cwd(), 'uploads');
+        const uploadsRoot = join(process.cwd(), 'uploads/tendering/');
         const attachments: Array<{ filename: string; path: string }> = [];
 
         for (const file of input.files) {
