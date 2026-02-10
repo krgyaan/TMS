@@ -6,6 +6,21 @@ import type {
     UpdateFinanceDocumentDto,
 } from './financeDocument.types';
 
+const parsePgTextArray = (value?: string | null): string[] => {
+    if (!value) return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+        return [trimmed];
+    }
+    const inner = trimmed.slice(1, -1);
+    if (!inner) return [];
+    return inner
+        .split(",")
+        .map((part) => part.trim().replace(/^"(.*)"$/, "$1"))
+        .filter((part) => part.length > 0);
+};
+
 // Build default values (for create mode)
 export const buildDefaultValues = (): FinanceDocumentFormValues => {
     return {
@@ -28,11 +43,12 @@ export const mapResponseToForm = (
     }
 
     const doc = existingData as FinanceDocumentListRow & { documentType?: number; financialYear?: number };
+    const uploadFiles = parsePgTextArray(doc.uploadFile as string | null);
     return {
         documentName: doc.documentName ?? '',
         documentType: toNumber(doc.documentType),
         financialYear: toNumber(doc.financialYear),
-        uploadFile: doc.uploadFile ? [doc.uploadFile] : [],
+        uploadFile: uploadFiles,
     };
 };
 

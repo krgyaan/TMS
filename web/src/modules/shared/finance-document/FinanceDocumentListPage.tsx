@@ -11,10 +11,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, Edit, FileX2, Search, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/hooks/useFormatedDate';
 import { useFinanceDocuments } from '@/hooks/api/useFinanceDocuments';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { FinanceDocumentListRow } from '@/modules/shared/finance-document/helpers/financeDocument.types';
+import { useFinancialYears } from '@/hooks/api/useFinancialYear';
+import { useFinanceDocTypes } from '@/hooks/api/useFinanceDocType';
 
 const FinanceDocumentListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -22,6 +23,9 @@ const FinanceDocumentListPage = () => {
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
+
+    const { data: financialYears = [] } = useFinancialYears();
+    const { data: financeDocTypes = [] } = useFinanceDocTypes();
 
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
@@ -51,6 +55,22 @@ const FinanceDocumentListPage = () => {
 
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
+
+    const financialYearMap = useMemo(
+        () =>
+            Object.fromEntries(
+                financialYears.map((fy) => [String(fy.id), fy.name] as const)
+            ),
+        [financialYears]
+    );
+
+    const financeDocTypeMap = useMemo(
+        () =>
+            Object.fromEntries(
+                financeDocTypes.map((dt) => [String(dt.id), dt.name] as const)
+            ),
+        [financeDocTypes]
+    );
 
     const financeDocumentActions: ActionItem<FinanceDocumentListRow>[] = useMemo(
         () => [
@@ -94,7 +114,11 @@ const FinanceDocumentListPage = () => {
                 headerName: 'Document Type',
                 flex: 1,
                 minWidth: 130,
-                valueGetter: (params) => params.data?.documentType ?? '—',
+                valueGetter: (params) => {
+                    const raw = params.data?.documentType;
+                    if (!raw) return '—';
+                    return financeDocTypeMap[raw] ?? '—';
+                },
                 sortable: true,
                 filter: true,
             },
@@ -104,7 +128,11 @@ const FinanceDocumentListPage = () => {
                 headerName: 'Financial Year',
                 flex: 1,
                 minWidth: 120,
-                valueGetter: (params) => params.data?.financialYear ?? '—',
+                valueGetter: (params) => {
+                    const raw = params.data?.financialYear;
+                    if (!raw) return '—';
+                    return financialYearMap[raw] ?? '—';
+                },
                 sortable: true,
                 filter: true,
             },
@@ -133,17 +161,6 @@ const FinanceDocumentListPage = () => {
                 filter: false,
             },
             {
-                field: 'createdAt',
-                colId: 'createdAt',
-                headerName: 'Created',
-                flex: 1,
-                minWidth: 120,
-                cellRenderer: (params: { data?: FinanceDocumentListRow }) =>
-                    params.data?.createdAt ? formatDate(params.data.createdAt) : '—',
-                sortable: true,
-                filter: true,
-            },
-            {
                 headerName: 'Actions',
                 filter: false,
                 cellRenderer: createActionColumnRenderer(financeDocumentActions),
@@ -152,7 +169,7 @@ const FinanceDocumentListPage = () => {
                 width: 80,
             },
         ],
-        [financeDocumentActions]
+        [financeDocumentActions, financialYearMap, financeDocTypeMap]
     );
 
     if (loading) {

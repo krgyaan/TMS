@@ -15,6 +15,7 @@ import { FinanceDocumentFormSchema } from '../helpers/financeDocument.schema';
 import type { FinanceDocumentFormValues, FinanceDocumentResponse, FinanceDocumentListRow } from '../helpers/financeDocument.types';
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from '../helpers/financeDocument.mappers';
 import { useFinancialYears } from '@/hooks/api/useFinancialYear';
+import { useFinanceDocTypes } from '@/hooks/api/useFinanceDocType';
 import { useCreateFinanceDocument, useUpdateFinanceDocument } from '@/hooks/api/useFinanceDocuments';
 
 interface FinanceDocumentFormProps {
@@ -22,23 +23,19 @@ interface FinanceDocumentFormProps {
     existingData?: FinanceDocumentResponse | FinanceDocumentListRow;
 }
 
-// TODO: Replace with actual document type hook when available
-const useDocumentTypeOptions = () => {
-    // Placeholder - replace with actual API hook
-    return useMemo(() => [
-        { id: '1', name: 'Type 1' },
-        { id: '2', name: 'Type 2' },
-    ], []);
-};
-
 export function FinanceDocumentForm({ mode, existingData }: FinanceDocumentFormProps) {
     const navigate = useNavigate();
     const { data: financialYears = [] } = useFinancialYears();
-    const documentTypeOptions = useDocumentTypeOptions();
+    const { data: financeDocTypes = [] } = useFinanceDocTypes();
 
     const financialYearOptions = useMemo(
         () => financialYears.map((fy) => ({ id: String(fy.id), name: fy.name })),
         [financialYears]
+    );
+
+    const documentTypeOptions = useMemo(
+        () => financeDocTypes.map((dt) => ({ id: String(dt.id), name: dt.name })),
+        [financeDocTypes]
     );
 
     const createMutation = useCreateFinanceDocument();
@@ -103,11 +100,11 @@ export function FinanceDocumentForm({ mode, existingData }: FinanceDocumentFormP
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-2 items-start">
                             <FieldWrapper
                                 control={form.control}
                                 name="documentName"
-                                label="Document Name**"
+                                label="Document Name"
                             >
                                 {(field) => (
                                     <Input
@@ -119,18 +116,18 @@ export function FinanceDocumentForm({ mode, existingData }: FinanceDocumentFormP
                             <SelectField
                                 control={form.control}
                                 name="documentType"
-                                label="Document Type**"
+                                label="Document Type"
                                 options={documentTypeOptions}
                                 placeholder="Select Option"
                             />
                             <SelectField
                                 control={form.control}
                                 name="financialYear"
-                                label="Financial Year**"
+                                label="Financial Year"
                                 options={financialYearOptions}
                                 placeholder="Select Option"
                             />
-                            <FieldWrapper control={form.control} name="uploadFile" label="Upload File*">
+                            <FieldWrapper control={form.control} name="uploadFile" label="Upload File">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="finance-document"

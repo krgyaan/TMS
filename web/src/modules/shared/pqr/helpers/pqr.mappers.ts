@@ -6,6 +6,21 @@ import type {
     UpdatePqrDto,
 } from './pqr.types';
 
+const parsePgTextArray = (value?: string | null): string[] => {
+    if (!value) return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+        return [trimmed];
+    }
+    const inner = trimmed.slice(1, -1);
+    if (!inner) return [];
+    return inner
+        .split(",")
+        .map((part) => part.trim().replace(/^"(.*)"$/, "$1"))
+        .filter((part) => part.length > 0);
+};
+
 // Build default values (for create mode)
 export const buildDefaultValues = (): PqrFormValues => {
     return {
@@ -35,18 +50,25 @@ export const mapResponseToForm = (
         return buildDefaultValues();
     }
 
+    const uploadPoFiles = parsePgTextArray(existingData.uploadPo as string | null);
+    const uploadSapGemPoFiles = parsePgTextArray(existingData.uploadSapGemPo as string | null);
+    const uploadCompletionFiles = parsePgTextArray(existingData.uploadCompletion as string | null);
+    const uploadPerformanceCertFiles = parsePgTextArray(
+        existingData.uploadPerformanceCertificate as string | null,
+    );
+
     return {
         teamName: toNumber((existingData as any).teamName),
         projectName: (existingData.projectName ?? '') as string,
         value: toNumber((existingData as any).value),
         item: (existingData.item ?? '') as string,
         poDate: (existingData.poDate ?? '') as string,
-        uploadPo: existingData.uploadPo ? [existingData.uploadPo] : [],
+        uploadPo: uploadPoFiles,
         sapGemPoDate: (existingData.sapGemPoDate ?? '') as string,
-        uploadSapGemPo: existingData.uploadSapGemPo ? [existingData.uploadSapGemPo] : [],
+        uploadSapGemPo: uploadSapGemPoFiles,
         completionDate: (existingData.completionDate ?? '') as string,
-        uploadCompletion: existingData.uploadCompletion ? [existingData.uploadCompletion] : [],
-        uploadPerformanceCertificate: existingData.uploadPerformanceCertificate ? [existingData.uploadPerformanceCertificate] : [],
+        uploadCompletion: uploadCompletionFiles,
+        uploadPerformanceCertificate: uploadPerformanceCertFiles,
         remarks: (existingData.remarks ?? '') as string,
     };
 };

@@ -30,7 +30,13 @@ export const useFinanceDocuments = (
     };
 
     return useQuery<PaginatedResult<FinanceDocumentListRow>>({
-        queryKey: financeDocumentsKey.list({ ...pagination, ...sort }),
+        queryKey: financeDocumentsKey.list({
+            page: pagination.page,
+            limit: pagination.limit,
+            search: pagination.search ?? undefined,
+            sortBy: sort?.sortBy,
+            sortOrder: sort?.sortOrder,
+        }),
         queryFn: () => financeDocumentsService.getAll(params),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {

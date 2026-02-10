@@ -39,3 +39,4 @@ export { bankTransfersService } from './bank-transfers.service';
 export { chequesService } from './cheques.service';
 export { pqrService } from './pqr.service';
 export { financeDocumentsService } from './finance-documents.service';
+export { financeDocTypeService } from './finance-doc-type.service';

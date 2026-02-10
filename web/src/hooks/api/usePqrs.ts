@@ -25,7 +25,13 @@ export const usePqrs = (
     };
 
     return useQuery<PaginatedResult<PqrListRow>>({
-        queryKey: pqrKey.list({ ...pagination, ...sort }),
+        queryKey: pqrKey.list({
+            page: pagination.page,
+            limit: pagination.limit,
+            search: pagination.search ?? undefined,
+            sortBy: sort?.sortBy,
+            sortOrder: sort?.sortOrder,
+        }),
         queryFn: () => pqrService.getAll(params),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
