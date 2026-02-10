@@ -48,6 +48,7 @@ type RfqRow = {
     dueDate: Date;
     rfqId: number | null;
     vendorOrganizationNames: string | null;
+    rfqCount: number;
 };
 
 type RfqDetails = {
@@ -262,6 +263,7 @@ export class RfqsService {
                         FROM ${vendorOrganizations}
                         WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
                     )`,
+                rfqCount: sql<number>`(SELECT count(*)::int FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
             })
             .from(tenderInfos)
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -289,6 +291,7 @@ export class RfqsService {
             dueDate: row.dueDate,
             rfqId: row.rfqId,
             vendorOrganizationNames: row.vendorOrganizationNames,
+            rfqCount: Number(row.rfqCount ?? 0),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -328,6 +331,26 @@ export class RfqsService {
             items: rfqItemsData,
             documents: rfqDocumentsData,
         } as RfqDetails;
+    }
+
+    async findAllByTenderId(tenderId: number): Promise<RfqDetails[]> {
+        const rfqRows = await this.db.select().from(rfqs).where(eq(rfqs.tenderId, tenderId));
+
+        if (rfqRows.length === 0) {
+            return [];
+        }
+
+        const result: RfqDetails[] = [];
+        for (const rfqRow of rfqRows) {
+            const rfqItemsData = await this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id));
+            const rfqDocumentsData = await this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id));
+            result.push({
+                ...rfqRow,
+                items: rfqItemsData,
+                documents: rfqDocumentsData,
+            } as RfqDetails);
+        }
+        return result;
     }
 
     /**

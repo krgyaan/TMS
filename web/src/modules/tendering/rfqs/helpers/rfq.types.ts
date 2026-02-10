@@ -20,10 +20,11 @@ export interface RfqDashboardRow {
     statusName?: string;
     dueDate: Date;
     rfqId: number | null;
-    // vendorOrganizationNames: string | null;
+    rfqCount?: number;
 }
 
 export interface RfqDashboardRowWithTimer extends RfqDashboardRow {
+    vendorOrganizationNames: string | null;
     timer?: {
         remainingSeconds: number;
         status: TimerStatus;

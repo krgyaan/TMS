@@ -135,12 +135,21 @@ export default function RfqShowPage() {
                 </TabsContent>
 
                 {/* RFQ */}
-                <TabsContent value="rfq">
-                    <RfqView
-                        rfq={rfqData || null}
-                        tender={tender || undefined}
-                        isLoading={rfqLoading}
-                    />
+                <TabsContent value="rfq" className="space-y-4">
+                    {rfqLoading ? (
+                        <RfqView rfq={null} tender={tender || undefined} isLoading={true} />
+                    ) : !rfqData || rfqData.length === 0 ? (
+                        <RfqView rfq={null} tender={tender || undefined} isLoading={false} />
+                    ) : (
+                        rfqData.map((rfq) => (
+                            <RfqView
+                                key={rfq.id}
+                                rfq={rfq}
+                                tender={tender || undefined}
+                                isLoading={false}
+                            />
+                        ))
+                    )}
                 </TabsContent>
 
                 {/* EMD & Tender Fees */}

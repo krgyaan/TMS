@@ -84,11 +84,8 @@ export class RfqsController {
 
     @Get('by-tender/:tenderId')
     async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        const rfq = await this.rfqsService.findByTenderId(tenderId);
-        if (!rfq) {
-            throw new NotFoundException(`RFQ for Tender ID ${tenderId} not found`);
-        }
-        return rfq;
+        const rfqs = await this.rfqsService.findAllByTenderId(tenderId);
+        return rfqs;
     }
 
     @Get(':id')
