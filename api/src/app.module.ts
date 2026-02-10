@@ -80,10 +80,10 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { WorkOrderModule } from "@/modules/operations/work-order/work-order.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
-import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
+import { ProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -177,10 +177,10 @@ import { LoggerModule } from "@/logger/logger.module";
         WorkOrderModule,
         KickOffMeetingModule,
         ProjectsModule,
-        ProjectsMasterModule,
         FollowupSchedulerModule,
         PqrModule,
         FinanceDocumentsModule,
+        ProjectsMasterModule,
         // BusinessPerformanceModule,
     ],
     controllers: [AppController],
