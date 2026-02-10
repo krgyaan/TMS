@@ -3,14 +3,14 @@ import { Routes, Route } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
 // Lazy imports
-const DocumentDashboard_PQR = lazy(() => import('@/modules/document-dashboard/pqr/PqrListPage'));
-const DocumentDashboard_PQR_Create = lazy(() => import('@/modules/document-dashboard/pqr/PqrCreatePage'));
-const DocumentDashboard_PQR_Edit = lazy(() => import('@/modules/document-dashboard/pqr/PqrEditPage'));
-const DocumentDashboard_PQR_Show = lazy(() => import('@/modules/document-dashboard/pqr/PqrShowPage'));
-const DocumentDashboard_FinanceDocument = lazy(() => import('@/modules/document-dashboard/finance-document/FinanceDocumentListPage'));
-const DocumentDashboard_FinanceDocument_Create = lazy(() => import('@/modules/document-dashboard/finance-document/FinanceDocumentCreatePage'));
-const DocumentDashboard_FinanceDocument_Edit = lazy(() => import('@/modules/document-dashboard/finance-document/FinanceDocumentEditPage'));
-const DocumentDashboard_FinanceDocument_Show = lazy(() => import('@/modules/document-dashboard/finance-document/FinanceDocumentShowPage'));
+const DocumentDashboard_PQR = lazy(() => import('@/modules/shared/pqr/PqrListPage'));
+const DocumentDashboard_PQR_Create = lazy(() => import('@/modules/shared/pqr/PqrCreatePage'));
+const DocumentDashboard_PQR_Edit = lazy(() => import('@/modules/shared/pqr/PqrEditPage'));
+const DocumentDashboard_PQR_Show = lazy(() => import('@/modules/shared/pqr/PqrShowPage'));
+const DocumentDashboard_FinanceDocument = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentListPage'));
+const DocumentDashboard_FinanceDocument_Create = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentCreatePage'));
+const DocumentDashboard_FinanceDocument_Edit = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentEditPage'));
+const DocumentDashboard_FinanceDocument_Show = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentShowPage'));
 
 export default function DocumentDashboardRoutes() {
     return (
