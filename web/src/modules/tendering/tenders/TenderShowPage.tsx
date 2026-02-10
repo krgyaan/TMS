@@ -53,7 +53,7 @@ export default function TenderShowPage() {
         : null;
 
     // Determine which tabs have data
-    const hasRfq = !rfqLoading && !!rfq;
+    const hasRfq = !rfqLoading && Array.isArray(rfq) && rfq.length > 0;
     const hasPhysicalDoc = !physicalDocLoading && !!physicalDoc;
     const hasPaymentRequests = !paymentRequestsLoading && paymentRequests && paymentRequests.length > 0;
     const hasChecklist = !checklistLoading && !!checklist;
@@ -138,10 +138,10 @@ export default function TenderShowPage() {
                 {/* RFQ */}
                 <TabsContent value="rfq">
                     {rfqLoading ? (
-                        <RfqView rfq={{} as any} isLoading />
-                    ) : rfq ? (
+                        <RfqView rfq={null} tender={tender ?? undefined} isLoading />
+                    ) : Array.isArray(rfq) && rfq.length > 0 ? (
                         <RfqView
-                            rfq={rfq}
+                            rfq={rfq[0]}
                             tender={tender ?? undefined}
                         />
                     ) : (

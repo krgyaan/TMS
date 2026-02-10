@@ -89,10 +89,10 @@ export function RfqView({
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Requested Vendor IDs
+                                Requested Vendor
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {rfq.vendorOrganizationNames || '—'}
+                                {rfq.requestedVendor || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
