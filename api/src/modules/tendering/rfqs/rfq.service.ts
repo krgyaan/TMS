@@ -624,6 +624,8 @@ export class RfqsService {
         recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
+            this.logger.log(`Sending ${eventType} email for tender ${tenderId} to ${recipients.to?.length || 0} recipients`);
+
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType,
