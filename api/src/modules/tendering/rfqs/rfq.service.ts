@@ -781,6 +781,14 @@ export class RfqsService {
             // Collect attachment file paths from RFQ documents
             const attachmentFiles = rfqDetails.documents?.map(doc => doc.path).filter((path): path is string => !!path) || [];
 
+            const shouldLogAttachmentDetails = process.env.EMAIL_LOG_ATTACHMENTS === "1";
+            if (shouldLogAttachmentDetails && rfqDetails.documents?.length) {
+                const sampleDoc = rfqDetails.documents[0];
+                this.logger.debug(
+                    `sendRfqSentEmail: sample document for tenderId=${tenderId}, rfqId=${rfqDetails.id}: docType=${sampleDoc.docType}, path=${sampleDoc.path}`,
+                );
+            }
+
             this.logger.log(
                 `sendRfqSentEmail: tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId} has ${attachmentFiles.length} attachment file(s): ${JSON.stringify(attachmentFiles)}`,
             );

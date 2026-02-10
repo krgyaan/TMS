@@ -252,6 +252,8 @@ export class GmailClient {
     private buildMimeMessage(email: ResolvedEmail): string {
         const textBody = this.htmlToText(email.htmlBody);
         const hasAttachments = email.attachments && email.attachments.length > 0;
+        const shouldLogMimeSummary = process.env.EMAIL_LOG_MIME === '1';
+        const mimeDumpPath = process.env.EMAIL_LOG_MIME_FILE;
 
         // If no attachments, use simple multipart/alternative
         if (!hasAttachments) {
@@ -272,7 +274,23 @@ export class GmailClient {
                 `--${boundary}--`,
             ];
 
-            return parts.join('\r\n');
+            const message = parts.join('\r\n');
+
+            if (shouldLogMimeSummary) {
+                this.logger.debug(
+                    `GmailClient.buildMimeMessage: built multipart/alternative message without attachments (subject="${email.subject}")`,
+                );
+            }
+
+            if (shouldLogMimeSummary && mimeDumpPath) {
+                try {
+                    fs.writeFileSync(mimeDumpPath, message);
+                } catch (e: any) {
+                    this.logger.warn(`GmailClient.buildMimeMessage: failed to write MIME dump file: ${e?.message || e}`);
+                }
+            }
+
+            return message;
         }
 
         // With attachments, use multipart/mixed with nested multipart/alternative
@@ -316,7 +334,26 @@ export class GmailClient {
 
         parts.push(`--${mixedBoundary}--`);
 
-        return parts.join('\r\n');
+        const message = parts.join('\r\n');
+
+        if (shouldLogMimeSummary) {
+            const attachmentNames = email.attachments!.map(a => a.filename);
+            this.logger.debug(
+                `GmailClient.buildMimeMessage: built multipart/mixed message with ${attachmentNames.length} attachment(s): ${attachmentNames.join(
+                    ', ',
+                )}`,
+            );
+        }
+
+        if (shouldLogMimeSummary && mimeDumpPath) {
+            try {
+                fs.writeFileSync(mimeDumpPath, message);
+            } catch (e: any) {
+                this.logger.warn(`GmailClient.buildMimeMessage: failed to write MIME dump file: ${e?.message || e}`);
+            }
+        }
+
+        return message;
     }
 
     /**

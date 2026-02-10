@@ -87,6 +87,7 @@ export class EmailService {
      */
     private resolveAttachments(input: { files: string[]; baseDir?: string }): Array<{ filename: string; path: string }> {
         const attachments: Array<{ filename: string; path: string }> = [];
+        const shouldLogDetails = process.env.EMAIL_LOG_ATTACHMENTS === '1';
 
         const requestedFiles = input.files || [];
         this.logger.debug(`resolveAttachments: requested files = ${JSON.stringify(requestedFiles)}`);
@@ -102,6 +103,19 @@ export class EmailService {
             if (!fs.existsSync(absolutePath)) {
                 this.logger.warn(`Attachment not found on disk for RFQ/tender email: ${finalRelative}`);
                 continue;
+            }
+
+            if (shouldLogDetails) {
+                try {
+                    const stats = fs.statSync(absolutePath);
+                    this.logger.debug(
+                        `resolveAttachments: file="${finalRelative}" absolutePath="${absolutePath}" size=${stats.size} bytes`,
+                    );
+                } catch {
+                    this.logger.debug(
+                        `resolveAttachments: file="${finalRelative}" absolutePath="${absolutePath}" (size unknown - stat failed)`,
+                    );
+                }
             }
 
             attachments.push({
