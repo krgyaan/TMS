@@ -85,7 +85,7 @@ export class RfqsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService
-    ) { }
+    ) {}
 
     /**
      * Build role-based filter conditions for tender queries
@@ -406,12 +406,8 @@ export class RfqsService {
 
         // Return immediately after transaction commits to avoid blocking the HTTP response
         // Background operations (emails, timer transition) run asynchronously
-        this.handleBackgroundOperations(
-            data.tenderId,
-            rfqDetails,
-            changedBy
-        ).catch((error) => {
-            this.logger.error('Background operations failed:', error);
+        this.handleBackgroundOperations(data.tenderId, rfqDetails, changedBy).catch(error => {
+            this.logger.error("Background operations failed:", error);
         });
 
         return rfqDetails;
@@ -421,24 +417,27 @@ export class RfqsService {
      * Handle background operations (emails, timer transition) asynchronously
      * This runs after the HTTP response is returned to avoid blocking and timeout issues
      */
-    private async handleBackgroundOperations(
-        tenderId: number,
-        rfqDetails: RfqDetails,
-        changedBy: number
-    ): Promise<void> {
+    private async handleBackgroundOperations(tenderId: number, rfqDetails: RfqDetails, changedBy: number): Promise<void> {
         try {
             // Send email notification
+
+            this.logger.log("background option logs", {
+                tenderId,
+                rfqDetails,
+                changedBy,
+            });
+
             await this.sendRfqSentEmail(tenderId, rfqDetails, changedBy);
 
             // TIMER TRANSITION: Stop rfq timer
             try {
                 this.logger.log(`Stopping timer for tender ${tenderId} after RFQ sent`);
                 await this.timersService.stopTimer({
-                    entityType: 'TENDER',
+                    entityType: "TENDER",
                     entityId: tenderId,
-                    stage: 'rfq',
+                    stage: "rfq",
                     userId: changedBy,
-                    reason: 'RFQ sent'
+                    reason: "RFQ sent",
                 });
                 this.logger.log(`Successfully stopped rfq timer for tender ${tenderId}`);
             } catch (error) {
@@ -446,7 +445,7 @@ export class RfqsService {
                 // Don't fail the entire operation if timer transition fails
             }
         } catch (error) {
-            this.logger.error('Unexpected error in background operations:', error);
+            this.logger.error("Unexpected error in background operations:", error);
             // Re-throw to be caught by the caller's error handler
             throw error;
         }
@@ -527,7 +526,10 @@ export class RfqsService {
     /**
      * Get counts for all RFQ dashboard tabs
      */
-    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{
+    async getDashboardCounts(
+        user?: ValidatedUser,
+        teamId?: number
+    ): Promise<{
         pending: number;
         sent: number;
         "rfq-rejected": number;
@@ -622,6 +624,8 @@ export class RfqsService {
         recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
+            this.logger.log(`Sending ${eventType} email for tender ${tenderId} to ${recipients.to?.length || 0} recipients`);
+
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType,
@@ -675,10 +679,10 @@ export class RfqsService {
         // Format due date
         const dueDate = rfqDetails.dueDate
             ? new Date(rfqDetails.dueDate).toLocaleDateString("en-IN", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-            })
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+              })
             : "Not specified";
 
         // Check document types
@@ -731,7 +735,7 @@ export class RfqsService {
                     { type: "role", role: "Team Leader", teamId: tender.team },
                     { type: "role", role: "Coordinator", teamId: tender.team },
                 ],
-                // attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             });
         }
     }
