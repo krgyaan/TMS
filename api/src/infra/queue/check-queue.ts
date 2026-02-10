@@ -1,7 +1,12 @@
 import { Queue } from "bullmq";
-import { redisConnection } from "../../config/redis.config";
+import { isRedisEnabled, redisConnection } from "../../config/redis.config";
 
 async function inspect() {
+    if (!isRedisEnabled) {
+        console.log("Redis is disabled in non-production environment; skipping inspect.");
+        process.exit(0);
+    }
+
     const q = new Queue("followup-mail-queue", { connection: redisConnection });
 
     console.log("Waiting:", await q.getWaitingCount());
