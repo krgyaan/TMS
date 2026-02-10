@@ -100,7 +100,6 @@ const navMain: NavGroup[] = [
             { title: "Imprests", url: paths.accounts.imprests, permission: "accounts.imprests" },
             { title: "Financial Docs", url: paths.accounts.financialDocs, permission: "accounts.financial-docs" },
             { title: "Loan & Advances", url: paths.accounts.loanAdvances, permission: "accounts.loan-advances" },
-            { title: "Projects", url: paths.accounts.projects, permission: "accounts.projects" },
             { title: "Accounts Checklists", url: paths.accounts.accountChecklists, permission: "accounts.checklists" },
             { title: "TDS Checklists", url: paths.accounts.tdsChecklists, permission: "accounts.tds-checklists" },
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
@@ -111,6 +110,7 @@ const navMain: NavGroup[] = [
         title: "Document Dashboard",
         icon: FileSearch,
         items: [
+            { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
             { title: "PQR", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
             { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
         ],

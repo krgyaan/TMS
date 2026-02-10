@@ -235,10 +235,6 @@ export const paths = {
         loanParties_create: "/master/loan-parties/create",
         loanParties_edit: (id: number | string) => `/master/loan-parties/${id}/edit`,
 
-        projects: "/master/projects",
-        projects_create: "/master/projects/create",
-        projects_edit: (id: number | string) => `/master/projects/${id}/edit`,
-
         states: "/master/states",
         states_create: "/master/states/create",
         states_edit: (id: number | string) => `/master/states/${id}/edit`,
@@ -282,5 +278,9 @@ export const paths = {
         financeDocumentCreate: "/document-dashboard/finance-document/create",
         financeDocumentEdit: (id: number | string) => `/document-dashboard/finance-document/${id}/edit`,
         financeDocumentView: (id: number | string) => `/document-dashboard/finance-document/${id}`,
+        projects: "/document-dashboard/projects",
+        projectsCreate: "/document-dashboard/projects/create",
+        projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
+        projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
     },
 };
