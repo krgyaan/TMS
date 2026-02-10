@@ -85,8 +85,9 @@ export class TenderApprovalService {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
                 }
             } else {
-                // All other roles: Show only own tenders
-                if (user.sub) {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                } else if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
@@ -229,9 +230,9 @@ export class TenderApprovalService {
                 rejectRemarks: tenderInformation.teRejectionRemarks,
             })
             .from(tenderInfos)
-            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
-            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
-            .innerJoin(items, eq(tenderInfos.item, items.id))
+            .leftJoin(users, eq(tenderInfos.teamMember, users.id))
+            .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause)
             .orderBy(orderByClause)
@@ -239,14 +240,15 @@ export class TenderApprovalService {
             .offset(offset);
         // Execute query
         const rows = (await query) as unknown as TenderRow[];
+        console.log("rows", rows);
 
         // Get total count
         let countQuery: any = this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
-            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
-            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
-            .innerJoin(items, eq(tenderInfos.item, items.id))
+            .leftJoin(users, eq(tenderInfos.teamMember, users.id))
+            .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id));
 
         // Add search joins to count query if search is used
@@ -300,9 +302,9 @@ export class TenderApprovalService {
         const countQuery = this.db
             .select({ count: sql<number>`count(*)` })
             .from(tenderInfos)
-            .innerJoin(users, eq(tenderInfos.teamMember, users.id))
-            .innerJoin(statuses, eq(tenderInfos.status, statuses.id))
-            .innerJoin(items, eq(tenderInfos.item, items.id))
+            .leftJoin(users, eq(tenderInfos.teamMember, users.id))
+            .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause);
 
@@ -339,9 +341,9 @@ export class TenderApprovalService {
 
         const rfqToArray = data.rfqTo
             ? data.rfqTo
-                  .split(",")
-                  .map(Number)
-                  .filter(n => !isNaN(n))
+                .split(",")
+                .map(Number)
+                .filter(n => !isNaN(n))
             : [];
 
         // Fetch incomplete fields
