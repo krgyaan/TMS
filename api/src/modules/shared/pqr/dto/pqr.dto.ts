@@ -12,7 +12,7 @@ export const CreatePqrSchema = z.object({
     uploadSapGemPo: optionalTextField(255),
     completionDate: z.string().min(1, 'Completion date is required'),
     uploadCompletion: optionalTextField(255),
-    uploadPerformanceCertificate: optionalTextField(255),
+    performanceCertificate: optionalTextField(255),
     remarks: optionalTextField(255),
 });
 

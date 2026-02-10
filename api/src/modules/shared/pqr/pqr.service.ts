@@ -33,12 +33,12 @@ export class PqrService {
             value: String(data.value),
             item: data.item ?? null,
             poDate: this.parseDate(data.poDate),
-            uplodePo: data.uploadPo ?? null,
+            uploadPo: data.uploadPo ?? null,
             sapGemPoDate: this.parseDate(data.sapGemPoDate),
-            uplodeSapGemPo: data.uploadSapGemPo ?? null,
+            uploadSapGemPo: data.uploadSapGemPo ?? null,
             completionDate: this.parseDate(data.completionDate),
-            uplodeCompletion: data.uploadCompletion ?? null,
-            performaceCretificate: data.uploadPerformanceCertificate ?? null,
+            uploadCompletion: data.uploadCompletion ?? null,
+            performanceCertificate: data.performanceCertificate ?? null,
             remarks: data.remarks ?? null,
             createdAt: now,
             updatedAt: now,
@@ -52,13 +52,12 @@ export class PqrService {
         if (data.value !== undefined) out.value = String(data.value);
         if (data.item !== undefined) out.item = data.item;
         if (data.poDate !== undefined) out.poDate = this.parseDate(data.poDate);
-        if (data.uploadPo !== undefined) out.uplodePo = data.uploadPo;
+        if (data.uploadPo !== undefined) out.uploadPo = data.uploadPo;
         if (data.sapGemPoDate !== undefined) out.sapGemPoDate = this.parseDate(data.sapGemPoDate);
-        if (data.uploadSapGemPo !== undefined) out.uplodeSapGemPo = data.uploadSapGemPo;
+        if (data.uploadSapGemPo !== undefined) out.uploadSapGemPo = data.uploadSapGemPo;
         if (data.completionDate !== undefined) out.completionDate = this.parseDate(data.completionDate);
-        if (data.uploadCompletion !== undefined) out.uplodeCompletion = data.uploadCompletion;
-        if (data.uploadPerformanceCertificate !== undefined)
-            out.performaceCretificate = data.uploadPerformanceCertificate;
+        if (data.uploadCompletion !== undefined) out.uploadCompletion = data.uploadCompletion;
+        if (data.performanceCertificate !== undefined) out.performanceCertificate = data.performanceCertificate;
         if (data.remarks !== undefined) out.remarks = data.remarks;
         return out as Partial<typeof pqrDocuments.$inferInsert>;
     }
@@ -71,12 +70,12 @@ export class PqrService {
             value: row.value,
             item: row.item,
             poDate: row.poDate,
-            uploadPo: row.uplodePo,
+            uploadPo: row.uploadPo,
             sapGemPoDate: row.sapGemPoDate,
-            uploadSapGemPo: row.uplodeSapGemPo,
+            uploadSapGemPo: row.uploadSapGemPo,
             completionDate: row.completionDate,
-            uploadCompletion: row.uplodeCompletion,
-            uploadPerformanceCertificate: row.performaceCretificate,
+            uploadCompletion: row.uploadCompletion,
+            uploadPerformanceCertificate: row.performanceCertificate,
             remarks: row.remarks,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
