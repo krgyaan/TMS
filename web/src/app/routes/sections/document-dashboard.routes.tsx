@@ -11,10 +11,10 @@ const DocumentDashboard_FinanceDocument = lazy(() => import('@/modules/shared/fi
 const DocumentDashboard_FinanceDocument_Create = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentCreatePage'));
 const DocumentDashboard_FinanceDocument_Edit = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentEditPage'));
 const DocumentDashboard_FinanceDocument_Show = lazy(() => import('@/modules/shared/finance-document/FinanceDocumentShowPage'));
-const DocumentDashboard_Projects = lazy(() => import('@/modules/shared/projects/ProjectsListPage'));
-const DocumentDashboard_Projects_Create = lazy(() => import('@/modules/shared/projects/ProjectsCreatePage'));
-const DocumentDashboard_Projects_Edit = lazy(() => import('@/modules/shared/projects/ProjectsEditPage'));
-const DocumentDashboard_Projects_Show = lazy(() => import('@/modules/shared/projects/ProjectsShowPage'));
+const DocumentDashboard_Projects = lazy(() => import('@/modules/shared/master-project/ProjectsListPage'));
+const DocumentDashboard_Projects_Create = lazy(() => import('@/modules/shared/master-project/ProjectsCreatePage'));
+const DocumentDashboard_Projects_Edit = lazy(() => import('@/modules/shared/master-project/ProjectsEditPage'));
+const DocumentDashboard_Projects_Show = lazy(() => import('@/modules/shared/master-project/ProjectsShowPage'));
 
 export default function DocumentDashboardRoutes() {
     return (

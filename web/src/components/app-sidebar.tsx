@@ -111,7 +111,7 @@ const navMain: NavGroup[] = [
         icon: FileSearch,
         items: [
             { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
-            { title: "PQR", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
+            { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
             { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
         ],
     },
