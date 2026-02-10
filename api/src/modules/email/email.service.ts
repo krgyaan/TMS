@@ -16,7 +16,8 @@ import {
 } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
 import { normalize } from 'path';
-import { basename, join } from 'path';
+import { basename } from 'path';
+import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
 
 @Injectable()
 export class EmailService {
@@ -30,6 +31,7 @@ export class EmailService {
         private readonly gmail: GmailClient,
         private readonly recipientResolver: RecipientResolver,
         private readonly config: ConfigService,
+        private readonly tenderFilesService: TenderFilesService,
     ) {
         this.isProd = this.config.get('NODE_ENV') === 'production';
         const rootDir = this.isProd ? 'dist' : 'src';
@@ -84,16 +86,21 @@ export class EmailService {
      * Resolve attachment file paths
      */
     private resolveAttachments(input: { files: string[]; baseDir?: string }): Array<{ filename: string; path: string }> {
-        const uploadsRoot = join(process.cwd(), 'uploads/tendering/');
         const attachments: Array<{ filename: string; path: string }> = [];
 
-        for (const file of input.files) {
-            const safeName = normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
-            const relativePath = input.baseDir ? join(input.baseDir, safeName) : safeName;
-            const absolutePath = join(uploadsRoot, relativePath);
+        const requestedFiles = input.files || [];
+        this.logger.debug(`resolveAttachments: requested files = ${JSON.stringify(requestedFiles)}`);
+
+        for (const file of requestedFiles) {
+            // Normalize and strip any attempted ../ segments
+            const safeRelative = normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
+            const finalRelative = input.baseDir ? `${input.baseDir}/${safeRelative}` : safeRelative;
+
+            // Delegate to TenderFilesService for absolute path resolution
+            const absolutePath = this.tenderFilesService.getAbsolutePath(finalRelative);
 
             if (!fs.existsSync(absolutePath)) {
-                this.logger.warn(`Attachment not found on disk: ${relativePath}`);
+                this.logger.warn(`Attachment not found on disk for RFQ/tender email: ${finalRelative}`);
                 continue;
             }
 
@@ -102,6 +109,10 @@ export class EmailService {
                 path: absolutePath,
             });
         }
+
+        this.logger.debug(
+            `resolveAttachments: resolved ${attachments.length} attachments out of ${requestedFiles.length} requested`,
+        );
 
         return attachments;
     }
@@ -149,17 +160,33 @@ export class EmailService {
             }
 
             // 5. Render template
-            const htmlBody = this.renderTemplate(options.template, {
+            const templatePayload = {
                 data: {
                     ...options.data,
                     senderName: sender.name,
-                }
-            });
+                },
+            };
+
+            const htmlBody = this.renderTemplate(options.template, templatePayload);
 
             // 5.5. Process attachments if provided
             let resolvedAttachments: Array<{ filename: string; path: string }> | undefined;
             if (options.attachments && options.attachments.files.length > 0) {
+                const totalRequested = options.attachments.files.length;
                 resolvedAttachments = this.resolveAttachments(options.attachments);
+
+                const resolvedCount = resolvedAttachments.length;
+                this.logger.log(
+                    `EmailService.send: resolved ${resolvedCount} attachment(s) out of ${totalRequested} requested for event ${options.eventType} (ref=${options.referenceType}:${options.referenceId})`,
+                );
+
+                if (resolvedCount === 0 && totalRequested > 0) {
+                    this.logger.warn(
+                        `EmailService.send: all requested attachments failed resolution. Requested files: ${JSON.stringify(
+                            options.attachments.files,
+                        )}`,
+                    );
+                }
             }
 
             // 6. Get thread info

@@ -192,6 +192,7 @@ export class GmailClient {
 
             const parts = [
                 headers.join('\r\n'),
+                '',
                 `--${boundary}`,
                 'Content-Type: text/plain; charset=UTF-8',
                 '',
@@ -214,6 +215,7 @@ export class GmailClient {
 
         const parts: string[] = [
             headers.join('\r\n'),
+            '',
             `--${mixedBoundary}`,
             `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
             '',
