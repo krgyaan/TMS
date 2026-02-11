@@ -129,7 +129,7 @@ const BankTransferListPage = () => {
             {
                 field: 'date',
                 headerName: 'Date',
-                width: 110,
+                width: 100,
                 colId: 'date',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -139,10 +139,12 @@ const BankTransferListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             tenderNameCol<BankTransferDashboardRow>('tenderNo', {
                 headerName: 'Tender Name',
                 width: 200,
+                maxWidth: 200,
                 colId: 'tenderNo',
                 sortable: true,
             }),
@@ -158,16 +160,19 @@ const BankTransferListPage = () => {
             {
                 field: 'utrNo',
                 headerName: 'UTR No',
-                width: 150,
+                width: 130,
+                maxWidth: 130,
                 colId: 'utrNo',
                 valueGetter: (params) => params.data?.utrNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             {
                 field: 'accountName',
                 headerName: 'Account Name',
-                width: 150,
+                width: 240,
+                maxWidth: 240,
                 colId: 'accountName',
                 valueGetter: (params) => params.data?.accountName || '—',
                 sortable: true,
@@ -176,7 +181,7 @@ const BankTransferListPage = () => {
             {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 100,
+                width: 120,
                 colId: 'bidValidity',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -190,7 +195,8 @@ const BankTransferListPage = () => {
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
-                width: 140,
+                width: 130,
+                maxWidth: 130,
                 colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
@@ -226,7 +232,7 @@ const BankTransferListPage = () => {
                 width: 57,
             },
         ],
-        [btActions]
+        [btActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {

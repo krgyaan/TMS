@@ -63,11 +63,11 @@ export class BankTransferService {
             );
         } else if (tab === 'returned') {
             conditions.push(
-                inArray(paymentInstruments.action, [3, 4, 5])
+                inArray(paymentInstruments.action, [3])
             );
         } else if (tab === 'settled') {
             conditions.push(
-                inArray(paymentInstruments.action, [6, 7])
+                inArray(paymentInstruments.action, [4])
             );
         }
 
@@ -246,6 +246,12 @@ export class BankTransferService {
         files: Express.Multer.File[],
         user: any,
     ) {
+        this.logger.debug('BT updateAction start', {
+            instrumentId,
+            action: body?.action,
+            bt_req: body?.bt_req,
+        });
+
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -306,64 +312,80 @@ export class BankTransferService {
             updateData.status = BT_STATUSES.SETTLED_WITH_PROJECT;
         }
 
-        await this.db
-            .update(paymentInstruments)
-            .set(updateData)
-            .where(eq(paymentInstruments.id, instrumentId));
-
-        // Handle transfer details update or creation
-        const transferDetailsUpdate: any = {};
-        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
-            if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
-            // Support both payment_datetime (from form) and payment_date (legacy)
-            const paymentDate = body.payment_datetime || body.payment_date;
-            if (paymentDate) transferDetailsUpdate.transactionDate = paymentDate;
-            if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
-            // Support both utr_message (from form) and utr_mgs (legacy)
-            const utrMsg = body.utr_message || body.utr_mgs;
-            if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
-        } else if (body.action === 'returned') {
-            // Support both transfer_date (from form) and return_date (legacy)
-            const returnDate = body.transfer_date || body.return_date;
-            if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
-            // Support both utr_no (from form) and utr_num (legacy)
-            const returnUtr = body.utr_no || body.utr_num;
-            if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
-        } else if (body.action === 'settled') {
-            if (body.action === 'settled') transferDetailsUpdate.action = body.action;
-        }
-
-        if (Object.keys(transferDetailsUpdate).length > 0) {
-            transferDetailsUpdate.updatedAt = new Date();
-
-            const [existingDetails] = await this.db
-                .select()
-                .from(instrumentTransferDetails)
-                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
-                .limit(1);
-
-            if (existingDetails) {
-                await this.db
-                    .update(instrumentTransferDetails)
-                    .set(transferDetailsUpdate)
-                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
-            } else {
-                await this.db.insert(instrumentTransferDetails).values({
-                    instrumentId,
-                    ...transferDetailsUpdate,
-                    createdAt: new Date(),
-                });
+        try {
+            await this.db
+                .update(paymentInstruments)
+                .set(updateData)
+                .where(eq(paymentInstruments.id, instrumentId));
+            // Handle transfer details update or creation
+            const transferDetailsUpdate: any = {};
+            if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+                if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
+                // Support both payment_datetime (from form) and payment_date (legacy)
+                const paymentDateStr = body.payment_datetime || body.payment_date;
+                if (paymentDateStr) {
+                    const paymentDate = new Date(paymentDateStr);
+                    if (isNaN(paymentDate.getTime())) {
+                        throw new BadRequestException('Invalid payment date');
+                    }
+                    transferDetailsUpdate.transactionDate = paymentDate;
+                }
+                if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
+                // Support both utr_message (from form) and utr_mgs (legacy)
+                const utrMsg = body.utr_message || body.utr_mgs;
+                if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
+            } else if (body.action === 'returned') {
+                // Support both transfer_date (from form) and return_date (legacy)
+                const returnDate = body.transfer_date || body.return_date;
+                if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
+                // Support both utr_no (from form) and utr_num (legacy)
+                const returnUtr = body.utr_no || body.utr_num;
+                if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
+            } else if (body.action === 'settled') {
+                if (body.action === 'settled') transferDetailsUpdate.action = body.action;
             }
+
+            if (Object.keys(transferDetailsUpdate).length > 0) {
+                transferDetailsUpdate.updatedAt = new Date();
+
+                const [existingDetails] = await this.db
+                    .select()
+                    .from(instrumentTransferDetails)
+                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                if (existingDetails) {
+                    await this.db
+                        .update(instrumentTransferDetails)
+                        .set(transferDetailsUpdate)
+                        .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+                } else {
+                    await this.db.insert(instrumentTransferDetails).values({
+                        instrumentId,
+                        ...transferDetailsUpdate,
+                        createdAt: new Date(),
+                    });
+                }
+            }
+
+            // Follow-up creation will be handled by a different service class
+
+            this.logger.debug('BT updateAction success', {
+                instrumentId,
+                action: body.action,
+                actionNumber,
+            });
+
+            return {
+                success: true,
+                instrumentId,
+                action: body.action,
+                actionNumber,
+            };
+        } catch (err) {
+            this.logger.error('BT updateAction error', err);
+            throw err;
         }
-
-        // Follow-up creation will be handled by a different service class
-
-        return {
-            success: true,
-            instrumentId,
-            action: body.action,
-            actionNumber,
-        };
     }
 
     async getById(id: number) {

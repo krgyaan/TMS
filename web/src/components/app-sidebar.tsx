@@ -75,10 +75,10 @@ const navMain: NavGroup[] = [
         title: "Services",
         icon: Headset,
         items: [
-            { title: "Customer", url: paths.services.customer, permission: "customers" },
-            { title: "Conference", url: paths.services.conference, permission: "conferences" },
-            { title: "Visit", url: paths.services.visit, permission: "visits" },
-            { title: "AMC", url: paths.services.amc, permission: "amc" },
+            { title: "Customer", url: paths.services.customer, permission: "services.customers" },
+            { title: "Conference", url: paths.services.conference, permission: "services.conferences" },
+            { title: "Visit", url: paths.services.visit, permission: "services.visits" },
+            { title: "AMC", url: paths.services.amc, permission: "services.amc" },
         ],
     },
     {
