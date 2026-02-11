@@ -1,6 +1,6 @@
 // imprest-admin.api.ts
 import api from "@/lib/axios"; // your axios/fetch wrapper
-import type { ImprestPaymentHistoryRow } from "./imprest-admin.types";
+import type { CreateImprestCreditPayload, ImprestPaymentHistoryRow } from "./imprest-admin.types";
 
 export const getEmployeeImprestSummary = async () => {
     console.log("Fetching Employee Imprest Summary...");
@@ -17,5 +17,12 @@ export const getImprestPaymentHistory = async (userId: number): Promise<ImprestP
 
 export const deleteImprestPaymentHistory = async (id: number): Promise<{ success: boolean }> => {
     const { data } = await api.delete(`/accounts/imprest/payment-history/${id}`);
+    return data;
+};
+
+export const createImprestCredit = async (payload: CreateImprestCreditPayload): Promise<{ success: boolean }> => {
+    const { data } = await api.post(`/accounts/imprest/credit`, payload);
+
+    console.log("data call made for credit", { data });
     return data;
 };

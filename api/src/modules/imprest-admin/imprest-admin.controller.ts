@@ -1,4 +1,4 @@
-import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards, Body } from "@nestjs/common";
+import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards, Body, BadRequestException } from "@nestjs/common";
 
 import { ImprestAdminService } from "./imprest-admin.service";
 import { Roles } from "@/modules/auth/decorators/roles.decorator";
@@ -6,6 +6,7 @@ import { RolesGuard } from "@/modules/auth/guards/roles.guard";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { CanRead, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
+import { CreateEmployeeImprestCreditSchema } from "./zod/create-employee-imprest-credit.schema";
 
 @Controller("accounts/imprest")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -110,5 +111,20 @@ export class ImprestAdminController {
     @Roles("admin", "account")
     async delete(@Param("id", ParseIntPipe) id: number) {
         return this.service.delete(id);
+    }
+
+    @Post("credit")
+    @Roles("admin", "account")
+    creditImprest(@Req() req) {
+        const parsed = CreateEmployeeImprestCreditSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return this.service.creditImprest(
+            parsed.data,
+            req.user.sub // admin who paid
+        );
     }
 }

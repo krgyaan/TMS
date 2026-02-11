@@ -8,6 +8,7 @@ import { CreateEmployeeImprestSchema, type CreateEmployeeImprestDto } from "@/mo
 import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { ZodValidationPipe } from "nestjs-zod";
+import { CreateEmployeeImprestCreditSchema } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
 
 // Multer config
 const multerConfig = {

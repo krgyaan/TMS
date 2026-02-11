@@ -11,6 +11,7 @@ import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-
 
 import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
 import { admin } from "googleapis/build/src/apis/admin";
+import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-credit.schema";
 
 @Injectable()
 export class ImprestAdminService {
@@ -437,5 +438,24 @@ export class ImprestAdminService {
         await this.db.delete(employeeImprestTransactions).where(eq(employeeImprestTransactions.id, id));
 
         return { success: true };
+    }
+
+    async creditImprest(data: CreateEmployeeImprestCreditDto, adminUserId: number) {
+        const note = data.projectName ?? `Transferred to ${data.userId}`;
+
+        const [created] = await this.db
+            .insert(employeeImprestTransactions)
+            .values({
+                userId: data.userId,
+                txnDate: data.txnDate,
+                teamMemberName: data.teamMemberName,
+                amount: data.amount,
+                projectName: note,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .returning();
+
+        return created;
     }
 }

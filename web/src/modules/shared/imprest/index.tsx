@@ -111,6 +111,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const { user, hasPermission, canUpdate } = useAuth();
     const { id } = useParams<{ id?: string }>();
     let userDetails = null;
+    const [isMobile, setIsMobile] = useState(false);
 
     const canMutateStatus = canUpdate("shared.imprestss");
 
@@ -119,6 +120,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
     console.log(requestedUserId, isOwnPage);
+
     if (requestedUserId) {
         userDetails = useUser(requestedUserId).data;
     }
@@ -147,6 +149,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const tallyMutation = useTallyImprest();
     const proofMutation = useProofImprest();
 
+    const MOBILE_PAGE_SIZE = 10;
+
+    const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxSlides, setLightboxSlides] = useState<{ src: string }[]>([]);
     const [addProofOpen, setAddProofOpen] = useState(false);
@@ -160,6 +165,14 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const [remarkText, setRemarkText] = useState("");
 
     /* -------------------- HANDLERS -------------------- */
+
+    useEffect(() => {
+        const mq = window.matchMedia("(max-width: 768px)");
+        const handler = () => setIsMobile(mq.matches);
+        handler();
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, []);
 
     const handleDelete = useCallback(
         (row: ImprestRow) => {
@@ -235,6 +248,36 @@ const ImprestEmployeeDashboard: React.FC = () => {
     useEffect(() => {
         console.log("QuickFilter:", searchText);
     }, [searchText]);
+
+    useEffect(() => {
+        setVisibleCount(MOBILE_PAGE_SIZE);
+    }, [rows]);
+
+    const StatusChip = ({
+        done,
+        doneText,
+        pendingText,
+        color,
+        onClick,
+    }: {
+        done: boolean;
+        doneText: string;
+        pendingText: string;
+        color: "green" | "blue" | "purple";
+        onClick: () => void;
+    }) => {
+        const colorMap = {
+            green: done ? "bg-green-100 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+            blue: done ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+            purple: done ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+        };
+
+        return (
+            <button onClick={onClick} className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>
+                {done ? doneText : pendingText}
+            </button>
+        );
+    };
 
     /* -------------------- COLUMNS -------------------- */
 
@@ -352,6 +395,50 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     /* -------------------- RENDER -------------------- */
 
+    const ImprestMobileCard: React.FC<{ row: ImprestRow }> = ({ row }) => {
+        const proofCount = row.invoiceProof.length;
+
+        return (
+            <div className="border rounded-xl p-3 mb-3 bg-background shadow-sm">
+                {/* Top row: Party + Amount */}
+                <div className="flex justify-between items-center">
+                    <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{row.partyName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{row.projectName}</p>
+                    </div>
+                    <p className="font-semibold text-sm tabular-nums">{formatINR(row.amount)}</p>
+                </div>
+
+                {/* Meta row */}
+                <div className="flex justify-between items-center mt-2 text-[11px] text-muted-foreground">
+                    <span>{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
+
+                    {proofCount > 0 && (
+                        <button onClick={() => openLightboxForRow(row)} className="flex items-center gap-1 text-primary">
+                            <Eye className="h-3.5 w-3.5" />
+                            {proofCount} proof{proofCount > 1 && "s"}
+                        </button>
+                    )}
+                </div>
+
+                {/* Status chips */}
+                <div className="flex gap-2 mt-3 flex-wrap">
+                    <StatusChip done={row.approvalStatus === 1} doneText="Approved" pendingText="Approval Pending" color="green" onClick={() => approveMutation.mutate(row.id)} />
+
+                    <StatusChip done={row.tallyStatus === 1} doneText="Tallied" pendingText="Tally Pending" color="blue" onClick={() => tallyMutation.mutate(row.id)} />
+
+                    <StatusChip done={row.proofStatus === 1} doneText="Verified" pendingText="Proof Pending" color="purple" onClick={() => proofMutation.mutate(row.id)} />
+                </div>
+
+                {/* Actions row */}
+                <div className="flex justify-end gap-3 mt-3 pt-2 border-t">
+                    <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
+                    <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                </div>
+            </div>
+        );
+    };
+
     if (isLoading) {
         return (
             <Card>
@@ -379,56 +466,73 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="space-y-1">
-                    <CardTitle>{pageTitle}</CardTitle>
-                    <CardDescription>
-                        {rows.length} {rows.length === 1 ? "record" : "records"}
-                    </CardDescription>
-                </div>
+            <CardHeader className="pb-4">
+                <div className="space-y-3">
+                    {/* Title */}
+                    <div>
+                        <CardTitle>{pageTitle}</CardTitle>
+                        <CardDescription>
+                            {rows.length} {rows.length === 1 ? "record" : "records"}
+                        </CardDescription>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                    <Input
-                        placeholder="Search imprests..."
-                        value={searchText}
-                        onChange={e => {
-                            const value = e.target.value;
-                            setSearchText(value);
-                            gridApi?.setGridOption("quickFilterText", value);
-                        }}
-                        className="w-64"
-                    />
+                    {/* Controls */}
+                    <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row items-center justify-between")}>
+                        {/* Search */}
+                        <Input
+                            placeholder="Search imprests..."
+                            value={searchText}
+                            onChange={e => {
+                                const value = e.target.value;
+                                setSearchText(value);
+                                gridApi?.setGridOption("quickFilterText", value);
+                            }}
+                            className={cn(isMobile ? "w-full" : "w-64")}
+                        />
 
-                    <Button variant="outline" size="sm" onClick={exportExcel}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                    </Button>
-                    <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Imprest
-                    </Button>
+                        {/* Buttons */}
+                        <div className={cn("flex gap-2", isMobile ? "w-full" : "items-center")}>
+                            <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className={cn(isMobile && "flex-1")}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Imprest
+                            </Button>
+
+                            <Button variant="outline" size="sm" onClick={exportExcel} className={cn(isMobile && "flex-1")}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Export
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </CardHeader>
 
             <CardContent>
-                <DataTable
-                    data={rows}
-                    columnDefs={columns}
-                    onGridReady={params => {
-                        setGridApi(params.api);
-                        params.api.setQuickFilter(searchText);
-                    }}
-                    gridOptions={{
-                        pagination: true,
-                        paginationPageSize: 20,
-                        rowHeight: 48,
-                        headerHeight: 44,
-                        suppressCellFocus: true,
-                        onGridReady: params => {
+                {isMobile ? (
+                    <div className="mt-2">
+                        {rows.map(row => (
+                            <ImprestMobileCard key={row.id} row={row} />
+                        ))}
+                    </div>
+                ) : (
+                    <DataTable
+                        data={rows}
+                        columnDefs={columns}
+                        onGridReady={params => {
                             setGridApi(params.api);
-                        },
-                    }}
-                />
+                            params.api.setQuickFilter(searchText);
+                        }}
+                        gridOptions={{
+                            pagination: true,
+                            paginationPageSize: 20,
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            suppressCellFocus: true,
+                            onGridReady: params => {
+                                setGridApi(params.api);
+                            },
+                        }}
+                    />
+                )}
             </CardContent>
 
             {/* Upload Proof Dialog */}
