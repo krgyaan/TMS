@@ -10,7 +10,6 @@ import {
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
-import { teams } from '@db/schemas/master/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
@@ -62,11 +61,11 @@ export class PayOnPortalService {
             );
         } else if (tab === 'returned') {
             conditions.push(
-                inArray(paymentInstruments.action, [3, 4, 5])
+                inArray(paymentInstruments.action, [3])
             );
         } else if (tab === 'settled') {
             conditions.push(
-                inArray(paymentInstruments.action, [6, 7])
+                inArray(paymentInstruments.action, [4])
             );
         }
 
@@ -314,21 +313,39 @@ export class PayOnPortalService {
             if (body.portal_name) transferDetailsUpdate.portalName = body.portal_name;
             if (body.amount) transferDetailsUpdate.amount = body.amount;
             // Support both payment_datetime (from form) and payment_date (legacy)
-            const paymentDate = body.payment_datetime || body.payment_date;
-            if (paymentDate) transferDetailsUpdate.transactionDate = paymentDate;
+            const paymentDateStr = body.payment_datetime || body.payment_date;
+            if (paymentDateStr) {
+                const paymentDate = new Date(paymentDateStr);
+                if (isNaN(paymentDate.getTime())) {
+                    throw new BadRequestException('Invalid payment date');
+                }
+                transferDetailsUpdate.transactionDate = paymentDate;
+            }
             if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
             // Support both utr_message (from form) and utr_mgs (legacy)
             const utrMsg = body.utr_message || body.utr_mgs;
             if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
         } else if (body.action === 'returned') {
             // Support both transfer_date (from form) and return_date (legacy)
-            const returnDate = body.transfer_date || body.return_date;
-            if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
+            const returnDateStr = body.transfer_date || body.return_date;
+            if (returnDateStr) {
+                const returnDate = new Date(returnDateStr);
+                if (isNaN(returnDate.getTime())) {
+                    throw new BadRequestException('Invalid return date');
+                }
+                transferDetailsUpdate.returnTransferDate = returnDate;
+            }
             if (body.return_reason) transferDetailsUpdate.reason = body.return_reason;
             if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
             if (body.utr_no) transferDetailsUpdate.returnUtr = body.utr_no;
         } else if (body.action === 'settled') {
-            if (body.settlement_date) transferDetailsUpdate.transactionDate = body.settlement_date;
+            if (body.settlement_date) {
+                const settlementDate = new Date(body.settlement_date);
+                if (isNaN(settlementDate.getTime())) {
+                    throw new BadRequestException('Invalid settlement date');
+                }
+                transferDetailsUpdate.transactionDate = settlementDate;
+            }
             if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
             if (body.settlement_reference_no) transferDetailsUpdate.transactionId = body.settlement_reference_no;
         }
@@ -359,7 +376,6 @@ export class PayOnPortalService {
         }
 
         // Follow-up creation will be handled by a different service class
-
         return {
             success: true,
             instrumentId,

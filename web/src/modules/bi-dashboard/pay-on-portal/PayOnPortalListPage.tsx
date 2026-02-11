@@ -139,10 +139,12 @@ const PayOnPortalListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             tenderNameCol<PayOnPortalDashboardRow>('tenderNo', {
                 headerName: 'Tender Name',
                 width: 200,
+                maxWidth: 200,
                 colId: 'tenderNo',
                 sortable: true,
             }),
@@ -150,6 +152,7 @@ const PayOnPortalListPage = () => {
                 field: 'teamMember',
                 headerName: 'Team Member',
                 width: 140,
+                maxWidth: 140,
                 colId: 'teamMember',
                 valueGetter: (params) => params.data?.teamMember || '—',
                 sortable: true,
@@ -159,6 +162,7 @@ const PayOnPortalListPage = () => {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
                 width: 140,
+                maxWidth: 140,
                 colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
@@ -168,15 +172,17 @@ const PayOnPortalListPage = () => {
                 field: 'utrNo',
                 headerName: 'UTR No',
                 width: 150,
+                maxWidth: 150,
                 colId: 'utrNo',
                 valueGetter: (params) => params.data?.utrNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             {
                 field: 'portalName',
                 headerName: 'Portal Name',
-                maxWidth: 120,
+                width: 120,
                 colId: 'portalName',
                 valueGetter: (params) => params.data?.portalName || '—',
                 sortable: true,
@@ -186,6 +192,7 @@ const PayOnPortalListPage = () => {
                 field: 'amount',
                 headerName: 'Amount',
                 width: 110,
+                maxWidth: 110,
                 colId: 'amount',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
@@ -194,6 +201,7 @@ const PayOnPortalListPage = () => {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
                 width: 130,
+                maxWidth: 130,
                 colId: 'bidValidity',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -226,7 +234,7 @@ const PayOnPortalListPage = () => {
                 width: 57,
             },
         ],
-        [popActions]
+        [popActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
