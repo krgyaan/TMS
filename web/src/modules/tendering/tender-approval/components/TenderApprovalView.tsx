@@ -5,7 +5,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { dummyTechnicalDocuments, dummyFinancialDocuments } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 
 // Helper function to map document IDs to names
 const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
@@ -85,6 +85,8 @@ export function TenderApprovalView({
     className = '',
 }: TenderApprovalViewProps) {
     const approval = tender.approval;
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     if (isLoading) {
         return (
@@ -271,7 +273,7 @@ export function TenderApprovalView({
                                             Alternative Technical Documents
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeTechnicalDocs, dummyTechnicalDocuments))}
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeTechnicalDocs, pqrOptions))}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -281,7 +283,7 @@ export function TenderApprovalView({
                                             Alternative Financial Documents
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeFinancialDocs, dummyFinancialDocuments))}
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeFinancialDocs, financeDocumentOptions))}
                                         </TableCell>
                                     </TableRow>
                                 )}

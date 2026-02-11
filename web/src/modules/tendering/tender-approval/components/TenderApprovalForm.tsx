@@ -24,7 +24,7 @@ import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/te
 import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
-import { dummyFinancialDocuments, dummyTechnicalDocuments } from '../../info-sheet/helpers/tenderInfoSheet.types';
+import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 
 interface TenderApprovalFormProps {
     tenderId: number;
@@ -94,6 +94,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const { data: statuses, isLoading: isStatusesLoading } = useStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     const isSubmitting = createApproval.isPending || updateApproval.isPending;
     const isPageLoading = isParentLoading || isVendorOrgsLoading || isStatusesLoading;
@@ -439,7 +441,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                             control={form.control}
                                                             name="alternativeTechnicalDocs"
                                                             label="Alternative Technical Docs"
-                                                            options={dummyTechnicalDocuments}
+                                                            options={pqrOptions}
                                                             placeholder="Select documents"
                                                         />
                                                         {form.formState.errors.alternativeTechnicalDocs && (
@@ -469,7 +471,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                             control={form.control}
                                                             name="alternativeFinancialDocs"
                                                             label="Alternative Financial Docs"
-                                                            options={dummyFinancialDocuments}
+                                                            options={financeDocumentOptions}
                                                             placeholder="Select documents"
                                                         />
                                                         {form.formState.errors.alternativeFinancialDocs && (

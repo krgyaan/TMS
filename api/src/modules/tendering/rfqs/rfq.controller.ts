@@ -14,7 +14,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
-import type { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
+import type { CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -115,5 +115,14 @@ export class RfqsController {
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.rfqsService.delete(id);
+    }
+
+    @Post(':rfqId/responses')
+    @HttpCode(HttpStatus.CREATED)
+    async createResponse(
+        @Param('rfqId', ParseIntPipe) rfqId: number,
+        @Body() body: CreateRfqResponseBodyDto,
+    ) {
+        return this.rfqsService.createResponse(rfqId, body);
     }
 }

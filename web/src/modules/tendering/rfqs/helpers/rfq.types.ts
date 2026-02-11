@@ -104,6 +104,26 @@ export interface UpdateRfqDto {
     }>;
 }
 
+/** Request body for POST /rfqs/:rfqId/responses */
+export interface CreateRfqResponseBodyDto {
+    vendorId: number;
+    receiptDatetime: string;
+    gstPercentage?: number;
+    gstType?: string;
+    deliveryTime?: number;
+    freightType?: string;
+    notes?: string;
+    items: Array<{
+        itemId: number;
+        requirement: string;
+        unit?: string;
+        qty?: number;
+        unitPrice?: number;
+        totalPrice?: number;
+    }>;
+    documents?: Array<{ docType: string; path: string; metadata?: any }>;
+}
+
 // Re-export form value types
 export type { RfqFormValues };
 

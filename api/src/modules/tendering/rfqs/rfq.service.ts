@@ -6,11 +6,24 @@ import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { tenderStatusHistory } from "@db/schemas/tendering/tender-status-history.schema";
-import { NewRfq, rfqs, rfqItems, rfqDocuments, NewRfqItem, NewRfqDocument } from "@db/schemas/tendering/rfqs.schema";
+import {
+    NewRfq,
+    rfqs,
+    rfqItems,
+    rfqDocuments,
+    NewRfqItem,
+    NewRfqDocument,
+    rfqResponses,
+    rfqResponseItems,
+    rfqResponseDocuments,
+    NewRfqResponse,
+    NewRfqResponseItem,
+    NewRfqResponseDocument,
+} from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@db/schemas/vendors/vendors.schema";
-import { CreateRfqDto, UpdateRfqDto } from "./dto/rfq.dto";
+import { CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from "./dto/rfq.dto";
 import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
@@ -537,6 +550,51 @@ export class RfqsService {
         }
 
         return result;
+    }
+
+    async createResponse(rfqId: number, data: CreateRfqResponseBodyDto) {
+        const rfq = await this.findById(rfqId);
+        if (!rfq) {
+            throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
+        }
+
+        const responseData: NewRfqResponse = {
+            rfqId,
+            vendorId: data.vendorId,
+            receiptDatetime: new Date(data.receiptDatetime),
+            gstPercentage: data.gstPercentage != null ? String(data.gstPercentage) : null,
+            gstType: data.gstType ?? null,
+            deliveryTime: data.deliveryTime ?? null,
+            freightType: data.freightType ?? null,
+            notes: data.notes ?? null,
+        };
+
+        const [newResponse] = await this.db.insert(rfqResponses).values(responseData).returning();
+
+        if (data.items && data.items.length > 0) {
+            const itemsData: NewRfqResponseItem[] = data.items.map(item => ({
+                rfqResponseId: newResponse.id,
+                rfqItemId: item.itemId,
+                requirement: item.requirement,
+                unit: item.unit ?? null,
+                qty: item.qty != null ? String(item.qty) : null,
+                unitPrice: item.unitPrice != null ? String(item.unitPrice) : null,
+                totalPrice: item.totalPrice != null ? String(item.totalPrice) : null,
+            }));
+            await this.db.insert(rfqResponseItems).values(itemsData);
+        }
+
+        if (data.documents && data.documents.length > 0) {
+            const documentsData: NewRfqResponseDocument[] = data.documents.map(doc => ({
+                rfqResponseId: newResponse.id,
+                docType: doc.docType,
+                path: doc.path.length > 255 ? doc.path.slice(0, 255) : doc.path,
+                metadata: doc.metadata ?? {},
+            }));
+            await this.db.insert(rfqResponseDocuments).values(documentsData);
+        }
+
+        return { id: newResponse.id, rfqId, vendorId: data.vendorId };
     }
 
     async delete(id: number): Promise<void> {

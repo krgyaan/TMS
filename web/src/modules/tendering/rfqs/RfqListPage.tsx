@@ -10,7 +10,7 @@ import { paths } from '@/app/routes/paths';
 import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
@@ -67,7 +67,15 @@ const Rfqs = () => {
 
     const deleteMutation = useDeleteRfq();
 
-    const rfqsActions: ActionItem<RfqDashboardRowWithTimer>[] = [
+    const rfqsActions = useMemo<ActionItem<RfqDashboardRowWithTimer>[]>(() => [
+        {
+            label: 'Record Receipt',
+            onClick: (row: RfqDashboardRowWithTimer) => {
+                if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
+            },
+            icon: <ClipboardList className="h-4 w-4" />,
+            visible: (row: RfqDashboardRowWithTimer) => activeTab === 'sent' && row.rfqId != null,
+        },
         {
             label: 'Change Status',
             onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
@@ -93,9 +101,8 @@ const Rfqs = () => {
                 }
             },
             icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: RfqDashboardRowWithTimer) => row.rfqId !== null,
         },
-    ];
+    ], [activeTab, navigate, deleteMutation]);
 
     const tabsConfig = useMemo(() => {
         return [

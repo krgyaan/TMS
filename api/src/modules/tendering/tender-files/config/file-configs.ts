@@ -11,6 +11,10 @@ export type TenderFileContext =
     | 'rfq-detailed-boq'
     | 'rfq-maf-format'
     | 'rfq-mii-format'
+    | 'rfq-response-quotation'
+    | 'rfq-response-technical'
+    | 'rfq-response-maf'
+    | 'rfq-response-mii'
     | 'info-sheets'
     | 'costing-sheets'
     | 'bid-submitted-docs'
@@ -200,6 +204,46 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     'rfq-mii-format': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-response-quotation': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-response-technical': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-response-maf': {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'rfq-response-mii': {
         maxFiles: 3,
         maxSizeBytes: MB(25),
         allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
