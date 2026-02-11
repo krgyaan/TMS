@@ -6,6 +6,8 @@ import { useWebsites } from './api/useWebsites';
 import { useItems } from './api/useItems';
 import { useStatuses } from './api/useStatuses';
 import { useGetTeamMembers } from './api/useUsers';
+import { usePqrs } from './api/usePqrs';
+import { useFinanceDocuments } from './api/useFinanceDocuments';
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -67,6 +69,49 @@ export function useStatusOptions(status: boolean = true) {
     return useMemo(
         () => statuses.filter((s) => s.status === status).map((s) => ({ id: String(s.id), name: s.name })),
         [statuses]
+    );
+}
+
+export function useDnbStatusOptions() {
+    const { data: statuses = [] } = useStatuses();
+
+    return useMemo(
+        () => statuses
+            .filter((s) => s.tenderCategory === 'dnb' && s.status === true)
+            .map((s) => ({ value: String(s.id), label: s.name })),
+        [statuses]
+    );
+}
+
+export function usePqrOptions() {
+    const { data: apiResponse } = usePqrs({ page: 1, limit: 100 });
+
+    return useMemo(
+        () => {
+            const pqrs = apiResponse?.data ?? [];
+            return pqrs.map((pqr) => {
+                const label = pqr.projectName
+                    ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
+                    : `PQR ${pqr.id}`;
+                return { value: String(pqr.id), label };
+            });
+        },
+        [apiResponse]
+    );
+}
+
+export function useFinanceDocumentOptions() {
+    const { data: apiResponse } = useFinanceDocuments({ page: 1, limit: 100 });
+
+    return useMemo(
+        () => {
+            const documents = apiResponse?.data ?? [];
+            return documents.map((doc) => ({
+                value: String(doc.id),
+                label: doc.documentName || `Document ${doc.id}`,
+            }));
+        },
+        [apiResponse]
     );
 }
 

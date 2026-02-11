@@ -43,10 +43,8 @@ import {
     scOptions,
     wcOptions,
     nwOptions,
-    rejectionReasonOptions,
-    dummyTechnicalDocuments,
-    dummyFinancialDocuments,
 } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
@@ -81,6 +79,9 @@ export function TenderInformationForm({
 }: TenderInformationFormProps) {
     const navigate = useNavigate();
     const { data: approvalData } = useTenderApproval(tenderId);
+    const rejectionReasonOptions = useDnbStatusOptions();
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     const initialFormValues = useMemo(() => {
         if (mode === 'create') {
@@ -278,10 +279,7 @@ export function TenderInformationForm({
                                                 control={form.control}
                                                 name="teRejectionReason"
                                                 label="Reason of Rejection"
-                                                options={rejectionReasonOptions.map(option => ({
-                                                    value: String(option.value),
-                                                    label: option.label
-                                                }))}
+                                                options={rejectionReasonOptions}
                                                 placeholder="Select rejection reason"
                                             />
                                             {getIncompleteFieldComment('teRejectionReason') && (
@@ -1008,7 +1006,7 @@ export function TenderInformationForm({
                                         control={form.control}
                                         name="technicalWorkOrders"
                                         label="PO Selected for Technical Eligibility"
-                                        options={dummyTechnicalDocuments}
+                                        options={pqrOptions}
                                         placeholder="Select documents"
                                     />
                                     {getIncompleteFieldComment('technicalWorkOrders') && (
@@ -1020,7 +1018,7 @@ export function TenderInformationForm({
                                         control={form.control}
                                         name="commercialDocuments"
                                         label="Financial PQC Documents"
-                                        options={dummyFinancialDocuments}
+                                        options={financeDocumentOptions}
                                         placeholder="Select documents"
                                     />
                                     {getIncompleteFieldComment('commercialDocuments') && (
