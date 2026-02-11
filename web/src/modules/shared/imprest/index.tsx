@@ -466,34 +466,42 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="space-y-1">
-                    <CardTitle>{pageTitle}</CardTitle>
-                    <CardDescription>
-                        {rows.length} {rows.length === 1 ? "record" : "records"}
-                    </CardDescription>
-                </div>
+            <CardHeader className="pb-4">
+                <div className="space-y-3">
+                    {/* Title */}
+                    <div>
+                        <CardTitle>{pageTitle}</CardTitle>
+                        <CardDescription>
+                            {rows.length} {rows.length === 1 ? "record" : "records"}
+                        </CardDescription>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                    <Input
-                        placeholder="Search imprests..."
-                        value={searchText}
-                        onChange={e => {
-                            const value = e.target.value;
-                            setSearchText(value);
-                            gridApi?.setGridOption("quickFilterText", value);
-                        }}
-                        className="w-64"
-                    />
-                    <div className="flex flex-col gap-2 md:flex-row md:gap-2">
-                        <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Imprest
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={exportExcel}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Export
-                        </Button>
+                    {/* Controls */}
+                    <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row items-center justify-between")}>
+                        {/* Search */}
+                        <Input
+                            placeholder="Search imprests..."
+                            value={searchText}
+                            onChange={e => {
+                                const value = e.target.value;
+                                setSearchText(value);
+                                gridApi?.setGridOption("quickFilterText", value);
+                            }}
+                            className={cn(isMobile ? "w-full" : "w-64")}
+                        />
+
+                        {/* Buttons */}
+                        <div className={cn("flex gap-2", isMobile ? "w-full" : "items-center")}>
+                            <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className={cn(isMobile && "flex-1")}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Imprest
+                            </Button>
+
+                            <Button variant="outline" size="sm" onClick={exportExcel} className={cn(isMobile && "flex-1")}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Export
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </CardHeader>
