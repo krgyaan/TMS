@@ -136,14 +136,13 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 1: When Accepted, cheque_no, receiving_cheque_handed_over, cheque_images, positive_pay_confirmation, remarks are required
         if (data.action === 'accounts-form-1' && data.cheque_req === 'Accepted') {
-            return !!data.cheque_no && !!data.receiving_cheque_handed_over && 
-                   data.cheque_images && data.cheque_images.length > 0 && 
-                   !!data.positive_pay_confirmation && !!data.remarks;
+            return !!data.cheque_no && !!data.receiving_cheque_handed_over &&
+                data.cheque_images && data.cheque_images.length > 0;
         }
         return true;
     },
     {
-        message: 'Cheque number, receiving cheque handed over, cheque images, positive pay confirmation, and remarks are required when accepted',
+        message: 'Cheque number, receiving cheque handed over, and cheque images are required when accepted',
         path: ['cheque_no'],
     }
 ).refine(

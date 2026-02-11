@@ -139,6 +139,7 @@ const DemandDraftListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             {
                 field: 'ddNo',
@@ -148,11 +149,13 @@ const DemandDraftListPage = () => {
                 valueGetter: (params) => params.data?.ddNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             tenderNameCol<DemandDraftDashboardRow>('tenderNo', {
                 headerName: 'Tender Details',
                 filter: true,
                 width: 200,
+                maxWidth: 200,
                 sortable: true,
             }),
             {
@@ -163,6 +166,7 @@ const DemandDraftListPage = () => {
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
+                maxWidth: 130,
             },
             {
                 field: 'beneficiaryName',
@@ -177,6 +181,7 @@ const DemandDraftListPage = () => {
                 field: 'ddAmount',
                 headerName: 'DD Amount',
                 width: 120,
+                maxWidth: 120,
                 colId: 'ddAmount',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
@@ -185,6 +190,7 @@ const DemandDraftListPage = () => {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
                 width: 110,
+                maxWidth: 110,
                 colId: 'bidValidity',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -200,6 +206,7 @@ const DemandDraftListPage = () => {
                 field: 'teamMember',
                 headerName: 'Member',
                 width: 120,
+                maxWidth: 120,
                 colId: 'teamMember',
                 valueGetter: (params) => params.data?.teamMember || '—',
                 sortable: true,
@@ -209,6 +216,7 @@ const DemandDraftListPage = () => {
                 field: 'expiry',
                 headerName: 'Expiry',
                 width: 90,
+                maxWidth: 90,
                 colId: 'expiry',
                 sortable: true,
                 valueGetter: (params) => params.data?.expiry || '—',
@@ -222,6 +230,7 @@ const DemandDraftListPage = () => {
                 field: 'ddStatus',
                 headerName: 'DD Status',
                 width: 130,
+                maxWidth: 130,
                 colId: 'ddStatus',
                 sortable: true,
                 filter: true,
@@ -240,7 +249,7 @@ const DemandDraftListPage = () => {
                 width: 57,
             },
         ],
-        [ddActions]
+        [ddActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {

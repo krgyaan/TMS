@@ -19,7 +19,7 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     reason_req: z.string().optional(),
     dd_no: z.string().optional(),
     dd_date: z.string().optional(),
-    req_no: z.number(),
+    req_no: z.coerce.number().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),

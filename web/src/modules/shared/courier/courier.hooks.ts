@@ -50,7 +50,6 @@ export const useMyCouriers = () => {
 
 export const useCourierOptions = () => {
     const { data: courier = [] } = useAllCouriers();
-    console.log("courier", courier);
     return useMemo(
         () =>
             Array.isArray(courier)
