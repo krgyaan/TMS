@@ -594,6 +594,22 @@ export interface CreateFinancialYearDto {
 
 export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
 
+// ========== FINANCE DOC TYPE ==========
+export interface FinanceDocType {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateFinanceDocTypeDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateFinanceDocTypeDto extends Partial<CreateFinanceDocTypeDto> { }
+
 // ========== LEAD TYPES ==========
 export interface LeadType {
     id: number;

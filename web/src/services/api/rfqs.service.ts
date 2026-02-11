@@ -39,8 +39,8 @@ class RfqsService extends BaseApiService {
         return this.get<Rfq>(`/${id}`);
     }
 
-    async getByTenderId(tenderId: number): Promise<Rfq> {
-        return this.get<Rfq>(`/by-tender/${tenderId}`);
+    async getByTenderId(tenderId: number): Promise<Rfq[]> {
+        return this.get<Rfq[]>(`/by-tender/${tenderId}`);
     }
 
     async create(data: CreateRfqDto): Promise<Rfq> {

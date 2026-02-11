@@ -64,6 +64,8 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { FinancialYearModule } from "@/modules/master/financial-year/financial-year.module";
+import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
 import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
@@ -78,8 +80,10 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { WorkOrderModule } from "@/modules/operations/work-order/work-order.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
-import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { PqrModule } from "@/modules/shared/pqr/pqr.module";
+import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
+import { ProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -158,6 +162,8 @@ import { LoggerModule } from "@/logger/logger.module";
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        FinancialYearModule,
+        FinanceDocTypeModule,
         TenderExecutivePerformanceModule,
         TeamLeaderPerformanceModule,
         OemDashboardModule,
@@ -171,8 +177,10 @@ import { LoggerModule } from "@/logger/logger.module";
         WorkOrderModule,
         KickOffMeetingModule,
         ProjectsModule,
-        ProjectsMasterModule,
         FollowupSchedulerModule,
+        PqrModule,
+        FinanceDocumentsModule,
+        ProjectsMasterModule,
         // BusinessPerformanceModule,
     ],
     controllers: [AppController],

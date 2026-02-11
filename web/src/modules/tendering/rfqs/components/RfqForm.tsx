@@ -82,11 +82,6 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     // const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
     const { data: allVendorOrganizations, isLoading: isLoadingVendors, error: vendorOrgsError } = useVendorOrganizationsWithRelations();
 
-    // Debug logging
-    console.log('allVendorOrganizations:', allVendorOrganizations);
-    console.log('isLoadingVendors:', isLoadingVendors);
-    console.log('vendorOrgsError:', vendorOrgsError);
-
     const isEditMode = !!initialData;
     const isSubmitting = createRfq.isPending || updateRfq.isPending;
 

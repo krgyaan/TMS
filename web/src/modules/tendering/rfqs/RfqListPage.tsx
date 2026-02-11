@@ -145,6 +145,24 @@ const Rfqs = () => {
             colId: 'dueDate',
         }),
         {
+            field: 'rfqCount',
+            headerName: 'Total RFQs',
+            width: 120,
+            colId: 'rfqCount',
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const count = data?.rfqCount ?? 0;
+                return (
+                    <Badge variant="outline">
+                        {count} sent
+                    </Badge>
+                );
+            },
+            visible: activeTab === 'sent',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
             width: 150,

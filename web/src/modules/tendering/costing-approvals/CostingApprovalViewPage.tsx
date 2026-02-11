@@ -145,7 +145,7 @@ export default function CostingApprovalViewPage() {
                 {/* RFQ */}
                 <TabsContent value="rfq">
                     <RfqView
-                        rfq={rfq || null}
+                        rfq={Array.isArray(rfq) && rfq.length > 0 ? rfq[0] : null}
                         tender={tender || undefined}
                         isLoading={rfqLoading}
                     />

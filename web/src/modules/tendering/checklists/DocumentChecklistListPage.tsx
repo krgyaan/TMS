@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Pencil, Plus, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -66,18 +66,15 @@ const Checklists = () => {
 
     const checklistActions: ActionItem<TenderDocumentChecklistDashboardRowWithTimer>[] = [
         {
-            label: 'Create',
+            label: 'Sumbit',
             onClick: (row: TenderDocumentChecklistDashboardRow) => {
-                navigate(paths.tendering.documentChecklistCreate(row.tenderId));
+                if (row.checklistSubmitted) {
+                    navigate(paths.tendering.documentChecklistEdit(row.tenderId));
+                } else {
+                    navigate(paths.tendering.documentChecklistCreate(row.tenderId));
+                }
             },
-            icon: <Plus className="h-4 w-4" />,
-        },
-        {
-            label: 'Edit',
-            onClick: (row: TenderDocumentChecklistDashboardRow) => {
-                navigate(paths.tendering.documentChecklistEdit(row.tenderId));
-            },
-            icon: <Pencil className="h-4 w-4" />,
+            icon: <Send className="h-4 w-4" />,
         },
         {
             label: 'View',

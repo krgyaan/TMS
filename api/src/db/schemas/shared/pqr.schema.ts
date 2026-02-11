@@ -9,15 +9,15 @@ export const pqrDocuments = pgTable("pqr_documents", {
     item: varchar("item", { length: 255 }),
 
     poDate: date("po_date"),
-    uplodePo: varchar("po_document", { length: 255 }),
+    uploadPo: varchar("po_document", { length: 255 }),
 
     sapGemPoDate: date("sap_gem_po_date"),
-    uplodeSapGemPo: varchar("sap_gem_po_document", { length: 255 }),
+    uploadSapGemPo: varchar("sap_gem_po_document", { length: 255 }),
 
     completionDate: date("completion_date"),
-    uplodeCompletion: varchar("completion_document", { length: 255 }),
+    uploadCompletion: varchar("completion_document", { length: 255 }),
 
-    performaceCretificate: varchar("performace_certificate", { length: 255 }),
+    performanceCertificate: varchar("performance_certificate", { length: 255 }),
     remarks: varchar("remarks", { length: 255 }),
 
     createdAt: timestamp("created_at", { withTimezone: false }),

@@ -50,7 +50,12 @@ export type TenderFileContext =
     | 'cheque-covering-letter'
     | 'cheque-cancelled-image'
     | 'cheque-receiving-handed-over'
-    | 'cheque-positive-pay-confirmation';
+    | 'cheque-positive-pay-confirmation'
+    | 'pqr-po'
+    | 'pqr-sap-gem-po'
+    | 'pqr-completion'
+    | 'pqr-performance-certificate'
+    | 'finance-document';
 
 export interface FileConfig {
     maxFiles: number;
@@ -603,6 +608,56 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'pqr-po': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'pqr-sap-gem-po': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'pqr-completion': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'pqr-performance-certificate': {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    'finance-document': {
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,

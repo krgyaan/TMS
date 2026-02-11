@@ -21,8 +21,8 @@ export const useTenderApprovals = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    // Pass effective teamId for both 'all' (admin) and 'team' scopes; for 'self' it will be null
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params: TenderApprovalFilters = {
         ...(tabKey && { tabKey }),
@@ -98,9 +98,9 @@ export const useUpdateTenderApproval = () => {
 
 export const useTenderApprovalsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...tenderApprovalsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<TenderApprovalDashboardCounts>({
         queryKey,
         queryFn: () => tenderApprovalsService.getDashboardCounts(teamIdParam),

@@ -50,7 +50,12 @@ export type TenderFileContext =
     | 'cheque-covering-letter'
     | 'cheque-cancelled-image'
     | 'cheque-receiving-handed-over'
-    | 'cheque-positive-pay-confirmation';
+    | 'cheque-positive-pay-confirmation'
+    | 'pqr-po'
+    | 'pqr-sap-gem-po'
+    | 'pqr-completion'
+    | 'pqr-performance-certificate'
+    | 'finance-document';
 
 export interface FileConfig {
     context: string;

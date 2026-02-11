@@ -37,11 +37,11 @@ export const useRfqByTenderId = (tenderId: number | null) => {
         queryKey: rfqsKey.byTender(tenderId ?? 0),
         queryFn: async () => {
             try {
-                return await rfqsService.getByTenderId(tenderId ?? 0);
+                const list = await rfqsService.getByTenderId(tenderId ?? 0);
+                return Array.isArray(list) ? list : [];
             } catch (error: any) {
-                // Handle 404 gracefully - return null if resource doesn't exist
                 if (error?.response?.status === 404) {
-                    return null;
+                    return [];
                 }
                 throw error;
             }
