@@ -64,6 +64,7 @@ export type UpdateRfqDto = z.infer<typeof UpdateRfqSchema>;
  * RFQ Response Item Schema - Based on rfqResponseItems table
  */
 export const RfqResponseItemSchema = z.object({
+    itemId: bigintField().positive('RFQ item ID is required'),
     requirement: textField().min(1, 'Requirement is required'),
     unit: optionalTextField(64),
     qty: optionalNumber(z.coerce.number().nonnegative()),
@@ -90,6 +91,12 @@ export const CreateRfqResponseSchema = z.object({
 });
 
 export type CreateRfqResponseDto = z.infer<typeof CreateRfqResponseSchema>;
+
+/**
+ * Body for POST /rfqs/:rfqId/responses (rfqId comes from URL)
+ */
+export const CreateRfqResponseBodySchema = CreateRfqResponseSchema.omit({ rfqId: true });
+export type CreateRfqResponseBodyDto = z.infer<typeof CreateRfqResponseBodySchema>;
 
 /**
  * Update RFQ Response Schema - Partial update
