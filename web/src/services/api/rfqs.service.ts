@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { RfqDashboardFilters, RfqDashboardRow, Rfq, CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { RfqDashboardFilters, RfqDashboardRow, Rfq, CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class RfqsService extends BaseApiService {
@@ -62,6 +62,10 @@ class RfqsService extends BaseApiService {
         }
         const query = params.toString();
         return this.get<any>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
+    }
+
+    async createRfqResponse(rfqId: number, data: CreateRfqResponseBodyDto): Promise<{ id: number; rfqId: number; vendorId: number }> {
+        return this.post<{ id: number; rfqId: number; vendorId: number }>(`/${rfqId}/responses`, data);
     }
 }
 

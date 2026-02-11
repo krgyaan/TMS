@@ -4,7 +4,7 @@ import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
 import { vendorOrganizationsService } from "@/services/api";
-import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
+import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto, CreateRfqResponseBodyDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 
 export const rfqsKey = {
@@ -89,6 +89,23 @@ export const useDeleteRfq = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: rfqsKey.lists() });
             toast.success("Rfq deleted successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useCreateRfqResponse = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ rfqId, data }: { rfqId: number; data: CreateRfqResponseBodyDto }) =>
+            rfqsService.createRfqResponse(rfqId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: rfqsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: rfqsKey.detail(variables.rfqId) });
+            toast.success("RFQ response recorded successfully");
         },
         onError: error => {
             toast.error(handleQueryError(error));
