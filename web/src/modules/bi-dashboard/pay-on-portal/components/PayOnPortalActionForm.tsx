@@ -173,19 +173,7 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                                     <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
                                         {(field) => <Input {...field} placeholder="Enter UTR message" />}
                                     </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="portal_name" label="Portal Name">
-                                        {(field) => <Input {...field} placeholder="Enter portal name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="amount" label="Amount">
-                                        {(field) => <NumberInput {...field} placeholder="Enter amount" />}
-                                    </FieldWrapper>
                                 </div>
-
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
                             </>
                         )}
                     </div>
@@ -238,14 +226,6 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                             <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
                                 {(field) => <Input {...field} placeholder="Enter UTR number" />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="return_reason" label="Return Reason">
-                                {(field) => <Input {...field} placeholder="Enter return reason" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="return_remarks" label="Return Remarks">
-                                {(field) => (
-                                    <Textarea {...field} placeholder="Enter return remarks" className="min-h-[80px]" />
-                                )}
-                            </FieldWrapper>
                         </div>
                     </div>
                 </ConditionalSection>
@@ -254,18 +234,6 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                 <ConditionalSection show={action === 'settled'}>
                     <div className="space-y-4 border rounded-lg p-4">
                         <h4 className="font-semibold text-base">Settled with Project Account</h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                            <FieldWrapper control={form.control} name="settlement_date" label="Settlement Date">
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="settlement_amount" label="Settlement Amount">
-                                {(field) => <NumberInput {...field} placeholder="Enter settlement amount" />}
-                            </FieldWrapper>
-                            <FieldWrapper control={form.control} name="settlement_reference_no" label="Settlement Reference No">
-                                {(field) => <Input {...field} placeholder="Enter settlement reference number" />}
-                            </FieldWrapper>
-                        </div>
                     </div>
                 </ConditionalSection>
 

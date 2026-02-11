@@ -20,8 +20,6 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     payment_datetime: z.string().optional(),
     utr_no: z.string().optional(),
     utr_message: z.string().optional(),
-    remarks: z.string().optional(),
-    portal_name: z.string().optional(),
     amount: z.coerce.number().optional(),
 
     // Initiate Followup
@@ -36,13 +34,8 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 
     // Returned via Bank Transfer
     transfer_date: z.string().optional(),
-    return_reason: z.string().optional(),
-    return_remarks: z.string().optional(),
 
     // Settled with Project Account
-    settlement_date: z.string().optional(),
-    settlement_amount: z.coerce.number().optional(),
-    settlement_reference_no: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
@@ -108,12 +101,12 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     (data) => {
         // Action 1: When Accepted, payment_datetime, utr_no, utr_message, remarks are required
         if (data.action === 'accounts-form-1' && data.pop_req === 'Accepted') {
-            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message && !!data.remarks;
+            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message;
         }
         return true;
     },
     {
-        message: 'Date and time of payment, UTR number, UTR message, and remarks are required when accepted',
+        message: 'Date and time of payment, UTR number, and UTR message are required when accepted',
         path: ['payment_datetime'],
     }
 ).refine(
