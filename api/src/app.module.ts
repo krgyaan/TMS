@@ -83,9 +83,10 @@ import { ProjectsModule } from "./modules/operations/projects/projects.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
-import { ProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
+import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects-master.module";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
+import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 
 @Module({
     imports: [
@@ -181,6 +182,7 @@ import { LoggerModule } from "@/logger/logger.module";
         PqrModule,
         FinanceDocumentsModule,
         ProjectsMasterModule,
+        ProjectsMasterrModule,
         // BusinessPerformanceModule,
     ],
     controllers: [AppController],
@@ -193,4 +195,4 @@ import { LoggerModule } from "@/logger/logger.module";
         AllExceptionsFilter,
     ],
 })
-export class AppModule { }
+export class AppModule {}
