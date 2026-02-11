@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DataTable from "@/components/ui/data-table";
-import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText } from "lucide-react";
+import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText, IndianRupee } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
 import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { GridApi } from "ag-grid-community";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PayImprestDialog } from "./components/PayImprestDialog";
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -28,6 +29,11 @@ const formatINR = (num: number) =>
 const ImprestAdminIndex: React.FC = () => {
     const [searchText, setSearchText] = useState("");
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
+
+    const [payImprestUser, setPayImprestUser] = useState<{
+        userId: number;
+        userName: string;
+    } | null>(null);
 
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
@@ -52,6 +58,15 @@ const ImprestAdminIndex: React.FC = () => {
             label: "Voucher",
             icon: <FileText className="h-4 w-4" />,
             onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
+        },
+        {
+            label: "Pay Imprest",
+            icon: <IndianRupee className="h-4 w-4" />,
+            onClick: row =>
+                setPayImprestUser({
+                    userId: row.userId,
+                    userName: row.userName,
+                }),
         },
     ];
 
@@ -269,6 +284,10 @@ const ImprestAdminIndex: React.FC = () => {
                     />
                 </CardContent>
             </Card>
+
+            {payImprestUser && (
+                <PayImprestDialog open={!!payImprestUser} onOpenChange={() => setPayImprestUser(null)} userId={payImprestUser.userId} userName={payImprestUser.userName} />
+            )}
         </div>
     );
 };
