@@ -131,7 +131,8 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthValue: 0,
 
     courierAddress: '',
-    clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+    // Allow zero clients by default; user can add as needed
+    clients: [],
 
     teRemark: '',
 });
@@ -237,6 +238,7 @@ export const mapResponseToForm = (
 
         courierAddress: data.courierAddress ?? '',
 
+        // Map existing clients, otherwise use an empty array (0 or more)
         clients: data.clients && data.clients.length > 0
             ? data.clients.map(client => ({
                 clientName: client.clientName ?? '',
@@ -244,7 +246,7 @@ export const mapResponseToForm = (
                 clientMobile: client.clientMobile ?? '',
                 clientEmail: client.clientEmail ?? '',
             }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+            : [],
 
         teRemark: data.teFinalRemark ?? '',
     };

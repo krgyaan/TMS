@@ -120,13 +120,13 @@ export const TenderInformationFormSchema = z.object({
     netWorthCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     netWorthValue: z.coerce.number().nonnegative().optional(),
 
-    // Client Details
+    // Client Details (zero or more)
     clients: z.array(z.object({
         clientName: z.string().min(1, 'Client name is required'),
         clientDesignation: z.string().optional(),
         clientMobile: z.string().max(200).optional(),
         clientEmail: z.string().email('Invalid email').optional().or(z.literal('')),
-    })).min(1, 'At least one client is required'),
+    })),
 
     // Address & Remarks
     courierAddress: z.string().max(1000).optional(),

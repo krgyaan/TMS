@@ -7,6 +7,7 @@ import { FileText } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
+import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from "@/hooks/useSelectOptions"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
@@ -28,7 +29,36 @@ const formatPercentage = (value?: number | null) => {
     return `${value}%`
 }
 
-const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+const getOptionLabel = (
+    options: Array<{ value: string; label: string }> | undefined,
+    raw: string | number | null | undefined,
+) => {
+    if (raw === null || raw === undefined) return "—"
+    const rawStr = String(raw).trim()
+    if (!rawStr) return "—"
+
+    if (!options || options.length === 0) {
+        return rawStr
+    }
+
+    const match = options.find((option) => option.value === rawStr)
+    if (match) {
+        return match.label
+    }
+
+    // If it's already a descriptive string, keep it as-is
+    if (isNaN(Number(rawStr))) {
+        return rawStr
+    }
+
+    // Fallback to the raw id string when no label is found
+    return rawStr
+}
+
+const formatDocuments = (
+    documents: Array<string | { id?: number; documentName: string }> = [],
+    options?: Array<{ value: string; label: string }>,
+) => {
     if (!documents.length) {
         return <span className="text-muted-foreground">No documents listed</span>
     }
@@ -37,14 +67,26 @@ const formatDocuments = (documents: string[] | Array<{ id?: number; documentName
         <div className="flex flex-wrap gap-2">
             {documents.map((doc, index) => {
                 // Handle both string arrays and object arrays
-                const docName = typeof doc === 'string' ? doc : doc.documentName;
-                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+                if (typeof doc === "string") {
+                    const label = options ? getOptionLabel(options, doc) : doc
+                    if (!label || label === "—") {
+                        return null
+                    }
+                    return (
+                        <Badge key={doc} variant="outline">
+                            {label}
+                        </Badge>
+                    )
+                }
+
+                const docName = doc.documentName
+                const docKey = doc.id ?? doc.documentName ?? index
 
                 return (
                     <Badge key={docKey} variant="outline">
                         {docName}
                     </Badge>
-                );
+                )
             })}
         </div>
     )
@@ -54,6 +96,10 @@ export const InfoSheetView = ({
     infoSheet,
     isLoading,
 }: InfoSheetViewProps) => {
+    const rejectionReasonOptions = useDnbStatusOptions()
+    const pqrOptions = usePqrOptions()
+    const financeDocumentOptions = useFinanceDocumentOptions()
+
     if (isLoading) {
         return (
             <Card>
@@ -118,7 +164,7 @@ export const InfoSheetView = ({
                                 Rejection Reason
                             </TableCell>
                             <TableCell className="text-sm w-1/4">
-                                {infoSheet.teRejectionReason ? `Status ${infoSheet.teRejectionReason}` : '—'}
+                                {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -656,7 +702,7 @@ export const InfoSheetView = ({
                                 Technical Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.technicalWorkOrders || [])}
+                                {formatDocuments(infoSheet.technicalWorkOrders || [], pqrOptions)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -664,7 +710,7 @@ export const InfoSheetView = ({
                                 Financial Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.commercialDocuments || [])}
+                                {formatDocuments(infoSheet.commercialDocuments || [], financeDocumentOptions)}
                             </TableCell>
                         </TableRow>
                     </TableBody>
