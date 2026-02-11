@@ -8,10 +8,11 @@ import { Logger } from "winston";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
 
-import { employeeImprests } from "@db/schemas/shared";
+import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
 
 import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
 
 @Injectable()
 export class EmployeeImprestService {
@@ -41,7 +42,7 @@ export class EmployeeImprestService {
 
     /* ----------------------------- READ ------------------------------ */
     async findAllByUser(userId: number) {
-        return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(employeeImprests.createdAt);
+        return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(desc(employeeImprests.createdAt));
     }
 
     async findOne(id: number) {
