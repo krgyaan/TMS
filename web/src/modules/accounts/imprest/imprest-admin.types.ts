@@ -17,3 +17,11 @@ export interface ImprestPaymentHistoryRow {
     amount: number;
     projectName: string | null;
 }
+
+export interface CreateImprestCreditPayload {
+    userId: number;
+    txnDate: string;
+    teamMemberName: string;
+    amount: number;
+    projectName?: string;
+}
