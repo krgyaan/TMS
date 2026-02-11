@@ -253,30 +253,14 @@ const ImprestEmployeeDashboard: React.FC = () => {
         setVisibleCount(MOBILE_PAGE_SIZE);
     }, [rows]);
 
-    const StatusChip = ({
-        done,
-        doneText,
-        pendingText,
-        color,
-        onClick,
-    }: {
-        done: boolean;
-        doneText: string;
-        pendingText: string;
-        color: "green" | "blue" | "purple";
-        onClick: () => void;
-    }) => {
+    const StatusChip = ({ done, doneText, pendingText, color }: { done: boolean; doneText: string; pendingText: string; color: "green" | "blue" | "purple" }) => {
         const colorMap = {
             green: done ? "bg-green-100 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
             blue: done ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
             purple: done ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
         };
 
-        return (
-            <button onClick={onClick} className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>
-                {done ? doneText : pendingText}
-            </button>
-        );
+        return <button className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>{done ? doneText : pendingText}</button>;
     };
 
     /* -------------------- COLUMNS -------------------- */
@@ -423,11 +407,11 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
                 {/* Status chips */}
                 <div className="flex gap-2 mt-3 flex-wrap">
-                    <StatusChip done={row.approvalStatus === 1} doneText="Approved" pendingText="Approval Pending" color="green" onClick={() => approveMutation.mutate(row.id)} />
+                    <StatusChip done={row.approvalStatus === 1} doneText="Approved" pendingText="Approval Pending" color="green" />
 
-                    <StatusChip done={row.tallyStatus === 1} doneText="Tallied" pendingText="Tally Pending" color="blue" onClick={() => tallyMutation.mutate(row.id)} />
+                    <StatusChip done={row.tallyStatus === 1} doneText="Tallied" pendingText="Tally Pending" color="blue" />
 
-                    <StatusChip done={row.proofStatus === 1} doneText="Verified" pendingText="Proof Pending" color="purple" onClick={() => proofMutation.mutate(row.id)} />
+                    <StatusChip done={row.proofStatus === 1} doneText="Verified" pendingText="Proof Pending" color="purple" />
                 </div>
 
                 {/* Actions row */}
