@@ -21,14 +21,28 @@ export const usePhysicalDocs = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
     search?: string
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+        search,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery<PaginatedResult<PhysicalDocsDashboardRow>>({
-        queryKey: physicalDocsKey.list({ tab, ...pagination, ...sort, search }),
+        queryKey: physicalDocsKey.list(queryKeyFilters),
         queryFn: () => physicalDocsService.getDashboard(tab, {
             page: pagination.page,
             limit: pagination.limit,
             sortBy: sort?.sortBy,
             sortOrder: sort?.sortOrder,
             search,
+            teamId: teamIdParam,
         }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
@@ -102,7 +116,7 @@ export const usePhysicalDocsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...physicalDocsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<PhysicalDocsDashboardCounts>({
         queryKey,
         queryFn: () => physicalDocsService.getDashboardCounts(teamIdParam),
