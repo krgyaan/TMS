@@ -1,6 +1,6 @@
 // employee-imprest.service.ts
 import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -13,6 +13,7 @@ import { employeeImprests, employeeImprestTransactions } from "@db/schemas/share
 import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
+import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 
 @Injectable()
 export class EmployeeImprestService {
@@ -41,8 +42,116 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- READ ------------------------------ */
-    async findAllByUser(userId: number) {
-        return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(desc(employeeImprests.createdAt));
+    async getEmployeeDashboard(userId: number) {
+        this.logger.info("Fetching employee dashboard", { userId });
+
+        try {
+            // ==============================
+            // 1️⃣ Summary (reuse logic pattern)
+            // ==============================
+            const [imprestAgg] = await this.db
+                .select({
+                    amountSpent: sql<number>`
+          COALESCE(SUM(${employeeImprests.amount}), 0)
+        `.as("amountSpent"),
+
+                    amountApproved: sql<number>`
+          COALESCE(
+            SUM(
+              CASE 
+                WHEN ${employeeImprests.approvalStatus} = 1
+                THEN ${employeeImprests.amount}
+                ELSE 0
+              END
+            ),
+          0)
+        `.as("amountApproved"),
+                })
+                .from(employeeImprests)
+                .where(eq(employeeImprests.userId, userId));
+
+            const [txnAgg] = await this.db
+                .select({
+                    amountReceived: sql<number>`
+          COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
+        `.as("amountReceived"),
+                })
+                .from(employeeImprestTransactions)
+                .where(eq(employeeImprestTransactions.userId, userId));
+
+            const [voucherAgg] = await this.db
+                .select({
+                    totalVouchers: sql<number>`
+          COUNT(${employeeImprestVouchers.id})
+        `.as("totalVouchers"),
+
+                    accountsApproved: sql<number>`
+          SUM(
+            CASE 
+              WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
+            END
+          )
+        `.as("accountsApproved"),
+
+                    adminApproved: sql<number>`
+          SUM(
+            CASE 
+              WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
+            END
+          )
+        `.as("adminApproved"),
+                })
+                .from(employeeImprestVouchers)
+                .where(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
+
+            const amountSpent = Number(imprestAgg.amountSpent);
+            const amountApproved = Number(imprestAgg.amountApproved);
+            const amountReceived = Number(txnAgg.amountReceived);
+
+            // ==============================
+            // 2️⃣ Detailed Lists
+            // ==============================
+            const imprests = await this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(desc(employeeImprests.createdAt));
+
+            const transactions = await this.db
+                .select()
+                .from(employeeImprestTransactions)
+                .where(eq(employeeImprestTransactions.userId, userId))
+                .orderBy(desc(employeeImprestTransactions.txnDate));
+
+            this.logger.info("Employee dashboard fetched", {
+                userId,
+                imprestCount: imprests.length,
+                transactionCount: transactions.length,
+            });
+
+            return {
+                summary: {
+                    amountSpent,
+                    amountApproved,
+                    amountReceived,
+                    amountLeft: amountApproved - amountReceived,
+
+                    voucherInfo: {
+                        totalVouchers: Number(voucherAgg.totalVouchers),
+                        accountsApproved: Number(voucherAgg.accountsApproved),
+                        adminApproved: Number(voucherAgg.adminApproved),
+                    },
+                },
+                imprests,
+                transactions,
+            };
+        } catch (error: any) {
+            this.logger.error("Failed to fetch employee dashboard", {
+                userId,
+                message: error?.message,
+                stack: error?.stack,
+            });
+
+            throw error;
+        }
     }
 
     async findOne(id: number) {
