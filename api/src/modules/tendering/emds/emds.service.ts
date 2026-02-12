@@ -314,9 +314,6 @@ export class EmdsService {
     private async countRequestsByStatus(user?: ValidatedUser, teamId?: number): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
-        // Uses SQL Aggregation for performance
-        // NOTE: We do NOT filter by tenderInfos.deleteStatus or tlStatus here.
-        // If a request exists and instrument is active, we count it.
         const [result] = await this.db
             .select({
                 sent: sql<number>`COALESCE(SUM(CASE WHEN ${this.getTabSqlCondition('sent')} THEN 1 ELSE 0 END), 0)`,
@@ -356,9 +353,10 @@ export class EmdsService {
         const offset = (page - 1) * limit;
 
         // Build search conditions
+        const searchTerm = search?.trim();
         const searchConditions: any[] = [];
-        if (search) {
-            const searchStr = `%${search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             searchConditions.push(
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
@@ -370,7 +368,7 @@ export class EmdsService {
                 sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
                 sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
                 sql`${users.name} ILIKE ${searchStr}`,
-                sql`${paymentInstruments.instrumentType} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.instrumentType}::text ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`
             );
         }
@@ -396,16 +394,20 @@ export class EmdsService {
             searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
-        // Get Total for Pagination
-        const [countResult] = await this.db
+        // Get Total for Pagination (ensure joins cover all fields used in whereClause, including users when searching)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(*)` })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
-            ))
-            .where(whereClause);
+            ));
+        // searchConditions reference users.name only when a non-empty searchTerm is present
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder.leftJoin(users, eq(users.id, paymentRequests.requestedBy));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         // Get Data
         const rows = await this.db
@@ -525,9 +527,10 @@ export class EmdsService {
         const offset = (page - 1) * limit;
 
         // Build search conditions
+        const searchTerm = search?.trim();
         const searchConditions: any[] = [];
-        if (search) {
-            const searchStr = `%${search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             searchConditions.push(
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
@@ -663,9 +666,10 @@ export class EmdsService {
         const dnbStatusIds = StatusCache.getIds('dnb');
 
         // Build search conditions
+        const searchTermDnb = search?.trim();
         const searchConditions: any[] = [];
-        if (search) {
-            const searchStr = `%${search}%`;
+        if (searchTermDnb) {
+            const searchStr = `%${searchTermDnb}%`;
             searchConditions.push(
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
