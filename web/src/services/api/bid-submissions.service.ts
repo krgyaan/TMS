@@ -38,6 +38,9 @@ class BidSubmissionsService extends BaseApiService {
             if (params.search) {
                 search.set('search', params.search);
             }
+            if (params.teamId !== undefined && params.teamId !== null) {
+                search.set('teamId', params.teamId.toString());
+            }
         }
 
         const queryString = search.toString();

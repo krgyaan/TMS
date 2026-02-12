@@ -18,6 +18,9 @@ export const useBidSubmissions = (
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const params: BidSubmissionListParams = {
         tab,
         page: pagination.page,
@@ -25,12 +28,16 @@ export const useBidSubmissions = (
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
         ...(pagination.search && { search: pagination.search }),
+        ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}),
     };
 
     const queryKeyFilters = {
         tab,
         ...pagination,
         ...sort,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<BidSubmissionDashboardRow>>({
@@ -117,7 +124,7 @@ export const useBidSubmissionsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...bidSubmissionsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<BidSubmissionDashboardCounts>({
         queryKey,
         queryFn: () => bidSubmissionsService.getDashboardCounts(teamIdParam),

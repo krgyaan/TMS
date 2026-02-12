@@ -8,7 +8,6 @@ import type {
     ResultDashboardRow,
     ResultDashboardCounts,
     TenderResult,
-    UploadResultFormPageProps,
     ResultDashboardFilters,
 } from '@/modules/tendering/results/helpers/tenderResult.types';
 import type { PaginatedResult } from '@/types/api.types';
@@ -26,8 +25,12 @@ export const tenderResultKey = {
 export const useResultDashboard = (
     filters?: ResultDashboardFilters
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const params: ResultDashboardFilters = {
         ...filters,
+        ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}),
     };
 
     const queryKeyFilters = {
@@ -36,7 +39,10 @@ export const useResultDashboard = (
         limit: filters?.limit,
         search: filters?.search,
         sortBy: filters?.sortBy,
-        sortOrder: filters?.sortOrder
+        sortOrder: filters?.sortOrder,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     const query = useQuery<PaginatedResult<ResultDashboardRow>>({

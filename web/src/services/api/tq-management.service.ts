@@ -33,6 +33,9 @@ class TqManagementService extends BaseApiService {
             if (filters.search) {
                 search.set('search', filters.search);
             }
+            if (filters.teamId !== undefined && filters.teamId !== null) {
+                search.set('teamId', String(filters.teamId));
+            }
         }
 
         const queryString = search.toString();

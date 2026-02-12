@@ -18,9 +18,23 @@ export const rfqsKey = {
 };
 
 export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    const effectiveFilters: RfqDashboardFilters | undefined = filters
+        ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
+        : (teamIdParam !== undefined ? { teamId: teamIdParam } as RfqDashboardFilters : undefined);
+
+    const queryKeyFilters = {
+        ...filters,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery({
-        queryKey: [...rfqsKey.all, 'dashboard', filters],
-        queryFn: () => rfqsService.getDashboard(filters),
+        queryKey: [...rfqsKey.all, 'dashboard', queryKeyFilters],
+        queryFn: () => rfqsService.getDashboard(effectiveFilters),
     });
 };
 
