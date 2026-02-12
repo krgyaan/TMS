@@ -1,20 +1,26 @@
 // src/modules/imprest/imprest.api.ts
 import api from "@/lib/axios";
-import type { ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
 
 /* ===================== IMPREST ===================== */
 
 // ---------- GET MY IMPRESTS ----------
-export const getMyImprests = async (): Promise<ImprestRow[]> => {
-    const res = await api.get("/employee-imprest");
+export const getMyImprests = async (): Promise<EmployeeImprestDashboard> => {
+    const res = await api.get<EmployeeImprestDashboard>("/employee-imprest");
+
+    console.log("Fetching my imprest dashboard");
+    console.log("Dashboard response:", res.data);
+
     return res.data;
 };
 
 // ---------- GET USER IMPRESTS ----------
-export const getUserImprests = async (userId: number): Promise<ImprestRow[]> => {
-    const res = await api.get(`/employee-imprest/user/${userId}`);
-    console.log("Fetching imprests for userId:", userId);
-    console.log("Response data:", res.data);
+export const getUserImprests = async (userId: number): Promise<EmployeeImprestDashboard> => {
+    const res = await api.get<EmployeeImprestDashboard>(`/employee-imprest/user/${userId}`);
+
+    console.log("Fetching employee dashboard for userId:", userId);
+    console.log("Dashboard response:", res.data);
+
     return res.data;
 };
 
