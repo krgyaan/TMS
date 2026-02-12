@@ -25,7 +25,7 @@ import {
     type CreateImprestInput,
 } from "./imprest.api";
 
-import type { ImprestVoucherRow } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestVoucherRow } from "./imprest.types";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -48,10 +48,20 @@ export const imprestVoucherKeys = {
 /* ---------------- IMPREST LIST ---------------- */
 
 export const useImprestList = (userId?: number) => {
-    return useQuery({
+    return useQuery<EmployeeImprestDashboard>({
         queryKey: imprestKeys.list(userId),
-        queryFn: () => (userId ? getUserImprests(userId) : getMyImprests()),
-        enabled: userId === undefined || !!userId,
+
+        queryFn: () => {
+            if (userId) {
+                return getUserImprests(userId);
+            }
+            return getMyImprests();
+        },
+
+        // Enable:
+        // - When viewing own page (userId undefined)
+        // - When viewing another user (valid userId number)
+        enabled: userId === undefined || typeof userId === "number",
     });
 };
 
