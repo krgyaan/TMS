@@ -110,8 +110,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, hasPermission, canUpdate } = useAuth();
     const { id } = useParams<{ id?: string }>();
-    let userDetails = null;
     const [isMobile, setIsMobile] = useState(false);
+
+    let userDetails = null;
 
     const canMutateStatus = canUpdate("shared.imprestss");
 
@@ -119,6 +120,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
+
     console.log(requestedUserId, isOwnPage);
 
     if (requestedUserId) {
@@ -141,7 +143,12 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const numericUserId = isOwnPage ? user?.id : requestedUserId;
     console.log(numericUserId);
-    const { data: rows = [], isLoading, error } = useImprestList(numericUserId);
+
+    const { data, isLoading, error } = useImprestList(numericUserId);
+
+    const summary = data?.summary;
+    console.log("summary", { summary });
+    const rows = data?.imprests ?? [];
 
     const deleteMutation = useDeleteImprest();
     const uploadProofsMutation = useUploadImprestProofs();
@@ -450,6 +457,77 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     return (
         <Card>
+            {/* SUMMARY */}
+            {/* SUMMARY */}
+            {/* ================= FINANCIAL SUMMARY ================= */}
+            {summary && (
+                <div className="mb-6 p-3">
+                    {isMobile ? (
+                        /* ================= MOBILE ================= */
+                        <Card className="border shadow-sm">
+                            <CardContent className="p-5 space-y-5">
+                                {/* Primary Balance */}
+                                <div>
+                                    <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
+                                    <p className="text-3xl font-semibold tabular-nums mt-1">{formatINR(summary.amountLeft)}</p>
+                                </div>
+
+                                <div className="h-px bg-border" />
+
+                                {/* Financial Breakdown */}
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Spent</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountSpent)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Approved</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountApproved)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Received</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountReceived)}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        /* ================= DESKTOP ================= */
+                        <Card className="border shadow-sm">
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-4 gap-8 items-center">
+                                    {/* Balance (Primary) */}
+                                    <div className="col-span-1">
+                                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
+                                        <p className="text-3xl font-semibold tabular-nums mt-2">{formatINR(summary.amountLeft)}</p>
+                                    </div>
+
+                                    {/* Supporting Metrics */}
+                                    <div className="col-span-3 grid grid-cols-3 gap-6">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Spent</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountSpent)}</p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Approved</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountApproved)}</p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Received</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountReceived)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
+
             <CardHeader className="pb-4">
                 <div className="space-y-3">
                     {/* Title */}
