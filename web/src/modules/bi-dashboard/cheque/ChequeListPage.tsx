@@ -153,6 +153,7 @@ const ChequeListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'cheque-pending' || activeTab === 'rejected',
             },
             {
                 field: 'chequeNo',
@@ -162,6 +163,7 @@ const ChequeListPage = () => {
                 valueGetter: (params) => params.data?.chequeNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'cheque-pending' || activeTab === 'rejected',
             },
             {
                 field: 'payeeName',
@@ -175,7 +177,8 @@ const ChequeListPage = () => {
             {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 90,
+                width: 120,
+                maxWidth: 120,
                 colId: 'bidValidity',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -190,6 +193,7 @@ const ChequeListPage = () => {
                 field: 'amount',
                 headerName: 'Amount',
                 width: 100,
+                maxWidth: 100,
                 colId: 'amount',
                 sortable: true,
                 filter: true,
@@ -203,6 +207,7 @@ const ChequeListPage = () => {
                 field: 'type',
                 headerName: 'Type',
                 width: 80,
+                maxWidth: 80,
                 colId: 'type',
                 valueGetter: (params) => params.data?.type || '—',
                 sortable: true,
@@ -212,6 +217,7 @@ const ChequeListPage = () => {
                 field: 'dueDate',
                 headerName: 'Due Date',
                 width: 130,
+                maxWidth: 130,
                 colId: 'dueDate',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
@@ -226,6 +232,7 @@ const ChequeListPage = () => {
                 field: 'expiry',
                 headerName: 'Expiry',
                 width: 90,
+                maxWidth: 90,
                 colId: 'expiry',
                 sortable: true,
                 filter: true,
@@ -238,7 +245,8 @@ const ChequeListPage = () => {
             {
                 field: 'chequeStatus',
                 headerName: 'Cheque Status',
-                width: 130,
+                width: 140,
+                maxWidth: 140,
                 colId: 'chequeStatus',
                 sortable: true,
                 filter: true,
@@ -257,7 +265,7 @@ const ChequeListPage = () => {
                 width: 57,
             },
         ],
-        [chequeActions]
+        [chequeActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
