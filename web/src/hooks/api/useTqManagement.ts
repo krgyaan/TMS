@@ -19,15 +19,25 @@ export const useTqManagement = (
     tabKey?: TabKey,
     filters?: TqManagementFilters,
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    const effectiveFilters: TqManagementFilters | undefined = filters
+        ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
+        : (teamIdParam !== undefined ? { teamId: teamIdParam } as TqManagementFilters : undefined);
+
+    const queryKeyFilters = {
+        tabKey,
+        ...filters,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery({
-        queryKey: [...tqManagementKey.lists(), { tabKey, ...filters }],
+        queryKey: [...tqManagementKey.lists(), queryKeyFilters],
         queryFn: async () => {
-            return tqManagementService.getDashboard(tabKey, {
-                page: filters?.page,
-                limit: filters?.limit,
-                sortBy: filters?.sortBy,
-                sortOrder: filters?.sortOrder,
-            });
+            return tqManagementService.getDashboard(tabKey, effectiveFilters);
         },
     });
 };
@@ -166,7 +176,7 @@ export const useTqManagementDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...tqManagementKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<TqManagementDashboardCounts>({
         queryKey,
         queryFn: () => tqManagementService.getDashboardCounts(teamIdParam),

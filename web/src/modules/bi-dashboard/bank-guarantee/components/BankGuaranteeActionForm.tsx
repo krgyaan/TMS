@@ -37,20 +37,14 @@ const ACTION_OPTIONS = [
     { value: 'returned-courier', label: 'Returned via Courier' },
     { value: 'request-cancellation', label: 'Request Cancellation' },
     { value: 'bg-cancellation-confirmation', label: 'BG Cancellation Confirmation' },
+    { value: 'fdr-cancellation-confirmation', label: 'FDR Cancellation Confirmation' },
 ];
 
 interface BankGuaranteeActionFormProps {
     instrumentId: number;
-    instrumentData?: {
-        bgNo?: string;
-        bgDate?: Date;
-        amount?: number;
-        tenderName?: string;
-        tenderNo?: string;
-    };
 }
 
-export function BankGuaranteeActionForm({ instrumentId, instrumentData }: BankGuaranteeActionFormProps) {
+export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankGuaranteeAction();
     const courierOptions = useCourierOptions();

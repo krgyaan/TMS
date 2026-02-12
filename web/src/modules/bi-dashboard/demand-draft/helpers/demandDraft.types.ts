@@ -12,6 +12,7 @@ export type DemandDraftDashboardFilters = {
 export interface DemandDraftDashboardRow {
     id: number;
     requestId: number;
+    purpose: string | null;
     ddCreationDate: Date | null;
     ddNo: string | null;
     beneficiaryName: string | null;

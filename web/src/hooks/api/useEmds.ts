@@ -54,7 +54,7 @@ export const usePaymentDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
     const queryKey = [...paymentRequestsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery({
         queryKey,
         queryFn: () => emdsService.getDashboardCounts(teamIdParam),

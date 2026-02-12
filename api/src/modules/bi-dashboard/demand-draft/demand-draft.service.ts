@@ -91,9 +91,11 @@ export class DemandDraftService {
 
         const conditions = this.buildDdDashboardConditions(tab);
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
@@ -138,6 +140,7 @@ export class DemandDraftService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 ddCreationDate: instrumentDdDetails.ddDate,
                 ddNo: instrumentDdDetails.ddNo,
                 beneficiaryName: paymentInstruments.favouring,
@@ -162,14 +165,19 @@ export class DemandDraftService {
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join statuses and users when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
@@ -180,6 +188,7 @@ export class DemandDraftService {
         const data: DemandDraftDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            purpose: row.purpose,
             ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
             ddNo: row.ddNo,
             beneficiaryName: row.beneficiaryName,

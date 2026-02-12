@@ -7,6 +7,7 @@ export type ResultDashboardFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    teamId?: number;
 };
 
 export interface UploadResultFormPageProps {

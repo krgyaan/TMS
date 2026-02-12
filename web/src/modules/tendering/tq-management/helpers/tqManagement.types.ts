@@ -51,6 +51,7 @@ export type TqManagementFilters = {
     search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    teamId?: number;
 };
 
 export interface TqManagementDashboardCounts {

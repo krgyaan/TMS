@@ -25,14 +25,29 @@ export const useReverseAuctionDashboard = (
     pagination?: { page: number; limit: number },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
-    const params: RaDashboardListParams = {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    const effectiveFilters: RaDashboardListParams = {
         ...filters,
+        ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}),
+    };
+
+    const params: RaDashboardListParams = {
+        ...effectiveFilters,
         ...pagination,
         ...sort,
     };
 
+    const queryKeyFilters = {
+        ...params,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery<RaDashboardResponse>({
-        queryKey: reverseAuctionsKey.dashboard(params as Record<string, unknown>),
+        queryKey: reverseAuctionsKey.dashboard(queryKeyFilters as Record<string, unknown>),
         queryFn: () => reverseAuctionService.getDashboard(params),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {

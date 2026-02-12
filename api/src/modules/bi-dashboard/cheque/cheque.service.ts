@@ -126,9 +126,11 @@ export class ChequeService {
 
         const conditions = this.buildChequeDashboardConditions(tab);
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
@@ -170,6 +172,7 @@ export class ChequeService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 chequeNo: instrumentChequeDetails.chequeNo,
                 payeeName: paymentInstruments.favouring,
                 bidValidity: tenderInfos.dueDate,
@@ -209,6 +212,7 @@ export class ChequeService {
         const data: ChequeDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            purpose: row.purpose,
             chequeNo: row.chequeNo,
             payeeName: row.payeeName,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,

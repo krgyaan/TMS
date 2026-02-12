@@ -1,13 +1,4 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    Query
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
 import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -50,9 +41,9 @@ export class BidSubmissionsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
+                // this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
                 const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'bid_submission');
-                this.logger.debug(`Timer for tender ${tender.tenderId}: ${JSON.stringify(timer)}`);
+                // this.logger.debug(`Timer for tender ${tender.tenderId}: ${JSON.stringify(timer)}`);
 
                 return {
                     ...tender,

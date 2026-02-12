@@ -44,7 +44,7 @@ class PhysicalDocsService extends BaseApiService {
 
     async getDashboard(
         tab?: 'pending' | 'sent' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string; teamId?: number }
     ): Promise<PaginatedResult<PhysicalDocsDashboardRow>> {
         const search = new URLSearchParams();
 
@@ -65,6 +65,9 @@ class PhysicalDocsService extends BaseApiService {
         }
         if (filters?.search) {
             search.set('search', filters.search);
+        }
+        if (filters?.teamId !== undefined && filters?.teamId !== null) {
+            search.set('teamId', String(filters.teamId));
         }
 
         const queryString = search.toString();
