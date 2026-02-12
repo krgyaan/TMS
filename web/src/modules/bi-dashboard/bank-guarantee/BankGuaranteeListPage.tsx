@@ -145,6 +145,7 @@ const BankGuaranteeListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'bgNo',
@@ -154,11 +155,13 @@ const BankGuaranteeListPage = () => {
                 valueGetter: (params) => params.data?.bgNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'beneficiaryName',
                 headerName: 'Beneficiary name',
                 width: 180,
+                maxWidth: 180,
                 colId: 'beneficiaryName',
                 valueGetter: (params) => params.data?.beneficiaryName || '—',
                 sortable: true,
@@ -168,6 +171,7 @@ const BankGuaranteeListPage = () => {
                 headerName: 'Tender Details',
                 filter: true,
                 width: 200,
+                maxWidth: 200,
             }),
             {
                 field: 'bidValidity',
@@ -198,6 +202,7 @@ const BankGuaranteeListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'bgClaimPeriod',
@@ -210,6 +215,7 @@ const BankGuaranteeListPage = () => {
                 },
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'bgChargesPaid',
@@ -218,6 +224,7 @@ const BankGuaranteeListPage = () => {
                 colId: 'bgChargesPaid',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'bgChargesCalculated',
@@ -226,6 +233,7 @@ const BankGuaranteeListPage = () => {
                 colId: 'bgChargesCalculated',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'fdrNo',
@@ -235,6 +243,7 @@ const BankGuaranteeListPage = () => {
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'fdrValue',
@@ -243,6 +252,7 @@ const BankGuaranteeListPage = () => {
                 colId: 'fdrValue',
                 sortable: true,
                 valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'tenderStatus',
@@ -290,7 +300,7 @@ const BankGuaranteeListPage = () => {
                 width: 57,
             },
         ],
-        [bgActions]
+        [bgActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {

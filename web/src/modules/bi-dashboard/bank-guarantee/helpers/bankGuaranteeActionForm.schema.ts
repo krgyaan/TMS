@@ -85,6 +85,30 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     bg_fdr_cancel_ref_no: z.string().optional(),
 }).refine(
     (data) => {
+        // BG request status is required for Accounts Form 1
+        if (data.action === 'accounts-form-1') {
+            return !!data.bg_req;
+        }
+        return true;
+    },
+    {
+        message: 'BG Request status is required',
+        path: ['bg_req'],
+    }
+).refine(
+    (data) => {
+        // Approved BG format is required when request is accepted
+        if (data.action === 'accounts-form-1' && data.bg_req === 'Accepted') {
+            return !!data.approve_bg;
+        }
+        return true;
+    },
+    {
+        message: 'Approved BG format is required when request is accepted',
+        path: ['approve_bg'],
+    }
+).refine(
+    (data) => {
         // Conditional validation: reason_req required when rejected
         if (data.action === 'accounts-form-1' && data.bg_req === 'Rejected') {
             return !!data.reason_req;
@@ -228,6 +252,30 @@ export const BankGuaranteeActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'Bank BG cancellation request is required',
         path: ['cancell_confirm'],
+    }
+).refine(
+    (data) => {
+        // Accounts Form (BG) 2: core BG details are required
+        if (data.action === 'accounts-form-2') {
+            return !!data.bg_no && !!data.bg_date && !!data.bg_validity;
+        }
+        return true;
+    },
+    {
+        message: 'BG number, creation date, and validity are required',
+        path: ['bg_no'],
+    }
+).refine(
+    (data) => {
+        // Accounts Form (BG) 3: core FDR details are required
+        if (data.action === 'accounts-form-3') {
+            return !!data.fdr_per && !!data.fdr_amt && !!data.fdr_no && !!data.fdr_validity;
+        }
+        return true;
+    },
+    {
+        message: 'FDR percentage, amount, number, and validity are required',
+        path: ['fdr_per'],
     }
 ).refine(
     (data) => {
