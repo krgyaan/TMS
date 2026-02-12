@@ -172,6 +172,7 @@ export class ChequeService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 chequeNo: instrumentChequeDetails.chequeNo,
                 payeeName: paymentInstruments.favouring,
                 bidValidity: tenderInfos.dueDate,
@@ -211,6 +212,7 @@ export class ChequeService {
         const data: ChequeDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            purpose: row.purpose,
             chequeNo: row.chequeNo,
             payeeName: row.payeeName,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
