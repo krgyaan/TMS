@@ -255,9 +255,9 @@ export class EmdsService {
     }
 
     /**
-     * Build role-based filter conditions for tender queries
+     * Build role-based filter conditions for tender queries (uses tender-level team fields)
      */
-    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+    private buildTenderRoleFilters(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
@@ -278,6 +278,42 @@ export class EmdsService {
                 // All other roles: Show only own tenders
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
+
+    /**
+     * Build role-based filter conditions for request queries
+     * Uses requesting user's team (users.team via paymentRequests.requestedBy)
+     */
+    private buildRequestRoleFilters(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: filter by requested user's team when teamId is provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(users.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: use own team
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(users.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: show only own requests
+                if (user.sub) {
+                    roleFilterConditions.push(eq(paymentRequests.requestedBy, user.sub));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
                 }
@@ -312,7 +348,7 @@ export class EmdsService {
     }
 
     private async countRequestsByStatus(user?: ValidatedUser, teamId?: number): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildRequestRoleFilters(user, teamId);
 
         const [result] = await this.db
             .select({
@@ -327,6 +363,7 @@ export class EmdsService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(roleFilterConditions.length > 0 ? and(...roleFilterConditions) : undefined);
 
         return {
@@ -346,7 +383,7 @@ export class EmdsService {
         counts?: DashboardCounts,
         search?: string
     ): Promise<RequestTabResponse> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildRequestRoleFilters(user, teamId);
 
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
@@ -394,20 +431,17 @@ export class EmdsService {
             searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
-        // Get Total for Pagination (ensure joins cover all fields used in whereClause, including users when searching)
-        let countQueryBuilder = this.db
+        // Get Total for Pagination
+        const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
-            ));
-        // searchConditions reference users.name only when a non-empty searchTerm is present
-        if (searchTerm) {
-            countQueryBuilder = countQueryBuilder.leftJoin(users, eq(users.id, paymentRequests.requestedBy));
-        }
-        const [countResult] = await countQueryBuilder.where(whereClause);
+            ))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(whereClause);
 
         // Get Data
         const rows = await this.db
@@ -483,7 +517,7 @@ export class EmdsService {
     }
 
     private async countPendingTenders(user?: ValidatedUser, teamId?: number): Promise<number> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildTenderRoleFilters(user, teamId);
 
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
@@ -521,7 +555,7 @@ export class EmdsService {
         counts?: DashboardCounts,
         search?: string
     ): Promise<PendingTabResponse> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildTenderRoleFilters(user, teamId);
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
@@ -627,7 +661,7 @@ export class EmdsService {
     }
 
     private async countTenderDnb(user?: ValidatedUser, teamId?: number): Promise<number> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildTenderRoleFilters(user, teamId);
         const dnbStatusIds = StatusCache.getIds('dnb');
 
         const [result] = await this.db
@@ -659,7 +693,7 @@ export class EmdsService {
         counts?: DashboardCounts,
         search?: string
     ): Promise<PendingTabResponse> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        const roleFilterConditions = this.buildTenderRoleFilters(user, teamId);
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;

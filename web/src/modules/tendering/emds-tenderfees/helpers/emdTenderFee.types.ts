@@ -73,6 +73,7 @@ export type EmdDashboardFilters = {
     search?: string;
     tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
     userId?: number;
+    teamId?: number;
     page?: number;
     limit?: number;
     sortBy?: string;

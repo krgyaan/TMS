@@ -24,11 +24,15 @@ export const usePaymentDashboard = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
     search?: string
 ) => {
+    const { teamId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const queryKeyFilters = {
         tab,
         ...pagination,
         ...sort,
         ...(search && { search }),
+        teamId: teamIdParam,
     };
 
     return useQuery({
@@ -39,6 +43,7 @@ export const usePaymentDashboard = (
             ...(sort?.sortBy && { sortBy: sort.sortBy }),
             ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
             ...(search && { search }),
+            ...(teamIdParam !== undefined && { teamId: teamIdParam }),
         }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {

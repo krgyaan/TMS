@@ -23,6 +23,9 @@ class EmdsService extends BaseApiService {
         if (filters?.limit) params.append('limit', filters.limit.toString());
         if (filters?.sortBy) params.append('sortBy', filters.sortBy);
         if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        if (filters?.teamId !== undefined && filters?.teamId !== null) {
+            params.append('teamId', filters.teamId.toString());
+        }
         if (filters?.search) params.append('search', filters.search);
         const query = params.toString();
         return this.get<EmdDashboardResponse>(`${query ? `?${query}` : ''}`);
