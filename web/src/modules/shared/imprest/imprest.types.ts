@@ -79,3 +79,43 @@ export type ImprestVoucherView = {
         invoiceProof: string;
     }[];
 };
+
+export interface EmployeeImprestDashboardSummaryDto {
+    amountSpent: number;
+    amountApproved: number;
+    amountReceived: number;
+    amountLeft: number;
+
+    voucherInfo: {
+        totalVouchers: number;
+        accountsApproved: number;
+        adminApproved: number;
+    };
+}
+
+export interface EmployeeImprestDashboard {
+    summary: {
+        amountSpent: number;
+        amountApproved: number;
+        amountReceived: number;
+        amountLeft: number;
+
+        voucherInfo: {
+            totalVouchers: number;
+            accountsApproved: number;
+            adminApproved: number;
+        };
+    };
+
+    imprests: ImprestRow[];
+    transactions: {
+        id: number;
+        userId: number;
+        txnDate: string;
+        teamMemberName: string | null;
+        projectName: string | null;
+        amount: number;
+        createdAt: string;
+        updatedAt: string;
+    }[];
+}

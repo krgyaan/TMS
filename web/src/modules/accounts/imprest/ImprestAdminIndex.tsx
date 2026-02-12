@@ -94,7 +94,7 @@ const ImprestAdminIndex: React.FC = () => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
+                        <a href={paths.shared.imprestUser(userId)} className="underline inline-flex items-center gap-1">
                             {p.value}
                             <ExternalLink className="h-3 w-3" />
                         </a>

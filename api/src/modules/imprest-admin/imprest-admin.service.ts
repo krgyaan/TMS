@@ -13,11 +13,17 @@ import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
 import { admin } from "googleapis/build/src/apis/admin";
 import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-credit.schema";
 
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
+
 @Injectable()
 export class ImprestAdminService {
     constructor(
         @Inject(DRIZZLE)
-        private readonly db: DbInstance
+        private readonly db: DbInstance,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
     ) {}
 
     /**
@@ -32,101 +38,171 @@ export class ImprestAdminService {
      * Only users having at least one imprest entry are returned.
      */
     async getEmployeeSummary(): Promise<EmployeeImprestSummaryDto[]> {
-        const voucherAgg = this.db
-            .select({
-                userId: employeeImprestVouchers.beneficiaryName,
+        this.logger.info("Fetching employee imprest summary");
 
-                totalVouchers: sql<number>`
-      COUNT(${employeeImprestVouchers.id})
-    `.as("totalVouchers"),
+        try {
+            // ==============================
+            // 1️⃣ Aggregate Imprests
+            // ==============================
+            const imprestAgg = this.db
+                .select({
+                    userId: employeeImprests.userId,
 
-                accountsApproved: sql<number>`
-      SUM(
-        CASE 
-          WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
-          THEN 1 
-          ELSE 0 
-        END
-      )
-    `.as("accountsApproved"),
+                    amountSpent: sql<number>`
+          COALESCE(SUM(${employeeImprests.amount}), 0)
+        `.as("amountSpent"),
 
-                adminApproved: sql<number>`
-      SUM(
-        CASE 
-          WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
-          THEN 1 
-          ELSE 0 
-        END
-      )
-    `.as("adminApproved"),
-            })
-            .from(employeeImprestVouchers)
-            .groupBy(employeeImprestVouchers.beneficiaryName)
-            .as("voucher_agg");
+                    amountApproved: sql<number>`
+          COALESCE(
+            SUM(
+              CASE 
+                WHEN ${employeeImprests.approvalStatus} = 1
+                THEN ${employeeImprests.amount}
+                ELSE 0
+              END
+            ),
+          0)
+        `.as("amountApproved"),
+                })
+                .from(employeeImprests)
+                .groupBy(employeeImprests.userId)
+                .as("imprest_agg");
 
-        const rows = await this.db
-            .select({
-                userId: employeeImprests.userId,
-                userName: users.name,
+            this.logger.debug("Imprest aggregation prepared");
 
-                amountSpent: sql<number>`
-        COALESCE(SUM(${employeeImprests.amount}), 0)
-      `,
+            // ==============================
+            // 2️⃣ Aggregate Transactions
+            // ==============================
+            const txnAgg = this.db
+                .select({
+                    userId: employeeImprestTransactions.userId,
 
-                amountApproved: sql<number>`
-        COALESCE(
+                    amountReceived: sql<number>`
+          COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
+        `.as("amountReceived"),
+                })
+                .from(employeeImprestTransactions)
+                .groupBy(employeeImprestTransactions.userId)
+                .as("txn_agg");
+
+            this.logger.debug("Transaction aggregation prepared");
+
+            // ==============================
+            // 3️⃣ Aggregate Vouchers
+            // ==============================
+            const voucherAgg = this.db
+                .select({
+                    userId: employeeImprestVouchers.beneficiaryName,
+
+                    totalVouchers: sql<number>`
+          COUNT(${employeeImprestVouchers.id})
+        `.as("totalVouchers"),
+
+                    accountsApproved: sql<number>`
           SUM(
             CASE 
-              WHEN ${employeeImprests.approvalStatus} = 1 
-              THEN ${employeeImprests.amount} 
-              ELSE 0 
+              WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
             END
-          ),
-          0
-        )
-      `,
+          )
+        `.as("accountsApproved"),
 
-                amountReceived: sql<number>`
-        COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
-      `,
+                    adminApproved: sql<number>`
+          SUM(
+            CASE 
+              WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
+            END
+          )
+        `.as("adminApproved"),
+                })
+                .from(employeeImprestVouchers)
+                .groupBy(employeeImprestVouchers.beneficiaryName)
+                .as("voucher_agg");
 
-                // 👇 voucher fields
-                totalVouchers: sql<number>`
-        COALESCE(${voucherAgg.totalVouchers}, 0)
-      `,
-                accountsApproved: sql<number>`
-        COALESCE(${voucherAgg.accountsApproved}, 0)
-      `,
-                adminApproved: sql<number>`
-        COALESCE(${voucherAgg.adminApproved}, 0)
-      `,
-            })
-            .from(employeeImprests)
-            .innerJoin(users, eq(users.id, employeeImprests.userId))
-            .leftJoin(employeeImprestTransactions, eq(employeeImprestTransactions.userId, employeeImprests.userId))
-            .leftJoin(voucherAgg, eq(voucherAgg.userId, sql`${employeeImprests.userId}::text`))
-            .groupBy(employeeImprests.userId, users.name, voucherAgg.totalVouchers, voucherAgg.accountsApproved, voucherAgg.adminApproved)
-            .orderBy(users.name);
+            this.logger.debug("Voucher aggregation prepared");
 
-        return rows.map(row => ({
-            userId: row.userId!,
-            userName: row.userName,
+            // ==============================
+            // 4️⃣ Final Join
+            // ==============================
+            this.logger.debug("Executing final employee summary query");
 
-            amountSpent: Number(row.amountSpent),
-            amountApproved: Number(row.amountApproved),
-            amountReceived: Number(row.amountReceived),
-            amountLeft: Number(row.amountApproved) - Number(row.amountReceived),
+            const rows = await this.db
+                .select({
+                    userId: users.id,
+                    userName: users.name,
 
-            voucherInfo: {
-                totalVouchers: Number(row.totalVouchers),
-                accountsApproved: Number(row.accountsApproved),
-                adminApproved: Number(row.adminApproved),
-            },
-        }));
+                    amountSpent: sql<number>`
+          COALESCE(${imprestAgg.amountSpent}, 0)
+        `,
+
+                    amountApproved: sql<number>`
+          COALESCE(${imprestAgg.amountApproved}, 0)
+        `,
+
+                    amountReceived: sql<number>`
+          COALESCE(${txnAgg.amountReceived}, 0)
+        `,
+
+                    totalVouchers: sql<number>`
+          COALESCE(${voucherAgg.totalVouchers}, 0)
+        `,
+
+                    accountsApproved: sql<number>`
+          COALESCE(${voucherAgg.accountsApproved}, 0)
+        `,
+
+                    adminApproved: sql<number>`
+          COALESCE(${voucherAgg.adminApproved}, 0)
+        `,
+                })
+                .from(users)
+                .innerJoin(imprestAgg, eq(imprestAgg.userId, users.id)) // ensures user has imprests
+                .leftJoin(txnAgg, eq(txnAgg.userId, users.id))
+                .leftJoin(voucherAgg, eq(voucherAgg.userId, sql`${users.id}::text`))
+                .orderBy(users.name);
+
+            this.logger.info("Employee summary query executed", {
+                rowsCount: rows.length,
+            });
+
+            // ==============================
+            // 5️⃣ Map Result
+            // ==============================
+            const result = rows.map(row => ({
+                userId: row.userId!,
+                userName: row.userName,
+
+                amountSpent: Number(row.amountSpent),
+                amountApproved: Number(row.amountApproved),
+                amountReceived: Number(row.amountReceived),
+
+                // Laravel logic: approved - received
+                amountLeft: Number(row.amountApproved) - Number(row.amountReceived),
+
+                voucherInfo: {
+                    totalVouchers: Number(row.totalVouchers),
+                    accountsApproved: Number(row.accountsApproved),
+                    adminApproved: Number(row.adminApproved),
+                },
+            }));
+
+            this.logger.debug("Employee summary mapped successfully");
+
+            return result;
+        } catch (error: any) {
+            this.logger.error("Failed to fetch employee summary", {
+                message: error?.message,
+                stack: error?.stack,
+            });
+
+            throw error;
+        }
     }
 
     async getByUser(userId: number) {
-        return this.db
+        let amt = await this.getUserAmts(userId);
+        let rows = await this.db
             .select({
                 id: employeeImprestTransactions.id,
                 userId: employeeImprestTransactions.userId,
@@ -140,8 +216,20 @@ export class ImprestAdminService {
             .innerJoin(users, eq(users.id, employeeImprestTransactions.userId))
             .where(eq(employeeImprestTransactions.userId, userId))
             .orderBy(desc(employeeImprestTransactions.txnDate));
-    }
 
+        return {
+            summary: {
+                amountSpent: amt.amountSpent,
+                amountApproved: amt.amountApproved,
+                amountReceived: amt.amountReceived,
+                amountLeft: amt.amountLeft,
+            },
+            data: rows.map(r => ({
+                ...r,
+                amount: Number(r.amount), // IMPORTANT for Drizzle numeric
+            })),
+        };
+    }
     // Role-based filtering
     // if (user.role !== "admin") {
     //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
@@ -457,5 +545,50 @@ export class ImprestAdminService {
             .returning();
 
         return created;
+    }
+
+    async getUserAmts(userId: number) {
+        // -------- Imprest totals (spent + approved) --------
+        const [imprestAgg] = await this.db
+            .select({
+                amountSpent: sql<number>`
+        COALESCE(SUM(${employeeImprests.amount}), 0)
+      `,
+                amountApproved: sql<number>`
+        COALESCE(
+          SUM(
+            CASE 
+              WHEN ${employeeImprests.approvalStatus} = 1 
+              THEN ${employeeImprests.amount} 
+              ELSE 0 
+            END
+          ),
+          0
+        )
+      `,
+            })
+            .from(employeeImprests)
+            .where(eq(employeeImprests.userId, userId));
+
+        // -------- Transaction total (received) --------
+        const [txnAgg] = await this.db
+            .select({
+                amountReceived: sql<number>`
+        COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
+      `,
+            })
+            .from(employeeImprestTransactions)
+            .where(eq(employeeImprestTransactions.userId, userId));
+
+        const amountSpent = Number(imprestAgg.amountSpent);
+        const amountApproved = Number(imprestAgg.amountApproved);
+        const amountReceived = Number(txnAgg.amountReceived);
+
+        return {
+            amountSpent,
+            amountApproved,
+            amountReceived,
+            amountLeft: amountApproved - amountReceived,
+        };
     }
 }
