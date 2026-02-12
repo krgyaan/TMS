@@ -178,6 +178,15 @@ const DemandDraftListPage = () => {
                 filter: true,
             },
             {
+                field: 'purpose',
+                headerName: 'Purpose',
+                width: 100,
+                colId: 'purpose',
+                valueGetter: (params) => params.data?.purpose || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'ddAmount',
                 headerName: 'DD Amount',
                 width: 120,

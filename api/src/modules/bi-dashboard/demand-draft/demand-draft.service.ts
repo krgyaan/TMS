@@ -140,6 +140,7 @@ export class DemandDraftService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 ddCreationDate: instrumentDdDetails.ddDate,
                 ddNo: instrumentDdDetails.ddNo,
                 beneficiaryName: paymentInstruments.favouring,
@@ -187,6 +188,7 @@ export class DemandDraftService {
         const data: DemandDraftDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            purpose: row.purpose,
             ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
             ddNo: row.ddNo,
             beneficiaryName: row.beneficiaryName,
