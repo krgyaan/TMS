@@ -42,13 +42,13 @@ export class EmployeeImprestController {
 
     @Get()
     getMyImprests(@Req() req) {
-        return this.service.findAllByUser(req.user.sub);
+        return this.service.getEmployeeDashboard(req.user.sub);
     }
 
     @Get("user/:userId")
     getByUser(@Param("userId", ParseIntPipe) userId: number) {
         console.log("Fetching imprests for userId (controller):", userId);
-        return this.service.findAllByUser(userId);
+        return this.service.getEmployeeDashboard(userId);
     }
 
     @Get(":id")
