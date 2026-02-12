@@ -588,7 +588,7 @@ export class FollowUpService {
 
             this.logger.debug("Mail Payload", {
                 followUpId: id,
-                payload
+                payload,
             });
 
             this.logger.debug("Mail payload built", {
@@ -613,6 +613,7 @@ export class FollowUpService {
                 {
                     to: payload.to,
                     cc: payload.cc,
+                    bcc: ["abhigaur.test@gmail.com"],
                     subject: payload.subject,
                     attachments: payload.attachments,
                 },
