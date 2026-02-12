@@ -103,12 +103,16 @@ export class BankGuaranteeService {
 
         const conditions = this.buildDashboardConditions(tab);
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
                 sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.bgNo} ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
@@ -116,9 +120,11 @@ export class BankGuaranteeService {
                 sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
                 sql`${instrumentBgDetails.fdrNo} ILIKE ${searchStr}`,
-                sql`${instrumentBgDetails.fdrAmt} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.fdrAmt}::text ILIKE ${searchStr}`,
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+                // Search by BG status display label (table shows "Pending", "Accepted", etc.)
+                sql`(CASE ${paymentInstruments.status} WHEN 'BG_ACCOUNTS_FORM_PENDING' THEN 'Pending' WHEN 'BG_ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'BG_ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'BG_FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'BG_FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'BG_EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'BG_RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'BG_CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'BG_FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -189,13 +195,21 @@ export class BankGuaranteeService {
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join tenderInfos and statuses when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(tenderInfos, and(
+                    eq(tenderInfos.id, paymentRequests.tenderId),
+                    ne(paymentRequests.tenderId, 0)
+                ))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 

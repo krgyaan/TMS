@@ -555,7 +555,7 @@ export class TenderInfosService {
                 userId: createdBy,
                 timerConfig: {
                     type: 'FIXED_DURATION',
-                    durationHours: 24
+                    durationHours: 72
                 },
                 metadata: {
                     createdBy,

@@ -21,7 +21,7 @@ export class FdrService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService
-    ) {}
+    ) { }
 
     private statusMap() {
         return {
@@ -112,10 +112,12 @@ export class FdrService {
         const { conditions: baseConditions, needsFdrDetails } = this.buildFdrDashboardConditions(tab);
         const conditions = [...baseConditions];
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
         // Note: We always join instrumentFdrDetails in the query, so we can search FDR columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,

@@ -90,9 +90,11 @@ export class BankTransferService {
 
         const conditions = this.buildBtDashboardConditions(tab);
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
@@ -158,14 +160,19 @@ export class BankTransferService {
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join users and statuses when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 

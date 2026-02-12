@@ -126,9 +126,11 @@ export class ChequeService {
 
         const conditions = this.buildChequeDashboardConditions(tab);
 
+        const searchTerm = options?.search?.trim();
+
         // Search filter - search across all rendered columns
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
             const searchConditions: any[] = [
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
