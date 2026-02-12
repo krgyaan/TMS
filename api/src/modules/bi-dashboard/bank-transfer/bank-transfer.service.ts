@@ -136,6 +136,7 @@ export class BankTransferService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
                 utrNo: instrumentTransferDetails.utrNum,
@@ -179,6 +180,7 @@ export class BankTransferService {
         const data: BankTransferDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            purpose: row.purpose,
             date: row.date ? new Date(row.date) : null,
             teamMember: row.teamMember?.toString() ?? null,
             member: row.teamMember?.toString() ?? null,
