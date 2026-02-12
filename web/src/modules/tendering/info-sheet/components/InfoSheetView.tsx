@@ -79,12 +79,17 @@ const formatDocuments = (
                     )
                 }
 
-                const docName = doc.documentName
-                const docKey = doc.id ?? doc.documentName ?? index
+                const rawName = doc.documentName
+                const docKey = doc.id ?? rawName ?? index
+                const label = options ? getOptionLabel(options, rawName) : rawName
+
+                if (!label || label === "—") {
+                    return null
+                }
 
                 return (
                     <Badge key={docKey} variant="outline">
-                        {docName}
+                        {label}
                     </Badge>
                 )
             })}
