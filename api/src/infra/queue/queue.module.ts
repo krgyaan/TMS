@@ -1,7 +1,7 @@
 import { Module, Global } from "@nestjs/common";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
-import { isRedisEnabled, redisConnection } from "@/config/redis.config";
+import { redisConnection } from "@/config/redis.config";
 
 @Global()
 @Module({
@@ -9,9 +9,6 @@ import { isRedisEnabled, redisConnection } from "@/config/redis.config";
         {
             provide: "REDIS_CONNECTION",
             useFactory: () => {
-                if (!isRedisEnabled) {
-                    return null;
-                }
 
                 return new IORedis({
                     host: redisConnection.host,
@@ -23,12 +20,9 @@ import { isRedisEnabled, redisConnection } from "@/config/redis.config";
             provide: "FOLLOWUP_QUEUE",
             inject: ["REDIS_CONNECTION"],
             useFactory: (connection: IORedis | null) => {
-                if (!isRedisEnabled || !connection) {
-                    // In non-production environments, return a no-op queue implementation
-                    // so that the rest of the application can run without Redis.
+                if (!connection) {
                     return {
                         add: async () => {
-                            // no-op
                         },
                     } as unknown as Queue;
                 }

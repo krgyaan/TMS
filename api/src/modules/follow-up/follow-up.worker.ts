@@ -1,6 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { Worker } from "bullmq";
-import { isRedisEnabled, redisConnection } from "@/config/redis.config";
+import { redisConnection } from "@/config/redis.config";
 import { FollowUpService } from "./follow-up.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -14,13 +14,6 @@ export class FollowupWorker implements OnModuleInit {
     ) { }
 
     onModuleInit() {
-        if (!isRedisEnabled) {
-            this.logger.info(
-                "Followup worker not started: Redis is disabled in non-production environment",
-            );
-            return;
-        }
-
         const worker = new Worker(
             "followup-mail-queue",
             async job => {
