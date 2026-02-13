@@ -2427,7 +2427,7 @@ export class EmdsService {
             'BG': 26,
             'CHEQUE': 33,
         };
-        return mapping[modeUpper] || 33; // Default to 33 if not found
+        return mapping[modeUpper] || 33;
     }
 
     /**

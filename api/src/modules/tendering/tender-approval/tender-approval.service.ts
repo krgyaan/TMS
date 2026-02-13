@@ -519,7 +519,7 @@ export class TenderApprovalService {
             // 3. Determine which timers should be started based on tender configuration
             const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
 
-            if (tender.rfqTo && tender.rfqTo !== '0') {
+            if (tender.rfqTo && tender.rfqTo !== '0' && tender.rfqTo !== '1') {
                 stagesToStart.push({ stage: 'rfq_sent' });
             }
             if (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1') {

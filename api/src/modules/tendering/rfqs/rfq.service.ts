@@ -5,20 +5,9 @@ import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
 import { users } from "@db/schemas/auth/users.schema";
-import { tenderStatusHistory } from "@db/schemas/tendering/tender-status-history.schema";
 import {
-    NewRfq,
-    rfqs,
-    rfqItems,
-    rfqDocuments,
-    NewRfqItem,
-    NewRfqDocument,
-    rfqResponses,
-    rfqResponseItems,
-    rfqResponseDocuments,
-    NewRfqResponse,
-    NewRfqResponseItem,
-    NewRfqResponseDocument,
+    NewRfq, rfqs, rfqItems, rfqDocuments, NewRfqItem, NewRfqDocument, rfqResponses, rfqResponseItems,
+    rfqResponseDocuments, NewRfqResponse, NewRfqResponseItem, NewRfqResponseDocument
 } from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
@@ -159,6 +148,7 @@ export class RfqsService {
             isNotNull(tenderInfos.rfqTo), // NOT NULL
             ne(tenderInfos.rfqTo, ""), // NOT empty string
             ne(tenderInfos.rfqTo, "0"), // NOT '0'
+            ne(tenderInfos.rfqTo, "1"), // NOT '1'
         ];
 
         // Apply role-based filtering
@@ -274,7 +264,7 @@ export class RfqsService {
                 vendorOrganizationNames: sql<string>`(
                         SELECT string_agg(${vendorOrganizations.name}, ', ')
                         FROM ${vendorOrganizations}
-                        WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ','))
+                        WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ''))
                     )`,
                 rfqCount: sql<number>`(SELECT count(*)::int FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
             })
@@ -318,7 +308,6 @@ export class RfqsService {
         }
 
         const rfqItemsData = await this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id));
-
         const rfqDocumentsData = await this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id));
 
         return {
