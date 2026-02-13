@@ -23,8 +23,8 @@ export const TenderInformationFormSchema = z.object({
 
     // Tender Value
     tenderValue: z.coerce.number().nonnegative().optional().refine(
-        (val) => val === undefined || val === null || val > 0,
-        { message: 'Tender value must be greater than 0' }
+        (val) => val === undefined || val === null || val >= 0,
+        { message: 'Tender value must be positive' }
     ),
 
     // OEM Experience

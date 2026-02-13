@@ -66,7 +66,36 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
     );
 };
 
-const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+const getOptionLabel = (
+    options: Array<{ value: string; label: string }> | undefined,
+    raw: string | number | null | undefined,
+) => {
+    if (raw === null || raw === undefined) return "—"
+    const rawStr = String(raw).trim()
+    if (!rawStr) return "—"
+
+    if (!options || options.length === 0) {
+        return rawStr
+    }
+
+    const match = options.find((option) => option.value === rawStr)
+    if (match) {
+        return match.label
+    }
+
+    // If it's already a descriptive string, keep it as-is
+    if (isNaN(Number(rawStr))) {
+        return rawStr
+    }
+
+    // Fallback to the raw id string when no label is found
+    return rawStr
+}
+
+const formatDocuments = (
+    documents: string[] | Array<{ id?: number; documentName: string }> = [],
+    options?: Array<{ value: string; label: string }>,
+) => {
     if (!documents.length) {
         return <span className="text-muted-foreground">No documents listed</span>
     }
@@ -75,14 +104,31 @@ const formatDocuments = (documents: string[] | Array<{ id?: number; documentName
         <div className="flex flex-wrap gap-2">
             {documents.map((doc, index) => {
                 // Handle both string arrays and object arrays
-                const docName = typeof doc === 'string' ? doc : doc.documentName;
-                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+                if (typeof doc === "string") {
+                    const label = options ? getOptionLabel(options, doc) : doc
+                    if (!label || label === "—") {
+                        return null
+                    }
+                    return (
+                        <Badge key={doc} variant="outline">
+                            {label}
+                        </Badge>
+                    )
+                }
+
+                const rawName = doc.documentName
+                const docKey = doc.id ?? rawName ?? index
+                const label = options ? getOptionLabel(options, rawName) : rawName
+
+                if (!label || label === "—") {
+                    return null
+                }
 
                 return (
                     <Badge key={docKey} variant="outline">
-                        {docName}
+                        {label}
                     </Badge>
-                );
+                )
             })}
         </div>
     )
@@ -431,7 +477,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet.technicalWorkOrders && infoSheet.technicalWorkOrders?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [])}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [], pqrOptions)}
                                                 </div>
                                             )}
                                             {
@@ -461,7 +507,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet.commercialDocuments && infoSheet.commercialDocuments?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [])}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [], financeDocumentOptions)}
                                                 </div>
                                             )}
                                             {

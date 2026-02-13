@@ -21,6 +21,8 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -656,35 +658,96 @@ export class TenderApprovalService {
         // Get physical docs requirement
         const phyDocs = "As per tender requirements"; // TODO: Get from tender data if available
 
-        // Map document IDs to names
-        const technicalDocMap: Record<string, string> = {
-            "1": "Technical Specification Document",
-            "2": "Product Catalog",
-            "3": "Test Certificates",
-            "4": "Quality Certifications (ISO, etc.)",
-            "5": "OEM Authorization",
-            "6": "Similar Work Experience Certificates",
-            "7": "Installation Manual",
+        // Fetch info sheet to get original documents
+        const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+
+        // Fetch all PQR and Finance documents for mapping
+        const [allPqrDocs, allFinanceDocs] = await Promise.all([
+            this.db.select().from(pqrDocuments).limit(1000),
+            this.db.select().from(financeDocuments).limit(1000),
+        ]);
+
+        // Create maps for document lookup
+        const pqrMap = new Map<number, string>();
+        allPqrDocs.forEach(pqr => {
+            const label = pqr.projectName
+                ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
+                : `PQR ${pqr.id}`;
+            pqrMap.set(pqr.id, label);
+        });
+
+        const financeMap = new Map<number, string>();
+        allFinanceDocs.forEach(doc => {
+            if (doc.documentName) {
+                financeMap.set(doc.id, doc.documentName);
+            }
+        });
+
+        // Map original technical documents from info sheet
+        const mapTechnicalDocs = (docs: Array<{ id?: number; documentName: string }> | string[] | null | undefined): string[] => {
+            if (!docs || !Array.isArray(docs) || docs.length === 0) return [];
+            return docs.map(doc => {
+                if (typeof doc === 'string') {
+                    const docId = parseInt(doc, 10);
+                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                        return pqrMap.get(docId)!;
+                    }
+                    return doc; // Return as-is if not a valid ID or not found
+                }
+                const docId = parseInt(doc.documentName, 10);
+                if (!isNaN(docId) && pqrMap.has(docId)) {
+                    return pqrMap.get(docId)!;
+                }
+                return doc.documentName || '';
+            }).filter(Boolean);
         };
 
-        const financialDocMap: Record<string, string> = {
-            "1": "Balance Sheet (Last 3 Years)",
-            "2": "Profit & Loss Statement",
-            "3": "Income Tax Returns",
-            "4": "GST Registration Certificate",
-            "5": "PAN Card",
-            "6": "Audited Financial Statements",
-            "7": "Bank Solvency Certificate",
-            "8": "Working Capital Certificate",
+        // Map original financial documents from info sheet
+        const mapFinancialDocs = (docs: Array<{ id?: number; documentName: string }> | string[] | null | undefined): string[] => {
+            if (!docs || !Array.isArray(docs) || docs.length === 0) return [];
+            return docs.map(doc => {
+                if (typeof doc === 'string') {
+                    const docId = parseInt(doc, 10);
+                    if (!isNaN(docId) && financeMap.has(docId)) {
+                        return financeMap.get(docId)!;
+                    }
+                    return doc; // Return as-is if not a valid ID or not found
+                }
+                const docId = parseInt(doc.documentName, 10);
+                if (!isNaN(docId) && financeMap.has(docId)) {
+                    return financeMap.get(docId)!;
+                }
+                return doc.documentName || '';
+            }).filter(Boolean);
         };
 
-        const mapDocIdsToNames = (ids: string[] | undefined, map: Record<string, string>): string[] => {
+        // Map alternative documents (using the same logic)
+        const mapAlternativeTechnicalDocs = (ids: string[] | undefined): string[] => {
             if (!ids || !Array.isArray(ids)) return [];
-            return ids.map(id => map[id] || id).filter(Boolean);
+            return ids.map(id => {
+                const docId = parseInt(id, 10);
+                if (!isNaN(docId) && pqrMap.has(docId)) {
+                    return pqrMap.get(docId)!;
+                }
+                return id;
+            }).filter(Boolean);
         };
 
-        const alternativeTechnicalDocNames = mapDocIdsToNames(payload.alternativeTechnicalDocs, technicalDocMap);
-        const alternativeFinancialDocNames = mapDocIdsToNames(payload.alternativeFinancialDocs, financialDocMap);
+        const mapAlternativeFinancialDocs = (ids: string[] | undefined): string[] => {
+            if (!ids || !Array.isArray(ids)) return [];
+            return ids.map(id => {
+                const docId = parseInt(id, 10);
+                if (!isNaN(docId) && financeMap.has(docId)) {
+                    return financeMap.get(docId)!;
+                }
+                return id;
+            }).filter(Boolean);
+        };
+
+        const originalTechnicalDocs = infoSheet ? mapTechnicalDocs(infoSheet.technicalWorkOrders) : [];
+        const originalFinancialDocs = infoSheet ? mapFinancialDocs(infoSheet.commercialDocuments) : [];
+        const alternativeTechnicalDocNames = mapAlternativeTechnicalDocs(payload.alternativeTechnicalDocs);
+        const alternativeFinancialDocNames = mapAlternativeFinancialDocs(payload.alternativeFinancialDocs);
 
         const emailData = {
             assignee: assignee.name,
@@ -703,6 +766,8 @@ export class TenderApprovalService {
             phyDocs,
             pqrApproved: payload.approvePqrSelection === "1",
             finApproved: payload.approveFinanceDocSelection === "1",
+            technicalDocs: originalTechnicalDocs.length > 0 ? originalTechnicalDocs.join(", ") : "None",
+            financialDocs: originalFinancialDocs.length > 0 ? originalFinancialDocs.join(", ") : "None",
             alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(", ") : "",
             alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(", ") : "",
             tlName,

@@ -22,6 +22,8 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { websites } from '@db/schemas/master/websites.schema';
 import { TimersService } from '@/modules/timers/timers.service';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
@@ -785,10 +787,53 @@ export class TenderInfoSheetsService {
             return `${value}%`;
         };
 
-        // Build document lists
-        const teDocs = infoSheet.technicalWorkOrders.map(doc => `<li>${doc.documentName}</li>`).join('');
-        const tenderDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
-        const ceDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
+        // Fetch all PQR and Finance documents for mapping
+        const [allPqrDocs, allFinanceDocs] = await Promise.all([
+            this.db.select().from(pqrDocuments).limit(1000),
+            this.db.select().from(financeDocuments).limit(1000),
+        ]);
+
+        // Create maps for document lookup
+        const pqrMap = new Map<number, string>();
+        allPqrDocs.forEach(pqr => {
+            const label = pqr.projectName
+                ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
+                : `PQR ${pqr.id}`;
+            pqrMap.set(pqr.id, label);
+        });
+
+        const financeMap = new Map<number, string>();
+        allFinanceDocs.forEach(doc => {
+            if (doc.documentName) {
+                financeMap.set(doc.id, doc.documentName);
+            }
+        });
+
+        // Map document names to labels
+        const mapDocumentName = (docName: string, isTechnical: boolean): string => {
+            const docId = parseInt(docName, 10);
+            if (!isNaN(docId)) {
+                if (isTechnical && pqrMap.has(docId)) {
+                    return pqrMap.get(docId)!;
+                }
+                if (!isTechnical && financeMap.has(docId)) {
+                    return financeMap.get(docId)!;
+                }
+            }
+            // Return as-is if not a valid ID or not found in maps
+            return docName;
+        };
+
+        // Build document lists with mapped names
+        const teDocs = infoSheet.technicalWorkOrders.length > 0
+            ? infoSheet.technicalWorkOrders.map(doc => `<li>${mapDocumentName(doc.documentName, true)}</li>`).join('')
+            : '<li>None</li>';
+        const tenderDocs = infoSheet.commercialDocuments.length > 0
+            ? infoSheet.commercialDocuments.map(doc => `<li>${mapDocumentName(doc.documentName, false)}</li>`).join('')
+            : '<li>None</li>';
+        const ceDocs = infoSheet.commercialDocuments.length > 0
+            ? infoSheet.commercialDocuments.map(doc => `<li>${mapDocumentName(doc.documentName, false)}</li>`).join('')
+            : '<li>None</li>';
 
         // Format array fields (modes) as comma-separated strings
         const formatArray = (arr: string[] | null | undefined): string => {
@@ -884,9 +929,9 @@ export class TenderInfoSheetsService {
             sc_display: infoSheet.solvencyCertificateType || 'Not specified',
             sc_amt: formatCurrency(infoSheet.solvencyCertificateValue),
             // Documents
-            te_docs: teDocs || '<li>None</li>',
-            tender_docs: tenderDocs || '<li>None</li>',
-            ce_docs: ceDocs || '<li>None</li>',
+            te_docs: teDocs,
+            tender_docs: tenderDocs,
+            ce_docs: ceDocs,
             // Clients
             clients: infoSheet.clients.map(client => ({
                 client_name: client.clientName,
