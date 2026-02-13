@@ -1885,7 +1885,7 @@ export class EmdsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             const result = await this.emailService.sendTenderEmail({
@@ -1897,6 +1897,7 @@ export class EmdsService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
 
             if (!result.success) {
@@ -2040,6 +2041,22 @@ export class EmdsService {
             .limit(1);
 
         if (!instrument) return;
+
+        // Collect PDF paths from instrument (for DD, FDR, BG modes)
+        const pdfFiles: string[] = [];
+        if (instrument.generatedPdf) {
+            pdfFiles.push(instrument.generatedPdf);
+        }
+        if (instrument.extraPdfPaths) {
+            try {
+                const extraPaths = JSON.parse(instrument.extraPdfPaths);
+                if (Array.isArray(extraPaths)) {
+                    pdfFiles.push(...extraPaths);
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to parse extraPdfPaths for instrument ${instrumentInfo.instrumentId}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
 
         // Get accounts team ID
         const accountsTeamId = await this.getAccountsTeamId();
@@ -2226,6 +2243,17 @@ export class EmdsService {
         // Get CC recipients by team
         const ccRecipients = await this.getCcRecipientsByTeam(tenderTeamId);
 
+        // Prepare attachments for modes that generate PDFs (DD, FDR, BG)
+        const attachments = (mode === 'DD' || mode === 'FDR' || mode === 'BG') && pdfFiles.length > 0
+            ? { files: pdfFiles }
+            : undefined;
+
+        if (attachments) {
+            this.logger.debug(
+                `Attaching ${pdfFiles.length} PDF(s) to ${mode} email for instrument ${instrumentInfo.instrumentId}: ${pdfFiles.join(', ')}`
+            );
+        }
+
         await this.sendEmail(
             `payment-request.${mode.toLowerCase()}`,
             tenderId,
@@ -2236,6 +2264,7 @@ export class EmdsService {
             {
                 to: toRecipients,
                 cc: ccRecipients,
+                attachments,
             }
         );
     }
@@ -2316,12 +2345,37 @@ export class EmdsService {
                 courierAddress: ddInstrument.courierAddress || 'Not specified',
             };
 
+            // Collect PDF paths from DD instrument
+            const pdfFiles: string[] = [];
+            if (ddInstrument.generatedPdf) {
+                pdfFiles.push(ddInstrument.generatedPdf);
+            }
+            if (ddInstrument.extraPdfPaths) {
+                try {
+                    const extraPaths = JSON.parse(ddInstrument.extraPdfPaths);
+                    if (Array.isArray(extraPaths)) {
+                        pdfFiles.push(...extraPaths);
+                    }
+                } catch (error) {
+                    this.logger.warn(`Failed to parse extraPdfPaths for DD instrument ${ddInstrumentId}: ${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+
             // Get TO recipient using DD responsible user ID
             const responsibleUserId = this.getResponsibleUserId('DD');
             const toRecipients = await this.getUserDetailsForEmail(responsibleUserId);
 
             // Get CC recipients by team
             const ccRecipients = await this.getCcRecipientsByTeam(tenderTeamId);
+
+            // Prepare attachments if PDFs are available
+            const attachments = pdfFiles.length > 0 ? { files: pdfFiles } : undefined;
+
+            if (attachments) {
+                this.logger.debug(
+                    `Attaching ${pdfFiles.length} PDF(s) to DD mail after cheque action for DD instrument ${ddInstrumentId}: ${pdfFiles.join(', ')}`
+                );
+            }
 
             // Send email
             await this.sendEmail(
@@ -2334,6 +2388,7 @@ export class EmdsService {
                 {
                     to: toRecipients,
                     cc: ccRecipients,
+                    attachments,
                 }
             );
 
