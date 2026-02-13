@@ -2097,7 +2097,7 @@ export class EmdsService {
 
             if (mode === 'DD') {
                 template = 'demand-draft-request';
-                subject = `DD Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+                subject = `DD for ${instrumentInfo.purpose}`;
                 emailData = {
                     chequeNo: ddDetails?.ddNo || 'N/A',
                     dueDate: formatDate(tender.dueDate),
@@ -2105,13 +2105,12 @@ export class EmdsService {
                     timeLimit: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
                     beneficiaryName: instrument.favouring || 'Not specified',
                     payableAt: instrument.payableAt || 'Not specified',
-                    link: `#/tendering/emds/${instrumentInfo.requestId}`, // TODO: Update with actual frontend URL
+                    link: `#/tendering/emds/${instrumentInfo.requestId}`,
                     courierAddress: instrument.courierAddress || 'Not specified',
                 };
             } else {
                 template = 'cheque-request';
-                // CHEQUE might map to SB (Security Bank/Standby) in expected format
-                subject = `SB Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+                subject = `New Cheque ${instrumentInfo.purpose}`;
                 emailData = {
                     purpose: instrumentInfo.purpose,
                     partyName: instrument.favouring || 'Not specified',
@@ -2119,8 +2118,8 @@ export class EmdsService {
                     amount: formatCurrency(instrumentInfo.amount),
                     chequeNeeds: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
                     link: `#/tendering/emds/${instrumentInfo.requestId}`,
-                    assignee: 'Tender Executive', // TODO: Get from user
-                    tlName: 'Team Leader', // TODO: Get from team leader
+                    assignee: 'Kailash',
+                    tlName: 'Team Leader',
                 };
             }
         } else if (mode === 'BG') {
@@ -2131,7 +2130,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'bank-guarantee-request';
-            subject = `BG Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+            subject = `BG for ${instrumentInfo.purpose}`;
             emailData = {
                 purpose: instrumentInfo.purpose,
                 bg_in_favor_of: instrument.favouring || 'Not specified',
@@ -2146,7 +2145,7 @@ export class EmdsService {
                 bg_needs: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
                 link_to_acc_form: `#/tendering/emds/${instrumentInfo.requestId}`,
                 courier_address: instrument.courierAddress || 'Not specified',
-                sign: 'Shivani', // TODO: Get from config or user
+                sign: 'Kailash',
             };
         } else if (mode === 'FDR') {
             const [fdrDetails] = await this.db
@@ -2156,7 +2155,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'fixed-deposit-receipt-request';
-            subject = `FDR Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+            subject = `FDR for ${instrumentInfo.purpose}`;
             emailData = {
                 purpose: instrumentInfo.purpose,
                 beneficiaryName: instrument.favouring || 'Not specified',
@@ -2174,7 +2173,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'bank-transfer-request';
-            subject = `BT Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+            subject = `Bank Transfer - ${instrumentInfo.purpose}`;
             emailData = {
                 tenderNo: tender.tenderNo,
                 tenderName: tender.tenderName,
@@ -2188,7 +2187,7 @@ export class EmdsService {
                 btIfsc: btDetails?.ifsc || 'Not specified',
                 amount: formatCurrency(instrumentInfo.amount),
                 link: `#/tendering/emds/${instrumentInfo.requestId}`,
-                sign: 'Shivani', // TODO: Get from config or user
+                sign: 'Kailash',
                 tlName: 'Team Leader', // TODO: Get from team leader
             };
         } else if (mode === 'PORTAL' || mode === 'POP') {
@@ -2199,7 +2198,7 @@ export class EmdsService {
                 .limit(1);
 
             template = 'pay-on-portal-request';
-            subject = `POP Request for EMD - ${tender.tenderName || tender.tenderNo}`;
+            subject = `Pay on Portal - ${instrumentInfo.purpose}`;
             emailData = {
                 portal: portalDetails?.portalName || 'Payment Portal',
                 purpose: instrumentInfo.purpose,
@@ -2211,17 +2210,24 @@ export class EmdsService {
                 netbanking: portalDetails?.isNetbanking === 'Yes' ? 'Yes' : 'No',
                 debit: portalDetails?.isDebit === 'Yes' ? 'Yes' : 'No',
                 link: `#/tendering/emds/${instrumentInfo.requestId}`,
-                sign: 'Shivani', // TODO: Get from config or user
-                tlName: 'Team Leader', // TODO: Get from team leader
+                sign: 'Kailash',
+                tlName: 'Team Leader',
             };
         } else {
             // Unknown instrument type, skip email
             return;
         }
 
-        // Build CC recipients
-        const ccRecipients: RecipientSource[] = [];
+        // To: by payment mode — BG → Imran, all others → Kailash
+        const toRecipients: RecipientSource[] =
+            mode === 'BG'
+                ? [{ type: 'emails', emails: ['imran@volksenergie.in'] }]
+                : [{ type: 'emails', emails: ['kailash@volksenergie.in'] }];
 
+        // CC: accounts team inbox
+        const ccRecipients: RecipientSource[] = [
+            { type: 'emails', emails: ['accounts@volksenergie.in'] },
+        ];
         // Add Team Admin and Team Leader from tender team (if tender team exists)
         if (tenderTeamId) {
             ccRecipients.push(
@@ -2229,11 +2235,6 @@ export class EmdsService {
                 { type: 'role', role: 'Team Leader', teamId: tenderTeamId }
             );
         }
-
-        // Add Account Team Leader from accounts team
-        ccRecipients.push(
-            { type: 'role', role: 'Team Leader', teamId: accountsTeamId }
-        );
 
         await this.sendEmail(
             `payment-request.${mode.toLowerCase()}`,
@@ -2243,7 +2244,7 @@ export class EmdsService {
             template,
             emailData,
             {
-                to: [{ type: 'role', role: 'Admin', teamId: accountsTeamId }],
+                to: toRecipients,
                 cc: ccRecipients,
             }
         );
