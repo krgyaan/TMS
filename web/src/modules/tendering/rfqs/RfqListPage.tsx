@@ -19,6 +19,7 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Rfqs = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
@@ -174,11 +175,25 @@ const Rfqs = () => {
             headerName: 'Vendor',
             width: 150,
             colId: 'vendorOrganizationNames',
-            valueGetter: (params) => {
-                const names = params.data?.vendorOrganizationNames
-                if (!names) return '—';
-
-                return names;
+            cellRenderer: (params: any) => {
+                const names = params.data?.vendorOrganizationNames;
+                if (!names) return <p>—</p>;
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Badge variant="secondary">
+                                {names.split(',').length} vendors
+                            </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <ul className="list-disc list-inside font-medium">
+                                {names.split(',').map((name: string) => (
+                                    <li key={name}>{name}</li>
+                                ))}
+                            </ul>
+                        </TooltipContent>
+                    </Tooltip>
+                );
             },
             sortable: true,
             filter: true,

@@ -261,11 +261,7 @@ export class RfqsService {
                 rfqTo: tenderInfos.rfqTo,
                 dueDate: tenderInfos.dueDate,
                 rfqId: rfqs.id,
-                vendorOrganizationNames: sql<string>`(
-                        SELECT string_agg(${vendorOrganizations.name}, ', ')
-                        FROM ${vendorOrganizations}
-                        WHERE CAST(${vendorOrganizations.id} AS TEXT) = ANY(string_to_array(${tenderInfos.rfqTo}, ''))
-                    )`,
+                vendorOrganizationIds: tenderInfos.rfqTo || null,
                 rfqCount: sql<number>`(SELECT count(*)::int FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
             })
             .from(tenderInfos)
@@ -278,23 +274,28 @@ export class RfqsService {
             .limit(limit)
             .offset(offset);
 
-        const data: RfqRow[] = rows.map(row => ({
-            tenderId: row.tenderId,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            teamMember: row.teamMember || 0,
-            teamMemberName: row.teamMemberName || "",
-            status: row.status || 0,
-            statusName: row.statusName || "",
-            latestStatus: null,
-            latestStatusName: null,
-            statusRemark: null,
-            itemName: row.itemName || "",
-            rfqTo: row.rfqTo || "",
-            dueDate: row.dueDate,
-            rfqId: row.rfqId,
-            vendorOrganizationNames: row.vendorOrganizationNames,
-            rfqCount: Number(row.rfqCount ?? 0),
+        const data: RfqRow[] = await Promise.all(rows.map(async row => {
+            const vendorOrganizationIds = row.vendorOrganizationIds?.split(',').map(id => parseInt(id.trim()));
+            const vendorOrganizationNames = await this.db.select().from(vendorOrganizations).where(inArray(vendorOrganizations.id, vendorOrganizationIds ?? []));
+
+            return {
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo,
+                tenderName: row.tenderName,
+                teamMember: row.teamMember || 0,
+                teamMemberName: row.teamMemberName || "",
+                status: row.status || 0,
+                statusName: row.statusName || "",
+                latestStatus: null,
+                latestStatusName: null,
+                statusRemark: null,
+                itemName: row.itemName || "",
+                rfqTo: row.rfqTo || "",
+                dueDate: row.dueDate,
+                rfqId: row.rfqId,
+                vendorOrganizationNames: vendorOrganizationNames.map(org => org.name).join(', '),
+                rfqCount: Number(row.rfqCount ?? 0),
+            };
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
