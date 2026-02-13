@@ -2095,18 +2095,19 @@ export class EmdsService {
                 .where(eq(instrumentDdDetails.instrumentId, instrumentInfo.instrumentId))
                 .limit(1);
 
+            // For DD mode, send cheque-request template with purpose='Yourself for DD'
             if (mode === 'DD') {
-                template = 'demand-draft-request';
-                subject = `DD for ${instrumentInfo.purpose}`;
+                template = 'cheque-request';
+                subject = `New Cheque ${instrumentInfo.purpose}`;
                 emailData = {
-                    chequeNo: ddDetails?.ddNo || 'N/A',
-                    dueDate: formatDate(tender.dueDate),
-                    amountFormatted: formatCurrency(instrumentInfo.amount),
-                    timeLimit: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
-                    beneficiaryName: instrument.favouring || 'Not specified',
-                    payableAt: instrument.payableAt || 'Not specified',
+                    purpose: 'Yourself for DD',
+                    partyName: instrument.favouring || 'Not specified',
+                    chequeDate: formatDate(instrument.issueDate),
+                    amount: formatCurrency(instrumentInfo.amount),
+                    chequeNeeds: instrument.courierDeadline ? `${instrument.courierDeadline} hours` : 'Not specified',
                     link: `#/tendering/emds/${instrumentInfo.requestId}`,
-                    courierAddress: instrument.courierAddress || 'Not specified',
+                    assignee: 'Kailash',
+                    tlName: 'Team Leader',
                 };
             } else {
                 template = 'cheque-request';
@@ -2218,23 +2219,12 @@ export class EmdsService {
             return;
         }
 
-        // To: by payment mode — BG → Imran, all others → Kailash
-        const toRecipients: RecipientSource[] =
-            mode === 'BG'
-                ? [{ type: 'emails', emails: ['imran@volksenergie.in'] }]
-                : [{ type: 'emails', emails: ['kailash@volksenergie.in'] }];
+        // Get responsible user ID based on instrument type
+        const responsibleUserId = this.getResponsibleUserId(mode);
+        const toRecipients = await this.getUserDetailsForEmail(responsibleUserId);
 
-        // CC: accounts team inbox
-        const ccRecipients: RecipientSource[] = [
-            { type: 'emails', emails: ['accounts@volksenergie.in'] },
-        ];
-        // Add Team Admin and Team Leader from tender team (if tender team exists)
-        if (tenderTeamId) {
-            ccRecipients.push(
-                { type: 'role', role: 'Admin', teamId: tenderTeamId },
-                { type: 'role', role: 'Team Leader', teamId: tenderTeamId }
-            );
-        }
+        // Get CC recipients by team
+        const ccRecipients = await this.getCcRecipientsByTeam(tenderTeamId);
 
         await this.sendEmail(
             `payment-request.${mode.toLowerCase()}`,
@@ -2251,6 +2241,110 @@ export class EmdsService {
     }
 
     /**
+     * Send DD mail after cheque action is completed
+     */
+    async sendDdMailAfterChequeAction(
+        ddInstrumentId: number,
+        requestId: number,
+        tenderId: number,
+        requestedBy: number
+    ): Promise<void> {
+        try {
+            // Fetch DD instrument and details
+            const [ddInstrument] = await this.db
+                .select()
+                .from(paymentInstruments)
+                .where(eq(paymentInstruments.id, ddInstrumentId))
+                .limit(1);
+
+            if (!ddInstrument) {
+                this.logger.warn(`DD instrument ${ddInstrumentId} not found`);
+                return;
+            }
+
+            const [ddDetails] = await this.db
+                .select()
+                .from(instrumentDdDetails)
+                .where(eq(instrumentDdDetails.instrumentId, ddInstrumentId))
+                .limit(1);
+
+            // Get tender info
+            let tender: any = null;
+            let tenderTeamId: number | null = null;
+            if (tenderId > 0) {
+                tender = await this.tenderInfosService.findById(tenderId);
+                tenderTeamId = tender?.team || null;
+            } else {
+                // For non-tender requests, get from request
+                const [request] = await this.db
+                    .select()
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, requestId))
+                    .limit(1);
+                if (request && request.tenderId > 0) {
+                    tender = await this.tenderInfosService.findById(request.tenderId);
+                    tenderTeamId = tender?.team || null;
+                }
+            }
+
+            // Format currency
+            const formatCurrency = (amount: number) => {
+                return `₹${amount.toLocaleString('en-IN')}`;
+            };
+
+            // Format date
+            const formatDate = (dateStr: string | null) => {
+                if (!dateStr) return 'Not specified';
+                return new Date(dateStr).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                });
+            };
+
+            // Build DD-specific email data
+            const template = 'demand-draft-request';
+            const subject = `DD for ${ddInstrument.purpose}`;
+            const emailData = {
+                chequeNo: ddDetails?.ddNo || 'N/A',
+                dueDate: tender?.dueDate ? formatDate(tender.dueDate) : 'Not specified',
+                amountFormatted: formatCurrency(Number(ddInstrument.amount)),
+                timeLimit: ddInstrument.courierDeadline ? `${ddInstrument.courierDeadline} hours` : 'Not specified',
+                beneficiaryName: ddInstrument.favouring || 'Not specified',
+                payableAt: ddInstrument.payableAt || 'Not specified',
+                link: `#/tendering/emds/${requestId}`,
+                courierAddress: ddInstrument.courierAddress || 'Not specified',
+            };
+
+            // Get TO recipient using DD responsible user ID
+            const responsibleUserId = this.getResponsibleUserId('DD');
+            const toRecipients = await this.getUserDetailsForEmail(responsibleUserId);
+
+            // Get CC recipients by team
+            const ccRecipients = await this.getCcRecipientsByTeam(tenderTeamId);
+
+            // Send email
+            await this.sendEmail(
+                'payment-request.dd',
+                tenderId || 0,
+                requestedBy,
+                subject,
+                template,
+                emailData,
+                {
+                    to: toRecipients,
+                    cc: ccRecipients,
+                }
+            );
+
+            this.logger.log(`DD mail sent after cheque action for DD instrument ${ddInstrumentId}`);
+        } catch (error) {
+            this.logger.error(`Failed to send DD mail after cheque action for DD instrument ${ddInstrumentId}:`, error);
+            // Don't throw - email failure shouldn't break the operation
+        }
+    }
+
+    /**
      * Get Accounts team ID
      */
     private async getAccountsTeamId(): Promise<number | null> {
@@ -2261,5 +2355,58 @@ export class EmdsService {
             .limit(1);
 
         return accountsTeam?.id || null;
+    }
+
+    /**
+     * Get responsible user ID based on instrument type
+     */
+    private getResponsibleUserId(mode: string): number {
+        const modeUpper = mode.toUpperCase();
+        const mapping: Record<string, number> = {
+            'DD': 33,
+            'FDR': 33,
+            'BT': 33,
+            'BANK_TRANSFER': 33,
+            'POP': 33,
+            'PORTAL': 33,
+            'BG': 26,
+            'CHEQUE': 33,
+        };
+        return mapping[modeUpper] || 33; // Default to 33 if not found
+    }
+
+    /**
+     * Get user details for email TO address
+     */
+    private async getUserDetailsForEmail(userId: number): Promise<RecipientSource[]> {
+        try {
+            const user = await this.recipientResolver.getUserById(userId);
+            if (user && user.email) {
+                return [{ type: 'user', userId }];
+            }
+            this.logger.warn(`User ${userId} not found or has no email`);
+            return [];
+        } catch (error) {
+            this.logger.error(`Failed to get user details for userId ${userId}:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * Get CC recipients by team (Admin + Team Leader + accounts@)
+     */
+    private async getCcRecipientsByTeam(teamId: number | null): Promise<RecipientSource[]> {
+        const ccRecipients: RecipientSource[] = [
+            { type: 'emails', emails: ['accounts@volksenergie.in'] },
+        ];
+
+        if (teamId) {
+            ccRecipients.push(
+                { type: 'role', role: 'Admin', teamId },
+                { type: 'role', role: 'Team Leader', teamId }
+            );
+        }
+
+        return ccRecipients;
     }
 }

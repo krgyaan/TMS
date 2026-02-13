@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
 import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -6,6 +6,7 @@ import {
     paymentRequests,
     paymentInstruments,
     instrumentChequeDetails,
+    instrumentDdDetails,
 } from '@db/schemas/tendering/emds.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -14,6 +15,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
 import { CHEQUE_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { EmdsService } from '@/modules/tendering/emds/emds.service';
 
 @Injectable()
 export class ChequeService {
@@ -21,6 +23,7 @@ export class ChequeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        @Inject(forwardRef(() => EmdsService)) private readonly emdsService: EmdsService,
     ) { }
 
     private statusMap() {
@@ -511,6 +514,60 @@ export class ChequeService {
                 .update(instrumentChequeDetails)
                 .set(chequeDetailsUpdate)
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+        }
+
+        // Check for linked DD and send DD mail after cheque action 'accounts-form-1'
+        if (body.action === 'accounts-form-1' && body.cheque_req === 'Accepted') {
+            try {
+                // Get cheque details to check for linked DD
+                const [chequeDetails] = await this.db
+                    .select()
+                    .from(instrumentChequeDetails)
+                    .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+                    .limit(1);
+
+                if (chequeDetails?.linkedDdId) {
+                    // Find the DD instrument that corresponds to this linkedDdId
+                    const [ddDetail] = await this.db
+                        .select()
+                        .from(instrumentDdDetails)
+                        .where(eq(instrumentDdDetails.id, chequeDetails.linkedDdId))
+                        .limit(1);
+
+                    if (ddDetail) {
+                        // Get the DD instrument and request
+                        const [ddInstrument] = await this.db
+                            .select()
+                            .from(paymentInstruments)
+                            .where(eq(paymentInstruments.id, ddDetail.instrumentId))
+                            .limit(1);
+
+                        if (ddInstrument) {
+                            // Get request ID and tender ID from request
+                            const requestId = ddInstrument.requestId;
+                            const [request] = await this.db
+                                .select()
+                                .from(paymentRequests)
+                                .where(eq(paymentRequests.id, requestId))
+                                .limit(1);
+                            const tenderId = request?.tenderId || 0;
+
+                            // Send DD mail
+                            await this.emdsService.sendDdMailAfterChequeAction(
+                                ddInstrument.id,
+                                requestId,
+                                tenderId,
+                                user.id
+                            );
+
+                            this.logger.log(`DD mail triggered after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send DD mail after cheque action for cheque ${instrumentId}:`, error);
+                // Don't fail the operation if email fails
+            }
         }
 
         // Follow-up creation will be handled by a different service class
