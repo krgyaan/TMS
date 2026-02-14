@@ -1,14 +1,14 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useRfqByTenderId, useRfqResponses } from '@/hooks/api/useRfqs';
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
@@ -19,6 +19,7 @@ import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoShe
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
 import { RfqView } from './components/RfqView';
+import { RfqResponsesTable } from './components/RfqResponsesTable';
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
@@ -44,6 +45,8 @@ export default function RfqShowPage() {
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: rfqData, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const rfqId = rfqData?.[0]?.id ?? null;
+    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfqId);
     const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
     const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
@@ -134,21 +137,43 @@ export default function RfqShowPage() {
                     />
                 </TabsContent>
 
-                {/* RFQ */}
-                <TabsContent value="rfq" className="space-y-4">
+                {/* RFQ - combined RfqView + RFQ Responses */}
+                <TabsContent value="rfq" className="space-y-6">
                     {rfqLoading ? (
                         <RfqView rfq={null} tender={tender || undefined} isLoading={true} />
                     ) : !rfqData || rfqData.length === 0 ? (
                         <RfqView rfq={null} tender={tender || undefined} isLoading={false} />
                     ) : (
-                        rfqData.map((rfq) => (
-                            <RfqView
-                                key={rfq.id}
-                                rfq={rfq}
-                                tender={tender || undefined}
-                                isLoading={false}
-                            />
-                        ))
+                        <>
+                            {rfqData.map((rfq) => (
+                                <RfqView
+                                    key={rfq.id}
+                                    rfq={rfq}
+                                    tender={tender || undefined}
+                                    isLoading={false}
+                                />
+                            ))}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold">RFQ Responses</h3>
+                                    {rfqId != null && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => navigate(paths.tendering.rfqsResponseList(rfqId))}
+                                        >
+                                            <List className="h-4 w-4 mr-2" />
+                                            View all
+                                        </Button>
+                                    )}
+                                </div>
+                                <RfqResponsesTable
+                                    responses={rfqResponses}
+                                    isLoading={rfqResponsesLoading}
+                                    rfqId={rfqId}
+                                />
+                            </div>
+                        </>
                     )}
                 </TabsContent>
 

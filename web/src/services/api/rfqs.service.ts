@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { RfqDashboardFilters, RfqDashboardRow, Rfq, CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { RfqDashboardFilters, RfqDashboardRow, Rfq, CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto, RfqResponseListItem, RfqResponseDetail } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class RfqsService extends BaseApiService {
@@ -69,6 +69,18 @@ class RfqsService extends BaseApiService {
 
     async createRfqResponse(rfqId: number, data: CreateRfqResponseBodyDto): Promise<{ id: number; rfqId: number; vendorId: number }> {
         return this.post<{ id: number; rfqId: number; vendorId: number }>(`/${rfqId}/responses`, data);
+    }
+
+    async getAllResponses(): Promise<RfqResponseListItem[]> {
+        return this.get<RfqResponseListItem[]>('/responses');
+    }
+
+    async getResponsesByRfqId(rfqId: number): Promise<RfqResponseListItem[]> {
+        return this.get<RfqResponseListItem[]>(`/${rfqId}/responses`);
+    }
+
+    async getResponseById(responseId: number): Promise<RfqResponseDetail> {
+        return this.get<RfqResponseDetail>(`/responses/${responseId}`);
     }
 }
 
