@@ -128,9 +128,13 @@ export const getImprestVouchers = async ({ userId }: { userId?: number }): Promi
     return Array.isArray(res.data) ? res.data : [];
 };
 
-// ---------- DETAIL ----------
-export const getImprestVoucherById = async (id: number): Promise<ImprestVoucherView> => {
-    const res = await api.get(`/accounts/imprest/voucher/view/${id}`);
+// ---------- DETAIL ---------
+
+export const getImprestVoucher = async (params: { userId: number; from: string; to: string }): Promise<ImprestVoucherView> => {
+    const res = await api.get("/accounts/imprest/voucher/view", {
+        params,
+    });
+
     return res.data;
 };
 
