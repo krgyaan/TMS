@@ -47,7 +47,7 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
+            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
         },
         {
             label: "Payment History",
