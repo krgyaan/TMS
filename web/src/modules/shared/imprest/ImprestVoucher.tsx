@@ -46,8 +46,6 @@ const ImprestVoucherList: React.FC = () => {
 
     const columns = useMemo(
         () => [
-            { field: "voucherCode", headerName: "Voucher No" },
-
             // ✅ Employee / Beneficiary column
             { field: "beneficiaryName", headerName: "Employee" },
 
