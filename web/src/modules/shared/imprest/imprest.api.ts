@@ -120,9 +120,10 @@ export const uploadImprestProofs = async (id: number, files: File[]) => {
 
 // ---------- LIST ----------
 export const getImprestVouchers = async ({ userId }: { userId?: number }): Promise<ImprestVoucherRow[]> => {
-    const url = userId ? `/accounts/imprest/voucher/${userId}` : `/accounts/imprest/voucher`;
+    const res = await api.get("/accounts/imprest/voucher", {
+        params: userId ? { userId } : {},
+    });
 
-    const res = await api.get(url);
     return res.data.data;
 };
 
