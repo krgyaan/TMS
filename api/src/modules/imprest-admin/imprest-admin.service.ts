@@ -265,7 +265,6 @@ export class ImprestAdminService {
     async listVouchers({ userId }: { userId?: number }) {
         const conditions: SQL[] = [];
 
-        // Filter by user if provided
         if (userId) {
             conditions.push(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
         }
@@ -278,14 +277,33 @@ export class ImprestAdminService {
                     id: employeeImprestVouchers.id,
                     voucherCode: employeeImprestVouchers.voucherCode,
 
-                    // NOTE: beneficiaryName stores userId as string
                     beneficiaryId: employeeImprestVouchers.beneficiaryName,
                     beneficiaryName: users.name,
 
-                    amount: employeeImprestVouchers.amount,
+                    // ✅ SQL GOES HERE — NOT IN MAP
+                    amount: sql<number>`
+          COALESCE(
+            (
+              SELECT SUM(${employeeImprests.amount})
+              FROM ${employeeImprests}
+              WHERE ${employeeImprests.userId}
+                = ${sql`${employeeImprestVouchers.beneficiaryName}::int`}
+                AND ${employeeImprests.approvalStatus} = 1
+                AND COALESCE(
+                      ${employeeImprests.approvedDate},
+                      ${employeeImprests.createdAt}
+                    )::timestamptz
+                    BETWEEN ${employeeImprestVouchers.validFrom}
+                        AND ${employeeImprestVouchers.validTo}
+            ),
+            0
+          )
+        `.as("amount"),
+
                     validFrom: employeeImprestVouchers.validFrom,
                     validTo: employeeImprestVouchers.validTo,
                     createdAt: employeeImprestVouchers.createdAt,
+
                     adminSignedBy: employeeImprestVouchers.adminSignedBy,
                     accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
                 })
@@ -311,17 +329,17 @@ export class ImprestAdminService {
                     beneficiaryId: row.beneficiaryId,
                     beneficiaryName: row.beneficiaryName,
 
+                    // ✅ plain JS value now
                     amount: Number(row.amount),
 
                     validFrom: row.validFrom,
                     validTo: row.validTo,
 
-                    // Derived fields (for UI)
                     year: startDate.getFullYear(),
                     week: this.getISOWeek(startDate),
 
-                    adminApproval: Boolean(row.adminSignedBy && row.adminSignedBy.trim()),
-                    accountantApproval: Boolean(row.accountsSignedBy && row.accountsSignedBy.trim()),
+                    adminApproval: Boolean(row.adminSignedBy),
+                    accountantApproval: Boolean(row.accountsSignedBy),
                 };
             }),
             meta: {
@@ -330,56 +348,59 @@ export class ImprestAdminService {
         };
     }
 
-    async createVoucher({ user, userId, validFrom, validTo }: { user: { id: number; role: string }; userId: number; validFrom: string; validTo: string }) {
-        // if (user.role !== "admin" && user.id !== userId) {
-        //     throw new ForbiddenException("You cannot create voucher for another user");
-        // }
+    async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
+        // ✅ THIS is where buildVoucherIfMissing is used
+        return this.buildVoucherIfMissing({
+            userId,
+            from: new Date(validFrom),
+            to: new Date(validTo),
+            createdBy: String(user.sub),
+        });
+    }
 
-        const fromDate = new Date(validFrom);
-        const toDate = new Date(validTo);
-
-        if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
-            throw new BadRequestException("Invalid date format");
-        }
-
+    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
+        // 1️⃣ Check existing voucher
         const existing = await this.db
-            .select({ id: employeeImprestVouchers.id })
+            .select()
             .from(employeeImprestVouchers)
-            .where(and(eq(employeeImprestVouchers.beneficiaryName, String(userId)), eq(employeeImprestVouchers.validFrom, fromDate), eq(employeeImprestVouchers.validTo, toDate)))
+            .where(and(eq(employeeImprestVouchers.beneficiaryName, String(userId)), eq(employeeImprestVouchers.validFrom, from), eq(employeeImprestVouchers.validTo, to)))
             .limit(1);
 
         if (existing.length > 0) {
-            throw new BadRequestException("Voucher already exists for this period");
+            return existing[0];
         }
 
+        // 2️⃣ Fetch imprests (Laravel-compatible)
         const imprests = await this.db
-            .select({ amount: employeeImprests.amount })
+            .select({
+                amount: employeeImprests.amount,
+            })
             .from(employeeImprests)
             .where(
                 and(
                     eq(employeeImprests.userId, userId),
-                    eq(employeeImprests.approvalStatus, 1),
-                    gte(employeeImprests.approvedDate, fromDate),
-                    lte(employeeImprests.approvedDate, toDate)
+                    sql`COALESCE(${employeeImprests.approvedDate}, ${employeeImprests.createdAt})
+             BETWEEN ${from} AND ${to}`
                 )
             );
 
         if (imprests.length === 0) {
-            throw new BadRequestException("No approved imprests found for this period");
+            throw new BadRequestException("No imprests found for selected period");
         }
 
-        const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
+        // 3️⃣ Aggregate
+        const totalAmount = imprests.reduce((sum, row) => sum + Number(row.amount), 0);
 
-        const voucherCode = await this.generateVoucherCode();
-
+        // 4️⃣ Insert voucher
         const [voucher] = await this.db
             .insert(employeeImprestVouchers)
             .values({
-                voucherCode,
+                voucherCode: await this.generateVoucherCode(),
                 beneficiaryName: String(userId),
                 amount: totalAmount,
-                validFrom: fromDate,
-                validTo: toDate,
+                validFrom: from,
+                validTo: to,
+                preparedBy: createdBy,
             })
             .returning();
 
@@ -485,8 +506,13 @@ export class ImprestAdminService {
                 and(
                     eq(employeeImprests.userId, voucher.employeeId),
                     eq(employeeImprests.approvalStatus, 1),
-                    gte(employeeImprests.approvedDate, voucher.validFrom),
-                    lte(employeeImprests.approvedDate, voucher.validTo)
+                    sql`
+                COALESCE(
+                    ${employeeImprests.approvedDate},
+                    ${employeeImprests.createdAt}
+                )
+                BETWEEN ${voucher.validFrom} AND ${voucher.validTo}
+                `
                 )
             )
             .orderBy(employeeImprests.approvedDate);
@@ -525,7 +551,6 @@ export class ImprestAdminService {
                 ...(approve && {
                     accountsSignedBy: user.sign ?? String(user.id),
                     accountsSignedAt: new Date(),
-                    approvalStatus: 1,
                 }),
             })
             .where(eq(employeeImprestVouchers.id, voucherId));
@@ -558,7 +583,6 @@ export class ImprestAdminService {
                 ...(approve && {
                     adminSignedBy: user.sign ?? String(user.id),
                     adminSignedAt: new Date(),
-                    approvalStatus: 1,
                 }),
             })
             .where(eq(employeeImprestVouchers.id, voucherId));
