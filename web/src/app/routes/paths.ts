@@ -265,7 +265,8 @@ export const paths = {
         imprest: "/shared/imprests",
         imprestUser: (id: number) => `/shared/imprests/user/${id}`,
         imprestCreate: "/shared/imprests/create",
-        imprestVoucher: (id: number) => `/shared/imprests/voucher/${id}`,
+        imprestVoucher: "/shared/imprests/voucher",
+        imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
         imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
     },
 
