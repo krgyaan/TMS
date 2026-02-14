@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -20,16 +20,19 @@ const formatINR = (num: number) =>
 
 const ImprestVoucherList: React.FC = () => {
     const navigate = useNavigate();
-    const { id } = useParams<{ id: string }>();
-    console.log("UserId from params:", id);
 
-    const parsedUserId = Number(id);
+    // ✅ Read query param
+    const [searchParams] = useSearchParams();
+    const userIdParam = searchParams.get("userId");
+    const queryUserId = userIdParam ? Number(userIdParam) : undefined;
 
-    console.log("parsedUserId:", parsedUserId);
-    const userDetails = useUser(parsedUserId).data;
-    console.log("user details:", userDetails);
-    const { data: rows = [], isLoading } = useImprestVoucherList(parsedUserId);
-    console.log("Fetched vouchers:", rows);
+    const safeUserId = queryUserId ?? 0;
+
+    const { data: userDetails } = useUser(safeUserId);
+
+    // ✅ Fetch vouchers
+    const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
+
     const actionItems = useMemo(
         () => [
             {
@@ -44,36 +47,57 @@ const ImprestVoucherList: React.FC = () => {
     const columns = useMemo(
         () => [
             { field: "voucherCode", headerName: "Voucher No" },
+
+            // ✅ Employee / Beneficiary column
+            { field: "beneficiaryName", headerName: "Employee" },
+
+            // ✅ Voucher Period column (Year + Week + Range)
             {
-                field: "validFrom",
-                headerName: "Period",
-                valueGetter: p => `${new Date(p.data.validFrom).toLocaleDateString("en-GB")} - ${new Date(p.data.validTo).toLocaleDateString("en-GB")}`,
+                headerName: "Voucher Period",
+                autoHeight: true,
+                cellStyle: { whiteSpace: "pre-line" },
+                valueGetter: (p: any) => {
+                    const formatDate = (d: string) =>
+                        new Date(d).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                        });
+
+                    return `Year: ${p.data.year}
+Week: ${p.data.week}
+${formatDate(p.data.validFrom)} - ${formatDate(p.data.validTo)}`;
+                },
             },
+
             {
                 field: "amount",
                 headerName: "Amount",
-                valueFormatter: p => formatINR(p.value),
+                valueFormatter: (p: any) => formatINR(p.value),
             },
+
             {
                 field: "accountantApproval",
                 headerName: "Accountant Approval",
-                cellRenderer: p =>
+                cellRenderer: (p: any) =>
                     p.value ? (
                         <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
                     ) : (
                         <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
                     ),
             },
+
             {
                 field: "adminApproval",
                 headerName: "Admin Approval",
-                cellRenderer: p =>
+                cellRenderer: (p: any) =>
                     p.value ? (
                         <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
                     ) : (
                         <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
                     ),
             },
+
             {
                 headerName: "Action",
                 cellRenderer: createActionColumnRenderer(actionItems),
@@ -86,9 +110,9 @@ const ImprestVoucherList: React.FC = () => {
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>{"Imprest Vouchers - " + (userDetails?.name ?? "")}</CardTitle>
+                    <CardTitle>{queryUserId ? `Imprest Vouchers - ${userDetails?.name ?? ""}` : "Imprest Vouchers"}</CardTitle>
                     <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
-                        <ArrowLeft className="h-4 w-4 " />
+                        <ArrowLeft className="h-4 w-4" />
                         Back
                     </Button>
                 </div>

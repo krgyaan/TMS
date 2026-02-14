@@ -42,15 +42,20 @@ export interface ImprestRow {
 export type ImprestVoucherRow = {
     id: number;
     voucherCode: string;
+
     beneficiaryName: string;
+
     amount: number;
+
     validFrom: string;
     validTo: string;
-    approvalStatus: number;
-    accountsSignedBy: string | null;
+
+    year: number;
+    week: number;
+
     adminApproval: boolean;
     accountantApproval: boolean;
-    adminSignedBy: string | null;
+
     createdAt: string;
 };
 

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DataTable from "@/components/ui/data-table";
-import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText, IndianRupee } from "lucide-react";
+import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText, IndianRupee, Plus } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
 import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
@@ -47,7 +47,7 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
+            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
         },
         {
             label: "Payment History",
@@ -57,7 +57,7 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Voucher",
             icon: <FileText className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
+            onClick: row => navigate(paths.shared.imprestVoucherByUser(row.userId)),
         },
         {
             label: "Pay Imprest",
@@ -269,6 +269,11 @@ const ImprestAdminIndex: React.FC = () => {
                             }}
                             className="w-64"
                         />
+
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            View All Vouchers
+                        </Button>
                     </div>
                 </CardHeader>
 
