@@ -51,7 +51,7 @@ const ImprestVoucherView: React.FC = () => {
     const navigate = useNavigate();
     const { canRead, canUpdate, user } = useAuth();
 
-    const canMutateStatus = canUpdate("shared.imprests");
+    const canMutateStatus = canUpdate("accounts.imprests");
 
     const isAuthorized = canRead("shared.imprests");
 
