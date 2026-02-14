@@ -48,28 +48,22 @@ export class ImprestAdminController {
 
     @Get("voucher")
     async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
-        const context: UserPermissionContext = {
-            userId: user.sub,
-            roleId: user.roleId,
-            roleName: user.role,
-            teamId: user.teamId,
-            dataScope: user.dataScope,
-        };
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
 
-        const canReadAll = await this.permissionService.hasPermission(context, { module: "accounts.imprests", action: "read" });
-
-        // 🔹 If user has read_all permission
         if (canReadAll) {
-            // If specific user requested → filter
-            if (userId) {
-                return this.service.listUserVouchers(userId);
-            }
-
-            // Otherwise → show all
-            return this.service.listAllVouchers();
+            return this.service.listVouchersRaw(userId);
         }
 
-        return this.service.listUserVouchers(user.sub);
+        return this.service.listVouchersRaw(user.sub);
     }
 
     // ========================
