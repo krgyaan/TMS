@@ -4,7 +4,7 @@ import { ImprestAdminService } from "./imprest-admin.service";
 import { Roles } from "@/modules/auth/decorators/roles.decorator";
 import { RolesGuard } from "@/modules/auth/guards/roles.guard";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { CanRead, CurrentUser } from "../auth/decorators";
+import { CanDelete, CanRead, CanUpdate, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
 import { CreateEmployeeImprestCreditSchema } from "./zod/create-employee-imprest-credit.schema";
 import { PermissionService, UserPermissionContext } from "../auth/services/permission.service";
@@ -78,6 +78,7 @@ export class ImprestAdminController {
     // ========================
 
     @Post("voucher")
+    @CanUpdate("accounts.imprests")
     async createVoucher(@Req() req, @Body() body) {
         return this.service.createVoucher({
             user: req.user,
@@ -103,6 +104,7 @@ export class ImprestAdminController {
     // APPROVE VOUCHER
     // ========================
     @Post("voucher/:id/account-approve")
+    @CanUpdate("accounts.imprests")
     accountApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
         return this.service.accountApproveVoucher({
             user: req.user,
@@ -116,6 +118,7 @@ export class ImprestAdminController {
     // ADMIN APPROVE VOUCHER
     // ========================
     @Post("voucher/:id/admin-approve")
+    @CanUpdate("accounts.imprests")
     adminApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
         return this.service.adminApproveVoucher({
             user: req.user,
@@ -129,13 +132,13 @@ export class ImprestAdminController {
     // DELETE TRANSACTION Payment History
     // ========================
     @Delete("/:id")
-    @Roles("admin", "account")
+    @CanDelete("accounts.imprests")
     async delete(@Param("id", ParseIntPipe) id: number) {
         return this.service.delete(id);
     }
 
     @Post("credit")
-    @Roles("admin", "account")
+    @CanDelete("accounts.imprests")
     creditImprest(@Req() req) {
         const parsed = CreateEmployeeImprestCreditSchema.safeParse(req.body);
 
