@@ -47,7 +47,6 @@ export class ImprestAdminController {
     // ========================
 
     @Get("voucher")
-    @CanRead("accounts.imprests")
     async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
         const context: UserPermissionContext = {
             userId: user.sub,
