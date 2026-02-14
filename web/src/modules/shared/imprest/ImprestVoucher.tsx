@@ -47,6 +47,14 @@ const ImprestVoucherList: React.FC = () => {
                         })
                     ),
             },
+            {
+                label: "View Proofs",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row: ImprestVoucherRow) =>
+                    navigate(
+                        `/shared/imprests/voucher/proofs?` + `userId=${row.beneficiaryId}` + `&from=${encodeURIComponent(row.validFrom)}` + `&to=${encodeURIComponent(row.validTo)}`
+                    ),
+            },
         ],
         [navigate]
     );
