@@ -320,8 +320,8 @@ export class ImprestAdminService {
                     year: startDate.getFullYear(),
                     week: this.getISOWeek(startDate),
 
-                    adminApproval: row.adminSignedBy != null,
-                    accountantApproval: row.accountsSignedBy != null,
+                    adminApproval: Boolean(row.adminSignedBy && row.adminSignedBy.trim()),
+                    accountantApproval: Boolean(row.accountsSignedBy && row.accountsSignedBy.trim()),
                 };
             }),
             meta: {
