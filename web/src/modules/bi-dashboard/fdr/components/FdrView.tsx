@@ -98,6 +98,74 @@ export function FdrView({
                             </TableCell>
                         </TableRow>
 
+                        {/* Request Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Request Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request ID
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestId ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestType || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Issue Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.issueDate ? formatDate(data.issueDate) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Expiry Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.expiryDate ? formatDate(data.expiryDate) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestStatus || '—'}
+                            </TableCell>
+                            <TableCell colSpan={2} />
+                        </TableRow>
+                        {data.requestRemarks && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Request Remarks
+                                </TableCell>
+                                <TableCell className="text-sm break-words" colSpan={3}>
+                                    {data.requestRemarks}
+                                </TableCell>
+                            </TableRow>
+                        )}
+
                         {/* Tender/Project Information */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">

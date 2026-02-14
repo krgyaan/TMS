@@ -7,6 +7,7 @@ import {
     paymentInstruments,
     instrumentChequeDetails,
     instrumentDdDetails,
+    instrumentFdrDetails,
 } from '@db/schemas/tendering/emds.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -678,6 +679,63 @@ export class ChequeService {
             throw new NotFoundException(`Payment Request with ID ${id} not found`);
         }
 
-        return result;
+        let linkedDd: {
+            requestId: number;
+            ddNo: string | null;
+            ddDate: Date | null;
+            amount: string | null;
+            status: string | null;
+            favouring: string | null;
+            payableAt: string | null;
+        } | null = null;
+        let linkedFdr: {
+            requestId: number;
+            fdrNo: string | null;
+            fdrDate: Date | null;
+            amount: string | null;
+            status: string | null;
+            favouring: string | null;
+            payableAt: string | null;
+        } | null = null;
+
+        if (result.linkedDdId) {
+            const [ddRow] = await this.db
+                .select({
+                    requestId: paymentRequests.id,
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    favouring: paymentInstruments.favouring,
+                    payableAt: paymentInstruments.payableAt,
+                })
+                .from(instrumentDdDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentDdDetails.instrumentId))
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(instrumentDdDetails.id, result.linkedDdId))
+                .limit(1);
+            if (ddRow) linkedDd = ddRow;
+        }
+
+        if (result.linkedFdrId) {
+            const [fdrRow] = await this.db
+                .select({
+                    requestId: paymentRequests.id,
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    favouring: paymentInstruments.favouring,
+                    payableAt: paymentInstruments.payableAt,
+                })
+                .from(instrumentFdrDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentFdrDetails.instrumentId))
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(instrumentFdrDetails.id, result.linkedFdrId))
+                .limit(1);
+            if (fdrRow) linkedFdr = fdrRow;
+        }
+
+        return { ...result, linkedDd, linkedFdr };
     }
 }

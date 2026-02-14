@@ -109,6 +109,65 @@ export function BankGuaranteeView({
                             </TableCell>
                         </TableRow>
 
+                        {/* Request Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Request Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request ID
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestId ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestType || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                BG Needs
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.bgNeeds || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                BG Purpose
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.bgPurpose || '—'}
+                            </TableCell>
+                        </TableRow>
+                        {data.requestRemarks && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Request Remarks
+                                </TableCell>
+                                <TableCell className="text-sm break-words" colSpan={3}>
+                                    {data.requestRemarks}
+                                </TableCell>
+                            </TableRow>
+                        )}
+
                         {/* Tender/Project Information */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">

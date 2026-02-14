@@ -2,9 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Receipt } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Receipt, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import { paths } from '@/app/routes/paths';
 
 interface ChequeViewProps {
     data: any;
@@ -106,6 +109,65 @@ export function ChequeView({
                             </TableCell>
                         </TableRow>
 
+                        {/* Request Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Request Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request ID
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestId ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Issue Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.issueDate ? formatDate(data.issueDate) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Expiry Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.expiryDate ? formatDate(data.expiryDate) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestStatus || '—'}
+                            </TableCell>
+                        </TableRow>
+                        {data.requestRemarks && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Request Remarks
+                                </TableCell>
+                                <TableCell className="text-sm break-words" colSpan={3}>
+                                    {data.requestRemarks}
+                                </TableCell>
+                            </TableRow>
+                        )}
+
                         {/* Tender/Project Information */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">
@@ -193,9 +255,146 @@ export function ChequeView({
                                 {data.chequeNeeds || '—'}
                             </TableCell>
                         </TableRow>
+                        {data.btTransferDate && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    BT Transfer Date
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatDate(data.btTransferDate)}
+                                </TableCell>
+                                <TableCell colSpan={2} />
+                            </TableRow>
+                        )}
 
-                        {/* Linked References */}
-                        {(data.linkedDdId || data.linkedFdrId) && (
+                        {/* Linked Demand Draft */}
+                        {data.linkedDd && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Linked Demand Draft
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        DD No
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedDd.ddNo || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        DD Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedDd.ddDate ? formatDate(data.linkedDd.ddDate) : '—'}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {data.linkedDd.amount ? formatINR(Number(data.linkedDd.amount)) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        <Badge variant="outline">{data.linkedDd.status || '—'}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Favouring
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedDd.favouring || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Payable At
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedDd.payableAt || '—'}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell colSpan={4} className="text-sm">
+                                        <Button variant="link" className="h-auto p-0 text-primary" asChild>
+                                            <Link to={paths.bi.demandDraftView(data.linkedDd.requestId)}>
+                                                <ExternalLink className="h-4 w-4 mr-1 inline" />
+                                                View DD
+                                            </Link>
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+
+                        {/* Linked FDR */}
+                        {data.linkedFdr && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Linked FDR
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        FDR No
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedFdr.fdrNo || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        FDR Date
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedFdr.fdrDate ? formatDate(data.linkedFdr.fdrDate) : '—'}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Amount
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {data.linkedFdr.amount ? formatINR(Number(data.linkedFdr.amount)) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Status
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        <Badge variant="outline">{data.linkedFdr.status || '—'}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Favouring
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedFdr.favouring || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Payable At
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {data.linkedFdr.payableAt || '—'}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell colSpan={4} className="text-sm">
+                                        <Button variant="link" className="h-auto p-0 text-primary" asChild>
+                                            <Link to={paths.bi.fdrView(data.linkedFdr.requestId)}>
+                                                <ExternalLink className="h-4 w-4 mr-1 inline" />
+                                                View FDR
+                                            </Link>
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+
+                        {/* Linked References (fallback when linkedDd/linkedFdr not populated) */}
+                        {!data.linkedDd && !data.linkedFdr && (data.linkedDdId || data.linkedFdrId) && (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
