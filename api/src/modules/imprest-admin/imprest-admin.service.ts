@@ -392,6 +392,8 @@ export class ImprestAdminService {
 
             u.name AS "beneficiaryName",
 
+            u.id AS "beneficiaryId",
+
             agg.year,
             agg.week,
             agg.valid_from AS "validFrom",
@@ -436,6 +438,7 @@ export class ImprestAdminService {
             voucherCode: r.voucherCode ?? null,
 
             beneficiaryName: r.beneficiaryName,
+            beneficiaryId: r.beneficiaryId,
 
             year: r.year,
             week: r.week,
@@ -633,18 +636,30 @@ export class ImprestAdminService {
         };
     }
 
-    async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
-        // if (!user.role.startsWith("account")) {
-        //     throw new ForbiddenException("Only accounts can approve here");
-        // }
+    async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
+        const voucher = await this.buildVoucherIfMissing({
+            userId,
+            from,
+            to,
+            createdBy: String(user.sub),
+        });
 
+        return this.getVoucherById({
+            user,
+            voucherId: voucher.id,
+        });
+    }
+
+    async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        if (approve && voucher.accountsSignedBy) {
+        const isSigned = (v?: string | null) => v && v.trim().length > 0;
+
+        if (approve && isSigned(voucher.accountsSignedBy)) {
             throw new BadRequestException("Voucher already approved by accounts");
         }
 
@@ -666,17 +681,15 @@ export class ImprestAdminService {
     }
 
     async adminApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
-        // if (user.role !== "admin") {
-        //     throw new ForbiddenException("Only admin can approve here");
-        // }
-
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        if (approve && voucher.adminSignedBy) {
+        const isSigned = (v?: string | null) => v && v.trim().length > 0;
+
+        if (approve && isSigned(voucher.adminSignedBy)) {
             throw new BadRequestException("Voucher already approved by admin");
         }
 
