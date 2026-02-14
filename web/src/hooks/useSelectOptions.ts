@@ -6,8 +6,8 @@ import { useWebsites } from './api/useWebsites';
 import { useItems } from './api/useItems';
 import { useStatuses } from './api/useStatuses';
 import { useGetTeamMembers } from './api/useUsers';
-import { usePqrs } from './api/usePqrs';
-import { useFinanceDocuments } from './api/useFinanceDocuments';
+import { usePqrsAll } from './api/usePqrs';
+import { useFinanceDocumentsAll } from './api/useFinanceDocuments';
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -84,7 +84,7 @@ export function useDnbStatusOptions() {
 }
 
 export function usePqrOptions() {
-    const { data: apiResponse } = usePqrs();
+    const { data: apiResponse } = usePqrsAll();
 
     return useMemo(
         () => {
@@ -101,7 +101,7 @@ export function usePqrOptions() {
 }
 
 export function useFinanceDocumentOptions() {
-    const { data: apiResponse } = useFinanceDocuments();
+    const { data: apiResponse } = useFinanceDocumentsAll();
 
     return useMemo(
         () => {

@@ -47,6 +47,28 @@ export const useFinanceDocuments = (
     });
 };
 
+const PAGE_SIZE = 100;
+
+export const useFinanceDocumentsAll = () => {
+    return useQuery<PaginatedResult<FinanceDocumentListRow>>({
+        queryKey: financeDocumentsKey.list({ all: true }),
+        queryFn: async () => {
+            const first = await financeDocumentsService.getAll({ page: 1, limit: PAGE_SIZE });
+            const { totalPages } = first.meta;
+            if (totalPages <= 1) return first;
+            const rest = await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, i) =>
+                    financeDocumentsService.getAll({ page: i + 2, limit: PAGE_SIZE })
+                )
+            );
+            return {
+                data: [...first.data, ...rest.flatMap((r) => r.data)],
+                meta: first.meta,
+            };
+        },
+    });
+};
+
 export const useFinanceDocument = (id: number | null) => {
     return useQuery<FinanceDocumentListRow>({
         queryKey: financeDocumentsKey.detail(id ?? 0),
