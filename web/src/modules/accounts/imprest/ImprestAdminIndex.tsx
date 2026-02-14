@@ -35,13 +35,22 @@ const ImprestAdminIndex: React.FC = () => {
         userName: string;
     } | null>(null);
 
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
-    const { isAdmin, isSuperUser } = useAuth();
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
     console.log("Fetched employee imprest summary data:", data);
+
+    const canView = canRead("accounts.imprests");
+
+    useEffect(() => {
+        if (!canView) {
+            navigate(paths.shared.imprest);
+        }
+    }, [canView, navigate]);
 
     const imprestActions: ActionItem<EmployeeImprestSummary>[] = [
         {
