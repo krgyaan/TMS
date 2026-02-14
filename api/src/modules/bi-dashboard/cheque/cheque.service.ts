@@ -714,7 +714,13 @@ export class ChequeService {
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
                 .where(eq(instrumentDdDetails.id, result.linkedDdId))
                 .limit(1);
-            if (ddRow) linkedDd = ddRow;
+            if (ddRow) {
+                // Fix: Convert ddDate from string to Date if necessary
+                linkedDd = {
+                    ...ddRow,
+                    ddDate: ddRow.ddDate ? new Date(ddRow.ddDate) : null,
+                };
+            }
         }
 
         if (result.linkedFdrId) {
@@ -733,9 +739,16 @@ export class ChequeService {
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
                 .where(eq(instrumentFdrDetails.id, result.linkedFdrId))
                 .limit(1);
-            if (fdrRow) linkedFdr = fdrRow;
-        }
+            if (fdrRow) {
+                // Fix: Convert fdrDate from string to Date if necessary
+                linkedFdr = {
+                    ...fdrRow,
+                    fdrDate: fdrRow.fdrDate ? new Date(fdrRow.fdrDate) : null,
+                };
+            }
 
+            return { ...result, linkedDd, linkedFdr };
+        }
         return { ...result, linkedDd, linkedFdr };
     }
 }
