@@ -266,86 +266,190 @@ export class ImprestAdminService {
         const conditions: SQL[] = [];
 
         if (userId) {
-            conditions.push(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
+            conditions.push(eq(employeeImprests.userId, userId));
         }
 
         const whereClause = conditions.length ? and(...conditions) : undefined;
 
-        const [rows, totalResult] = await Promise.all([
-            this.db
-                .select({
-                    id: employeeImprestVouchers.id,
-                    voucherCode: employeeImprestVouchers.voucherCode,
+        /* -------------------------------------------------
+       1️⃣ Aggregate EXACTLY like Laravel
+    -------------------------------------------------- */
+        const voucherAgg = this.db
+            .select({
+                userId: employeeImprests.userId,
 
-                    beneficiaryId: employeeImprestVouchers.beneficiaryName,
-                    beneficiaryName: users.name,
+                beneficiaryName: sql<string>`
+                ${users.name}
+            `.as("beneficiaryName"),
 
-                    // ✅ SQL GOES HERE — NOT IN MAP
-                    amount: sql<number>`
-          COALESCE(
-            (
-              SELECT SUM(${employeeImprests.amount})
-              FROM ${employeeImprests}
-              WHERE ${employeeImprests.userId}
-                = ${sql`${employeeImprestVouchers.beneficiaryName}::int`}
-                AND ${employeeImprests.approvalStatus} = 1
-                AND COALESCE(
-                      ${employeeImprests.approvedDate},
-                      ${employeeImprests.createdAt}
-                    )::timestamptz
-                    BETWEEN ${employeeImprestVouchers.validFrom}
-                        AND ${employeeImprestVouchers.validTo}
-            ),
-            0
-          )
-        `.as("amount"),
+                year: sql<number>`
+                EXTRACT(YEAR FROM COALESCE(
+                    ${employeeImprests.approvedDate},
+                    ${employeeImprests.createdAt}
+                ))
+            `.as("year"),
 
-                    validFrom: employeeImprestVouchers.validFrom,
-                    validTo: employeeImprestVouchers.validTo,
-                    createdAt: employeeImprestVouchers.createdAt,
+                week: sql<number>`
+                EXTRACT(WEEK FROM COALESCE(
+                    ${employeeImprests.approvedDate},
+                    ${employeeImprests.createdAt}
+                ))
+            `.as("week"),
 
-                    adminSignedBy: employeeImprestVouchers.adminSignedBy,
-                    accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
-                })
-                .from(employeeImprestVouchers)
-                .leftJoin(users, eq(users.id, sql`${employeeImprestVouchers.beneficiaryName}::int`))
-                .where(whereClause)
-                .orderBy(desc(employeeImprestVouchers.validFrom)),
+                validFrom: sql<Date>`
+                MIN(COALESCE(
+                    ${employeeImprests.approvedDate},
+                    ${employeeImprests.createdAt}
+                ))
+            `.as("validFrom"),
 
-            this.db
-                .select({ count: sql<number>`count(*)` })
-                .from(employeeImprestVouchers)
-                .where(whereClause),
-        ]);
+                validTo: sql<Date>`
+                MIN(COALESCE(
+                    ${employeeImprests.approvedDate},
+                    ${employeeImprests.createdAt}
+                )) + INTERVAL '6 days'
+            `.as("validTo"),
 
+                amount: sql<number>`
+                SUM(${employeeImprests.amount})
+            `.as("amount"),
+            })
+            .from(employeeImprests)
+            .innerJoin(users, eq(users.id, employeeImprests.userId))
+            .where(whereClause)
+            .groupBy(employeeImprests.userId, users.name, sql`year`, sql`week`)
+            .as("voucher_agg");
+
+        /* -------------------------------------------------
+       2️⃣ OUTER SELECT — ONLY use voucherAgg.*
+    -------------------------------------------------- */
+        const rows = await this.db
+            .select({
+                id: employeeImprestVouchers.id,
+                voucherCode: employeeImprestVouchers.voucherCode,
+
+                beneficiaryName: sql<string>`${voucherAgg.beneficiaryName}`,
+                year: sql<number>`${voucherAgg.year}`,
+                week: sql<number>`${voucherAgg.week}`,
+
+                validFrom: sql<Date>`${voucherAgg.validFrom}`,
+                validTo: sql<Date>`${voucherAgg.validTo}`,
+
+                amount: sql<number>`${voucherAgg.amount}`,
+
+                adminSignedBy: employeeImprestVouchers.adminSignedBy,
+                accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
+
+                adminRemark: employeeImprestVouchers.adminRemark,
+                accountsRemark: employeeImprestVouchers.accountsRemark,
+            })
+            .from(voucherAgg)
+            .leftJoin(
+                employeeImprestVouchers,
+                and(
+                    eq(employeeImprestVouchers.beneficiaryName, sql`${voucherAgg.userId}::text`),
+                    eq(employeeImprestVouchers.validFrom, voucherAgg.validFrom),
+                    eq(employeeImprestVouchers.validTo, voucherAgg.validTo)
+                )
+            )
+            .orderBy(desc(sql`${voucherAgg.year}`), desc(sql`${voucherAgg.week}`));
+        /* -------------------------------------------------
+       3️⃣ Map for UI
+    -------------------------------------------------- */
         return {
-            data: rows.map(row => {
-                const startDate = new Date(row.validFrom);
+            data: rows.map(r => ({
+                id: r.id,
+                voucherCode: r.voucherCode,
 
-                return {
-                    id: row.id,
-                    voucherCode: row.voucherCode,
+                beneficiaryName: r.beneficiaryName,
 
-                    beneficiaryId: row.beneficiaryId,
-                    beneficiaryName: row.beneficiaryName,
+                year: Number(r.year),
+                week: Number(r.week),
 
-                    // ✅ plain JS value now
-                    amount: Number(row.amount),
+                validFrom: r.validFrom,
+                validTo: r.validTo,
 
-                    validFrom: row.validFrom,
-                    validTo: row.validTo,
+                amount: Number(r.amount),
 
-                    year: startDate.getFullYear(),
-                    week: this.getISOWeek(startDate),
+                accountantApproval: !!r.accountsSignedBy && r.accountsSignedBy.trim() !== "",
 
-                    adminApproval: Boolean(row.adminSignedBy),
-                    accountantApproval: Boolean(row.accountsSignedBy),
-                };
-            }),
-            meta: {
-                total: Number(totalResult[0].count),
-            },
+                adminApproval: !!r.adminSignedBy && r.adminSignedBy.trim() !== "",
+
+                accountsRemark: r.accountsRemark ?? null,
+                adminRemark: r.adminRemark ?? null,
+            })),
         };
+    }
+
+    async listVouchersRaw(userId?: number) {
+        const whereSql = userId ? sql`WHERE ei.user_id = ${userId}` : sql``;
+
+        const result = await this.db.execute(
+            sql`
+        SELECT
+            v.id AS "id",
+            v.voucher_code AS "voucherCode",
+
+            u.name AS "beneficiaryName",
+
+            agg.year,
+            agg.week,
+            agg.valid_from AS "validFrom",
+            agg.valid_to   AS "validTo",
+            agg.total_amount AS "amount",
+
+            v.accounts_signed_by,
+            v.admin_signed_by,
+            v.accounts_remark,
+            v.admin_remark
+
+        FROM (
+            SELECT
+                ei.user_id,
+                EXTRACT(YEAR FROM COALESCE(ei.approved_date, ei.created_at))::int AS year,
+                EXTRACT(WEEK FROM COALESCE(ei.approved_date, ei.created_at))::int AS week,
+
+                MIN(COALESCE(ei.approved_date, ei.created_at)) AS valid_from,
+                MIN(COALESCE(ei.approved_date, ei.created_at)) + INTERVAL '6 days' AS valid_to,
+
+                SUM(ei.amount)::numeric AS total_amount
+
+            FROM employee_imprests ei
+            ${whereSql}
+            GROUP BY ei.user_id, year, week
+        ) agg
+
+        INNER JOIN users u
+            ON u.id = agg.user_id
+
+        LEFT JOIN employee_imprest_vouchers v
+            ON v.beneficiary_name = agg.user_id::text
+           AND EXTRACT(YEAR FROM v.valid_from) = agg.year
+           AND EXTRACT(WEEK FROM v.valid_from) = agg.week
+
+        ORDER BY agg.year DESC, agg.week DESC
+        `
+        );
+
+        return result.rows.map((r: any) => ({
+            id: r.id ?? null,
+            voucherCode: r.voucherCode ?? null,
+
+            beneficiaryName: r.beneficiaryName,
+
+            year: r.year,
+            week: r.week,
+            validFrom: r.validFrom,
+            validTo: r.validTo,
+
+            amount: Number(r.amount),
+
+            accountantApproval: !!(r.accounts_signed_by && r.accounts_signed_by.trim()),
+            adminApproval: !!(r.admin_signed_by && r.admin_signed_by.trim()),
+
+            accountsRemark: r.accounts_remark ?? null,
+            adminRemark: r.admin_remark ?? null,
+        }));
     }
 
     async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
