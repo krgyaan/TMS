@@ -466,28 +466,36 @@ export class ImprestAdminService {
     }
 
     async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        // 1️⃣ Check existing voucher
-        const existing = await this.db
+        // 1️⃣ Find existing voucher (RANGE MATCH — CRITICAL)
+        const [existing] = await this.db
             .select()
             .from(employeeImprestVouchers)
-            .where(and(eq(employeeImprestVouchers.beneficiaryName, String(userId)), eq(employeeImprestVouchers.validFrom, from), eq(employeeImprestVouchers.validTo, to)))
+            .where(
+                and(
+                    eq(employeeImprestVouchers.beneficiaryName, String(userId)),
+                    sql`${employeeImprestVouchers.validFrom} <= ${to}`,
+                    sql`${employeeImprestVouchers.validTo} >= ${from}`
+                )
+            )
             .limit(1);
 
-        if (existing.length > 0) {
-            return existing[0];
+        if (existing) {
+            return existing;
         }
 
-        // 2️⃣ Fetch imprests (Laravel-compatible)
+        // 2️⃣ Fetch imprests in range
         const imprests = await this.db
-            .select({
-                amount: employeeImprests.amount,
-            })
+            .select({ amount: employeeImprests.amount })
             .from(employeeImprests)
             .where(
                 and(
                     eq(employeeImprests.userId, userId),
-                    sql`COALESCE(${employeeImprests.approvedDate}, ${employeeImprests.createdAt})
-             BETWEEN ${from} AND ${to}`
+                    sql`
+          COALESCE(
+            ${employeeImprests.approvedDate},
+            ${employeeImprests.createdAt}
+          ) BETWEEN ${from} AND ${to}
+        `
                 )
             );
 
@@ -496,9 +504,9 @@ export class ImprestAdminService {
         }
 
         // 3️⃣ Aggregate
-        const totalAmount = imprests.reduce((sum, row) => sum + Number(row.amount), 0);
+        const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        // 4️⃣ Insert voucher
+        // 4️⃣ Create voucher
         const [voucher] = await this.db
             .insert(employeeImprestVouchers)
             .values({
