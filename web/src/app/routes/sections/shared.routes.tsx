@@ -64,7 +64,8 @@ export default function SharedRoutes() {
             <Route path="imprests/create" element={<ImprestCreatePage />} />
             <Route path="imprests/payment-history" element={<ImprestPaymentHistoryPage />} />
             <Route path="imprests/voucher" element={<ImprestVoucherPage />} />
-            <Route path="imprests/voucher/view/:id" element={<ImprestVoucherViewPage />} />
+            <Route path="imprests/voucher/view" element={<ImprestVoucherViewPage />} />
+
             {/* <Route path="imprests/show/:id" element={<ImprestViewPage />} /> */}
         </Routes>
     );
