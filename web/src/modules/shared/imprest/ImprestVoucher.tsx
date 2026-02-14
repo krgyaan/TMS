@@ -38,12 +38,18 @@ const ImprestVoucherList: React.FC = () => {
             {
                 label: "View",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestVoucherRow) => navigate(paths.shared.imprestVoucherView(row.id)),
+                onClick: (row: ImprestVoucherRow) =>
+                    navigate(
+                        paths.shared.imprestVoucherView({
+                            userId: Number(row.beneficiaryId), // ✅ numeric
+                            from: row.validFrom,
+                            to: row.validTo,
+                        })
+                    ),
             },
         ],
         [navigate]
     );
-
     const columns = useMemo(
         () => [
             // ✅ Employee / Beneficiary column

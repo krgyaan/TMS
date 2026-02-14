@@ -44,6 +44,7 @@ export type ImprestVoucherRow = {
     voucherCode: string;
 
     beneficiaryName: string;
+    beneficiaryId: string;
 
     amount: number;
 
