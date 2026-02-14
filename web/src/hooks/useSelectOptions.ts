@@ -84,7 +84,7 @@ export function useDnbStatusOptions() {
 }
 
 export function usePqrOptions() {
-    const { data: apiResponse } = usePqrs({ page: 1, limit: 100 });
+    const { data: apiResponse } = usePqrs();
 
     return useMemo(
         () => {
@@ -101,7 +101,7 @@ export function usePqrOptions() {
 }
 
 export function useFinanceDocumentOptions() {
-    const { data: apiResponse } = useFinanceDocuments({ page: 1, limit: 100 });
+    const { data: apiResponse } = useFinanceDocuments();
 
     return useMemo(
         () => {
