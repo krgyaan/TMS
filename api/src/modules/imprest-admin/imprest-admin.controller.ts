@@ -87,11 +87,18 @@ export class ImprestAdminController {
 
     @Get("voucher/view")
     async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+        const parsedFrom = new Date(decodeURIComponent(from));
+        const parsedTo = new Date(decodeURIComponent(to));
+
+        if (isNaN(parsedFrom.getTime()) || isNaN(parsedTo.getTime())) {
+            throw new BadRequestException("Invalid date range");
+        }
+
         return this.service.getVoucherByPeriod({
             user: req.user,
             userId,
-            from: new Date(from),
-            to: new Date(to),
+            from: parsedFrom,
+            to: parsedTo,
         });
     }
 
