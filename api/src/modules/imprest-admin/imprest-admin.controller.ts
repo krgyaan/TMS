@@ -7,11 +7,17 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { CanRead, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
 import { CreateEmployeeImprestCreditSchema } from "./zod/create-employee-imprest-credit.schema";
+import { PermissionService, UserPermissionContext } from "../auth/services/permission.service";
+
+import { ValidatedUser } from "../auth/strategies/jwt.strategy";
 
 @Controller("accounts/imprest")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ImprestAdminController {
-    constructor(private readonly service: ImprestAdminService) {}
+    constructor(
+        private readonly service: ImprestAdminService,
+        private readonly permissionService: PermissionService
+    ) {}
 
     /**
      * ADMIN / ACCOUNT:
@@ -29,9 +35,9 @@ export class ImprestAdminController {
     @Get("payment-history/:userId")
     async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
         // employee can only view their own history
-        if (user.role === "employee" && user.id !== userId) {
-            throw new ForbiddenException("Access denied");
-        }
+        // if (user.role === "employee" && user.id !== userId) {
+        //     throw new ForbiddenException("Access denied");
+        // }
 
         return this.service.getByUser(userId);
     }
@@ -39,19 +45,34 @@ export class ImprestAdminController {
     // ========================
     // LIST VOUCHERS
     // ========================
+
     @Get("voucher")
-    async listAllVouchers() {
-        return this.service.listVouchers({
-            user: undefined,
-        });
+    @CanRead("accounts.imprests")
+    async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
+        const context: UserPermissionContext = {
+            userId: user.sub,
+            roleId: user.roleId,
+            roleName: user.role,
+            teamId: user.teamId,
+            dataScope: user.dataScope,
+        };
+
+        const canReadAll = await this.permissionService.hasPermission(context, { module: "accounts.imprests", action: "readVouchers" });
+
+        // 🔹 If user has read_all permission
+        if (canReadAll) {
+            // If specific user requested → filter
+            if (userId) {
+                return this.service.listUserVouchers(userId);
+            }
+
+            // Otherwise → show all
+            return this.service.listAllVouchers();
+        }
+
+        return this.service.listUserVouchers(user.sub);
     }
 
-    @Get("voucher/:id")
-    async listUserVouchers(@Param("id", ParseIntPipe) userId: number, @Query("page") page = "1", @Query("limit") limit = "10") {
-        return this.service.listVouchers({
-            user: { id: userId },
-        });
-    }
     // ========================
     // CREATE VOUCHER
     // ========================

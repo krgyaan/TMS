@@ -15,6 +15,8 @@ import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-cr
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { imprestCategories, teams } from "@/db/schemas";
+import { projects } from "@/db/schemas/operations/projects.schema";
 
 @Injectable()
 export class ImprestAdminService {
@@ -37,6 +39,23 @@ export class ImprestAdminService {
      *
      * Only users having at least one imprest entry are returned.
      */
+
+    /**
+     * Returns ISO-8601 week number for a given date
+     * Week starts on Monday
+     */
+    private getISOWeek(date: Date): number {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+        // Thursday determines the year
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+
+        return weekNo;
+    }
+
     async getEmployeeSummary(): Promise<EmployeeImprestSummaryDto[]> {
         this.logger.info("Fetching employee imprest summary");
 
@@ -235,11 +254,20 @@ export class ImprestAdminService {
     //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
     // }
 
-    async listVouchers({ user }: { user?: { id: number } }) {
+    async listAllVouchers() {
+        return this.listVouchers({});
+    }
+
+    async listUserVouchers(userId: number) {
+        return this.listVouchers({ userId });
+    }
+
+    async listVouchers({ userId }: { userId?: number }) {
         const conditions: SQL[] = [];
 
-        if (user) {
-            conditions.push(eq(employeeImprestVouchers.beneficiaryName, String(user.id)));
+        // Filter by user if provided
+        if (userId) {
+            conditions.push(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
         }
 
         const whereClause = conditions.length ? and(...conditions) : undefined;
@@ -249,7 +277,11 @@ export class ImprestAdminService {
                 .select({
                     id: employeeImprestVouchers.id,
                     voucherCode: employeeImprestVouchers.voucherCode,
-                    beneficiaryName: employeeImprestVouchers.beneficiaryName,
+
+                    // NOTE: beneficiaryName stores userId as string
+                    beneficiaryId: employeeImprestVouchers.beneficiaryName,
+                    beneficiaryName: users.name,
+
                     amount: employeeImprestVouchers.amount,
                     validFrom: employeeImprestVouchers.validFrom,
                     validTo: employeeImprestVouchers.validTo,
@@ -258,6 +290,7 @@ export class ImprestAdminService {
                     accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
                 })
                 .from(employeeImprestVouchers)
+                .leftJoin(users, eq(users.id, sql`${employeeImprestVouchers.beneficiaryName}::int`))
                 .where(whereClause)
                 .orderBy(desc(employeeImprestVouchers.validFrom)),
 
@@ -267,20 +300,30 @@ export class ImprestAdminService {
                 .where(whereClause),
         ]);
 
-        const data = rows.map(row => ({
-            id: row.id,
-            voucherCode: row.voucherCode,
-            beneficiaryName: row.beneficiaryName,
-            amount: row.amount,
-            validFrom: row.validFrom,
-            validTo: row.validTo,
-            createdAt: row.createdAt,
-            adminApproval: row.adminSignedBy != null,
-            accountantApproval: row.accountsSignedBy != null,
-        }));
-
         return {
-            data,
+            data: rows.map(row => {
+                const startDate = new Date(row.validFrom);
+
+                return {
+                    id: row.id,
+                    voucherCode: row.voucherCode,
+
+                    beneficiaryId: row.beneficiaryId,
+                    beneficiaryName: row.beneficiaryName,
+
+                    amount: Number(row.amount),
+
+                    validFrom: row.validFrom,
+                    validTo: row.validTo,
+
+                    // Derived fields (for UI)
+                    year: startDate.getFullYear(),
+                    week: this.getISOWeek(startDate),
+
+                    adminApproval: row.adminSignedBy != null,
+                    accountantApproval: row.accountsSignedBy != null,
+                };
+            }),
             meta: {
                 total: Number(totalResult[0].count),
             },
@@ -378,25 +421,36 @@ export class ImprestAdminService {
 
     async getVoucherById({ user, voucherId }: { user: { id: number; role: string }; voucherId: number }) {
         /* -----------------------------------------
-       FETCH VOUCHER
+       FETCH VOUCHER + EMPLOYEE
     ------------------------------------------ */
 
         const [voucher] = await this.db
             .select({
                 id: employeeImprestVouchers.id,
                 voucherCode: employeeImprestVouchers.voucherCode,
-                beneficiaryName: employeeImprestVouchers.beneficiaryName,
+
+                beneficiaryId: employeeImprestVouchers.beneficiaryName,
+
                 amount: employeeImprestVouchers.amount,
                 validFrom: employeeImprestVouchers.validFrom,
                 validTo: employeeImprestVouchers.validTo,
+
                 accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
                 accountsSignedAt: employeeImprestVouchers.accountsSignedAt,
+                accountsRemark: employeeImprestVouchers.accountsRemark,
+
                 adminSignedBy: employeeImprestVouchers.adminSignedBy,
                 adminSignedAt: employeeImprestVouchers.adminSignedAt,
-                accountsRemark: employeeImprestVouchers.accountsRemark,
                 adminRemark: employeeImprestVouchers.adminRemark,
+
+                // 👇 EMPLOYEE DETAILS (Laravel $abc)
+                employeeId: users.id,
+                employeeName: users.name,
+                teamName: teams.name, // make sure column exists
             })
             .from(employeeImprestVouchers)
+            .leftJoin(users, eq(users.id, sql`${employeeImprestVouchers.beneficiaryName}::int`))
+            .leftJoin(teams, eq(teams.id, users.team))
             .where(eq(employeeImprestVouchers.id, voucherId))
             .limit(1);
 
@@ -404,31 +458,32 @@ export class ImprestAdminService {
             throw new NotFoundException("Voucher not found");
         }
 
-        /* -----------------------------------------
-        ACCESS CHECK
-    ------------------------------------------ */
-
-        // if (user.role !== "admin" && voucher.beneficiaryName !== String(user.id)) {
-        //     throw new ForbiddenException("You cannot view this voucher");
-        // }
+        if (voucher.employeeId == null) {
+            throw new NotFoundException("Voucher beneficiary not found");
+        }
 
         /* -----------------------------------------
-        FETCH LINE ITEMS
+       FETCH LINE ITEMS (FULL DETAILS)
     ------------------------------------------ */
 
         const items = await this.db
             .select({
                 id: employeeImprests.id,
-                categoryId: employeeImprests.categoryId,
+
+                category: imprestCategories.name, // ✔ category name
+
+                projectCode: projects.projectCode, // ✔ project code
                 projectName: employeeImprests.projectName,
+
                 remark: employeeImprests.remark,
                 amount: employeeImprests.amount,
-                invoiceProof: employeeImprests.invoiceProof,
             })
             .from(employeeImprests)
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .leftJoin(projects, eq(projects.projectName, employeeImprests.projectName))
             .where(
                 and(
-                    eq(employeeImprests.userId, Number(voucher.beneficiaryName)),
+                    eq(employeeImprests.userId, voucher.employeeId),
                     eq(employeeImprests.approvalStatus, 1),
                     gte(employeeImprests.approvedDate, voucher.validFrom),
                     lte(employeeImprests.approvedDate, voucher.validTo)
@@ -437,8 +492,14 @@ export class ImprestAdminService {
             .orderBy(employeeImprests.approvedDate);
 
         return {
-            voucher,
-            items,
+            voucher: {
+                ...voucher,
+                amount: Number(voucher.amount),
+            },
+            items: items.map(i => ({
+                ...i,
+                amount: Number(i.amount),
+            })),
         };
     }
 
