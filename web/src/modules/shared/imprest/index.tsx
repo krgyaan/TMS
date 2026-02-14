@@ -496,7 +496,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                     Add Imprest
                                 </Button>
 
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(user.id))}>
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Vouchers
                                 </Button>
