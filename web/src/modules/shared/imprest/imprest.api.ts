@@ -124,7 +124,8 @@ export const getImprestVouchers = async ({ userId }: { userId?: number }): Promi
         params: userId ? { userId } : {},
     });
 
-    return res.data.data;
+    // ✅ backend returns an array directly
+    return Array.isArray(res.data) ? res.data : [];
 };
 
 // ---------- DETAIL ----------
