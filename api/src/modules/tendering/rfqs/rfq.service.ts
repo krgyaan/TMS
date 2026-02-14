@@ -587,6 +587,110 @@ export class RfqsService {
         return { id: newResponse.id, rfqId, vendorId: data.vendorId };
     }
 
+    async findAllResponses() {
+        const rows = await this.db
+            .select({
+                id: rfqResponses.id,
+                rfqId: rfqResponses.rfqId,
+                vendorId: rfqResponses.vendorId,
+                vendorName: vendors.name,
+                receiptDatetime: rfqResponses.receiptDatetime,
+                tenderId: rfqs.tenderId,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                dueDate: tenderInfos.dueDate,
+                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as('item_summary'),
+            })
+            .from(rfqResponses)
+            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
+            .leftJoin(rfqs, eq(rfqResponses.rfqId, rfqs.id))
+            .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
+            .orderBy(desc(rfqResponses.createdAt));
+        return rows;
+    }
+
+    async findResponsesByRfqId(rfqId: number) {
+        const rfq = await this.findById(rfqId);
+        if (!rfq) {
+            throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
+        }
+        const rows = await this.db
+            .select({
+                id: rfqResponses.id,
+                rfqId: rfqResponses.rfqId,
+                vendorId: rfqResponses.vendorId,
+                vendorName: vendors.name,
+                receiptDatetime: rfqResponses.receiptDatetime,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                dueDate: tenderInfos.dueDate,
+                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as('item_summary'),
+            })
+            .from(rfqResponses)
+            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
+            .leftJoin(rfqs, eq(rfqResponses.rfqId, rfqs.id))
+            .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
+            .where(eq(rfqResponses.rfqId, rfqId))
+            .orderBy(desc(rfqResponses.createdAt));
+        return rows;
+    }
+
+    async findResponseById(responseId: number) {
+        const [row] = await this.db
+            .select({
+                id: rfqResponses.id,
+                rfqId: rfqResponses.rfqId,
+                vendorId: rfqResponses.vendorId,
+                vendorName: vendors.name,
+                receiptDatetime: rfqResponses.receiptDatetime,
+                gstPercentage: rfqResponses.gstPercentage,
+                gstType: rfqResponses.gstType,
+                deliveryTime: rfqResponses.deliveryTime,
+                freightType: rfqResponses.freightType,
+                notes: rfqResponses.notes,
+                createdAt: rfqResponses.createdAt,
+                updatedAt: rfqResponses.updatedAt,
+            })
+            .from(rfqResponses)
+            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
+            .where(eq(rfqResponses.id, responseId));
+        if (!row) {
+            throw new NotFoundException(`RFQ response with ID ${responseId} not found`);
+        }
+        const items = await this.db
+            .select()
+            .from(rfqResponseItems)
+            .where(eq(rfqResponseItems.rfqResponseId, responseId));
+        const documents = await this.db
+            .select()
+            .from(rfqResponseDocuments)
+            .where(eq(rfqResponseDocuments.rfqResponseId, responseId));
+        const rfqDetails = await this.findById(row.rfqId);
+        return {
+            ...row,
+            items: items.map(i => ({
+                id: i.id,
+                rfqResponseId: i.rfqResponseId,
+                rfqItemId: i.rfqItemId,
+                requirement: i.requirement,
+                unit: i.unit,
+                qty: i.qty,
+                unitPrice: i.unitPrice,
+                totalPrice: i.totalPrice,
+                createdAt: i.createdAt,
+            })),
+            documents: documents.map(d => ({
+                id: d.id,
+                rfqResponseId: d.rfqResponseId,
+                docType: d.docType,
+                path: d.path,
+                metadata: d.metadata,
+                createdAt: d.createdAt,
+            })),
+            rfq: rfqDetails ?? undefined,
+        };
+    }
+
     async delete(id: number): Promise<void> {
         const result = await this.db.delete(rfqs).where(eq(rfqs.id, id)).returning();
         if (!result[0]) {

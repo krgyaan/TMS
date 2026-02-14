@@ -17,7 +17,7 @@ import { paths } from "@/app/routes/paths";
 import { useCreateImprest } from "./imprest.hooks";
 import { createImprestSchema, type CreateImprestInput } from "./imprest.schema";
 import SelectField from "@/components/form/SelectField";
-import { useProjectsMaster } from "@/hooks/api/useProjects";
+import { useProjectOptions } from "@/hooks/useSelectOptions";
 import { useImprestCategories } from "@/hooks/api/useImprestCategories";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -25,7 +25,7 @@ registerPlugin(FilePondPluginFileValidateType, FilePondPluginImagePreview);
 
 const EmployeeImprestForm: React.FC = () => {
     const navigate = useNavigate();
-    const { data: projects = [] } = useProjectsMaster();
+    const projectOptions = useProjectOptions();
     const { data: imprestCategories = [] } = useImprestCategories();
     const { user } = useAuth();
 
@@ -107,10 +107,7 @@ const EmployeeImprestForm: React.FC = () => {
                                     name="projectName"
                                     label="Select Project"
                                     placeholder="-- Select Project --"
-                                    options={projects.map(p => ({
-                                        id: p.projectName, // string goes directly into projectName
-                                        name: p.projectName,
-                                    }))}
+                                    options={projectOptions}
                                 />
 
                                 {/* Amount */}

@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTender } from "@/hooks/api/useTenders";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
-import { useRfqByTenderId } from "@/hooks/api/useRfqs";
+import { useRfqByTenderId, useRfqResponses } from "@/hooks/api/useRfqs";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { usePaymentRequestsByTender } from "@/hooks/api/useEmds";
 import { useDocumentChecklistByTender } from "@/hooks/api/useDocumentChecklists";
@@ -13,6 +13,7 @@ import { TenderView } from "@/modules/tendering/tenders/components/TenderView";
 import { InfoSheetView } from "@/modules/tendering/info-sheet/components/InfoSheetView";
 import { TenderApprovalView } from "@/modules/tendering/tender-approval/components/TenderApprovalView";
 import { RfqView } from "@/modules/tendering/rfqs/components/RfqView";
+import { RfqResponsesTable } from "@/modules/tendering/rfqs/components/RfqResponsesTable";
 import { PhysicalDocsView } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
 import { EmdTenderFeeShow } from "@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow";
 import { DocumentChecklistView } from "@/modules/tendering/checklists/components/DocumentChecklistView";
@@ -20,7 +21,7 @@ import { CostingSheetView } from "@/modules/tendering/costing-sheets/components/
 import { BidSubmissionView } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
 import { TenderResultShow } from "@/modules/tendering/results/components/TenderResultShow";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +38,8 @@ export default function TenderShowPage() {
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
     const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const rfqId = Array.isArray(rfq) && rfq.length > 0 ? rfq[0].id : null;
+    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfqId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
     const { data: checklist, isLoading: checklistLoading } = useDocumentChecklistByTender(tenderId ?? 0);
@@ -135,15 +138,37 @@ export default function TenderShowPage() {
                     )}
                 </TabsContent>
 
-                {/* RFQ */}
-                <TabsContent value="rfq">
+                {/* RFQ - combined RfqView + RFQ Responses */}
+                <TabsContent value="rfq" className="space-y-6">
                     {rfqLoading ? (
                         <RfqView rfq={null} tender={tender ?? undefined} isLoading />
                     ) : Array.isArray(rfq) && rfq.length > 0 ? (
-                        <RfqView
-                            rfq={rfq[0]}
-                            tender={tender ?? undefined}
-                        />
+                        <>
+                            <RfqView
+                                rfq={rfq[0]}
+                                tender={tender ?? undefined}
+                            />
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold">RFQ Responses</h3>
+                                    {rfqId != null && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => navigate(paths.tendering.rfqsResponseList(rfqId))}
+                                        >
+                                            <List className="h-4 w-4 mr-2" />
+                                            View all
+                                        </Button>
+                                    )}
+                                </div>
+                                <RfqResponsesTable
+                                    responses={rfqResponses}
+                                    isLoading={rfqResponsesLoading}
+                                    rfqId={rfqId}
+                                />
+                            </div>
+                        </>
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />

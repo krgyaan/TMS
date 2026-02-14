@@ -98,6 +98,41 @@ export function BankTransferView({
                             </TableCell>
                         </TableRow>
 
+                        {/* Request Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Request Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request ID
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestId ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestType || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                        </TableRow>
+
                         {/* Tender/Project Information */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">
@@ -139,6 +174,22 @@ export function BankTransferView({
                                 Transfer Details
                             </TableCell>
                         </TableRow>
+                        {(data.portalName || data.paymentMethod) && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Portal Name
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.portalName || '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Payment Method
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.paymentMethod || '—'}
+                                </TableCell>
+                            </TableRow>
+                        )}
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Account Number

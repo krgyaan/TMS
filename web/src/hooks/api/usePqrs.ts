@@ -42,6 +42,28 @@ export const usePqrs = (
     });
 };
 
+const PAGE_SIZE = 100;
+
+export const usePqrsAll = () => {
+    return useQuery<PaginatedResult<PqrListRow>>({
+        queryKey: pqrKey.list({ all: true }),
+        queryFn: async () => {
+            const first = await pqrService.getAll({ page: 1, limit: PAGE_SIZE });
+            const { totalPages } = first.meta;
+            if (totalPages <= 1) return first;
+            const rest = await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, i) =>
+                    pqrService.getAll({ page: i + 2, limit: PAGE_SIZE })
+                )
+            );
+            return {
+                data: [...first.data, ...rest.flatMap((r) => r.data)],
+                meta: first.meta,
+            };
+        },
+    });
+};
+
 export const usePqr = (id: number | null) => {
     return useQuery<PqrListRow>({
         queryKey: pqrKey.detail(id ?? 0),
