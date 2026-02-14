@@ -39,7 +39,11 @@ const ImprestVoucherView: React.FC = () => {
     const voucherId = Number(id);
 
     const navigate = useNavigate();
-    const { canRead, user } = useAuth();
+    const { canRead, canUpdate, user } = useAuth();
+
+    const canMutateStatus = canUpdate("shared.imprests");
+
+    const isAuthorized = canRead("shared.imprests");
 
     const { data, isLoading, refetch } = useImprestVoucherView(voucherId);
 
@@ -234,13 +238,13 @@ const ImprestVoucherView: React.FC = () => {
 
             {/* ---------------- Actions ---------------- */}
             <div className="voucher-actions">
-                {!voucher.accountsSignedBy && (
+                {canMutateStatus && !voucher.accountsSignedBy && (
                     <Button variant="outline" onClick={() => setAccModalOpen(true)}>
                         Approve by Accounts
                     </Button>
                 )}
 
-                {!voucher.adminSignedBy && (
+                {canMutateStatus && !voucher.adminSignedBy && (
                     <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
                         Approve by CEO
                     </Button>
@@ -248,7 +252,6 @@ const ImprestVoucherView: React.FC = () => {
 
                 <Button onClick={handlePrint}>Print</Button>
             </div>
-
             {/* ================= MODALS ================= */}
 
             {/* Accounts Modal */}
