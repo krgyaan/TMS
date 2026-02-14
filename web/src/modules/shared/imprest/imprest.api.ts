@@ -151,3 +151,8 @@ export const adminApproveVoucher = async (payload: { id: number; remark?: string
     const res = await api.post(`/accounts/imprest/voucher/${id}/admin-approve`, body);
     return res.data;
 };
+
+export const getImprestVoucherProofs = async (params: { userId: number; from: string; to: string }) => {
+    const res = await api.get("/accounts/imprest/voucher/proofs", { params });
+    return res.data;
+};
