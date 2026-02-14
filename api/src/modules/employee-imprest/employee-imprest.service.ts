@@ -1,6 +1,6 @@
 // employee-imprest.service.ts
 import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -14,6 +14,7 @@ import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/cr
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { imprestCategories } from "@/db/schemas";
 
 @Injectable()
 export class EmployeeImprestService {
@@ -113,11 +114,57 @@ export class EmployeeImprestService {
             // ==============================
             // 2️⃣ Detailed Lists
             // ==============================
-            const imprests = await this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(desc(employeeImprests.createdAt));
+            const imprests = await this.db
+                .select({
+                    id: employeeImprests.id,
+                    userId: employeeImprests.userId,
+
+                    categoryId: employeeImprests.categoryId,
+                    categoryName: imprestCategories.name, // ✅ THIS IS WHAT YOU WERE MISSING
+
+                    teamId: employeeImprests.teamId,
+                    partyName: employeeImprests.partyName,
+                    projectName: employeeImprests.projectName,
+
+                    ip: employeeImprests.ip,
+                    amount: employeeImprests.amount,
+                    strtotime: employeeImprests.strtotime,
+                    remark: employeeImprests.remark,
+
+                    invoiceProof: employeeImprests.invoiceProof,
+                    approvalStatus: employeeImprests.approvalStatus,
+                    tallyStatus: employeeImprests.tallyStatus,
+                    proofStatus: employeeImprests.proofStatus,
+                    status: employeeImprests.status,
+
+                    approvedDate: employeeImprests.approvedDate,
+                    createdAt: employeeImprests.createdAt,
+                    updatedAt: employeeImprests.updatedAt,
+                })
+                .from(employeeImprests)
+                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+                .where(eq(employeeImprests.userId, userId))
+                .orderBy(desc(employeeImprests.createdAt));
 
             const transactions = await this.db
-                .select()
+                .select({
+                    id: employeeImprestTransactions.id,
+                    userId: employeeImprestTransactions.userId,
+                    txnDate: employeeImprestTransactions.txnDate,
+                    teamMemberName: employeeImprestTransactions.teamMemberName,
+                    projectName: employeeImprestTransactions.projectName,
+                    amount: employeeImprestTransactions.amount,
+                    createdAt: employeeImprestTransactions.createdAt,
+                    updatedAt: employeeImprestTransactions.updatedAt,
+
+                    categoryName: imprestCategories.name,
+                })
                 .from(employeeImprestTransactions)
+                .leftJoin(
+                    employeeImprests,
+                    and(eq(employeeImprests.userId, employeeImprestTransactions.userId), eq(employeeImprests.projectName, employeeImprestTransactions.projectName))
+                )
+                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
                 .where(eq(employeeImprestTransactions.userId, userId))
                 .orderBy(desc(employeeImprestTransactions.txnDate));
 

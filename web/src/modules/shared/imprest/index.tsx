@@ -293,11 +293,23 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 minWidth: 140,
             },
             {
+                field: "categoryName",
+                headerName: "Category",
+                flex: 1,
+                minWidth: 140,
+            },
+            {
                 field: "amount",
                 headerName: "Amount",
                 width: 120,
                 valueFormatter: p => formatINR(p.value),
                 cellClass: "font-medium tabular-nums",
+            },
+            {
+                field: "remark",
+                headerName: "Remarks",
+                flex: 1,
+                minWidth: 140,
             },
             {
                 field: "invoiceProof",
