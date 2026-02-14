@@ -8,6 +8,7 @@ import { useStatuses } from './api/useStatuses';
 import { useGetTeamMembers } from './api/useUsers';
 import { usePqrsAll } from './api/usePqrs';
 import { useFinanceDocumentsAll } from './api/useFinanceDocuments';
+import { useProjectsMaster } from './api/useProjects';
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -112,6 +113,19 @@ export function useFinanceDocumentOptions() {
             }));
         },
         [apiResponse]
+    );
+}
+
+export function useProjectOptions() {
+    const { data: projects = [] } = useProjectsMaster();
+
+    return useMemo(
+        () =>
+            projects.map((p) => ({
+                id: p.projectName,
+                name: p.projectName,
+            })),
+        [projects]
     );
 }
 
