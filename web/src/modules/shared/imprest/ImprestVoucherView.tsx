@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,17 @@ const formatINR = (n: number) =>
 /* ---------------------------------- */
 
 const ImprestVoucherView: React.FC = () => {
-    const { id } = useParams<{ id: string }>();
-    const voucherId = Number(id);
+    const [searchParams] = useSearchParams();
+
+    const userId = Number(searchParams.get("userId"));
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
+
+    if (!userId || !from || !to) {
+        return <div className="p-6">Invalid voucher link</div>;
+    }
+
+    const isSigned = (v?: string | null) => v && v.trim().length > 0;
 
     const navigate = useNavigate();
     const { canRead, canUpdate, user } = useAuth();
@@ -46,7 +55,15 @@ const ImprestVoucherView: React.FC = () => {
 
     const isAuthorized = canRead("shared.imprests");
 
-    const { data, isLoading, refetch } = useImprestVoucherView(voucherId);
+    if (!canRead("shared.imprests")) {
+        return <div className="p-6">Access denied</div>;
+    }
+
+    const { data, isLoading, refetch } = useImprestVoucherView({
+        userId,
+        from,
+        to,
+    });
 
     const accountApproveMutation = useAccountApproveVoucher();
     const adminApproveMutation = useAdminApproveVoucher();
@@ -55,11 +72,11 @@ const ImprestVoucherView: React.FC = () => {
     const [adminModalOpen, setAdminModalOpen] = React.useState(false);
 
     const [remark, setRemark] = React.useState("");
-    const [approve, setApprove] = React.useState(false);
+    const [accApprove, setAccApprove] = React.useState(false);
+    const [adminApprove, setAdminApprove] = React.useState(false);
 
     if (isLoading) return <div className="p-6">Loading…</div>;
     if (!data) return <div className="p-6">Voucher not found</div>;
-    if (!canRead("accounts.imprests")) return <div className="p-6">Access denied</div>;
 
     const { voucher, items } = data;
 
@@ -67,7 +84,8 @@ const ImprestVoucherView: React.FC = () => {
 
     const resetForm = () => {
         setRemark("");
-        setApprove(false);
+        setAccApprove(false);
+        setAdminApprove(false);
     };
 
     /* ---------------------------------- */
@@ -77,7 +95,11 @@ const ImprestVoucherView: React.FC = () => {
     const handleAccountSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         accountApproveMutation.mutate(
-            { id: voucher.id, remark, approve },
+            {
+                id: voucher.id,
+                remark,
+                approve: accApprove,
+            },
             {
                 onSuccess: () => {
                     setAccModalOpen(false);
@@ -91,7 +113,11 @@ const ImprestVoucherView: React.FC = () => {
     const handleAdminSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         adminApproveMutation.mutate(
-            { id: voucher.id, remark, approve },
+            {
+                id: voucher.id,
+                remark,
+                approve: adminApprove,
+            },
             {
                 onSuccess: () => {
                     setAdminModalOpen(false);
@@ -304,13 +330,13 @@ const ImprestVoucherView: React.FC = () => {
 
             {/* ---------------- Actions ---------------- */}
             <div className="voucher-actions">
-                {canMutateStatus && !voucher.accountsSignedBy && (
+                {canMutateStatus && !isSigned(voucher.accountsSignedBy) && (
                     <Button variant="outline" onClick={() => setAccModalOpen(true)}>
                         Approve by Accounts
                     </Button>
                 )}
 
-                {canMutateStatus && !voucher.adminSignedBy && (
+                {canMutateStatus && !isSigned(voucher.adminSignedBy) && (
                     <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
                         Approve by CEO
                     </Button>
@@ -331,7 +357,7 @@ const ImprestVoucherView: React.FC = () => {
                         <Textarea placeholder="Remark" value={remark} onChange={e => setRemark(e.target.value)} />
 
                         <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={approve} onChange={e => setApprove(e.target.checked)} />
+                            <input type="checkbox" checked={accApprove} onChange={e => setAccApprove(e.target.checked)} />
                             Approve it
                         </label>
 
@@ -358,7 +384,7 @@ const ImprestVoucherView: React.FC = () => {
                         <Textarea placeholder="Remark" value={remark} onChange={e => setRemark(e.target.value)} />
 
                         <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={approve} onChange={e => setApprove(e.target.checked)} />
+                            <input type="checkbox" checked={adminApprove} onChange={e => setAdminApprove(e.target.checked)} />
                             Approve it
                         </label>
 
