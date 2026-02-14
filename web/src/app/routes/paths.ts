@@ -270,7 +270,8 @@ export const paths = {
         imprestCreate: "/shared/imprests/create",
         imprestVoucher: "/shared/imprests/voucher",
         imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
-        imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
+        imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
+            `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
     },
 
     // ==================== DOCUMENT DASHBOARD ====================
