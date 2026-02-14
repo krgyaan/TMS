@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft } from "lucide-react";
 
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
@@ -457,19 +457,100 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     return (
         <Card>
-            {/* SUMMARY */}
+            <CardHeader className="pb-4">
+                <div className="space-y-4">
+                    {/* Top Row: Back + Title */}
+                    <div className={cn("flex items-start gap-2", isMobile ? "flex-col" : "flex-row items-center justify-between")}>
+                        {/* Left Side: Back + Title */}
+                        <div className="flex items-center gap-2">
+                            {!isOwnPage && (
+                                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8">
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                            )}
+
+                            <div>
+                                <CardTitle className="leading-none">{pageTitle}</CardTitle>
+                                <CardDescription className="mt-1">
+                                    {rows.length} {rows.length === 1 ? "record" : "records"}
+                                </CardDescription>
+                            </div>
+                        </div>
+
+                        {/* Right Side Controls (Desktop Only) */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    placeholder="Search imprests..."
+                                    value={searchText}
+                                    onChange={e => {
+                                        const value = e.target.value;
+                                        setSearchText(value);
+                                        gridApi?.setGridOption("quickFilterText", value);
+                                    }}
+                                    className="w-64"
+                                />
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Imprest
+                                </Button>
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(user.id))}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    View Vouchers
+                                </Button>
+
+                                <Button variant="outline" size="sm" onClick={exportExcel}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Mobile Controls */}
+                    {isMobile && (
+                        <div className="flex flex-col gap-2">
+                            <Input
+                                placeholder="Search imprests..."
+                                value={searchText}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    setSearchText(value);
+                                    gridApi?.setGridOption("quickFilterText", value);
+                                }}
+                                className="w-full"
+                            />
+
+                            <div className="flex gap-2">
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className="flex-1">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add
+                                </Button>
+
+                                <Button variant="outline" size="sm" onClick={exportExcel} className="flex-1">
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </CardHeader>
+
             {/* SUMMARY */}
             {/* ================= FINANCIAL SUMMARY ================= */}
             {summary && (
-                <div className="mb-6 p-3">
+                <div className="mx-3 p-4">
                     {isMobile ? (
                         /* ================= MOBILE ================= */
                         <Card className="border shadow-sm">
-                            <CardContent className="p-5 space-y-5">
+                            <CardContent className="p-5 space-y-3">
                                 {/* Primary Balance */}
                                 <div>
-                                    <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
-                                    <p className="text-3xl font-semibold tabular-nums mt-1">{formatINR(summary.amountLeft)}</p>
+                                    <p className="text-xs uppercase tracking-widest text-muted-foreground ">Amount Left</p>
+                                    <p className="text-2xl font-semibold tabular-nums mt-1">{formatINR(summary.amountLeft)}</p>
                                 </div>
 
                                 <div className="h-px bg-border" />
@@ -496,14 +577,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                     ) : (
                         /* ================= DESKTOP ================= */
                         <Card className="border shadow-sm">
-                            <CardContent className="p-6">
-                                <div className="grid grid-cols-4 gap-8 items-center">
-                                    {/* Balance (Primary) */}
-                                    <div className="col-span-1">
-                                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
-                                        <p className="text-3xl font-semibold tabular-nums mt-2">{formatINR(summary.amountLeft)}</p>
-                                    </div>
-
+                            <CardContent className="p-2 pl-5">
+                                <div className="grid grid-cols-4 gap-3 items-center">
                                     {/* Supporting Metrics */}
                                     <div className="col-span-3 grid grid-cols-3 gap-6">
                                         <div>
@@ -521,52 +596,18 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                             <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountReceived)}</p>
                                         </div>
                                     </div>
+
+                                    {/* Balance (Primary) */}
+                                    <div className="col-span-1 ">
+                                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
+                                        <p className="text-xl font-semibold tabular-nums mt-2">{formatINR(summary.amountLeft)}</p>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
                 </div>
             )}
-
-            <CardHeader className="pb-4">
-                <div className="space-y-3">
-                    {/* Title */}
-                    <div>
-                        <CardTitle>{pageTitle}</CardTitle>
-                        <CardDescription>
-                            {rows.length} {rows.length === 1 ? "record" : "records"}
-                        </CardDescription>
-                    </div>
-
-                    {/* Controls */}
-                    <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row items-center justify-between")}>
-                        {/* Search */}
-                        <Input
-                            placeholder="Search imprests..."
-                            value={searchText}
-                            onChange={e => {
-                                const value = e.target.value;
-                                setSearchText(value);
-                                gridApi?.setGridOption("quickFilterText", value);
-                            }}
-                            className={cn(isMobile ? "w-full" : "w-64")}
-                        />
-
-                        {/* Buttons */}
-                        <div className={cn("flex gap-2", isMobile ? "w-full" : "items-center")}>
-                            <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className={cn(isMobile && "flex-1")}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Imprest
-                            </Button>
-
-                            <Button variant="outline" size="sm" onClick={exportExcel} className={cn(isMobile && "flex-1")}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </CardHeader>
 
             <CardContent>
                 {isMobile ? (
