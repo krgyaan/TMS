@@ -85,11 +85,13 @@ export class ImprestAdminController {
     // VIEW VOUCHER BY ID
     //=========================
 
-    @Get("voucher/view/:id")
-    async getVoucherById(@Param("id", ParseIntPipe) id: number, @Req() req) {
-        return this.service.getVoucherById({
+    @Get("voucher/view")
+    async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+        return this.service.getVoucherByPeriod({
             user: req.user,
-            voucherId: Number(id),
+            userId,
+            from: new Date(from),
+            to: new Date(to),
         });
     }
 
