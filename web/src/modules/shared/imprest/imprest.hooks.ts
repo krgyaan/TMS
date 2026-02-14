@@ -13,7 +13,6 @@ import {
 
     // vouchers
     getImprestVouchers,
-    getImprestVoucherById,
     accountApproveVoucher,
     adminApproveVoucher,
 
@@ -23,6 +22,7 @@ import {
     proofImprest,
     addImprestRemark,
     type CreateImprestInput,
+    getImprestVoucher,
 } from "./imprest.api";
 
 import type { EmployeeImprestDashboard, ImprestVoucherRow } from "./imprest.types";
@@ -208,11 +208,11 @@ export const useImprestVoucherList = (userId?: number) => {
     });
 };
 
-export const useImprestVoucherView = (id: number) => {
+export const useImprestVoucherView = (params: { userId: number; from: string; to: string }) => {
     return useQuery({
-        queryKey: imprestVoucherKeys.detail(id),
-        queryFn: () => getImprestVoucherById(id),
-        enabled: !!id,
+        queryKey: imprestVoucherKeys.detail(params),
+        queryFn: () => getImprestVoucher(params),
+        enabled: !!params.userId && !!params.from && !!params.to,
     });
 };
 
