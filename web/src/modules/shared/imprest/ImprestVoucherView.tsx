@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useImprestVoucherView, useAccountApproveVoucher, useAdminApproveVoucher } from "./imprest.hooks";
 
 import { useAuth } from "@/contexts/AuthContext";
+import html2pdf from "html2pdf.js";
 
 /* ---------------------------------- */
 /* Utilities                          */
@@ -101,8 +102,73 @@ const ImprestVoucherView: React.FC = () => {
         );
     };
 
-    const handlePrint = () => {
-        window.print();
+    const injectHtml2CanvasSafeCSS = () => {
+        const style = document.createElement("style");
+        style.id = "html2canvas-safe-style";
+        style.innerHTML = `
+        html.pdf-export, html.pdf-export * {
+            color: #000 !important;
+            background-color: #fff !important;
+            border-color: #000 !important;
+
+            --background: #ffffff !important;
+            --foreground: #000000 !important;
+            --card: #ffffff !important;
+            --card-foreground: #000000 !important;
+            --popover: #ffffff !important;
+            --popover-foreground: #000000 !important;
+            --primary: #000000 !important;
+            --primary-foreground: #ffffff !important;
+            --secondary: #ffffff !important;
+            --secondary-foreground: #000000 !important;
+            --muted: #ffffff !important;
+            --muted-foreground: #000000 !important;
+            --accent: #ffffff !important;
+            --accent-foreground: #000000 !important;
+            --border: #000000 !important;
+            --input: #ffffff !important;
+            --ring: #000000 !important;
+        }
+    `;
+        document.head.appendChild(style);
+    };
+
+    const removeHtml2CanvasSafeCSS = () => {
+        document.getElementById("html2canvas-safe-style")?.remove();
+    };
+
+    const handleExportPDF = async () => {
+        const element = document.getElementById("printableArea");
+        if (!element) return;
+
+        // 🔑 Enable PDF mode
+        document.documentElement.classList.add("pdf-export");
+        injectHtml2CanvasSafeCSS();
+
+        try {
+            await html2pdf()
+                .set({
+                    margin: [10, 10, 10, 10] as const,
+                    filename: `Imprest-Voucher-${voucher.voucherCode}.pdf`,
+                    image: { type: "jpeg", quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: "#ffffff",
+                    },
+                    jsPDF: {
+                        unit: "mm",
+                        format: "a4",
+                        orientation: "landscape",
+                    },
+                })
+                .from(element)
+                .save();
+        } finally {
+            // 🔑 Always clean up
+            document.documentElement.classList.remove("pdf-export");
+            removeHtml2CanvasSafeCSS();
+        }
     };
 
     /* ---------------------------------- */
@@ -134,7 +200,7 @@ const ImprestVoucherView: React.FC = () => {
                         </tr>
 
                         <tr>
-                            <td colSpan={4} className="pt-3">
+                            <td colSpan={4} className="text-xl pt-3">
                                 <h3>Expense Report</h3>
                             </td>
                         </tr>
@@ -250,7 +316,7 @@ const ImprestVoucherView: React.FC = () => {
                     </Button>
                 )}
 
-                <Button onClick={handlePrint}>Print</Button>
+                <Button onClick={handleExportPDF}>Print</Button>
             </div>
             {/* ================= MODALS ================= */}
 
@@ -308,21 +374,136 @@ const ImprestVoucherView: React.FC = () => {
                 </DialogContent>
             </Dialog>
             <style>{`
-                .voucher-container { padding:24px; }
-                table { width:100%; border-collapse:collapse; }
-                th, td { padding:6px; }
-                .voucher-items, .voucher-items th, .voucher-items td {
-                    border:1px solid #000;
+                .voucher-container {
+                    padding: 20px;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 12px;
+                    color: inherit;
                 }
-                .voucher-items .wrap { white-space:pre-wrap; }
-                .voucher-signatures { width:50%; margin-top:40px; }
-                .voucher-signatures img { height:40px; width:120px; object-fit:contain; }
-                .text-right { text-align:right; }
-                .voucher-actions { display:flex; justify-content:center; gap:12px; margin-top:24px; }
-                @media print {
-                    button, .voucher-toolbar, .voucher-actions { display:none !important; }
-                    body { background:#fff; color:#000; }
-                    table, th, td { border:1px solid #000 !important; }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+
+                /* ================= Header ================= */
+
+                .voucher-header,
+                .voucher-header td {
+                    border: 1px solid currentColor;
+                }
+
+                .voucher-header h4 {
+                    margin: 0;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+
+                .voucher-header p {
+                    margin: 2px 0;
+                    font-size: 12px;
+                }
+
+                .voucher-header td {
+                    padding: 6px;
+                    vertical-align: top;
+                }
+
+                /* ================= Items Table ================= */
+
+                .voucher-items {
+                    margin-top: 18px;
+                    table-layout: fixed;        /* CRITICAL */
+                    font-size: 11px;
+                }
+
+                .voucher-items th,
+                .voucher-items td {
+                    border: 1px solid currentColor;
+                    padding: 6px;
+                    vertical-align: top;
+                    word-wrap: break-word;
+                    white-space: pre-wrap;
+                }
+
+                .voucher-items th {
+                    font-weight: bold;
+                    text-align: left;
+                }
+
+                /* Column widths (match accounting PDF) */
+                .voucher-items th:nth-child(1),
+                .voucher-items td:nth-child(1) { width: 5%; }
+
+                .voucher-items th:nth-child(2),
+                .voucher-items td:nth-child(2) { width: 16%; }
+
+                .voucher-items th:nth-child(3),
+                .voucher-items td:nth-child(3) { width: 12%; }
+
+                .voucher-items th:nth-child(4),
+                .voucher-items td:nth-child(4) { width: 16%; }
+
+                .voucher-items th:nth-child(5),
+                .voucher-items td:nth-child(5) { width: 33%; }
+
+                .voucher-items th:nth-child(6),
+                .voucher-items td:nth-child(6) {
+                    width: 18%;
+                    text-align: right;
+                }
+
+                /* Repeat table header on every PDF page */
+                thead {
+                    display: table-header-group;
+                }
+
+                tr {
+                    page-break-inside: avoid;
+                }
+
+                /* ================= Total Row ================= */
+
+                .total-row td {
+                    font-weight: bold;
+                    border-top: 2px solid #000;
+                }
+
+                /* ================= Signatures ================= */
+
+                .voucher-signatures {
+                    margin-top: 32px;
+                    width: 60%;
+                }
+
+                .voucher-signatures,
+                .voucher-signatures th,
+                .voucher-signatures td {
+                    border: 1px solid currentColor;
+                }
+
+                .voucher-signatures th,
+                .voucher-signatures td {
+                    padding: 8px;
+                    font-size: 12px;
+                }
+
+                .voucher-signatures img {
+                    height: 40px;
+                    width: 120px;
+                    object-fit: contain;
+                }
+
+                /* ================= Utility ================= */
+
+                .text-right {
+                    text-align: right;
+                }
+
+                .voucher-actions {
+                    display: flex;
+                    justify-content: center;
+                    margin-top: 24px;
                 }
             `}</style>
         </div>
