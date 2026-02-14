@@ -57,7 +57,7 @@ export class ImprestAdminController {
             dataScope: user.dataScope,
         };
 
-        const canReadAll = await this.permissionService.hasPermission(context, { module: "accounts.imprests", action: "readVouchers" });
+        const canReadAll = await this.permissionService.hasPermission(context, { module: "accounts.imprests", action: "read" });
 
         // 🔹 If user has read_all permission
         if (canReadAll) {
