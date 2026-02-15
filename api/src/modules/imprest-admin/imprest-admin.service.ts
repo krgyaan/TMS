@@ -522,39 +522,17 @@ export class ImprestAdminService {
         return voucher;
     }
 
-    async getVoucherProofs({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
-        // 1️⃣ Recalculate period EXACTLY like Laravel
-        const periodResult = await this.db.execute(sql`
-    SELECT
-      MIN(COALESCE(approved_date, created_at)) AS "startDate",
-      (
-        MIN(COALESCE(approved_date, created_at))
-        + INTERVAL '6 days'
-      ) AS "endDate"
-    FROM employee_imprests
-    WHERE user_id = ${userId}
-  `);
+    async getVoucherProofs({ user, userId, year, week }: { user: any; userId: number; year: number; week: number }) {
+        const rows = await this.db.execute(sql`
+        SELECT invoice_proof
+        FROM employee_imprests
+        WHERE user_id = ${userId}
+          AND EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) = ${year}
+          AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
+    `);
 
-        const startDate = periodResult.rows[0]?.startDate;
-        const endDate = periodResult.rows[0]?.endDate;
+        const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
 
-        if (!startDate || !endDate) {
-            return { proofs: [] };
-        }
-
-        // 2️⃣ Fetch proofs within that window
-        const proofRows = await this.db.execute(sql`
-    SELECT invoice_proof
-    FROM employee_imprests
-    WHERE user_id = ${userId}
-      AND DATE(COALESCE(approved_date, created_at))
-          BETWEEN DATE(${startDate}) AND DATE(${endDate})
-  `);
-
-        // 3️⃣ Flatten JSONB arrays
-        const files = proofRows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
-
-        // 4️⃣ Normalize
         const proofs = files.map((file: string, index: number) => {
             const ext = file.split(".").pop()?.toLowerCase() ?? "";
             return {
@@ -565,8 +543,6 @@ export class ImprestAdminService {
                 url: `/uploads/employeeimprest/${file}`,
             };
         });
-
-        console.log(proofs);
 
         return { proofs };
     }

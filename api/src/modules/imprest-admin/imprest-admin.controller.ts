@@ -103,12 +103,12 @@ export class ImprestAdminController {
     }
 
     @Get("voucher/proofs")
-    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("year", ParseIntPipe) year: number, @Query("week", ParseIntPipe) week: number, @Req() req) {
         return this.service.getVoucherProofs({
             user: req.user,
             userId,
-            from: new Date(from),
-            to: new Date(to),
+            year,
+            week,
         });
     }
 
