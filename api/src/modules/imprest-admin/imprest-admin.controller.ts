@@ -85,8 +85,8 @@ export class ImprestAdminController {
     // VIEW VOUCHER BY ID
     //=========================
 
-    @Get("voucher/proofs")
-    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+    @Get("voucher/view")
+    async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
         const parsedFrom = new Date(decodeURIComponent(from));
         const parsedTo = new Date(decodeURIComponent(to));
 
@@ -94,11 +94,21 @@ export class ImprestAdminController {
             throw new BadRequestException("Invalid date range");
         }
 
-        return this.service.getVoucherProofs({
+        return this.service.getVoucherByPeriod({
             user: req.user,
             userId,
             from: parsedFrom,
             to: parsedTo,
+        });
+    }
+
+    @Get("voucher/proofs")
+    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+        return this.service.getVoucherProofs({
+            user: req.user,
+            userId,
+            from: new Date(from),
+            to: new Date(to),
         });
     }
 
