@@ -8,26 +8,24 @@ import { Button } from "@/components/ui/button";
 const ImprestVoucherProofs: React.FC = () => {
     const [searchParams] = useSearchParams();
 
-    const userIdParam = searchParams.get("userId");
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
-
-    const userId = userIdParam ? Number(userIdParam) : null;
+    const userId = Number(searchParams.get("userId"));
+    const year = Number(searchParams.get("year"));
+    const week = Number(searchParams.get("week"));
 
     const [preview, setPreview] = React.useState<any>(null);
 
     const { data, isLoading } = useQuery({
-        queryKey: ["voucher-proofs", userId, from, to],
+        queryKey: ["voucher-proofs", userId, year, week],
         queryFn: () =>
             getImprestVoucherProofs({
-                userId: userId as number,
-                from: from as string,
-                to: to as string,
+                userId,
+                year,
+                week,
             }),
-        enabled: Boolean(userId && from && to),
+        enabled: Boolean(userId && year && week),
     });
 
-    if (!userId || !from || !to) {
+    if (!userId || !year || !week) {
         return <div className="p-6">Invalid or missing query parameters</div>;
     }
 
