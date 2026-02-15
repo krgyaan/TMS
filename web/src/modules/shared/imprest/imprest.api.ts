@@ -152,7 +152,7 @@ export const adminApproveVoucher = async (payload: { id: number; remark?: string
     return res.data;
 };
 
-export const getImprestVoucherProofs = async (params: { userId: number; from: string; to: string }) => {
+export const getImprestVoucherProofs = async (params: { userId: number; year: number; week: number }) => {
     const res = await api.get("/accounts/imprest/voucher/proofs", { params });
     return res.data;
 };
