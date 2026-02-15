@@ -26,6 +26,7 @@ import {
 } from "./imprest.api";
 
 import type { EmployeeImprestDashboard, ImprestVoucherRow } from "./imprest.types";
+import type { UpdateImprestInput } from "./imprest.schema";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -77,23 +78,6 @@ export const useCreateImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
         onError: () => toast.error("Failed to create imprest"),
-    });
-};
-
-/* ---------------- UPDATE ---------------- */
-
-export const useUpdateImprest = () => {
-    const qc = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) => updateImprest(id, data),
-
-        onSuccess: () => {
-            toast.success("Updated successfully");
-            qc.invalidateQueries({ queryKey: imprestKeys.root });
-        },
-
-        onError: () => toast.error("Failed to update imprest"),
     });
 };
 
@@ -245,5 +229,20 @@ export const useAdminApproveVoucher = () => {
         },
 
         onError: () => toast.error("Failed to update voucher"),
+    });
+};
+
+export const useUpdateImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: UpdateImprestInput }) => updateImprest(id, data),
+
+        onSuccess: () => {
+            toast.success("Updated successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update imprest"),
     });
 };

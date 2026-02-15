@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req } from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req, Patch } from "@nestjs/common";
 import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
@@ -56,14 +56,15 @@ export class EmployeeImprestController {
         return this.service.findOne(id);
     }
 
-    @Put(":id")
+    @Patch(":id")
     update(
         @Param("id", ParseIntPipe) id: number,
         @Body(new ZodValidationPipe(UpdateEmployeeImprestSchema))
-        body: UpdateEmployeeImprestDto,
-        @CurrentUser("id") userId: number
+        body: UpdateEmployeeImprestDto
     ) {
-        return this.service.update(id, body, userId);
+        console.log("TEST");
+        console.log(id, body);
+        return this.service.update(id, body);
     }
 
     @Delete(":id")

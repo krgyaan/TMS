@@ -63,10 +63,10 @@ export const createImprest = async ({ data, files }: { data: CreateImprestInput;
 };
 
 // ---------- UPDATE ----------
-export const updateImprest = async (id: number, data: Partial<ImprestRow>) => {
-    const res = await api.patch(`/employee-imprest/${id}`, data);
-    return res.data;
-};
+// export const updateImprest = async (id: number, data: Partial<ImprestRow>) => {
+//     const res = await api.patch(`/employee-imprest/${id}`, data);
+//     return res.data;
+// };
 
 // ---------- DELETE ----------
 export const deleteImprest = async (id: number) => {
@@ -154,5 +154,10 @@ export const adminApproveVoucher = async (payload: { id: number; remark?: string
 
 export const getImprestVoucherProofs = async (params: { userId: number; from: string; to: string }) => {
     const res = await api.get("/accounts/imprest/voucher/proofs", { params });
+    return res.data;
+};
+
+export const updateImprest = async (id: number, data: Partial<ImprestRow>) => {
+    const res = await api.patch(`/employee-imprest/${id}`, data);
     return res.data;
 };

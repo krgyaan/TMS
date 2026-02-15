@@ -208,22 +208,18 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
-    async update(id: number, data: UpdateEmployeeImprestDto, userId: number) {
+    async update(id: number, data: UpdateEmployeeImprestDto) {
         const existing = await this.findOne(id);
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
-        }
-
         const updateData: Record<string, any> = {
             updatedAt: new Date(),
         };
 
-        // Only real columns from employee_imprests
+        // Editable fields
         if (data.partyName !== undefined) updateData.partyName = data.partyName;
         if (data.projectName !== undefined) updateData.projectName = data.projectName;
         if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
@@ -231,6 +227,7 @@ export class EmployeeImprestService {
         if (data.amount !== undefined) updateData.amount = data.amount;
         if (data.remark !== undefined) updateData.remark = data.remark;
 
+        // Status / workflow fields (allowed as per your instruction)
         if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
         if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
         if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
@@ -241,7 +238,6 @@ export class EmployeeImprestService {
 
         return updated;
     }
-
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);

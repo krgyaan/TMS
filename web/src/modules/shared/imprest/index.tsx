@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft, Pencil } from "lucide-react";
 
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
@@ -16,7 +16,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "./imprest.hooks";
+import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest } from "./imprest.hooks";
 
 import type { ImprestRow } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
@@ -171,6 +171,10 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
     const [remarkText, setRemarkText] = useState("");
 
+    const [editOpen, setEditOpen] = useState(false);
+    const [editRow, setEditRow] = useState<ImprestRow | null>(null);
+    const updateImprestMutation = useUpdateImprest();
+
     /* -------------------- HANDLERS -------------------- */
 
     useEffect(() => {
@@ -228,6 +232,37 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const openLightboxForRow = (row: ImprestRow) => {
         setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employeeimprest/${filename}` })));
         setLightboxOpen(true);
+    };
+
+    const openEditModal = (row: ImprestRow) => {
+        setEditRow(row);
+        setEditOpen(true);
+    };
+
+    const submitEditImprest = (e?: React.FormEvent) => {
+        e?.preventDefault();
+
+        if (!editRow) return;
+
+        updateImprestMutation.mutate(
+            {
+                id: editRow.id,
+                data: {
+                    partyName: editRow.partyName,
+                    projectName: editRow.projectName,
+                    categoryId: editRow.categoryId,
+                    teamId: editRow.teamId,
+                    amount: editRow.amount,
+                    remark: editRow.remark,
+                },
+            },
+            {
+                onSuccess: () => {
+                    setEditOpen(false);
+                    setEditRow(null);
+                },
+            }
+        );
     };
 
     /* -------------------- EXCEL -------------------- */
@@ -388,6 +423,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
                             {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
+
+                            {canUpdate("imprests.shared") && row.approvalStatus === 0 && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
                         </div>
                     );
                 },
@@ -732,6 +769,35 @@ const ImprestEmployeeDashboard: React.FC = () => {
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Imprest</DialogTitle>
+                        <DialogDescription>Update imprest details before approval.</DialogDescription>
+                    </DialogHeader>
+
+                    {editRow && (
+                        <form onSubmit={submitEditImprest} className="space-y-4">
+                            <Input value={editRow.partyName} onChange={e => setEditRow({ ...editRow, partyName: e.target.value })} placeholder="Party Name" />
+
+                            <Input value={editRow.projectName} onChange={e => setEditRow({ ...editRow, projectName: e.target.value })} placeholder="Project Name" />
+
+                            <Input type="number" value={editRow.amount} onChange={e => setEditRow({ ...editRow, amount: Number(e.target.value) })} placeholder="Amount" />
+
+                            <Textarea value={editRow.remark ?? ""} onChange={e => setEditRow({ ...editRow, remark: e.target.value })} placeholder="Remark" />
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                                    Cancel
+                                </Button>
+
+                                <Button type="submit">Save Changes</Button>
+                            </div>
+                        </form>
+                    )}
                 </DialogContent>
             </Dialog>
 
