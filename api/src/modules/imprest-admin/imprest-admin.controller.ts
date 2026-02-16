@@ -32,14 +32,45 @@ export class ImprestAdminController {
     // ========================
     // GET PAYMENT HISTORY (BY USER)
     // ========================
-    @Get("payment-history/:userId")
-    async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
-        // employee can only view their own history
-        // if (user.role === "employee" && user.id !== userId) {
-        //     throw new ForbiddenException("Access denied");
-        // }
+    // @Get("payment-history/:userId")
+    // async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
+    //     // employee can only view their own history
+    //     // if (user.role === "employee" && user.id !== userId) {
+    //     //     throw new ForbiddenException("Access denied");
+    //     // }
 
-        return this.service.getByUser(userId);
+    //     return this.service.getByUser(userId);
+    // }
+
+    @Get("payment-history")
+    async getPaymentHistory(@CurrentUser() user: any, @Query("userId") userId?: number) {
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
+
+        // 🔐 Admin / Accounts can see all or filter by user
+        if (canReadAll) {
+            return this.service.getPaymentHistory(userId);
+        }
+
+        // 👤 Employee can only see their own
+        return this.service.getPaymentHistory(user.sub);
+    }
+
+    @Delete("payment-history/:id")
+    @CanDelete("accounts.imprests")
+    async deletePaymentHistory(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: any) {
+        return this.service.deletePaymentHistory({
+            transactionId: id,
+            deletedBy: user.sub,
+        });
     }
 
     // ========================

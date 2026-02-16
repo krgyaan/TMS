@@ -219,9 +219,10 @@ export class ImprestAdminService {
         }
     }
 
-    async getByUser(userId: number) {
-        let amt = await this.getUserAmts(userId);
-        let rows = await this.db
+    async getPaymentHistory(userId?: number) {
+        const whereClause = userId ? eq(employeeImprestTransactions.userId, userId) : undefined;
+
+        const rows = await this.db
             .select({
                 id: employeeImprestTransactions.id,
                 userId: employeeImprestTransactions.userId,
@@ -233,22 +234,40 @@ export class ImprestAdminService {
             })
             .from(employeeImprestTransactions)
             .innerJoin(users, eq(users.id, employeeImprestTransactions.userId))
-            .where(eq(employeeImprestTransactions.userId, userId))
+            .where(whereClause)
             .orderBy(desc(employeeImprestTransactions.txnDate));
 
         return {
-            summary: {
-                amountSpent: amt.amountSpent,
-                amountApproved: amt.amountApproved,
-                amountReceived: amt.amountReceived,
-                amountLeft: amt.amountLeft,
-            },
             data: rows.map(r => ({
                 ...r,
-                amount: Number(r.amount), // IMPORTANT for Drizzle numeric
+                amount: Number(r.amount),
             })),
         };
     }
+
+    async deletePaymentHistory({ transactionId, deletedBy }: { transactionId: number; deletedBy: number }) {
+        // 1️⃣ Check existence
+        const [txn] = await this.db
+            .select({
+                id: employeeImprestTransactions.id,
+            })
+            .from(employeeImprestTransactions)
+            .where(eq(employeeImprestTransactions.id, transactionId))
+            .limit(1);
+
+        if (!txn) {
+            throw new NotFoundException("Payment transaction not found");
+        }
+
+        // 2️⃣ Delete
+        await this.db.delete(employeeImprestTransactions).where(eq(employeeImprestTransactions.id, transactionId));
+
+        return {
+            success: true,
+            message: "Payment history entry deleted successfully",
+        };
+    }
+
     // Role-based filtering
     // if (user.role !== "admin") {
     //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
