@@ -23,6 +23,7 @@ import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -620,7 +621,8 @@ export class TenderApprovalService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] },
+        attachments?: { files: string[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -632,6 +634,7 @@ export class TenderApprovalService {
                 subject,
                 template,
                 data,
+                attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -670,8 +673,13 @@ export class TenderApprovalService {
 
         // Get vendor names from rfqTo
         let vendor = "Selected Vendors";
-        if (payload.rfqTo && payload.rfqTo.length > 0) {
-            // TODO: Fetch vendor organization names from rfqTo IDs
+        if (payload.rfqRequired === 'yes' && payload.rfqTo && payload.rfqTo.length > 0) {
+            const vendorOrgs = await this.db
+                .select({ name: vendorOrganizations.name })
+                .from(vendorOrganizations)
+                .where(inArray(vendorOrganizations.id, payload.rfqTo));
+            vendor = vendorOrgs.map(org => org.name).join(', ') || 'Selected Vendors';
+        } else if (payload.rfqTo && payload.rfqTo.length > 0) {
             vendor = `${payload.rfqTo.length} vendor(s)`;
         }
 
@@ -782,6 +790,8 @@ export class TenderApprovalService {
             processingFeeMode: payload.processingFeeMode || "Not specified",
             tenderFeesMode: payload.tenderFeeMode || "Not specified",
             emdMode: payload.emdMode || "Not specified",
+            rfqRequired: payload.rfqRequired || null,
+            quotationFilesCount: payload.quotationFiles?.length || 0,
             vendor,
             phyDocs,
             pqrApproved: payload.approvePqrSelection === "1",
@@ -808,12 +818,17 @@ export class TenderApprovalService {
             eventType = "tender.rejected";
         }
 
+        // Prepare attachments if quotation files exist
+        const attachments = payload.rfqRequired === 'no' && payload.quotationFiles && payload.quotationFiles.length > 0
+            ? { files: payload.quotationFiles }
+            : undefined;
+
         await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
             to: [{ type: "user", userId: tender.teamMember }],
             cc: [
                 { type: "role", role: "Admin", teamId: tender.team },
                 { type: "role", role: "Coordinator", teamId: tender.team },
             ],
-        });
+        }, attachments);
     }
 }

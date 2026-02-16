@@ -34,7 +34,14 @@
             <li>The selected mode of Processing Fee: {{data.processingFeeMode}}</li>
             <li>The selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
             <li>The selected mode of EMD: {{data.emdMode}}</li>
-            <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            <li>RFQ Required: {{#if data.rfqRequired}}{{#if (eq data.rfqRequired "yes")}}Yes{{else}}No{{/if}}{{else}}Not specified{{/if}}</li>
+            {{#if (eq data.rfqRequired "yes")}}
+                <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            {{else if (eq data.rfqRequired "no")}}
+                <li>Quotation files have been uploaded ({{data.quotationFilesCount}} file(s)) - see attachments</li>
+            {{else}}
+                <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            {{/if}}
             <li>Courier Physical Documents: {{data.phyDocs}}</li>
         </ul>
         <p><b>Selected Technical Documents (PQR):</b> {{data.technicalDocs}}</p>
