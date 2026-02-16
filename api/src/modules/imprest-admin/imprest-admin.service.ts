@@ -405,13 +405,33 @@ export class ImprestAdminService {
 
         const result = await this.db.execute(
             sql`
+        WITH base AS (
+            SELECT
+                ei.user_id,
+                COALESCE(ei.approved_date, ei.created_at) AS effective_date,
+                ei.amount
+            FROM employee_imprests ei
+            ${whereSql}
+        ),
+        agg AS (
+            SELECT
+                user_id,
+                EXTRACT(YEAR FROM effective_date)::int AS year,
+                EXTRACT(WEEK FROM effective_date)::int AS week,
+
+                MIN(effective_date) AS valid_from,
+                MIN(effective_date) + INTERVAL '6 days' AS valid_to,
+
+                SUM(amount)::numeric AS total_amount
+            FROM base
+            GROUP BY user_id, year, week
+        )
         SELECT
             v.id AS "id",
             v.voucher_code AS "voucherCode",
 
             u.name AS "beneficiaryName",
-
-            u.id AS "beneficiaryId",
+            u.id   AS "beneficiaryId",
 
             agg.year,
             agg.week,
@@ -424,22 +444,7 @@ export class ImprestAdminService {
             v.accounts_remark,
             v.admin_remark
 
-        FROM (
-            SELECT
-                ei.user_id,
-                EXTRACT(YEAR FROM COALESCE(ei.approved_date, ei.created_at))::int AS year,
-                EXTRACT(WEEK FROM COALESCE(ei.approved_date, ei.created_at))::int AS week,
-
-                MIN(COALESCE(ei.approved_date, ei.created_at)) AS valid_from,
-                MIN(COALESCE(ei.approved_date, ei.created_at)) + INTERVAL '6 days' AS valid_to,
-
-                SUM(ei.amount)::numeric AS total_amount
-
-            FROM employee_imprests ei
-            ${whereSql}
-            GROUP BY ei.user_id, year, week
-        ) agg
-
+        FROM agg
         INNER JOIN users u
             ON u.id = agg.user_id
 
