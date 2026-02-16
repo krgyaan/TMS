@@ -72,7 +72,7 @@ export class FollowUpService {
 
         try {
             const contacts: FollowUpContact[] = dto.contacts.map(c => ({
-                name: c.name,
+                name: c.name ?? "",
                 email: c.email ?? null,
                 phone: c.phone ?? null,
                 org: c.org ?? null,
@@ -429,7 +429,7 @@ export class FollowUpService {
                 await this.db.insert(followUpPersons).values(
                     newContacts.map(c => ({
                         followUpId: existing.id,
-                        name: c.name,
+                        name: c.name ?? "",
                         email: c.email ?? null,
                         phone: c.phone ?? null,
                     }))
