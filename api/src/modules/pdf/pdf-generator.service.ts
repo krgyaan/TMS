@@ -11,6 +11,14 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     private browser: Browser | null = null;
     private readonly maxRetries = 3;
     private readonly retryDelays = [1000, 2000, 4000]; // Exponential backoff in milliseconds
+    private readonly assetsBasePath: string;
+    private imageCache: Map<string, string> = new Map();
+
+    constructor() {
+        const isProd = process.env.NODE_ENV === 'production';
+        const rootDir = isProd ? 'dist' : 'src';
+        this.assetsBasePath = path.join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');
+    }
 
     async onModuleInit() {
         try {
@@ -27,6 +35,58 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             await this.browser.close();
             this.logger.log('Puppeteer browser closed');
         }
+    }
+
+    /**
+     * Load image file and convert to base64
+     * @param imageName - Name of image file (e.g., 'logo.png')
+     * @returns Base64 string without data URI prefix, or null if file not found
+     */
+    private async loadImageAsBase64(imageName: string): Promise<string | null> {
+        // Check cache first
+        if (this.imageCache.has(imageName)) {
+            return this.imageCache.get(imageName)!;
+        }
+
+        try {
+            const imagePath = path.join(this.assetsBasePath, imageName);
+            const imageBuffer = await fs.readFile(imagePath);
+            const base64 = imageBuffer.toString('base64');
+            this.imageCache.set(imageName, base64);
+            return base64;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                this.logger.warn(`PDF image asset not found: ${imageName} at ${path.join(this.assetsBasePath, imageName)}`);
+                return null;
+            }
+            this.logger.error(`Failed to load PDF image ${imageName}: ${error instanceof Error ? error.message : String(error)}`);
+            return null;
+        }
+    }
+
+    /**
+     * Load all required PDF template images and inject into data
+     * @param data - Data object to inject images into
+     * @returns Data object with image base64 variables added
+     */
+    private async injectPdfImages(data: Record<string, any>): Promise<Record<string, any>> {
+        const imageData: Record<string, string | null> = {};
+
+        // Load common images (logo, phone, email, web icons)
+        imageData.img_logo_base64 = await this.loadImageAsBase64('logo.png');
+        imageData.img_phone_base64 = await this.loadImageAsBase64('phone.png');
+        imageData.img_email_base64 = await this.loadImageAsBase64('email.png');
+        imageData.img_web_base64 = await this.loadImageAsBase64('web.png');
+
+        // Load tick/cross images (used in indicative template)
+        imageData.img_tick_base64 = await this.loadImageAsBase64('tick.png');
+        imageData.img_cross_base64 = await this.loadImageAsBase64('cross.png');
+
+        // Inject images into data at top level (will be flattened later)
+        return {
+            ...data,
+            ...imageData,
+        };
     }
 
     /**
@@ -48,6 +108,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             throw new Error(`Unknown template type: ${templateType}`);
         }
 
+        // Inject PDF images into data
+        const dataWithImages = await this.injectPdfImages(data);
+
         const pdfPaths: string[] = [];
         const templateDir = typeConfig.directory === 'dd' && instrumentType === 'FDR' ? 'fdr' : typeConfig.directory;
 
@@ -62,7 +125,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
                 const relativePath = await this.generateSinglePdf(
                     templateType,
                     templateName,
-                    data, 
+                    dataWithImages, 
                     instrumentId,
                     templateDir
                 );
