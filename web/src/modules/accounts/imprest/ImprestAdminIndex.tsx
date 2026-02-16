@@ -61,7 +61,7 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestPaymentHistory(row.userId)),
+            onClick: row => navigate(paths.shared.imprestPaymentHistoryByUser(row.userId)),
         },
         {
             label: "Voucher",
@@ -279,9 +279,13 @@ const ImprestAdminIndex: React.FC = () => {
                             className="w-64"
                         />
 
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistory)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Payment History
+                        </Button>
                         <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
                             <Plus className="h-4 w-4 mr-2" />
-                            View All Vouchers
+                            All Vouchers
                         </Button>
                     </div>
                 </CardHeader>

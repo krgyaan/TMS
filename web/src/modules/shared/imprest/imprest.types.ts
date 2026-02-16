@@ -125,3 +125,13 @@ export interface EmployeeImprestDashboard {
         updatedAt: string;
     }[];
 }
+
+export interface ImprestPaymentHistoryRow {
+    id: number;
+    userId: number;
+
+    teamMemberName: string;
+    date: string; // ISO date
+    amount: number;
+    projectName: string | null;
+}

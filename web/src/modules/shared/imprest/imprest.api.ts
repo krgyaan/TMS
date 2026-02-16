@@ -1,6 +1,6 @@
 // src/modules/imprest/imprest.api.ts
 import api from "@/lib/axios";
-import type { EmployeeImprestDashboard, ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestRow, ImprestVoucherRow, ImprestVoucherView } from "./imprest.types";
 
 /* ===================== IMPREST ===================== */
 
@@ -136,6 +136,23 @@ export const getImprestVoucher = async (params: { userId: number; from: string; 
     });
 
     return res.data;
+};
+
+/* ===================== PAYMENT HISTORY ===================== */
+export const getImprestPaymentHistory = async (userId?: number): Promise<ImprestPaymentHistoryRow[]> => {
+    const res = await api.get("/accounts/imprest/payment-history", {
+        params: userId ? { userId } : {},
+    });
+
+    console.log("payment history", res.data);
+
+    // ✅ return ONLY the array
+    return Array.isArray(res.data?.data) ? res.data.data : [];
+};
+
+export const deleteImprestPaymentHistory = async (id: number): Promise<{ success: boolean }> => {
+    const { data } = await api.delete(`/accounts/imprest/payment-history/${id}`);
+    return data;
 };
 
 // ---------- ACCOUNT APPROVE ----------

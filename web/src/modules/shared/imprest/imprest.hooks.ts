@@ -21,11 +21,15 @@ import {
     tallyImprest,
     proofImprest,
     addImprestRemark,
+
+    //PAYMENT HISTORY
+    getImprestPaymentHistory,
+    deleteImprestPaymentHistory,
     type CreateImprestInput,
     getImprestVoucher,
 } from "./imprest.api";
 
-import type { EmployeeImprestDashboard, ImprestVoucherRow } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestVoucherRow } from "./imprest.types";
 import type { UpdateImprestInput } from "./imprest.schema";
 
 /* ---------------- QUERY KEYS ---------------- */
@@ -44,6 +48,12 @@ export const imprestVoucherKeys = {
     list: (userId?: number) => [...imprestVoucherKeys.root, "list", userId ?? "all"] as const,
 
     detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
+};
+
+export const imprestPaymentHistoryKeys = {
+    all: ["imprest-payment-history"] as const,
+    byUser: (userId: number) => ["imprest-payment-history", userId] as const,
+    list: (userId?: number) => [...imprestPaymentHistoryKeys.all, userId ?? "all"] as const,
 };
 
 /* ---------------- IMPREST LIST ---------------- */
@@ -197,6 +207,37 @@ export const useImprestVoucherView = (params: { userId: number; from: string; to
         queryKey: imprestVoucherKeys.detail(params),
         queryFn: () => getImprestVoucher(params),
         enabled: !!params.userId && !!params.from && !!params.to,
+    });
+};
+
+/**
+ * ==========================
+ * PAYMENT HISTORY (BY USER)
+ * ==========================
+ */
+export const useImprestPaymentHistory = (userId?: number) => {
+    return useQuery<ImprestPaymentHistoryRow[]>({
+        queryKey: imprestPaymentHistoryKeys.list(userId),
+        queryFn: () => getImprestPaymentHistory(userId),
+    });
+};
+
+/**
+ * ==========================
+ * DELETE PAYMENT HISTORY
+ * ==========================
+ */
+export const useDeleteImprestPaymentHistory = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: deleteImprestPaymentHistory,
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: imprestPaymentHistoryKeys.all,
+                exact: false,
+            });
+        },
     });
 };
 
