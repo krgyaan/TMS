@@ -25,6 +25,7 @@ import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
+import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
 
 interface TenderApprovalFormProps {
     tenderId: number;
@@ -180,6 +181,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     }, [form.formState.errors]);
 
     const tlDecision = form.watch('tlDecision');
+    const rfqRequired = form.watch('rfqRequired');
     const tenderStatus = form.watch('tenderStatus');
     const techDocs = form.watch('approvePqrSelection');
     const finDocs = form.watch('approveFinanceDocSelection');
@@ -194,6 +196,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -205,6 +209,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -218,6 +224,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('remarks', undefined);
         } else if (tlDecision === '0') {
             // Clear all conditional fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -233,6 +241,19 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         }
     }, [tlDecision, form]);
 
+    // Clear fields when rfqRequired changes
+    useEffect(() => {
+        if (tlDecision === '1') {
+            if (rfqRequired === 'yes') {
+                // Clear quotation files when switching to RFQ required
+                form.setValue('quotationFiles', []);
+            } else if (rfqRequired === 'no') {
+                // Clear vendor selection when switching to quotation files
+                form.setValue('rfqTo', []);
+            }
+        }
+    }, [rfqRequired, tlDecision, form]);
+
     const vendorOrgOptions = useMemo(() =>
         vendorOrganizations?.map(org => ({ value: String(org.id), label: org.name })) ?? [],
         [vendorOrganizations]
@@ -242,6 +263,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         statuses?.filter(s => s.tenderCategory === 'dnb').map(s => ({ value: String(s.id), label: s.name })) ?? [],
         [statuses]
     );
+
+    const rfqRequiredOptions = useMemo(() => [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+    ], []);
 
     const processingFeeModeOptions = useMemo(() =>
         infoSheet?.processingFeeMode?.map(mode => ({ value: mode, label: mode })) ?? [],
@@ -367,15 +393,44 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
                         {tlDecision === '1' && (
                             <div className="space-y-8 animate-in fade-in-50 duration-300">
+                                <div className="grid gap-2 md:grid-cols-2 items-start">
+                                    <SelectField
+                                        control={form.control}
+                                        name="rfqRequired"
+                                        label="RFQ Required"
+                                        options={rfqRequiredOptions}
+                                        placeholder="Select if RFQ is required"
+                                    />
+                                    {form.formState.errors.rfqRequired && (
+                                        <p className="text-sm text-destructive mt-1">{form.formState.errors.rfqRequired.message}</p>
+                                    )}
+
+                                    {rfqRequired === 'yes' && (
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="rfqTo"
+                                            label="Send RFQ to"
+                                            options={vendorOrgOptions}
+                                            placeholder="Select vendors"
+                                        />
+                                    )}
+
+                                    {rfqRequired === 'no' && (
+                                        <div className="space-y-2">
+                                            <TenderFileUploader
+                                                context="rfq-response-quotation"
+                                                value={form.watch('quotationFiles') || []}
+                                                onChange={(paths) => form.setValue('quotationFiles', paths)}
+                                                label="Upload quotation files (required, max 5)"
+                                            />
+                                            {form.formState.errors.quotationFiles && (
+                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.quotationFiles.message}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="space-y-4">
                                     <h4 className="font-semibold text-base text-primary border-b pb-2">Bidding Details</h4>
-                                    <MultiSelectField
-                                        control={form.control}
-                                        name="rfqTo"
-                                        label="Send RFQ to"
-                                        options={vendorOrgOptions}
-                                        placeholder="Select vendors"
-                                    />
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
                                             <SelectField

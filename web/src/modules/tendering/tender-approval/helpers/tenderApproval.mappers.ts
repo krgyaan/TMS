@@ -4,6 +4,8 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
     if (!approval) {
         return {
             tlDecision: '0',
+            rfqRequired: undefined,
+            quotationFiles: [],
             rfqTo: [],
             processingFeeMode: undefined,
             tenderFeeMode: undefined,
@@ -26,6 +28,8 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
 
     return {
         tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
+        rfqRequired: approval.rfqRequired as 'yes' | 'no' | undefined,
+        quotationFiles: approval.quotationFiles ?? [],
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
         processingFeeMode: toOptionalString(approval.processingFeeMode),
         tenderFeeMode: toOptionalString(approval.tenderFeeMode),
@@ -51,6 +55,12 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         const payload: SaveTenderApprovalDto = {
             ...basePayload,
         };
+        if (values.rfqRequired) {
+            payload.rfqRequired = values.rfqRequired;
+        }
+        if (values.quotationFiles && values.quotationFiles.length > 0) {
+            payload.quotationFiles = values.quotationFiles;
+        }
         if (values.rfqTo && values.rfqTo.length > 0) {
             payload.rfqTo = values.rfqTo.map(id => Number(id));
         }

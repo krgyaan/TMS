@@ -16,6 +16,8 @@ export interface IncompleteField {
 // Save DTO - what we send to API
 export interface SaveTenderApprovalDto {
     tlStatus: "0" | "1" | "2" | "3" | number;
+    rfqRequired?: "yes" | "no";
+    quotationFiles?: string[];
     rfqTo?: number[];
     processingFeeMode?: string;
     tenderFeeMode?: string;
@@ -36,6 +38,8 @@ export interface TenderApproval {
     tenderId?: number;
     tlStatus?: "0" | "1" | "2" | "3" | number;
     tlDecision?: "0" | "1" | "2" | "3" | number;
+    rfqRequired?: "yes" | "no" | null;
+    quotationFiles?: string[] | null;
     rfqTo: number[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;

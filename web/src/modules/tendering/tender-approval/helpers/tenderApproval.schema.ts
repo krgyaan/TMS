@@ -3,6 +3,10 @@ import { z } from 'zod';
 export const TenderApprovalFormSchema = z.object({
     tlDecision: z.enum(['0', '1', '2', '3']),
 
+    // RFQ Required (when approved)
+    rfqRequired: z.enum(['yes', 'no']).optional(),
+    quotationFiles: z.array(z.string()).max(5).optional(),
+
     // Bidding Details (when approved)
     rfqTo: z.array(z.string()).optional(),
     processingFeeMode: z.string().optional(),
@@ -54,4 +58,22 @@ export const TenderApprovalFormSchema = z.object({
 }, {
     message: "Please select alternative financial documents",
     path: ["alternativeFinancialDocs"],
+}).refine((data) => {
+    // If approved and RFQ required is yes, must select at least one vendor
+    if (data.tlDecision === '1' && data.rfqRequired === 'yes') {
+        return Array.isArray(data.rfqTo) && data.rfqTo.length > 0;
+    }
+    return true;
+}, {
+    message: "Please select at least one vendor for RFQ",
+    path: ["rfqTo"],
+}).refine((data) => {
+    // If approved and RFQ required is no, must upload at least one quotation file
+    if (data.tlDecision === '1' && data.rfqRequired === 'no') {
+        return Array.isArray(data.quotationFiles) && data.quotationFiles.length > 0;
+    }
+    return true;
+}, {
+    message: "Please upload at least one quotation file",
+    path: ["quotationFiles"],
 });
