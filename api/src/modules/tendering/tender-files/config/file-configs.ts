@@ -214,7 +214,7 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     'rfq-response-quotation': {
-        maxFiles: 3,
+        maxFiles: 5,
         maxSizeBytes: MB(25),
         allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
         allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar'],

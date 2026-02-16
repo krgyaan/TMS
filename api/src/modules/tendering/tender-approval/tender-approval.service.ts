@@ -321,6 +321,8 @@ export class TenderApprovalService {
         const result = await this.db
             .select({
                 tlStatus: tenderInfos.tlStatus,
+                rfqRequired: tenderInfos.rfqRequired,
+                quotationFiles: tenderInfos.quotationFiles,
                 rfqTo: tenderInfos.rfqTo,
                 processingFeeMode: tenderInfos.processingFeeMode,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
@@ -348,6 +350,17 @@ export class TenderApprovalService {
                 .filter(n => !isNaN(n))
             : [];
 
+        // Parse quotationFiles from JSON string if present
+        let quotationFilesArray: string[] = [];
+        if (data.quotationFiles) {
+            try {
+                quotationFilesArray = JSON.parse(data.quotationFiles);
+            } catch (e) {
+                // If parsing fails, treat as empty array
+                quotationFilesArray = [];
+            }
+        }
+
         // Fetch incomplete fields
         const incompleteFieldsResult = await this.db
             .select({
@@ -362,6 +375,7 @@ export class TenderApprovalService {
         return {
             ...data,
             rfqTo: rfqToArray,
+            quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
         };
     }
@@ -401,6 +415,8 @@ export class TenderApprovalService {
             const rfqToString = payload.rfqTo?.join(",") || "";
 
             updateData.rfqTo = rfqToString;
+            updateData.rfqRequired = payload.rfqRequired ?? null;
+            updateData.quotationFiles = payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null;
             updateData.processingFeeMode = payload.processingFeeMode ?? null;
             updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
             updateData.emdMode = payload.emdMode ?? null;
@@ -439,6 +455,8 @@ export class TenderApprovalService {
             }
 
             updateData.rfqTo = null;
+            updateData.rfqRequired = null;
+            updateData.quotationFiles = null;
             updateData.processingFeeMode = null;
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;
@@ -448,6 +466,8 @@ export class TenderApprovalService {
             // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
             updateData.rfqTo = null;
+            updateData.rfqRequired = null;
+            updateData.quotationFiles = null;
             updateData.processingFeeMode = null;
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;

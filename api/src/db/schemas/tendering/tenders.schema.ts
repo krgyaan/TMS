@@ -31,6 +31,8 @@ export const tenderInfos = pgTable("tender_infos", {
     tenderApprovalStatus: varchar("tender_approval_status", { length: 50 }),
     tlRejectionRemarks: text("tl_rejection_remarks"),
     oemNotAllowed: varchar("oem_not_allowed", { length: 50 }),
+    rfqRequired: varchar("rfq_required", { length: 10 }),
+    quotationFiles: text("quotation_files"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
         .defaultNow()

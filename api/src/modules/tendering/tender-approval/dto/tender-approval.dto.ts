@@ -24,6 +24,8 @@ export const TenderApprovalPayloadSchema = z.object({
         required_error: 'TL status is required',
         invalid_type_error: 'TL status must be one of: 0, 1, 2, 3',
     }),
+    rfqRequired: z.enum(['yes', 'no']).optional(),
+    quotationFiles: z.array(z.string()).optional(),
     rfqTo: z.array(bigintField().positive()).optional(),
     processingFeeMode: optionalTextField(100),
     tenderFeeMode: optionalTextField(100),
