@@ -135,3 +135,9 @@ export interface ImprestPaymentHistoryRow {
     amount: number;
     projectName: string | null;
 }
+
+export type ProofItem = {
+    type: "image" | "pdf";
+    url: string;
+    name: string;
+};
