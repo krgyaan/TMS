@@ -424,7 +424,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
                             {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
 
-                            {canUpdate("imprests.shared") && row.approvalStatus === 0 && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {canUpdate("imprests.shared") && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
                         </div>
                     );
                 },
@@ -548,6 +548,11 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Vouchers
+                                </Button>
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId))}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    View Payment History
                                 </Button>
 
                                 <Button variant="outline" size="sm" onClick={exportExcel}>
