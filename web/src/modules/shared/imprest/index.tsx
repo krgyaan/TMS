@@ -422,9 +422,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
+                            {canMutateStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
 
-                            {canUpdate("imprests.shared") && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
                         </div>
                     );
                 },
