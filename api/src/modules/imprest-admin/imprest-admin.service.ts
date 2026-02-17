@@ -278,124 +278,110 @@ export class ImprestAdminService {
 
         const result = await this.db.execute(
             sql`
-        /* -----------------------------
-           BASE: APPROVED IMPRESTS (ID SAFE)
-        ------------------------------ */
-        WITH base AS (
-            SELECT
-                ei.id AS imprest_id,
-                ei.user_id,
-                COALESCE(ei.approved_date, ei.created_at) AS effective_date,
-                ei.amount,
-                ei.invoice_proof
-            FROM employee_imprests ei
-            WHERE 1 = 1
-              AND ei.approval_status = 1
-              ${whereSql}
-        ),
+                /* -------------------------------------------------
+                BASE: APPROVED IMPRESTS (DATE ONLY)
+                -------------------------------------------------- */
+                WITH base AS (
+                    SELECT
+                        ei.id AS imprest_id,
+                        ei.user_id,
 
-        /* -----------------------------
-           PER-IMPREST DEDUP (CRITICAL)
-        ------------------------------ */
-        per_imprest AS (
-            SELECT
-                imprest_id,
-                user_id,
-                effective_date,
-                amount,
-                invoice_proof
-            FROM base
-            GROUP BY
-                imprest_id,
-                user_id,
-                effective_date,
-                amount,
-                invoice_proof
-        ),
+                        /* Laravel: COALESCE(approved_date, created_at) */
+                        COALESCE(ei.approved_date, ei.created_at)::date AS effective_date,
 
-        /* -----------------------------
-           AMOUNTS (SAFE SUM)
-        ------------------------------ */
-        amounts AS (
-            SELECT
-                user_id,
-                EXTRACT(YEAR FROM effective_date)::int AS year,
-                EXTRACT(WEEK FROM effective_date)::int AS week,
+                        ei.amount,
+                        ei.invoice_proof
+                    FROM employee_imprests ei
+                    WHERE ei.approval_status = 1
+                    ${whereSql}
+                ),
 
-                MIN(effective_date)::date AS start_date,
-                (
-                    MIN(effective_date)
-                    + (
-                        6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7)
-                      ) * INTERVAL '1 day'
-                )::date AS end_date,
+                /* -------------------------------------------------
+                AMOUNTS: GROUP EXACTLY LIKE LARAVEL
+                -------------------------------------------------- */
+                    amounts AS (
+                        SELECT
+                            user_id,
 
-                SUM(amount)::numeric AS total_amount
-            FROM per_imprest
-            GROUP BY user_id, year, week
-        ),
+                            EXTRACT(YEAR FROM effective_date)::int AS year,
+                            EXTRACT(WEEK FROM effective_date)::int AS week,
 
-        /* -----------------------------
-           PROOFS (SEPARATE & SAFE)
-        ------------------------------ */
-        proofs AS (
-            SELECT
-                user_id,
-                EXTRACT(YEAR FROM effective_date)::int AS year,
-                EXTRACT(WEEK FROM effective_date)::int AS week,
-                array_agg(DISTINCT proof)
-                    FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
-            FROM (
+                            MIN(effective_date) AS start_date,
+
+                            (
+                                MIN(effective_date)
+                                + (
+                                    (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
+                                    * INTERVAL '1 day'
+                                )
+                            )::date AS end_date,
+
+                            SUM(amount)::numeric AS total_amount
+                        FROM base
+                        GROUP BY user_id, year, week
+                    ),
+
+                /* -------------------------------------------------
+                PROOFS: COLLECT SEPARATELY (NO EFFECT ON SUM)
+                -------------------------------------------------- */
+                proofs AS (
+                    SELECT
+                        user_id,
+                        EXTRACT(YEAR FROM effective_date)::int AS year,
+                        EXTRACT(WEEK FROM effective_date)::int AS week,
+                        array_agg(DISTINCT proof)
+                            FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
+                    FROM (
+                        SELECT
+                            user_id,
+                            effective_date,
+                            jsonb_array_elements_text(
+                                CASE
+                                    WHEN jsonb_typeof(invoice_proof) = 'array'
+                                    THEN invoice_proof
+                                    ELSE '[]'::jsonb
+                                END
+                            ) AS proof
+                        FROM base
+                    ) p
+                    GROUP BY user_id, year, week
+                )
+
+                /* -------------------------------------------------
+                FINAL RESULT (DATE MATCH, NOT TIMESTAMP)
+                -------------------------------------------------- */
                 SELECT
-                    user_id,
-                    effective_date,
-                    jsonb_array_elements_text(
-                        CASE
-                            WHEN jsonb_typeof(invoice_proof) = 'array'
-                            THEN invoice_proof
-                            ELSE '[]'::jsonb
-                        END
-                    ) AS proof
-                FROM per_imprest
-            ) p
-            GROUP BY user_id, year, week
-        )
+                    v.id AS "id",
+                    v.voucher_code AS "voucherCode",
 
-        /* -----------------------------
-           FINAL RESULT
-        ------------------------------ */
-        SELECT
-            v.id AS "id",
-            v.voucher_code AS "voucherCode",
+                    u.name AS "beneficiaryName",
+                    u.id   AS "beneficiaryId",
 
-            u.name AS "beneficiaryName",
-            u.id   AS "beneficiaryId",
+                    a.year,
+                    a.week,
+                    a.start_date AS "validFrom",
+                    a.end_date   AS "validTo",
 
-            a.year,
-            a.week,
-            a.start_date AS "validFrom",
-            a.end_date   AS "validTo",
-            a.total_amount AS "amount",
+                    a.total_amount AS "amount",
+                    p.all_invoice_proofs AS "allInvoiceProofs",
 
-            p.all_invoice_proofs AS "allInvoiceProofs",
-
-            v.accounts_signed_by,
-            v.admin_signed_by,
-            v.accounts_remark,
-            v.admin_remark
-        FROM amounts a
-        INNER JOIN users u
-            ON u.id = a.user_id
-        LEFT JOIN proofs p
-            ON p.user_id = a.user_id
-           AND p.year = a.year
-           AND p.week = a.week
-        LEFT JOIN employee_imprest_vouchers v
-            ON v.beneficiary_name = a.user_id::text
-           AND v.valid_from::date = a.start_date
-           AND v.valid_to::date   = a.end_date
-        ORDER BY a.year DESC, a.week DESC
-        `
+                    v.accounts_signed_by,
+                    v.admin_signed_by,
+                    v.accounts_remark,
+                    v.admin_remark
+                FROM amounts a
+                INNER JOIN users u
+                    ON u.id = a.user_id
+                LEFT JOIN proofs p
+                    ON p.user_id = a.user_id
+                AND p.year = a.year
+                AND p.week = a.week
+                LEFT JOIN employee_imprest_vouchers v
+                    ON v.beneficiary_name = a.user_id::text
+                AND v.valid_from::date = a.start_date
+                AND v.valid_to::date   = a.end_date
+                ORDER BY a.year DESC, a.week DESC
+                        `
         );
 
         return result.rows.map((r: any) => ({
@@ -408,10 +394,10 @@ export class ImprestAdminService {
             year: r.year,
             week: r.week,
 
-            validFrom: r.validFrom,
-            validTo: r.validTo,
+            validFrom: r.validFrom, // DATE
+            validTo: r.validTo, // DATE
 
-            amount: Number(r.amount), // ✅ NOW GUARANTEED CORRECT
+            amount: Number(r.amount),
 
             proofs: (r.allInvoiceProofs ?? []).map((file: string, index: number) => {
                 const ext = file.split(".").pop()?.toLowerCase() ?? "";
@@ -545,7 +531,8 @@ export class ImprestAdminService {
                 id: employeeImprests.id,
 
                 category: imprestCategories.name,
-                projectCode: projects.projectCode,
+
+                // 👇 use stored string directly
                 projectName: employeeImprests.projectName,
 
                 remark: employeeImprests.remark,
@@ -553,20 +540,15 @@ export class ImprestAdminService {
             })
             .from(employeeImprests)
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-            .leftJoin(projects, eq(projects.projectName, employeeImprests.projectName))
             .where(
                 and(
                     eq(employeeImprests.userId, voucher.employeeId),
-
-                    // 🔴 Laravel uses buttonstatus, NOT approvalStatus
                     eq(employeeImprests.approvalStatus, 1),
-
-                    // 🔴 Laravel uses approved_date ONLY (NO COALESCE)
                     sql`
-                    ${employeeImprests.approvedDate}::date
-                    BETWEEN ${voucher.validFrom}::date
-                    AND ${voucher.validTo}::date
-                `
+                ${employeeImprests.approvedDate}::date
+                BETWEEN ${voucher.validFrom}::date
+                AND ${voucher.validTo}::date
+            `
                 )
             )
             .orderBy(employeeImprests.approvedDate);
