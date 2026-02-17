@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const UpdateEmployeeImprestSchema = z.object({
     // relations
-    userId: z.coerce.number().int().optional().nullable(),
     categoryId: z.coerce.number().int().optional().nullable(),
     teamId: z.coerce.number().int().optional().nullable(),
 
@@ -12,14 +11,14 @@ export const UpdateEmployeeImprestSchema = z.object({
     ip: z.string().max(100).optional().nullable(),
 
     // numeric
-    amount: z.coerce.number().int().min(1),
+    amount: z.coerce.number().int().min(1).optional(),
     strtotime: z.coerce.number().int().optional().nullable(),
 
     // text
     remark: z.string().optional().nullable(),
 
     // jsonb
-    invoiceProof: z.array(z.unknown()).optional(),
+    invoiceProof: z.array(z.string()).optional(),
 
     // statuses
     approvalStatus: z.coerce.number().int().optional(),
