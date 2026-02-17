@@ -291,18 +291,11 @@ export class EmployeeImprestService {
     }
 
     async approveImprest({ imprestId, userId }: { imprestId: number; userId: number }) {
-        const imprest = await this.db.query.employeeImprests.findFirst({
-            where: eq(employeeImprests.id, imprestId),
-        });
-
-        if (!imprest) {
-            throw new NotFoundException("Imprest not found");
-        }
-
         await this.db
             .update(employeeImprests)
             .set({
-                approvalStatus: 1,
+                approvalStatus: 1, // Laravel: buttonstatus = 1
+                approvedDate: new Date(), // Laravel: Carbon::now()
             })
             .where(eq(employeeImprests.id, imprestId));
 
@@ -340,10 +333,6 @@ export class EmployeeImprestService {
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
-        }
-
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
         }
 
         await this.db.delete(employeeImprests).where(eq(employeeImprests.id, id));
