@@ -15,7 +15,7 @@ import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-cr
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import { imprestCategories, teams } from "@/db/schemas";
+import { imprestCategories, teams, userProfiles } from "@/db/schemas";
 import { projects } from "@/db/schemas/operations/projects.schema";
 
 @Injectable()
@@ -273,159 +273,97 @@ export class ImprestAdminService {
     //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
     // }
 
-    async listAllVouchers() {
-        return this.listVouchers({});
-    }
-
-    async listUserVouchers(userId: number) {
-        return this.listVouchers({ userId });
-    }
-
-    async listVouchers({ userId }: { userId?: number }) {
-        const conditions: SQL[] = [];
-
-        if (userId) {
-            conditions.push(eq(employeeImprests.userId, userId));
-        }
-
-        const whereClause = conditions.length ? and(...conditions) : undefined;
-
-        /* -------------------------------------------------
-       1️⃣ Aggregate EXACTLY like Laravel
-    -------------------------------------------------- */
-        const voucherAgg = this.db
-            .select({
-                userId: employeeImprests.userId,
-
-                beneficiaryName: sql<string>`
-                ${users.name}
-            `.as("beneficiaryName"),
-
-                year: sql<number>`
-                EXTRACT(YEAR FROM COALESCE(
-                    ${employeeImprests.approvedDate},
-                    ${employeeImprests.createdAt}
-                ))
-            `.as("year"),
-
-                week: sql<number>`
-                EXTRACT(WEEK FROM COALESCE(
-                    ${employeeImprests.approvedDate},
-                    ${employeeImprests.createdAt}
-                ))
-            `.as("week"),
-
-                validFrom: sql<Date>`
-                MIN(COALESCE(
-                    ${employeeImprests.approvedDate},
-                    ${employeeImprests.createdAt}
-                ))
-            `.as("validFrom"),
-
-                validTo: sql<Date>`
-                MIN(COALESCE(
-                    ${employeeImprests.approvedDate},
-                    ${employeeImprests.createdAt}
-                )) + INTERVAL '6 days'
-            `.as("validTo"),
-
-                amount: sql<number>`
-                SUM(${employeeImprests.amount})
-            `.as("amount"),
-            })
-            .from(employeeImprests)
-            .innerJoin(users, eq(users.id, employeeImprests.userId))
-            .where(whereClause)
-            .groupBy(employeeImprests.userId, users.name, sql`year`, sql`week`)
-            .as("voucher_agg");
-
-        /* -------------------------------------------------
-       2️⃣ OUTER SELECT — ONLY use voucherAgg.*
-    -------------------------------------------------- */
-        const rows = await this.db
-            .select({
-                id: employeeImprestVouchers.id,
-                voucherCode: employeeImprestVouchers.voucherCode,
-
-                beneficiaryName: sql<string>`${voucherAgg.beneficiaryName}`,
-                year: sql<number>`${voucherAgg.year}`,
-                week: sql<number>`${voucherAgg.week}`,
-
-                validFrom: sql<Date>`${voucherAgg.validFrom}`,
-                validTo: sql<Date>`${voucherAgg.validTo}`,
-
-                amount: sql<number>`${voucherAgg.amount}`,
-
-                adminSignedBy: employeeImprestVouchers.adminSignedBy,
-                accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
-
-                adminRemark: employeeImprestVouchers.adminRemark,
-                accountsRemark: employeeImprestVouchers.accountsRemark,
-            })
-            .from(voucherAgg)
-            .leftJoin(
-                employeeImprestVouchers,
-                and(
-                    eq(employeeImprestVouchers.beneficiaryName, sql`${voucherAgg.userId}::text`),
-                    eq(employeeImprestVouchers.validFrom, voucherAgg.validFrom),
-                    eq(employeeImprestVouchers.validTo, voucherAgg.validTo)
-                )
-            )
-            .orderBy(desc(sql`${voucherAgg.year}`), desc(sql`${voucherAgg.week}`));
-        /* -------------------------------------------------
-       3️⃣ Map for UI
-    -------------------------------------------------- */
-        return {
-            data: rows.map(r => ({
-                id: r.id,
-                voucherCode: r.voucherCode,
-
-                beneficiaryName: r.beneficiaryName,
-
-                year: Number(r.year),
-                week: Number(r.week),
-
-                validFrom: r.validFrom,
-                validTo: r.validTo,
-
-                amount: Number(r.amount),
-
-                accountantApproval: !!r.accountsSignedBy && r.accountsSignedBy.trim() !== "",
-
-                adminApproval: !!r.adminSignedBy && r.adminSignedBy.trim() !== "",
-
-                accountsRemark: r.accountsRemark ?? null,
-                adminRemark: r.adminRemark ?? null,
-            })),
-        };
-    }
-
     async listVouchersRaw(userId?: number) {
-        const whereSql = userId ? sql`WHERE ei.user_id = ${userId}` : sql``;
+        const whereSql = userId ? sql`AND ei.user_id = ${userId}` : sql``;
 
         const result = await this.db.execute(
             sql`
+        /* -----------------------------
+           BASE: APPROVED IMPRESTS (ID SAFE)
+        ------------------------------ */
         WITH base AS (
             SELECT
+                ei.id AS imprest_id,
                 ei.user_id,
                 COALESCE(ei.approved_date, ei.created_at) AS effective_date,
-                ei.amount
+                ei.amount,
+                ei.invoice_proof
             FROM employee_imprests ei
-            ${whereSql}
+            WHERE 1 = 1
+              AND ei.approval_status = 1
+              ${whereSql}
         ),
-        agg AS (
+
+        /* -----------------------------
+           PER-IMPREST DEDUP (CRITICAL)
+        ------------------------------ */
+        per_imprest AS (
+            SELECT
+                imprest_id,
+                user_id,
+                effective_date,
+                amount,
+                invoice_proof
+            FROM base
+            GROUP BY
+                imprest_id,
+                user_id,
+                effective_date,
+                amount,
+                invoice_proof
+        ),
+
+        /* -----------------------------
+           AMOUNTS (SAFE SUM)
+        ------------------------------ */
+        amounts AS (
             SELECT
                 user_id,
                 EXTRACT(YEAR FROM effective_date)::int AS year,
                 EXTRACT(WEEK FROM effective_date)::int AS week,
 
-                MIN(effective_date) AS valid_from,
-                MIN(effective_date) + INTERVAL '6 days' AS valid_to,
+                MIN(effective_date)::date AS start_date,
+                (
+                    MIN(effective_date)
+                    + (
+                        6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7)
+                      ) * INTERVAL '1 day'
+                )::date AS end_date,
 
                 SUM(amount)::numeric AS total_amount
-            FROM base
+            FROM per_imprest
+            GROUP BY user_id, year, week
+        ),
+
+        /* -----------------------------
+           PROOFS (SEPARATE & SAFE)
+        ------------------------------ */
+        proofs AS (
+            SELECT
+                user_id,
+                EXTRACT(YEAR FROM effective_date)::int AS year,
+                EXTRACT(WEEK FROM effective_date)::int AS week,
+                array_agg(DISTINCT proof)
+                    FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
+            FROM (
+                SELECT
+                    user_id,
+                    effective_date,
+                    jsonb_array_elements_text(
+                        CASE
+                            WHEN jsonb_typeof(invoice_proof) = 'array'
+                            THEN invoice_proof
+                            ELSE '[]'::jsonb
+                        END
+                    ) AS proof
+                FROM per_imprest
+            ) p
             GROUP BY user_id, year, week
         )
+
+        /* -----------------------------
+           FINAL RESULT
+        ------------------------------ */
         SELECT
             v.id AS "id",
             v.voucher_code AS "voucherCode",
@@ -433,27 +371,30 @@ export class ImprestAdminService {
             u.name AS "beneficiaryName",
             u.id   AS "beneficiaryId",
 
-            agg.year,
-            agg.week,
-            agg.valid_from AS "validFrom",
-            agg.valid_to   AS "validTo",
-            agg.total_amount AS "amount",
+            a.year,
+            a.week,
+            a.start_date AS "validFrom",
+            a.end_date   AS "validTo",
+            a.total_amount AS "amount",
+
+            p.all_invoice_proofs AS "allInvoiceProofs",
 
             v.accounts_signed_by,
             v.admin_signed_by,
             v.accounts_remark,
             v.admin_remark
-
-        FROM agg
+        FROM amounts a
         INNER JOIN users u
-            ON u.id = agg.user_id
-
+            ON u.id = a.user_id
+        LEFT JOIN proofs p
+            ON p.user_id = a.user_id
+           AND p.year = a.year
+           AND p.week = a.week
         LEFT JOIN employee_imprest_vouchers v
-            ON v.beneficiary_name = agg.user_id::text
-           AND EXTRACT(YEAR FROM v.valid_from) = agg.year
-           AND EXTRACT(WEEK FROM v.valid_from) = agg.week
-
-        ORDER BY agg.year DESC, agg.week DESC
+            ON v.beneficiary_name = a.user_id::text
+           AND v.valid_from::date = a.start_date
+           AND v.valid_to::date   = a.end_date
+        ORDER BY a.year DESC, a.week DESC
         `
         );
 
@@ -466,10 +407,22 @@ export class ImprestAdminService {
 
             year: r.year,
             week: r.week,
+
             validFrom: r.validFrom,
             validTo: r.validTo,
 
-            amount: Number(r.amount),
+            amount: Number(r.amount), // ✅ NOW GUARANTEED CORRECT
+
+            proofs: (r.allInvoiceProofs ?? []).map((file: string, index: number) => {
+                const ext = file.split(".").pop()?.toLowerCase() ?? "";
+                return {
+                    id: index + 1,
+                    file,
+                    ext,
+                    type: ext === "pdf" ? "pdf" : "image",
+                    url: `/uploads/employeeimprest/${file}`,
+                };
+            }),
 
             accountantApproval: !!(r.accounts_signed_by && r.accounts_signed_by.trim()),
             adminApproval: !!(r.admin_signed_by && r.admin_signed_by.trim()),
@@ -487,63 +440,6 @@ export class ImprestAdminService {
             to: new Date(validTo),
             createdBy: String(user.sub),
         });
-    }
-
-    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        // 1️⃣ Find existing voucher (RANGE MATCH — CRITICAL)
-        const [existing] = await this.db
-            .select()
-            .from(employeeImprestVouchers)
-            .where(
-                and(
-                    eq(employeeImprestVouchers.beneficiaryName, String(userId)),
-                    sql`${employeeImprestVouchers.validFrom} <= ${to}`,
-                    sql`${employeeImprestVouchers.validTo} >= ${from}`
-                )
-            )
-            .limit(1);
-
-        if (existing) {
-            return existing;
-        }
-
-        // 2️⃣ Fetch imprests in range
-        const imprests = await this.db
-            .select({ amount: employeeImprests.amount })
-            .from(employeeImprests)
-            .where(
-                and(
-                    eq(employeeImprests.userId, userId),
-                    sql`
-          COALESCE(
-            ${employeeImprests.approvedDate},
-            ${employeeImprests.createdAt}
-          ) BETWEEN ${from} AND ${to}
-        `
-                )
-            );
-
-        if (imprests.length === 0) {
-            throw new BadRequestException("No imprests found for selected period");
-        }
-
-        // 3️⃣ Aggregate
-        const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
-
-        // 4️⃣ Create voucher
-        const [voucher] = await this.db
-            .insert(employeeImprestVouchers)
-            .values({
-                voucherCode: await this.generateVoucherCode(),
-                beneficiaryName: String(userId),
-                amount: totalAmount,
-                validFrom: from,
-                validTo: to,
-                preparedBy: createdBy,
-            })
-            .returning();
-
-        return voucher;
     }
 
     async getVoucherProofs({ user, userId, year, week }: { user: any; userId: number; year: number; week: number }) {
@@ -574,6 +470,191 @@ export class ImprestAdminService {
      VOUCHER CODE GENERATOR
   ------------------------------------------ */
 
+    private getFinancialYear() {
+        const now = new Date();
+        const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        return String(year).slice(-2);
+    }
+
+    async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
+        const voucher = await this.buildVoucherIfMissing({
+            userId,
+            from,
+            to,
+            createdBy: String(user.sub),
+        });
+
+        return this.getVoucherById({
+            user,
+            voucherId: voucher.id,
+        });
+    }
+
+    async getVoucherById({ user, voucherId }: { user: { id: number; role: string }; voucherId: number }) {
+        /* -----------------------------------------
+       FETCH VOUCHER + EMPLOYEE (Laravel: $voucher + $abc)
+    ------------------------------------------ */
+
+        const [voucher] = await this.db
+            .select({
+                id: employeeImprestVouchers.id,
+                voucherCode: employeeImprestVouchers.voucherCode,
+
+                beneficiaryId: employeeImprestVouchers.beneficiaryName,
+
+                amount: employeeImprestVouchers.amount,
+                validFrom: employeeImprestVouchers.validFrom,
+                validTo: employeeImprestVouchers.validTo,
+
+                accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
+                accountsSignedAt: employeeImprestVouchers.accountsSignedAt,
+                accountsRemark: employeeImprestVouchers.accountsRemark,
+
+                adminSignedBy: employeeImprestVouchers.adminSignedBy,
+                adminSignedAt: employeeImprestVouchers.adminSignedAt,
+                adminRemark: employeeImprestVouchers.adminRemark,
+
+                // 👇 Laravel: User::where('id', name_id)
+                employeeId: users.id,
+                employeeName: users.name,
+                teamName: teams.name,
+            })
+            .from(employeeImprestVouchers)
+            .leftJoin(users, eq(users.id, sql`${employeeImprestVouchers.beneficiaryName}::int`))
+            .leftJoin(teams, eq(teams.id, users.team))
+            .where(eq(employeeImprestVouchers.id, voucherId))
+            .limit(1);
+
+        if (!voucher) {
+            throw new NotFoundException("Voucher not found");
+        }
+
+        if (voucher.employeeId == null) {
+            throw new NotFoundException("Voucher beneficiary not found");
+        }
+
+        /* -----------------------------------------
+       FETCH LINE ITEMS (Laravel: $vo)
+       EXACT PARITY WITH:
+       whereDate(approved_date)
+       where buttonstatus = 1
+    ------------------------------------------ */
+
+        const items = await this.db
+            .select({
+                id: employeeImprests.id,
+
+                category: imprestCategories.name,
+                projectCode: projects.projectCode,
+                projectName: employeeImprests.projectName,
+
+                remark: employeeImprests.remark,
+                amount: employeeImprests.amount,
+            })
+            .from(employeeImprests)
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .leftJoin(projects, eq(projects.projectName, employeeImprests.projectName))
+            .where(
+                and(
+                    eq(employeeImprests.userId, voucher.employeeId),
+
+                    // 🔴 Laravel uses buttonstatus, NOT approvalStatus
+                    eq(employeeImprests.approvalStatus, 1),
+
+                    // 🔴 Laravel uses approved_date ONLY (NO COALESCE)
+                    sql`
+                    ${employeeImprests.approvedDate}::date
+                    BETWEEN ${voucher.validFrom}::date
+                    AND ${voucher.validTo}::date
+                `
+                )
+            )
+            .orderBy(employeeImprests.approvedDate);
+
+        /* -----------------------------------------
+       RETURN STRUCTURE (Laravel-equivalent)
+    ------------------------------------------ */
+
+        return {
+            voucher: {
+                id: voucher.id,
+                voucherCode: voucher.voucherCode,
+
+                beneficiaryId: Number(voucher.beneficiaryId),
+                beneficiaryName: voucher.employeeName,
+                teamName: voucher.teamName,
+
+                validFrom: voucher.validFrom,
+                validTo: voucher.validTo,
+
+                amount: Number(voucher.amount),
+
+                accountsSignedBy: voucher.accountsSignedBy,
+                accountsSignedAt: voucher.accountsSignedAt,
+                accountsRemark: voucher.accountsRemark,
+
+                adminSignedBy: voucher.adminSignedBy,
+                adminSignedAt: voucher.adminSignedAt,
+                adminRemark: voucher.adminRemark,
+            },
+
+            items: items.map(item => ({
+                ...item,
+                amount: Number(item.amount),
+            })),
+        };
+    }
+
+    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
+        // 1️⃣ Exact-match lookup (Laravel parity)
+        const [existing] = await this.db
+            .select()
+            .from(employeeImprestVouchers)
+            .where(and(eq(employeeImprestVouchers.beneficiaryName, String(userId)), eq(employeeImprestVouchers.validFrom, from), eq(employeeImprestVouchers.validTo, to)))
+            .limit(1);
+
+        if (existing) {
+            return existing;
+        }
+
+        // 2️⃣ Fetch imprests using COALESCE range
+        const imprests = await this.db
+            .select({ amount: employeeImprests.amount })
+            .from(employeeImprests)
+            .where(
+                and(
+                    eq(employeeImprests.userId, userId),
+                    sql`
+          COALESCE(
+            ${employeeImprests.approvedDate},
+            ${employeeImprests.createdAt}
+          ) BETWEEN ${from} AND ${to}
+        `
+                )
+            );
+
+        if (imprests.length === 0) {
+            throw new BadRequestException("No imprests found for selected period");
+        }
+
+        const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
+
+        // 3️⃣ Create voucher
+        const [voucher] = await this.db
+            .insert(employeeImprestVouchers)
+            .values({
+                voucherCode: await this.generateVoucherCode(),
+                beneficiaryName: String(userId),
+                amount: totalAmount,
+                validFrom: from,
+                validTo: to,
+                preparedBy: createdBy,
+            })
+            .returning();
+
+        return voucher;
+    }
+
     private async generateVoucherCode() {
         const year = this.getFinancialYear();
 
@@ -597,134 +678,32 @@ export class ImprestAdminService {
         return `VE/${year}/V${String(next).padStart(3, "0")}`;
     }
 
-    private getFinancialYear() {
-        const now = new Date();
-        const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-        return String(year).slice(-2);
-    }
-
-    async getVoucherById({ user, voucherId }: { user: { id: number; role: string }; voucherId: number }) {
-        /* -----------------------------------------
-       FETCH VOUCHER + EMPLOYEE
-    ------------------------------------------ */
-
-        const [voucher] = await this.db
-            .select({
-                id: employeeImprestVouchers.id,
-                voucherCode: employeeImprestVouchers.voucherCode,
-
-                beneficiaryId: employeeImprestVouchers.beneficiaryName,
-
-                amount: employeeImprestVouchers.amount,
-                validFrom: employeeImprestVouchers.validFrom,
-                validTo: employeeImprestVouchers.validTo,
-
-                accountsSignedBy: employeeImprestVouchers.accountsSignedBy,
-                accountsSignedAt: employeeImprestVouchers.accountsSignedAt,
-                accountsRemark: employeeImprestVouchers.accountsRemark,
-
-                adminSignedBy: employeeImprestVouchers.adminSignedBy,
-                adminSignedAt: employeeImprestVouchers.adminSignedAt,
-                adminRemark: employeeImprestVouchers.adminRemark,
-
-                // 👇 EMPLOYEE DETAILS (Laravel $abc)
-                employeeId: users.id,
-                employeeName: users.name,
-                teamName: teams.name, // make sure column exists
-            })
-            .from(employeeImprestVouchers)
-            .leftJoin(users, eq(users.id, sql`${employeeImprestVouchers.beneficiaryName}::int`))
-            .leftJoin(teams, eq(teams.id, users.team))
-            .where(eq(employeeImprestVouchers.id, voucherId))
-            .limit(1);
-
-        if (!voucher) {
-            throw new NotFoundException("Voucher not found");
-        }
-
-        if (voucher.employeeId == null) {
-            throw new NotFoundException("Voucher beneficiary not found");
-        }
-
-        /* -----------------------------------------
-       FETCH LINE ITEMS (FULL DETAILS)
-    ------------------------------------------ */
-
-        const items = await this.db
-            .select({
-                id: employeeImprests.id,
-
-                category: imprestCategories.name, // ✔ category name
-
-                projectCode: projects.projectCode, // ✔ project code
-                projectName: employeeImprests.projectName,
-
-                remark: employeeImprests.remark,
-                amount: employeeImprests.amount,
-            })
-            .from(employeeImprests)
-            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-            .leftJoin(projects, eq(projects.projectName, employeeImprests.projectName))
-            .where(
-                and(
-                    eq(employeeImprests.userId, voucher.employeeId),
-                    eq(employeeImprests.approvalStatus, 1),
-                    sql`
-                COALESCE(
-                    ${employeeImprests.approvedDate},
-                    ${employeeImprests.createdAt}
-                )
-                BETWEEN ${voucher.validFrom} AND ${voucher.validTo}
-                `
-                )
-            )
-            .orderBy(employeeImprests.approvedDate);
-
-        return {
-            voucher: {
-                ...voucher,
-                amount: Number(voucher.amount),
-            },
-            items: items.map(i => ({
-                ...i,
-                amount: Number(i.amount),
-            })),
-        };
-    }
-
-    async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
-        const voucher = await this.buildVoucherIfMissing({
-            userId,
-            from,
-            to,
-            createdBy: String(user.sub),
-        });
-
-        return this.getVoucherById({
-            user,
-            voucherId: voucher.id,
-        });
-    }
-
-    async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
+    async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string }; voucherId: number; remark?: string; approve: boolean }) {
+        // 1️⃣ Fetch voucher
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        const isSigned = (v?: string | null) => v && v.trim().length > 0;
-
-        if (approve && isSigned(voucher.accountsSignedBy)) {
+        // 2️⃣ Check already signed
+        if (approve && voucher.accountsSignedBy) {
             throw new BadRequestException("Voucher already approved by accounts");
         }
 
+        // 3️⃣ Fetch user signature (Laravel: $user->sign)
+        const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
+        console.log("profile", profile);
+
+        // 4️⃣ Update voucher
         await this.db
             .update(employeeImprestVouchers)
             .set({
+                // Always update remark (Laravel parity)
                 accountsRemark: remark ?? voucher.accountsRemark,
+
                 ...(approve && {
-                    accountsSignedBy: user.sign ?? String(user.id),
+                    accountsSignedBy: profile?.signature ?? "kailash.jpg",
                     accountsSignedAt: new Date(),
                 }),
             })
@@ -736,25 +715,31 @@ export class ImprestAdminService {
         };
     }
 
-    async adminApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string; sign?: string }; voucherId: number; remark?: string; approve: boolean }) {
+    async adminApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string }; voucherId: number; remark?: string; approve: boolean }) {
+        // 1️⃣ Fetch voucher
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        const isSigned = (v?: string | null) => v && v.trim().length > 0;
-
-        if (approve && isSigned(voucher.adminSignedBy)) {
+        // 2️⃣ Check already signed
+        if (approve && voucher.adminSignedBy) {
             throw new BadRequestException("Voucher already approved by admin");
         }
 
+        // 3️⃣ Fetch user signature
+        const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
+
+        // 4️⃣ Update voucher
         await this.db
             .update(employeeImprestVouchers)
             .set({
+                // Always update remark
                 adminRemark: remark ?? voucher.adminRemark,
+
                 ...(approve && {
-                    adminSignedBy: user.sign ?? String(user.id),
+                    adminSignedBy: profile?.signature ?? "piyush.jpeg",
                     adminSignedAt: new Date(),
                 }),
             })
