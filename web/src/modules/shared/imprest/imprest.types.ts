@@ -57,7 +57,17 @@ export type ImprestVoucherRow = {
     adminApproval: boolean;
     accountantApproval: boolean;
 
+    proofs: InvoiceProof[]; // 👈 added
+
     createdAt: string;
+};
+
+export type InvoiceProof = {
+    id: number;
+    file: string;
+    ext: string;
+    type: "image" | "pdf" | "doc" | string;
+    url: string;
 };
 
 export type ImprestVoucherView = {
