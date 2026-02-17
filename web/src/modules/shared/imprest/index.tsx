@@ -24,6 +24,10 @@ import { cn } from "@/lib/utils";
 import type { GridApi } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser } from "@/hooks/api/useUsers";
+import SelectField from "@/components/form/SelectField";
+import { imprestCategoriesKey, useImprestCategories } from "@/hooks/api/useImprestCategories";
+import { useProjectOptions } from "@/hooks/useSelectOptions";
+import SelectInput from "@/components/SelectInput";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -112,13 +116,17 @@ const fileUrl = (file: string) => `/uploads/employeeimprest/${file}`;
 
 const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user, hasPermission, canUpdate } = useAuth();
+    const { user, hasPermission, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
     const [isMobile, setIsMobile] = useState(false);
+
+    const projectOptions = useProjectOptions();
+    const { data: imprestCategories = [] } = useImprestCategories();
 
     let userDetails = null;
 
     const canMutateStatus = canUpdate("accounts.imprests");
+    const canDeleteStatus = canDelete("accounts.imprests");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
 
@@ -250,12 +258,12 @@ const ImprestEmployeeDashboard: React.FC = () => {
             {
                 id: editRow.id,
                 data: {
-                    partyName: editRow.partyName,
-                    projectName: editRow.projectName,
-                    categoryId: editRow.categoryId,
-                    teamId: editRow.teamId,
-                    amount: editRow.amount,
-                    remark: editRow.remark,
+                    partyName: editRow.partyName?.trim() || null,
+                    projectName: editRow.projectName || null,
+                    categoryId: typeof editRow.categoryId === "number" ? editRow.categoryId : null,
+                    teamId: typeof editRow.teamId === "number" ? editRow.teamId : null,
+                    amount: Number(editRow.amount) || 0,
+                    remark: editRow.remark?.trim() || null,
                 },
             },
             {
@@ -445,9 +453,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {canMutateStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
-
                             {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {canDeleteStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
                     );
                 },
@@ -809,13 +816,71 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
                     {editRow && (
                         <form onSubmit={submitEditImprest} className="space-y-4">
-                            <Input value={editRow.partyName} onChange={e => setEditRow({ ...editRow, partyName: e.target.value })} placeholder="Party Name" />
+                            {/* Party Name */}
+                            <Input
+                                value={editRow.partyName ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        partyName: e.target.value,
+                                    })
+                                }
+                                placeholder="Party Name"
+                            />
 
-                            <Input value={editRow.projectName} onChange={e => setEditRow({ ...editRow, projectName: e.target.value })} placeholder="Project Name" />
+                            <SelectInput
+                                label="Select Project"
+                                placeholder="-- Select Project --"
+                                value={editRow.projectName ?? ""}
+                                options={projectOptions}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        projectName: val,
+                                    })
+                                }
+                            />
 
-                            <Input type="number" value={editRow.amount} onChange={e => setEditRow({ ...editRow, amount: Number(e.target.value) })} placeholder="Amount" />
+                            <SelectInput
+                                label="Select Category"
+                                placeholder="-- Select Category --"
+                                value={String(editRow.categoryId ?? "")}
+                                options={imprestCategories.map(i => ({
+                                    id: String(i.id),
+                                    name: i.name,
+                                }))}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        categoryId: Number(val),
+                                    })
+                                }
+                            />
 
-                            <Textarea value={editRow.remark ?? ""} onChange={e => setEditRow({ ...editRow, remark: e.target.value })} placeholder="Remark" />
+                            {/* Amount */}
+                            <Input
+                                type="number"
+                                value={editRow.amount}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        amount: Number(e.target.value),
+                                    })
+                                }
+                                placeholder="Amount"
+                            />
+
+                            {/* Remark */}
+                            <Textarea
+                                value={editRow.remark ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        remark: e.target.value,
+                                    })
+                                }
+                                placeholder="Remark"
+                            />
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
