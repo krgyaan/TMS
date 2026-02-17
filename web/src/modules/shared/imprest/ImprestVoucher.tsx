@@ -32,6 +32,7 @@ const ImprestVoucherList: React.FC = () => {
 
     // ✅ Fetch vouchers
     const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
+    console.log(rows);
 
     const actionItems = useMemo(
         () => [
@@ -50,7 +51,17 @@ const ImprestVoucherList: React.FC = () => {
             {
                 label: "View Proofs",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestVoucherRow) => navigate(`/shared/imprests/voucher/proofs?` + `userId=${row.beneficiaryId}` + `&year=${row.year}` + `&week=${row.week}`),
+                onClick: (row: ImprestVoucherRow) =>
+                    navigate("/shared/imprests/voucher/proofs", {
+                        state: {
+                            proofs: row.proofs,
+                            beneficiaryName: row.beneficiaryName,
+                            period: {
+                                from: row.validFrom,
+                                to: row.validTo,
+                            },
+                        },
+                    }),
             },
         ],
         [navigate]
