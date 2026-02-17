@@ -532,14 +532,31 @@ export class ImprestAdminService {
 
                 category: imprestCategories.name,
 
-                // 👇 use stored string directly
                 projectName: employeeImprests.projectName,
+
+                // 👇 derived safely (never duplicates)
+                projectCode: sql<string>`
+            COALESCE(p.project_code, '-')
+        `.as("projectCode"),
 
                 remark: employeeImprests.remark,
                 amount: employeeImprests.amount,
             })
             .from(employeeImprests)
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            // 👇 SAFE project lookup (NO DUPLICATES)
+            .leftJoin(
+                sql`
+                LATERAL (
+                    SELECT project_code
+                    FROM projects
+                    WHERE projects.project_name = ${employeeImprests.projectName}
+                    ORDER BY projects.id
+                    LIMIT 1
+                ) p
+                `,
+                sql`TRUE`
+            )
             .where(
                 and(
                     eq(employeeImprests.userId, voucher.employeeId),
