@@ -606,30 +606,35 @@ export class ImprestAdminService {
     }
 
     async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        // 1️⃣ Exact-match lookup (Laravel parity)
+        // 1️⃣ DATE-ONLY lookup (Laravel parity)
         const [existing] = await this.db
             .select()
             .from(employeeImprestVouchers)
-            .where(and(eq(employeeImprestVouchers.beneficiaryName, String(userId)), eq(employeeImprestVouchers.validFrom, from), eq(employeeImprestVouchers.validTo, to)))
+            .where(
+                and(
+                    eq(employeeImprestVouchers.beneficiaryName, String(userId)),
+                    sql`${employeeImprestVouchers.validFrom}::date = ${from}::date`,
+                    sql`${employeeImprestVouchers.validTo}::date = ${to}::date`
+                )
+            )
             .limit(1);
 
         if (existing) {
             return existing;
         }
 
-        // 2️⃣ Fetch imprests using COALESCE range
+        // 2️⃣ Fetch imprests (DATE-based, approved only)
         const imprests = await this.db
             .select({ amount: employeeImprests.amount })
             .from(employeeImprests)
             .where(
                 and(
                     eq(employeeImprests.userId, userId),
+                    eq(employeeImprests.approvalStatus, 1),
                     sql`
-          COALESCE(
-            ${employeeImprests.approvedDate},
-            ${employeeImprests.createdAt}
-          ) BETWEEN ${from} AND ${to}
-        `
+                    ${employeeImprests.approvedDate}::date
+                    BETWEEN ${from}::date AND ${to}::date
+                `
                 )
             );
 
@@ -639,14 +644,14 @@ export class ImprestAdminService {
 
         const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        // 3️⃣ Create voucher
+        // 3️⃣ Create voucher (timestamps irrelevant now)
         const [voucher] = await this.db
             .insert(employeeImprestVouchers)
             .values({
                 voucherCode: await this.generateVoucherCode(),
                 beneficiaryName: String(userId),
                 amount: totalAmount,
-                validFrom: from,
+                validFrom: from, // time no longer matters
                 validTo: to,
                 preparedBy: createdBy,
             })
