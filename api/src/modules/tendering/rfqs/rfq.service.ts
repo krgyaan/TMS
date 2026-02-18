@@ -6,8 +6,18 @@ import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import {
-    NewRfq, rfqs, rfqItems, rfqDocuments, NewRfqItem, NewRfqDocument, rfqResponses, rfqResponseItems,
-    rfqResponseDocuments, NewRfqResponse, NewRfqResponseItem, NewRfqResponseDocument
+    NewRfq,
+    rfqs,
+    rfqItems,
+    rfqDocuments,
+    NewRfqItem,
+    NewRfqDocument,
+    rfqResponses,
+    rfqResponseItems,
+    rfqResponseDocuments,
+    NewRfqResponse,
+    NewRfqResponseItem,
+    NewRfqResponseDocument,
 } from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
@@ -88,7 +98,7 @@ export class RfqsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService
-    ) { }
+    ) {}
 
     /**
      * Build role-based filter conditions for tender queries
@@ -274,29 +284,42 @@ export class RfqsService {
             .limit(limit)
             .offset(offset);
 
-        const data: RfqRow[] = await Promise.all(rows.map(async row => {
-            const vendorOrganizationIds = row.vendorOrganizationIds?.split(',').map(id => parseInt(id.trim()));
-            const vendorOrganizationNames = await this.db.select().from(vendorOrganizations).where(inArray(vendorOrganizations.id, vendorOrganizationIds ?? []));
+        const data: RfqRow[] = await Promise.all(
+            rows.map(async row => {
+                const vendorOrganizationIds = (row.vendorOrganizationIds ?? "")
+                    .split(",")
+                    .map(id => parseInt(id.trim(), 10))
+                    .filter(id => Number.isInteger(id) && id > 0);
 
-            return {
-                tenderId: row.tenderId,
-                tenderNo: row.tenderNo,
-                tenderName: row.tenderName,
-                teamMember: row.teamMember || 0,
-                teamMemberName: row.teamMemberName || "",
-                status: row.status || 0,
-                statusName: row.statusName || "",
-                latestStatus: null,
-                latestStatusName: null,
-                statusRemark: null,
-                itemName: row.itemName || "",
-                rfqTo: row.rfqTo || "",
-                dueDate: row.dueDate,
-                rfqId: row.rfqId,
-                vendorOrganizationNames: vendorOrganizationNames.map(org => org.name).join(', '),
-                rfqCount: Number(row.rfqCount ?? 0),
-            };
-        }));
+                let vendorOrganizationNames: { name: string }[] = [];
+
+                if (vendorOrganizationIds.length > 0) {
+                    vendorOrganizationNames = await this.db
+                        .select({ name: vendorOrganizations.name })
+                        .from(vendorOrganizations)
+                        .where(inArray(vendorOrganizations.id, vendorOrganizationIds));
+                }
+
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    teamMember: row.teamMember || 0,
+                    teamMemberName: row.teamMemberName || "",
+                    status: row.status || 0,
+                    statusName: row.statusName || "",
+                    latestStatus: null,
+                    latestStatusName: null,
+                    statusRemark: null,
+                    itemName: row.itemName || "",
+                    rfqTo: row.rfqTo || "",
+                    dueDate: row.dueDate,
+                    rfqId: row.rfqId,
+                    vendorOrganizationNames: vendorOrganizationNames.map(org => org.name).join(", "),
+                    rfqCount: Number(row.rfqCount ?? 0),
+                };
+            })
+        );
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
@@ -599,7 +622,7 @@ export class RfqsService {
                 tenderName: tenderInfos.tenderName,
                 tenderNo: tenderInfos.tenderNo,
                 dueDate: tenderInfos.dueDate,
-                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as('item_summary'),
+                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
             })
             .from(rfqResponses)
             .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
@@ -624,7 +647,7 @@ export class RfqsService {
                 tenderName: tenderInfos.tenderName,
                 tenderNo: tenderInfos.tenderNo,
                 dueDate: tenderInfos.dueDate,
-                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as('item_summary'),
+                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
             })
             .from(rfqResponses)
             .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
@@ -657,14 +680,8 @@ export class RfqsService {
         if (!row) {
             throw new NotFoundException(`RFQ response with ID ${responseId} not found`);
         }
-        const items = await this.db
-            .select()
-            .from(rfqResponseItems)
-            .where(eq(rfqResponseItems.rfqResponseId, responseId));
-        const documents = await this.db
-            .select()
-            .from(rfqResponseDocuments)
-            .where(eq(rfqResponseDocuments.rfqResponseId, responseId));
+        const items = await this.db.select().from(rfqResponseItems).where(eq(rfqResponseItems.rfqResponseId, responseId));
+        const documents = await this.db.select().from(rfqResponseDocuments).where(eq(rfqResponseDocuments.rfqResponseId, responseId));
         const rfqDetails = await this.findById(row.rfqId);
         return {
             ...row,
@@ -892,19 +909,15 @@ export class RfqsService {
         }
 
         // Get user profile for mobile number
-        const [userProfile] = await this.db
-            .select({ mobile: users.mobile })
-            .from(users)
-            .where(eq(users.id, tender.teamMember))
-            .limit(1);
+        const [userProfile] = await this.db.select({ mobile: users.mobile }).from(users).where(eq(users.id, tender.teamMember)).limit(1);
 
         // Format due date
         const dueDate = rfqDetails.dueDate
             ? new Date(rfqDetails.dueDate).toLocaleDateString("en-IN", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-            })
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+              })
             : "Not specified";
 
         // Check document types based on RFQ document docType values
@@ -931,7 +944,7 @@ export class RfqsService {
             const orgName = orgNameById.get(orgId) || "Vendor Organization";
 
             this.logger.log(
-                `sendRfqSentEmail: building emailData for tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId}, orgName="${orgName}", vendorCount=${vendorEmails.length}, itemsCount=${rfqDetails.items.length}`,
+                `sendRfqSentEmail: building emailData for tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId}, orgName="${orgName}", vendorCount=${vendorEmails.length}, itemsCount=${rfqDetails.items.length}`
             );
 
             const emailData = {
@@ -959,13 +972,11 @@ export class RfqsService {
             const shouldLogAttachmentDetails = process.env.EMAIL_LOG_ATTACHMENTS === "1";
             if (shouldLogAttachmentDetails && rfqDetails.documents?.length) {
                 const sampleDoc = rfqDetails.documents[0];
-                this.logger.debug(
-                    `sendRfqSentEmail: sample document for tenderId=${tenderId}, rfqId=${rfqDetails.id}: docType=${sampleDoc.docType}, path=${sampleDoc.path}`,
-                );
+                this.logger.debug(`sendRfqSentEmail: sample document for tenderId=${tenderId}, rfqId=${rfqDetails.id}: docType=${sampleDoc.docType}, path=${sampleDoc.path}`);
             }
 
             this.logger.log(
-                `sendRfqSentEmail: tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId} has ${attachmentFiles.length} attachment file(s): ${JSON.stringify(attachmentFiles)}`,
+                `sendRfqSentEmail: tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId} has ${attachmentFiles.length} attachment file(s): ${JSON.stringify(attachmentFiles)}`
             );
 
             await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
