@@ -174,7 +174,7 @@ const ImprestVoucherView: React.FC = () => {
         try {
             await html2pdf()
                 .set({
-                    margin: [10, 10, 10, 10] as const,
+                    margin: [5, 5, 5, 5] as const,
                     filename: `Imprest-Voucher-${voucher.voucherCode}.pdf`,
                     image: { type: "jpeg", quality: 0.98 },
                     html2canvas: {
@@ -185,7 +185,7 @@ const ImprestVoucherView: React.FC = () => {
                     jsPDF: {
                         unit: "mm",
                         format: "a4",
-                        orientation: "landscape",
+                        orientation: "portrait",
                     },
                 })
                 .from(element)
@@ -244,12 +244,12 @@ const ImprestVoucherView: React.FC = () => {
                             <td>
                                 Employee Name:
                                 <br />
-                                <b>{voucher.employeeName}</b>
+                                <b>{voucher.beneficiaryName}</b>
                             </td>
                             <td>
                                 Employee ID:
                                 <br />
-                                <b>ID00{voucher.employeeId}</b>
+                                <b>ID00{voucher.beneficiaryId}</b>
                             </td>
                             <td colSpan={2}>
                                 Team Name:
@@ -531,6 +531,106 @@ const ImprestVoucherView: React.FC = () => {
                     justify-content: center;
                     margin-top: 24px;
                 }
+
+                html.pdf-export {
+
+                    /* ---------- Page geometry ---------- */
+                    @page {
+                        size: A4 portrait;
+                        margin: 8mm;
+                    }
+                }
+
+                /* ---------- Lock printable width (prevents squeezing) ---------- */
+                html.pdf-export .voucher-container {
+                    width: 194mm;          /* usable A4 width */
+                    margin: 0 auto;
+                    padding: 0;
+                    font-size: 11px;
+                }
+
+                /* ---------- Table behaves like costing sheet ---------- */
+                html.pdf-export .voucher-items {
+                    table-layout: auto;    /* 🔑 override fixed layout */
+                    font-size: 11px;
+                }
+
+                /* ---------- Header repeat ---------- */
+                html.pdf-export .voucher-items thead {
+                    display: table-header-group;
+                }
+
+                /* ---------- Cell behaviour ---------- */
+                html.pdf-export .voucher-items th,
+                html.pdf-export .voucher-items td {
+                    white-space: normal;
+                    word-break: break-word;
+                    line-height: 1.35;
+                    vertical-align: top;
+                }
+
+                /* ---------- Column minimums (NOT widths) ---------- */
+                html.pdf-export .voucher-items th:nth-child(1),
+                html.pdf-export .voucher-items td:nth-child(1) {
+                    min-width: 10mm;
+                }
+
+                html.pdf-export .voucher-items th:nth-child(2),
+                html.pdf-export .voucher-items td:nth-child(2) {
+                    min-width: 28mm;
+                }
+
+                html.pdf-export .voucher-items th:nth-child(3),
+                html.pdf-export .voucher-items td:nth-child(3) {
+                    font-size: 9px;        /* smaller, accounting-style */
+                    letter-spacing: 0.2px;
+                }
+               html.pdf-export .voucher-items th:nth-child(4),
+                html.pdf-export .voucher-items td:nth-child(4) {
+                    font-size: 9px;        /* smaller, accounting-style */
+                    letter-spacing: 0.2px;
+                    min-width: 28mm;
+                }
+
+                html.pdf-export .voucher-items th:nth-child(5),
+                html.pdf-export .voucher-items td:nth-child(5) {
+                    min-width: 70mm;       /* remarks */
+                    min-width: 28mm;
+                }
+
+                html.pdf-export .voucher-items th:nth-child(6),
+                html.pdf-export .voucher-items td:nth-child(6) {
+                    width: 10mm;
+                    text-align: right;
+                }
+
+                /* ---------- Page break discipline ---------- */
+                html.pdf-export .voucher-items tr {
+                    page-break-inside: avoid;
+                }
+
+                html.pdf-export .total-row {
+                    page-break-inside: avoid;
+                }
+
+                html.pdf-export .voucher-signatures {
+                    page-break-inside: avoid;
+                    margin-top: 24px;
+                }
+
+                /* ---------- Signature images ---------- */
+                html.pdf-export .voucher-signatures img {
+                    max-width: 100%;
+                    height: 40px;
+                    object-fit: contain;
+                }
+
+                /* ---------- Hide UI-only elements in PDF ---------- */
+                html.pdf-export .voucher-actions,
+                html.pdf-export .voucher-toolbar {
+                    display: none !important;
+                }
+
             `}</style>
         </div>
     );
