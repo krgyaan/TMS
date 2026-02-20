@@ -61,7 +61,6 @@ export class FollowUpService {
     // ========================
     // CREATE
     // ========================
-
     async create(dto: CreateFollowUpDto, currentUserId: number): Promise<FollowUp> {
         this.logger.info("Creating follow-up", {
             partyName: dto.partyName,
@@ -71,7 +70,10 @@ export class FollowUpService {
         });
 
         try {
-            const contacts: FollowUpContact[] = dto.contacts.map(c => ({
+            // ------------------------
+            // NORMALIZE CONTACTS
+            // ------------------------
+            const contacts = (dto.contacts ?? []).map(c => ({
                 name: c.name ?? "",
                 email: c.email ?? null,
                 phone: c.phone ?? null,
@@ -79,12 +81,12 @@ export class FollowUpService {
                 addedAt: new Date().toISOString(),
             }));
 
+            // Sync to client directory (same behavior as before)
             await this.syncToClientDirectory(contacts);
 
-            this.logger.debug("Client directory synced", {
-                contactsCount: contacts.length,
-            });
-
+            // ------------------------
+            // DATE NORMALIZATION
+            // ------------------------
             const normalizeDateToISODate = (v?: string | null) => {
                 if (!v) return null;
                 const d = new Date(v);
@@ -96,12 +98,14 @@ export class FollowUpService {
 
             const nextFollowUpDate = normalizeDateToISODate(dto.nextFollowUpDate ?? null);
 
-            const frequency = typeof (dto as any).frequency === "number" ? (dto as any).frequency : dto.frequency ? Number((dto as any).frequency) : 1;
+            const frequency = typeof (dto as any).frequency === "number" ? (dto as any).frequency : dto.frequency ? Number(dto.frequency) : 1;
 
             const stopReason = dto.stopReason == null ? null : Number(dto.stopReason);
-
             const reminderCount = dto.reminderCount ?? 1;
 
+            // ------------------------
+            // INSERT FOLLOW-UP
+            // ------------------------
             const [created] = await this.db
                 .insert(followUps)
                 .values({
@@ -115,9 +119,8 @@ export class FollowUpService {
                     comment: dto.comment ?? null,
                     details: dto.details ?? null,
                     latestComment: dto.latestComment ?? null,
-                    contacts,
-                    followUpHistory: dto.followUpHistory ?? [],
                     attachments: dto.attachments ?? [],
+                    followUpHistory: dto.followUpHistory ?? [],
                     startFrom,
                     nextFollowUpDate,
                     frequency,
@@ -133,6 +136,25 @@ export class FollowUpService {
                 })
                 .returning();
 
+            // ------------------------
+            // INSERT CONTACTS (RELATIONAL ✅)
+            // ------------------------
+            if (contacts.length > 0) {
+                await this.db.insert(followUpPersons).values(
+                    contacts.map(c => ({
+                        followUpId: created.id,
+                        name: c.name,
+                        email: c.email,
+                        phone: c.phone,
+                    }))
+                );
+
+                this.logger.debug("Contacts inserted", {
+                    followUpId: created.id,
+                    count: contacts.length,
+                });
+            }
+
             this.logger.info("Follow-up created successfully", {
                 followUpId: created.id,
             });
@@ -146,21 +168,12 @@ export class FollowUpService {
             throw error;
         }
     }
-
     // ========================
     // FIND ALL
     // ========================
 
     async findAll(query: FollowUpQueryDto, currentUser: { id: number; role: string }) {
         const { tab, search, page, limit, sortBy, sortOrder } = query;
-
-        this.logger.info("Fetching follow-ups list", {
-            userId: currentUser.id,
-            tab,
-            search,
-            page,
-            limit,
-        });
 
         try {
             const offset = (page - 1) * limit;
