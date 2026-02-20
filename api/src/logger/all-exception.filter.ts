@@ -1,4 +1,5 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, Inject } from "@nestjs/common";
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Inject } from "@nestjs/common";
+import { Response } from "express";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import * as Sentry from "@sentry/node";
@@ -12,10 +13,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
+        const response = ctx.getResponse<Response>();
         const request = ctx.getRequest();
 
-        const status = exception instanceof HttpException ? exception.getStatus() : 500;
+        const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
+        const errorResponse =
+            exception instanceof HttpException
+                ? exception.getResponse()
+                : {
+                      statusCode: status,
+                      message: "Internal server error",
+                  };
+
+        // 🔹 Logging (unchanged)
         Sentry.setContext("request", {
             url: request?.url,
             method: request?.method,
@@ -31,5 +42,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
             body: request?.body,
             exception,
         });
+
+        // ✅ THIS IS THE MISSING PIECE
+        return response.status(status).json(errorResponse);
     }
 }
