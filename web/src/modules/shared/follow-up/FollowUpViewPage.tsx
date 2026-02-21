@@ -49,9 +49,9 @@ import { paths } from "@/app/routes/paths";
 ================================ */
 
 const FREQUENCY_CONFIG: Record<number, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
+    3: { label: "2 times a day", variant: "secondary", icon: Calendar },
     1: { label: "Daily", variant: "default", icon: Clock },
     2: { label: "Alternate Days", variant: "default", icon: Clock },
-    3: { label: "2 times a day", variant: "secondary", icon: Calendar },
     4: { label: "Weekly (every Mon)", variant: "secondary", icon: Calendar },
     5: { label: "Twice a Week (every Mon & Thu)", variant: "outline", icon: CalendarClock },
     6: { label: "Stop", variant: "destructive", icon: PauseCircle },
