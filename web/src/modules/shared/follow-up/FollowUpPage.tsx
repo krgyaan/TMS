@@ -53,7 +53,7 @@ const FREQUENCY_LABELS: Record<number, string> = {
     2: "Alternate Days",
     3: "Twice a day",
     4: "Weekly",
-    5: "Twice a Week",
+    5: "Biweekly",
     6: "Stop",
 };
 
