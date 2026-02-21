@@ -31,10 +31,10 @@ import { FollowupMailBase } from "./zod/mail.dto";
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "Twice a day",
+    4: "Weekly",
+    5: "Twice a Week",
+    6: "Stop",
 };
 
 export const STOP_REASON_LABELS: Record<number, string> = {
