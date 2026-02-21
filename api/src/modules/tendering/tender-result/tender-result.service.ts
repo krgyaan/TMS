@@ -21,6 +21,7 @@ import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { paymentInstruments, paymentRequests } from '@/db/schemas';
 import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -43,10 +44,42 @@ export class TenderResultService {
         private readonly recipientResolver: RecipientResolver,
     ) { }
 
-    /**
-     * Get dashboard data by tab - Direct queries without config
-     */
+
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
+
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tab?: ResultDashboardType,
         filters?: ResultDashboardFilters
     ): Promise<PaginatedResult<ResultDashboardRow>> {
@@ -64,13 +97,11 @@ export class TenderResultService {
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'result-awaited') {
             conditions.push(
@@ -80,11 +111,13 @@ export class TenderResultService {
                     eq(tenderResults.status, 'Under Evaluation')
                 )!
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'won') {
             conditions.push(
                 isNotNull(tenderResults.id),
                 eq(tenderResults.status, 'Won')
             );
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'lost') {
             conditions.push(
                 isNotNull(tenderResults.id),
@@ -101,15 +134,18 @@ export class TenderResultService {
 
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderCostingSheets.finalPrice}::text ILIKE ${searchStr}`,
+                sql`${items.name} ILIKE ${searchStr}`,
+                sql`${tenderResults.result} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -186,7 +222,6 @@ export class TenderResultService {
         try {
             const sqlQuery = query.toSQL();
             dataQuerySql = JSON.stringify(sqlQuery);
-            this.logger.debug(`[TenderResult] SQL Query: ${dataQuerySql}`);
         } catch (error) {
             this.logger.debug(`[TenderResult] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -234,12 +269,15 @@ export class TenderResultService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getCounts(): Promise<ResultDashboardCounts> {
+    async getCounts(user?: ValidatedUser, teamId?: number): Promise<ResultDashboardCounts> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb']),
             eq(bidSubmissions.status, 'Bid Submitted'),
+            ...roleFilterConditions,
         ];
 
         const resultAwaitedConditions = [
@@ -456,12 +494,42 @@ export class TenderResultService {
 
     async findByTenderId(tenderId: number) {
         const [result] = await this.db
-            .select()
+            .select({
+                result: tenderResults,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamExecutiveName: users.name,
+                tenderValue: tenderInfos.gstValues,
+                costingFinalPrice: tenderCostingSheets.finalPrice,
+                itemName: items.name,
+                tenderStatus: statuses.name,
+                reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
+            })
             .from(tenderResults)
+            .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
-        return result || null;
+        if (!result) {
+            return null;
+        }
+
+        return {
+            ...result.result,
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            teamExecutiveName: result.teamExecutiveName,
+            tenderValue: result.tenderValue,
+            finalPrice: result.costingFinalPrice || result.tenderValue,
+            itemName: result.itemName,
+            tenderStatus: result.tenderStatus,
+            raApplicable: result.reverseAuctionApplicable === 'Yes',
+        };
     }
 
     async getOrCreateForTender(tenderId: number): Promise<{ id: number; isNew: boolean }> {

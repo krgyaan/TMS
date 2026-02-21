@@ -121,6 +121,12 @@ export class FollowUpController {
         return this.service.remove(id);
     }
 
+    @Get("test-followup/:id")
+    async test(@Param("id") id: number) {
+        await this.service.processFollowupMail(id);
+        return "Triggered";
+    }
+
     // ========================
     // AMOUNT SUMMARY (DASHBOARD)
     // ========================

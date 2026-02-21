@@ -156,8 +156,8 @@ export interface TenderInfoSheetResponse {
     orderValue3: string | number | null;
     customEligibilityCriteria: string | null;
 
-    technicalWorkOrders: string[] | null;
-    commercialDocuments: string[] | null;
+    technicalWorkOrders: Array<{ id?: number; documentName: string }> | string[] | null;
+    commercialDocuments: Array<{ id?: number; documentName: string }> | string[] | null;
 
     avgAnnualTurnoverType: string | null;
     avgAnnualTurnoverValue: string | number | null;
@@ -299,41 +299,7 @@ export const nwOptions = [
     { value: 'AMOUNT', label: 'Amount' },
 ];
 
-export const rejectionReasonOptions = [
-    { value: '9', label: 'Status 9' },
-    { value: '10', label: 'Status 10' },
-    { value: '11', label: 'Status 11' },
-    { value: '12', label: 'Status 12' },
-    { value: '13', label: 'Status 13' },
-    { value: '14', label: 'Status 14' },
-    { value: '15', label: 'Status 15' },
-    { value: '29', label: 'Status 29' },
-    { value: '30', label: 'Status 30' },
-    { value: '35', label: 'Status 35' },
-    { value: '36', label: 'Status 36' },
-];
 
-// Dummy Master Documents (replace later with API call)
-export const dummyTechnicalDocuments = [
-    { value: '1', label: 'Technical Specification Document' },
-    { value: '2', label: 'Product Catalog' },
-    { value: '3', label: 'Test Certificates' },
-    { value: '4', label: 'Quality Certifications (ISO, etc.)' },
-    { value: '5', label: 'OEM Authorization' },
-    { value: '6', label: 'Similar Work Experience Certificates' },
-    { value: '7', label: 'Installation Manual' },
-];
-
-export const dummyFinancialDocuments = [
-    { value: '1', label: 'Balance Sheet (Last 3 Years)' },
-    { value: '2', label: 'Profit & Loss Statement' },
-    { value: '3', label: 'Income Tax Returns' },
-    { value: '4', label: 'GST Registration Certificate' },
-    { value: '5', label: 'PAN Card' },
-    { value: '6', label: 'Audited Financial Statements' },
-    { value: '7', label: 'Bank Solvency Certificate' },
-    { value: '8', label: 'Working Capital Certificate' },
-];
 
 export const dummyPqcDocuments = [
     { value: '1', label: 'Company Registration Certificate' },

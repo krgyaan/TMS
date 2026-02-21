@@ -17,7 +17,7 @@ export function booleanIconCol<T = any>(
     } as ColDef<T>;
 }
 
-export function tenderNameCol<T extends { tenderNo: string; tenderName: string }>(
+export function tenderNameCol<T extends { tenderNo?: string | null; tenderName?: string | null }>(
     field: Field<T> = 'tenderNo',
     overrides: Partial<ColDef<T>> = {}
 ): ColDef<T> {

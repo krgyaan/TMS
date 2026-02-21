@@ -5,6 +5,7 @@ import type { ColDef, GridOptions, GridReadyEvent, RowSelectionOptions } from 'a
 import { myAgTheme } from '@/components/data-grid/theme';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 
@@ -13,6 +14,7 @@ export interface DataTableProps<T = any> {
     columnDefs: ColDef<T>[];
     gridOptions?: Partial<GridOptions<T>>;
     loading?: boolean;
+    enableCellTextSelection?: boolean;
     onGridReady?: (event: GridReadyEvent<T>) => void;
     className?: string;
     enablePagination?: boolean;
@@ -32,10 +34,15 @@ export interface DataTableProps<T = any> {
     };
     onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void;
     autoSizeColumns?: boolean | string[];
+    showTotalCount?: boolean;
+    showLengthChange?: boolean;
+    pageSizeOptions?: number[];
+    onPageSizeChange?: (pageSize: number) => void;
 }
 
 const DataTable = <T extends Record<string, any>>({
     data,
+    enableCellTextSelection = true,
     columnDefs,
     gridOptions = {},
     loading = false,
@@ -55,14 +62,70 @@ const DataTable = <T extends Record<string, any>>({
     onSelectionChanged,
     themeOverride,
     autoSizeColumns,
+    showTotalCount = true,
+    showLengthChange = true,
+    pageSizeOptions = [5, 10, 25, 50, 100],
+    onPageSizeChange,
 }: DataTableProps<T>) => {
 
     // 1. Calculate Pagination Logic
     const activePageSize = manualPagination ? (paginationState?.pageSize ?? 50) : pageSize;
     const currentPage = (paginationState?.pageIndex ?? 0) + 1;
     const totalPages = manualPagination ? Math.ceil(rowCount / activePageSize) : 0;
-    const startRow = (currentPage - 1) * activePageSize + 1;
-    const endRow = Math.min(currentPage * activePageSize, rowCount);
+
+    // Generate page numbers to display (show max 5 pages around current)
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        const maxPagesToShow = 5;
+
+        if (totalPages <= maxPagesToShow) {
+            // Show all pages if total is less than max
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            // Show pages around current page
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+            // Adjust if we're near the end
+            if (endPage - startPage < maxPagesToShow - 1) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            if (startPage > 1) {
+                pages.push(1);
+                if (startPage > 2) pages.push('...');
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pages.push(i);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) pages.push('...');
+                pages.push(totalPages);
+            }
+        }
+
+        return pages;
+    };
+
+    const handlePageSizeChange = (newSize: string) => {
+        const newPageSize = parseInt(newSize, 10);
+        if (onPageSizeChange) {
+            onPageSizeChange(newPageSize);
+        } else if (onPaginationChange && paginationState) {
+            // Reset to first page when changing page size
+            onPaginationChange({ ...paginationState, pageSize: newPageSize, pageIndex: 0 });
+        }
+    };
+
+    const handlePageChange = (page: number) => {
+        if (onPaginationChange && paginationState) {
+            onPaginationChange({ ...paginationState, pageIndex: page - 1 });
+        }
+    };
 
     // 2. Memoize Grid Options
     const defaultGridOptions: GridOptions<T> = useMemo(() => ({
@@ -132,6 +195,7 @@ const DataTable = <T extends Record<string, any>>({
 
                 <div style={{ width: '100%' }}>
                     <AgGridReact
+                        enableCellTextSelection={enableCellTextSelection}
                         rowData={data}
                         columnDefs={columnDefs}
                         gridOptions={defaultGridOptions}
@@ -148,36 +212,78 @@ const DataTable = <T extends Record<string, any>>({
             {/* Pagination Footer: Fixed height at bottom */}
             {manualPagination && paginationState && onPaginationChange && (
                 <div className="flex items-center justify-between px-4 py-3 border-t bg-background shrink-0">
-                    <div className="text-sm text-muted-foreground">
-                        {rowCount > 0 ? (
-                            <>Showing <strong>{startRow}</strong> to <strong>{endRow}</strong> of <strong>{rowCount}</strong> entries</>
-                        ) : (
-                            "No results found"
-                        )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onPaginationChange({ ...paginationState, pageIndex: paginationState.pageIndex - 1 })}
-                            disabled={paginationState.pageIndex === 0 || loading}
-                        >
-                            <ChevronLeft className="h-4 w-4 mr-1" />
-                            Previous
-                        </Button>
-                        <div className="text-sm font-medium min-w-[80px] text-center">
-                            Page {currentPage} of {totalPages || 1}
+                    {/* Left: Total Count */}
+                    {showTotalCount && (
+                        <div className="text-sm text-muted-foreground">
+                            Total: <strong>{rowCount}</strong>
                         </div>
+                    )}
+
+                    {/* Center: Pagination with Page Numbers */}
+                    <div className="flex items-center gap-1">
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => onPaginationChange({ ...paginationState, pageIndex: paginationState.pageIndex + 1 })}
-                            disabled={currentPage >= totalPages || loading}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1 || loading}
+                            className="h-8 w-8 p-0"
                         >
-                            Next
-                            <ChevronRight className="h-4 w-4 ml-1" />
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {getPageNumbers().map((page, index) => {
+                            if (page === '...') {
+                                return (
+                                    <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
+                                        ...
+                                    </span>
+                                );
+                            }
+                            const pageNum = page as number;
+                            return (
+                                <Button
+                                    key={pageNum}
+                                    variant={pageNum === currentPage ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => handlePageChange(pageNum)}
+                                    disabled={loading}
+                                    className="h-8 min-w-8 px-2"
+                                >
+                                    {pageNum}
+                                </Button>
+                            );
+                        })}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage >= totalPages || loading}
+                            className="h-8 w-8 p-0"
+                        >
+                            <ChevronRight className="h-4 w-4" />
                         </Button>
                     </div>
+
+                    {/* Right: Length Change */}
+                    {showLengthChange && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Show per Page:</span>
+                            <Select
+                                value={activePageSize.toString()}
+                                onValueChange={handlePageSizeChange}
+                            >
+                                <SelectTrigger className="w-20 h-8">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {pageSizeOptions.map((size) => (
+                                        <SelectItem key={size} value={size.toString()}>
+                                            {size}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

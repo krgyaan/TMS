@@ -69,8 +69,12 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.approveFinanceDocSelection) {
             payload.approveFinanceDocSelection = values.approveFinanceDocSelection as '1' | '2';
         }
-        // Note: alternativeTechnicalDocs and alternativeFinancialDocs are not yet supported by backend
-        // They are kept in the form for validation but not sent in the payload
+        if (values.alternativeTechnicalDocs && values.alternativeTechnicalDocs.length > 0) {
+            payload.alternativeTechnicalDocs = values.alternativeTechnicalDocs;
+        }
+        if (values.alternativeFinancialDocs && values.alternativeFinancialDocs.length > 0) {
+            payload.alternativeFinancialDocs = values.alternativeFinancialDocs;
+        }
         return payload;
     }
 

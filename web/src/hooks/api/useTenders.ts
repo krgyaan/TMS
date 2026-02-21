@@ -18,7 +18,8 @@ export const tendersKey = {
 export const useTenders = (
     activeTab?: string,
     category?: string,
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 }
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { queryParams: teamParams, teamId, userId, dataScope } = useTeamFilter();
 
@@ -28,7 +29,9 @@ export const useTenders = (
         ...teamParams,
         page: pagination.page,
         limit: pagination.limit,
-        search: pagination.search
+        search: pagination.search,
+        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
 
     const queryKeyFilters = {
@@ -38,6 +41,7 @@ export const useTenders = (
         userId,
         dataScope,
         ...pagination,
+        ...sort,
     };
 
     return useQuery<PaginatedResult<TenderInfoWithNames>>({
@@ -119,9 +123,35 @@ export const useGenerateTenderName = () => {
 };
 
 export const useTendersDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    // Include all filter context in query key to ensure proper cache invalidation
+    // Use explicit values (including null) so React Query can properly differentiate cache entries
+    const queryKey = [...tendersKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery({
-        queryKey: tendersKey.dashboardCounts(),
-        queryFn: () => tenderInfosService.getDashboardCounts(),
-        staleTime: 30000,
+        queryKey,
+        queryFn: () => tenderInfosService.getDashboardCounts(teamIdParam),
+        staleTime: 0, // Always refetch when query key changes to ensure counts are up-to-date
+    });
+};
+
+export const useUpdateTenderStatus = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { status: number; comment: string } }) =>
+            tenderInfosService.updateStatus(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
+            queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: tendersKey.dashboardCounts() });
+            toast.success("Tender status updated successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
     });
 };

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc, ne } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc, desc, ne, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -14,6 +14,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { DD_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 
 @Injectable()
 export class DemandDraftService {
@@ -21,7 +22,58 @@ export class DemandDraftService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly followUpService: FollowUpService,
     ) { }
+
+    private statusMap() {
+        return {
+            [DD_STATUSES.PENDING]: 'Pending',
+            [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [DD_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [DD_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [DD_STATUSES.COURIER_RETURN_RECEIVED]: 'Returned',
+            [DD_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Requested',
+            [DD_STATUSES.CANCELLED_AT_BRANCH]: 'Cancelled at Branch',
+            [DD_STATUSES.BANK_RETURN_COMPLETED]: 'Returned',
+            [DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: 'Settled with Project',
+        };
+    }
+
+    private buildDdDashboardConditions(tab?: string) {
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'DD'),
+            eq(paymentInstruments.isActive, true),
+        ];
+
+        if (tab === 'pending') {
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 0),
+                    eq(paymentInstruments.status, DD_STATUSES.PENDING)
+                )
+            );
+        } else if (tab === 'created') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+            );
+        } else if (tab === 'rejected') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED)
+            );
+        } else if (tab === 'returned') {
+            conditions.push(
+                inArray(paymentInstruments.action, [3, 4, 5])
+            );
+        } else if (tab === 'cancelled') {
+            conditions.push(
+                inArray(paymentInstruments.action, [6, 7])
+            );
+        }
+
+        return conditions;
+    }
 
     async getDashboardData(
         tab?: string,
@@ -37,40 +89,26 @@ export class DemandDraftService {
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions: any[] = [
-            eq(paymentInstruments.instrumentType, 'DD'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const conditions = this.buildDdDashboardConditions(tab);
 
-        // Apply tab-specific filters
-        if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
-        } else if (tab === 'created') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
-            );
-        } else if (tab === 'rejected') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED)
-            );
-        } else if (tab === 'returned') {
-            conditions.push(inArray(paymentInstruments.action, [3, 4, 5]));
-        } else if (tab === 'cancelled') {
-            conditions.push(inArray(paymentInstruments.action, [6, 7]));
-        }
+        const searchTerm = options?.search?.trim();
 
-        // Search filter
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentDdDetails.ddNo} ILIKE ${searchStr}
-                )`
-            );
+        // Search filter - search across all rendered columns
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentDdDetails.ddNo} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${instrumentDdDetails.ddDate}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -101,125 +139,102 @@ export class DemandDraftService {
         const rows = await this.db
             .select({
                 id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
                 ddCreationDate: instrumentDdDetails.ddDate,
                 ddNo: instrumentDdDetails.ddNo,
-                beneficiaryName: sql<string | null>`NULL`, // DD doesn't have beneficiaryName in schema
+                beneficiaryName: paymentInstruments.favouring,
                 ddAmount: paymentInstruments.amount,
                 tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
                 tenderNo: tenderInfos.tenderNo,
                 bidValidity: tenderInfos.dueDate,
                 tenderStatus: statuses.name,
-                member: users.name,
-                expiry: sql<Date | null>`NULL`, // DD doesn't have validityDate in schema
+                teamMember: users.name,
                 ddStatus: paymentInstruments.status,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join statuses and users when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
+        function isExpired(dueDate: Date): boolean {
+            return dueDate && new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000) < new Date(Date.now());
+        }
+
         const data: DemandDraftDashboardRow[] = rows.map((row) => ({
             id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
             ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
             ddNo: row.ddNo,
             beneficiaryName: row.beneficiaryName,
             ddAmount: row.ddAmount ? Number(row.ddAmount) : null,
-            tenderName: row.tenderName,
-            tenderNo: row.tenderNo,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
-            member: row.member,
-            expiry: row.expiry ? new Date(row.expiry) : null,
-            ddStatus: row.ddStatus,
+            teamMember: row.teamMember?.toString() ?? null,
+            expiry: row.ddCreationDate ? (isExpired(new Date(row.ddCreationDate)) ? 'Expired' : 'Valid') : null,
+            ddStatus: this.statusMap()[row.ddStatus],
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countDdByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<DemandDraftDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'DD'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const pending = await this.countDdByConditions(
+            this.buildDdDashboardConditions('pending')
+        );
 
-        // Count pending
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(paymentInstruments.action),
-        ];
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...pendingConditions));
-        const pending = Number(pendingResult?.count || 0);
+        const created = await this.countDdByConditions(
+            this.buildDdDashboardConditions('created')
+        );
 
-        // Count created
-        const createdConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED),
-        ];
-        const [createdResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...createdConditions));
-        const created = Number(createdResult?.count || 0);
+        const rejected = await this.countDdByConditions(
+            this.buildDdDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
+        const returned = await this.countDdByConditions(
+            this.buildDdDashboardConditions('returned')
+        );
 
-        // Count returned
-        const returnedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [3, 4, 5]),
-        ];
-        const [returnedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...returnedConditions));
-        const returned = Number(returnedResult?.count || 0);
-
-        // Count cancelled
-        const cancelledConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [6, 7]),
-        ];
-        const [cancelledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...cancelledConditions));
-        const cancelled = Number(cancelledResult?.count || 0);
+        const cancelled = await this.countDdByConditions(
+            this.buildDdDashboardConditions('cancelled')
+        );
 
         return {
             pending,
@@ -233,15 +248,16 @@ export class DemandDraftService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
+            'accounts-form': 1,
             'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
             'initiate-followup': 2,
-            'request-extension': 5,
             'returned-courier': 3,
             'returned-bank-transfer': 4,
-            'request-cancellation': 7,
+            'settled': 5,
+            'settled-with-project': 5,
+            'request-cancellation': 6,
             'dd-cancellation-confirmation': 7,
+            'cancelled-at-branch': 7,
         };
         return actionMap[action] || 1;
     }
@@ -276,6 +292,9 @@ export class DemandDraftService {
             }
         }
 
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
+
         const filePaths: string[] = [];
         if (files && files.length > 0) {
             for (const file of files) {
@@ -283,6 +302,33 @@ export class DemandDraftService {
                 filePaths.push(relativePath);
             }
         }
+
+        /**
+         * Get single file for a field by checking if body field exists or if it's a file path string
+         */
+        const getFileForField = (
+            fieldname: string,
+            files: Express.Multer.File[],
+            body: any,
+            fileIndexTracker: { current: number }
+        ): Express.Multer.File | null => {
+            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
+                const file = files[fileIndexTracker.current];
+                fileIndexTracker.current++;
+                return file;
+            }
+            return null;
+        };
+
+        /**
+         * Get file path from body if it's a string (from TenderFileUploader)
+         */
+        const getFilePathFromBody = (fieldname: string, body: any): string | null => {
+            if (body[fieldname] && typeof body[fieldname] === 'string') {
+                return body[fieldname];
+            }
+            return null;
+        };
 
         const updateData: any = {
             action: actionNumber,
@@ -300,13 +346,22 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
             updateData.status = DD_STATUSES.COURIER_RETURN_RECEIVED;
-            if (filePaths.length > 0) {
+            // Handle docket_slip file or path
+            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = getFilePathFromBody('docket_slip', body);
+            if (docketSlipFile) {
+                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
+            } else if (filePaths.length > 0) {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === 'returned-bank-transfer') {
             updateData.status = DD_STATUSES.BANK_RETURN_COMPLETED;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
+        } else if (body.action === 'settled' || body.action === 'settled-with-project') {
+            updateData.status = DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
         } else if (body.action === 'request-cancellation') {
             updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
         } else if (body.action === 'dd-cancellation-confirmation') {
@@ -322,7 +377,14 @@ export class DemandDraftService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const ddDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-2') {
+        if (body.action === 'accounts-form-1' || body.action === 'accounts-form') {
+            // Store dd_no, dd_date, req_no when Accepted (form requires these)
+            if (body.dd_req === 'Accepted') {
+                if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
+                if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
+                if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
+            }
+        } else if (body.action === 'accounts-form-2') {
             if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
             if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
             if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
@@ -334,15 +396,30 @@ export class DemandDraftService {
 
         if (Object.keys(ddDetailsUpdate).length > 0) {
             ddDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentDdDetails)
-                .set(ddDetailsUpdate)
-                .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+
+            // Check if ddDetails record exists
+            const [existingDdDetails] = await this.db
+                .select()
+                .from(instrumentDdDetails)
+                .where(eq(instrumentDdDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingDdDetails) {
+                await this.db
+                    .update(instrumentDdDetails)
+                    .set(ddDetailsUpdate)
+                    .where(eq(instrumentDdDetails.instrumentId, instrumentId));
+            } else {
+                // Create new ddDetails record
+                await this.db.insert(instrumentDdDetails).values({
+                    instrumentId,
+                    ...ddDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
         }
 
-        if (body.action === 'initiate-followup' && contacts.length > 0) {
-            this.logger.log(`Follow-up should be created for instrument ${instrumentId}`);
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,
@@ -350,5 +427,94 @@ export class DemandDraftService {
             action: body.action,
             actionNumber,
         };
+    }
+
+    async getById(id: number) {
+        const [result] = await this.db
+            .select({
+                // Payment Instrument fields
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                validityDate: paymentInstruments.validityDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                coveringLetter: paymentInstruments.coveringLetter,
+                extraPdfPaths: paymentInstruments.extraPdfPaths,
+                createdAt: paymentInstruments.createdAt,
+                updatedAt: paymentInstruments.updatedAt,
+
+                // Payment Request fields
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                requestType: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                requestDueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestPurpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                requestStatus: paymentRequests.status,
+                requestRemarks: paymentRequests.remarks,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestUpdatedAt: paymentRequests.updatedAt,
+
+                // DD Details - all fields
+                ddDetailsId: instrumentDdDetails.id,
+                ddNo: instrumentDdDetails.ddNo,
+                ddDate: instrumentDdDetails.ddDate,
+                reqNo: instrumentDdDetails.reqNo,
+                ddNeeds: instrumentDdDetails.ddNeeds,
+                ddPurpose: instrumentDdDetails.ddPurpose,
+                ddRemarks: instrumentDdDetails.ddRemarks,
+                ddDetailsCreatedAt: instrumentDdDetails.createdAt,
+                ddDetailsUpdatedAt: instrumentDdDetails.updatedAt,
+
+                // Tender Info fields
+                tenderName: tenderInfos.tenderName,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusId: tenderInfos.status,
+                tenderOrganizationId: tenderInfos.organization,
+                tenderItemId: tenderInfos.item,
+                tenderTeamMember: tenderInfos.teamMember,
+
+                // Status fields
+                tenderStatusName: statuses.name,
+
+                // User fields
+                requestedByName: users.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentRequests.id, id),
+                eq(paymentInstruments.instrumentType, 'DD'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Request with ID ${id} not found`);
+        }
+
+        return result;
     }
 }

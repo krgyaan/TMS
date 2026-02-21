@@ -1,9 +1,8 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { ArrowLeft, FileText, Pencil } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -36,8 +35,6 @@ interface EmdTenderFeeShowProps {
     paymentRequests?: PaymentRequest[] | null;
     tender?: TenderInfoWithNames | null;
     isLoading?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
 }
 
 const formatValue = (value?: string | number | null) => {
@@ -60,29 +57,19 @@ const hasValue = (value?: string | Date | number | null) => {
 export const EmdTenderFeeShow = ({
     paymentRequests,
     isLoading,
-    onEdit,
-    onBack,
 }: EmdTenderFeeShowProps) => {
     if (isLoading) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>
-                        <Skeleton className="h-6 w-48" />
-                    </CardTitle>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            {Array.from({ length: 6 }).map((_, idx) => (
-                                <TableRow key={idx}>
-                                    <TableCell colSpan={4}>
-                                        <Skeleton className="h-12 w-full" />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <Skeleton key={idx} className="h-10 w-full" />
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -91,22 +78,17 @@ export const EmdTenderFeeShow = ({
     if (!paymentRequests || paymentRequests.length === 0) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
                         Payment Requests Details
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="text-muted-foreground">
-                                    No payment requests available for this tender.
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No payment requests available for this tender.</p>
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -159,7 +141,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Favouring
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                         {formatValue(instrument.favouring)}
                                     </TableCell>
                                 </>
@@ -174,7 +156,7 @@ export const EmdTenderFeeShow = ({
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Payable At
                                         </TableCell>
-                                        <TableCell className="text-sm" colSpan={hasValue(instrument.issueDate) ? 1 : 3}>
+                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={hasValue(instrument.issueDate) ? 1 : 3}>
                                             {formatValue(instrument.payableAt)}
                                         </TableCell>
                                     </>
@@ -242,7 +224,7 @@ export const EmdTenderFeeShow = ({
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Courier Address
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                     {formatValue(instrument.courierAddress)}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
@@ -268,7 +250,7 @@ export const EmdTenderFeeShow = ({
                                                 <TableCell className="text-sm font-medium text-muted-foreground capitalize">
                                                     {key1.replace(/([A-Z])/g, ' $1').trim()}
                                                 </TableCell>
-                                                <TableCell className="text-sm">
+                                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                     {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1)))
                                                         ? formatDateTime(value1)
                                                         : String(value1)}
@@ -278,7 +260,7 @@ export const EmdTenderFeeShow = ({
                                                         <TableCell className="text-sm font-medium text-muted-foreground capitalize">
                                                             {key2.replace(/([A-Z])/g, ' $1').trim()}
                                                         </TableCell>
-                                                        <TableCell className="text-sm">
+                                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                             {value2 instanceof Date || (typeof value2 === "string" && !isNaN(Date.parse(value2)))
                                                                 ? formatDateTime(value2)
                                                                 : String(value2)}
@@ -314,20 +296,6 @@ export const EmdTenderFeeShow = ({
                     <FileText className="h-5 w-5" />
                     Payment Requests Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -366,7 +334,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                         {formatValue(emdRequest.remarks)}
                                     </TableCell>
                                 </TableRow>
@@ -408,7 +376,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                         {formatValue(tenderFeeRequest.remarks)}
                                     </TableCell>
                                 </TableRow>
@@ -450,7 +418,7 @@ export const EmdTenderFeeShow = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm">
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                         {formatValue(processingFeeRequest.remarks)}
                                     </TableCell>
                                 </TableRow>

@@ -1,42 +1,58 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, ExternalLink } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderViewProps {
     tender: TenderInfoWithNames;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
+
+/**
+ * Parse documents field from JSON string to array of file paths
+ */
+const parseDocuments = (documents: string | null): string[] => {
+    if (!documents) return [];
+    try {
+        const parsed = JSON.parse(documents);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Extract filename from file path
+ */
+const getFileName = (filePath: string): string => {
+    // Handle paths like "tender-documents/filename.pdf" or just "filename.pdf"
+    const parts = filePath.split('/');
+    return parts[parts.length - 1] || filePath;
+};
 
 export function TenderView({
     tender,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: TenderViewProps) {
+    const documents = parseDocuments(tender.documents);
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -51,20 +67,6 @@ export function TenderView({
                     <FileText className="h-5 w-5" />
                     Tender Details
                 </CardTitle>
-                <CardAction className='flex gap-2'>
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -206,11 +208,48 @@ export function TenderView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {tender.remarks}
                                     </TableCell>
                                 </TableRow>
                             </>
+                        )}
+
+                        {/* Documents */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Documents ({documents.length})
+                            </TableCell>
+                        </TableRow>
+                        {documents.length > 0 ? (
+                            documents.map((filePath, index) => (
+                                <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Document {index + 1}
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={2}>
+                                        <span className="text-xs text-muted-foreground font-mono break-all">
+                                            {getFileName(filePath)}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
+                                        >
+                                            <ExternalLink className="h-4 w-4 mr-1" />
+                                            View
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm text-muted-foreground" colSpan={4}>
+                                    No documents uploaded
+                                </TableCell>
+                            </TableRow>
                         )}
                     </TableBody>
                 </Table>

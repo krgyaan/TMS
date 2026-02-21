@@ -22,6 +22,8 @@ export interface SaveTenderApprovalDto {
     emdMode?: string;
     approvePqrSelection?: "1" | "2";
     approveFinanceDocSelection?: "1" | "2";
+    alternativeTechnicalDocs?: string[];
+    alternativeFinancialDocs?: string[];
     tenderStatus?: number;
     oemNotAllowed?: string;
     tlRejectionRemarks?: string;

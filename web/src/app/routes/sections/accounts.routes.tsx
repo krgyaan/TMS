@@ -1,7 +1,6 @@
 import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
-import ImprestPaymentHistory from "@/modules/accounts/imprest/ImprestPaymentHistory";
 
 const Accounts_Imprests = lazy(() => import("@/modules/accounts/imprest/ImprestAdminIndex"));
 const Accounts_FinancialDocs = lazy(() => import("@/modules/accounts/financial-docs"));
@@ -23,7 +22,6 @@ export default function AccountsRoutes() {
                     </RouteWrapper>
                 }
             />
-            <Route path="imprests/payment-history/:userId" element={<ImprestPaymentHistory />} />
             <Route
                 path="imprests/user/:userId"
                 element={

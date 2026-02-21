@@ -7,6 +7,7 @@ export type ResultDashboardFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    teamId?: number;
 };
 
 export interface UploadResultFormPageProps {
@@ -73,6 +74,7 @@ export interface ResultDashboardRow {
     raApplicable: boolean;
     reverseAuctionId: number | null;
     emdDetails: EmdDetails | null;
+    technicallyQualified: string | null;
 }
 
 export interface ResultDashboardCounts {

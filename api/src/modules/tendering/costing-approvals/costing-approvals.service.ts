@@ -17,6 +17,8 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -64,6 +66,7 @@ export class CostingApprovalsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly timersService: TimersService,
     ) { }
 
     private costingApprovalBaseQuery(select: any): any {
@@ -110,9 +113,10 @@ export class CostingApprovalsService {
      * Get dashboard data by tab - Direct queries without config
      */
     async getDashboardData(
-        userTeam: number,
         tab?: 'pending' | 'approved' | 'tender-dnb',
-        filters?: CostingApprovalFilters
+        filters?: CostingApprovalFilters,
+        user?: ValidatedUser,
+        teamId?: number
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -128,17 +132,44 @@ export class CostingApprovalsService {
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
 
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            conditions.push(isNull(tenderCostingSheets.status));
+            conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
         } else if (activeTab === 'approved') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
@@ -195,68 +226,6 @@ export class CostingApprovalsService {
             .limit(limit)
             .offset(offset) as any;
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map((r: any) => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            const data = rows.map((row: any) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    teamMember: row.teamMember,
-                    teamMemberName: row.teamMemberName,
-                    itemName: row.itemName,
-                    status: row.status,
-                    statusName: row.statusName,
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    dueDate: row.dueDate,
-                    emdAmount: row.emdAmount,
-                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
-                    costingStatus: row.costingStatus,
-                    googleSheetUrl: row.googleSheetUrl,
-                    costingSheetId: row.costingSheetId,
-                };
-            });
-
-            return wrapPaginatedResponse(data, Number(count), page, limit);
-        }
-
         const data = rows.map((row: any) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
@@ -280,9 +249,47 @@ export class CostingApprovalsService {
         return wrapPaginatedResponse(data, Number(count), page, limit);
     }
 
-    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<CostingApprovalDashboardCounts> {
+        const baseCondition = TenderInfosService.getActiveCondition();
+
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const filteredBaseCondition = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
         const baseConditions = [
-            TenderInfosService.getActiveCondition(),
+            filteredBaseCondition,
             TenderInfosService.getApprovedCondition(),
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
@@ -291,7 +298,7 @@ export class CostingApprovalsService {
         const pendingConditions = [
             ...baseConditions,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(tenderCostingSheets.status),
+            eq(tenderCostingSheets.status, 'Submitted'),
         ];
 
         // Count approved: costing_status = 'Approved'
@@ -303,7 +310,7 @@ export class CostingApprovalsService {
 
         // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
         const tenderDnbBaseConditions = [
-            TenderInfosService.getActiveCondition(),
+            filteredBaseCondition,
             TenderInfosService.getApprovedCondition(),
             isNotNull(tenderCostingSheets.submittedFinalPrice),
         ];
@@ -424,6 +431,22 @@ export class CostingApprovalsService {
 
         // Send email notification
         await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
+
+        // TIMER TRANSITION: Stop costing_sheet_approval timer
+        try {
+            this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing approval`);
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: costingSheet.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: userId,
+                reason: 'Costing approved'
+            });
+            this.logger.log(`Successfully stopped costing_sheet_approval timer for tender ${costingSheet.tenderId}`);
+        } catch (error) {
+            this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing approval:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
 
         return result;
     }
@@ -592,7 +615,7 @@ export class CostingApprovalsService {
             'costing-sheet.approved',
             tenderId,
             approvedBy,
-            `Costing Sheet Approved: ${tender.tenderNo}`,
+            `Costing approved - ${tender.tenderName}`,
             'costing-sheet-approved',
             emailData,
             {
@@ -654,11 +677,14 @@ export class CostingApprovalsService {
             'costing-sheet.rejected',
             tenderId,
             rejectedBy,
-            `Costing Sheet Rejected: ${tender.tenderNo}`,
+            `Costing Rejected/Redo costing - ${tender.tenderName}`,
             'costing-sheet-rejected',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }
