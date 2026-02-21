@@ -289,7 +289,7 @@ export default function TenderExecutivePerformance() {
 
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Select value={userId ? userId.toString() : undefined} onValueChange={v => setUserId(Number(v))}>
@@ -319,9 +319,6 @@ export default function TenderExecutivePerformance() {
                                     <Input type="date" className="pl-9" value={toDate ?? ""} onChange={e => setToDate(e.target.value || null)} />
                                 </div>
                             </div>
-                            <Button className="w-full md:w-auto">
-                                <Filter className="mr-2 h-4 w-4" /> Apply Filters
-                            </Button>
                         </div>
                     </CardContent>
                 </Card>
