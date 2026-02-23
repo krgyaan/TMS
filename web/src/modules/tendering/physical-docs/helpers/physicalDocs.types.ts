@@ -3,8 +3,6 @@ import { PhysicalDocsFormSchema } from './physicalDocs.schema';
 import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { useMemo } from 'react';
 import { useDocumentsSubmitted } from '@/hooks/api/useDocumentsSubmitted';
-import { useCourierDashboard } from '@/modules/shared/courier/courier.hooks';
-import type { Courier } from '@/modules/shared/courier/courier.types';
 
 // Form Values Type
 export type PhysicalDocsFormValues = z.infer<typeof PhysicalDocsFormSchema>;
