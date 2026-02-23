@@ -90,6 +90,10 @@ export const BG_NEEDED_IN_OPTIONS = [
 export const BANKS = [
     { value: 'BGLIMIT_0771', label: 'BG Limit' },
     { value: 'AU_8316', label: 'AU 8316' },
+    { value: 'AU_5242', label: 'AU 5242' },
+    { value: 'AU_5180', label: 'AU 5180' },
+    { value: 'AU_5190', label: 'AU 5190' },
+    { value: 'AU_9589', label: 'AU 9589' },
     { value: 'YESBANK_2011', label: 'Yes Bank 2011' },
     { value: 'YESBANK_0771', label: 'Yes Bank 0771' },
     { value: 'HDFC_0026', label: 'HDFC Bank 0026' },
