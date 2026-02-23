@@ -617,9 +617,7 @@ export class CourierService {
             const existing = await this.findOne(id);
             if (!existing) throw new NotFoundException("Courier not found");
 
-            if (existing.userId !== userId) {
-                throw new ForbiddenException("Not authorized");
-            }
+            this.logger.debug("Courier found for deletion", { courierId: id, currentUser: userId });
 
             await this.db.delete(couriers).where(eq(couriers.id, id));
 

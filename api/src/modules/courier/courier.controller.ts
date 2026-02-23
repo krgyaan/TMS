@@ -28,6 +28,7 @@ import { CurrentUser } from "@/decorators/current-user.decorator";
 import { CreateDispatchSchema } from "./zod/dispatch-courier.schema";
 import { ZodValidationPipe } from "nestjs-zod";
 import { UpdateCourierStatusSchema } from "./zod/update-courier-status.schema";
+import { CanDelete } from "../auth/decorators";
 
 // Allowed file types
 const ALLOWED_MIME_TYPES = [
@@ -203,6 +204,7 @@ export class CourierController {
     }
 
     @Delete(":id")
+    @CanDelete("shared.couriers")
     delete(@Param("id", ParseIntPipe) id: number, @CurrentUser("id") userId: number) {
         return this.service.delete(id, userId);
     }
