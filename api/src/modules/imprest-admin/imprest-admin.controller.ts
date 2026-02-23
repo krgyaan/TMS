@@ -32,14 +32,45 @@ export class ImprestAdminController {
     // ========================
     // GET PAYMENT HISTORY (BY USER)
     // ========================
-    @Get("payment-history/:userId")
-    async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
-        // employee can only view their own history
-        // if (user.role === "employee" && user.id !== userId) {
-        //     throw new ForbiddenException("Access denied");
-        // }
+    // @Get("payment-history/:userId")
+    // async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
+    //     // employee can only view their own history
+    //     // if (user.role === "employee" && user.id !== userId) {
+    //     //     throw new ForbiddenException("Access denied");
+    //     // }
 
-        return this.service.getByUser(userId);
+    //     return this.service.getByUser(userId);
+    // }
+
+    @Get("payment-history")
+    async getPaymentHistory(@CurrentUser() user: any, @Query("userId") userId?: number) {
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
+
+        // 🔐 Admin / Accounts can see all or filter by user
+        if (canReadAll) {
+            return this.service.getPaymentHistory(userId);
+        }
+
+        // 👤 Employee can only see their own
+        return this.service.getPaymentHistory(user.sub);
+    }
+
+    @Delete("payment-history/:id")
+    @CanDelete("accounts.imprests")
+    async deletePaymentHistory(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: any) {
+        return this.service.deletePaymentHistory({
+            transactionId: id,
+            deletedBy: user.sub,
+        });
     }
 
     // ========================
@@ -48,28 +79,22 @@ export class ImprestAdminController {
 
     @Get("voucher")
     async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
-        const context: UserPermissionContext = {
-            userId: user.sub,
-            roleId: user.roleId,
-            roleName: user.role,
-            teamId: user.teamId,
-            dataScope: user.dataScope,
-        };
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
 
-        const canReadAll = await this.permissionService.hasPermission(context, { module: "accounts.imprests", action: "read" });
-
-        // 🔹 If user has read_all permission
         if (canReadAll) {
-            // If specific user requested → filter
-            if (userId) {
-                return this.service.listUserVouchers(userId);
-            }
-
-            // Otherwise → show all
-            return this.service.listAllVouchers();
+            return this.service.listVouchersRaw(userId);
         }
 
-        return this.service.listUserVouchers(user.sub);
+        return this.service.listVouchersRaw(user.sub);
     }
 
     // ========================
@@ -91,11 +116,30 @@ export class ImprestAdminController {
     // VIEW VOUCHER BY ID
     //=========================
 
-    @Get("voucher/view/:id")
-    async getVoucherById(@Param("id", ParseIntPipe) id: number, @Req() req) {
-        return this.service.getVoucherById({
+    @Get("voucher/view")
+    async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+        const parsedFrom = new Date(decodeURIComponent(from));
+        const parsedTo = new Date(decodeURIComponent(to));
+
+        if (isNaN(parsedFrom.getTime()) || isNaN(parsedTo.getTime())) {
+            throw new BadRequestException("Invalid date range");
+        }
+
+        return this.service.getVoucherByPeriod({
             user: req.user,
-            voucherId: Number(id),
+            userId,
+            from: parsedFrom,
+            to: parsedTo,
+        });
+    }
+
+    @Get("voucher/proofs")
+    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("year", ParseIntPipe) year: number, @Query("week", ParseIntPipe) week: number, @Req() req) {
+        return this.service.getVoucherProofs({
+            user: req.user,
+            userId,
+            year,
+            week,
         });
     }
 

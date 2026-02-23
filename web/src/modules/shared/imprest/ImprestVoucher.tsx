@@ -32,22 +32,42 @@ const ImprestVoucherList: React.FC = () => {
 
     // ✅ Fetch vouchers
     const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
+    console.log(rows);
 
     const actionItems = useMemo(
         () => [
             {
                 label: "View",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestVoucherRow) => navigate(paths.shared.imprestVoucherView(row.id)),
+                onClick: (row: ImprestVoucherRow) =>
+                    navigate(
+                        paths.shared.imprestVoucherView({
+                            userId: Number(row.beneficiaryId), // ✅ numeric
+                            from: row.validFrom,
+                            to: row.validTo,
+                        })
+                    ),
+            },
+            {
+                label: "View Proofs",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row: ImprestVoucherRow) =>
+                    navigate("/shared/imprests/voucher/proofs", {
+                        state: {
+                            proofs: row.proofs,
+                            beneficiaryName: row.beneficiaryName,
+                            period: {
+                                from: row.validFrom,
+                                to: row.validTo,
+                            },
+                        },
+                    }),
             },
         ],
         [navigate]
     );
-
     const columns = useMemo(
         () => [
-            { field: "voucherCode", headerName: "Voucher No" },
-
             // ✅ Employee / Beneficiary column
             { field: "beneficiaryName", headerName: "Employee" },
 
@@ -65,8 +85,8 @@ const ImprestVoucherList: React.FC = () => {
                         });
 
                     return `Year: ${p.data.year}
-Week: ${p.data.week}
-${formatDate(p.data.validFrom)} - ${formatDate(p.data.validTo)}`;
+                        Week: ${p.data.week}
+                        ${formatDate(p.data.validFrom)} - ${formatDate(p.data.validTo)}`;
                 },
             },
 
@@ -79,23 +99,43 @@ ${formatDate(p.data.validFrom)} - ${formatDate(p.data.validTo)}`;
             {
                 field: "accountantApproval",
                 headerName: "Accountant Approval",
-                cellRenderer: (p: any) =>
-                    p.value ? (
-                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
-                    ) : (
-                        <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
-                    ),
+                autoHeight: true,
+                cellRenderer: (p: any) => {
+                    const remark = p.data?.accountantRemark;
+
+                    return (
+                        <div className="flex flex-col gap-1">
+                            {p.value ? (
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded w-fit">Approved</span>
+                            ) : (
+                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded w-fit">Pending</span>
+                            )}
+
+                            {remark && <div className="text-xs text-muted-foreground font-semibold">{remark}</div>}
+                        </div>
+                    );
+                },
             },
 
             {
                 field: "adminApproval",
                 headerName: "Admin Approval",
-                cellRenderer: (p: any) =>
-                    p.value ? (
-                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Approved</span>
-                    ) : (
-                        <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Pending</span>
-                    ),
+                autoHeight: true,
+                cellRenderer: (p: any) => {
+                    const remark = p.data?.adminRemark;
+
+                    return (
+                        <div className="flex flex-col gap-1">
+                            {p.value ? (
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded w-fit">Approved</span>
+                            ) : (
+                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded w-fit">Pending</span>
+                            )}
+
+                            {remark && <div className="text-xs text-muted-foreground font-semibold">{remark}</div>}
+                        </div>
+                    );
+                },
             },
 
             {

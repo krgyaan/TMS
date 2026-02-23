@@ -35,13 +35,22 @@ const ImprestAdminIndex: React.FC = () => {
         userName: string;
     } | null>(null);
 
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
-    const { isAdmin, isSuperUser } = useAuth();
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
     console.log("Fetched employee imprest summary data:", data);
+
+    const canView = canRead("accounts.imprests");
+
+    useEffect(() => {
+        if (!canView) {
+            navigate(paths.shared.imprest);
+        }
+    }, [canView, navigate]);
 
     const imprestActions: ActionItem<EmployeeImprestSummary>[] = [
         {
@@ -52,7 +61,7 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestPaymentHistory(row.userId)),
+            onClick: row => navigate(paths.shared.imprestPaymentHistoryByUser(row.userId)),
         },
         {
             label: "Voucher",
@@ -270,9 +279,13 @@ const ImprestAdminIndex: React.FC = () => {
                             className="w-64"
                         />
 
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistory)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Payment History
+                        </Button>
                         <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
                             <Plus className="h-4 w-4 mr-2" />
-                            View All Vouchers
+                            All Vouchers
                         </Button>
                     </div>
                 </CardHeader>

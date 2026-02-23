@@ -38,6 +38,8 @@ import {
     Info,
 } from "lucide-react";
 import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 /* ================================
    HELPERS
@@ -71,10 +73,11 @@ const formatLabel = (label: string) => {
 ================================ */
 
 export default function TenderExecutivePerformance() {
-    const [userId, setUserId] = useState<number | null>(15);
-    const [fromDate, setFromDate] = useState<string | null>("2025-10-01");
-    const [toDate, setToDate] = useState<string | null>("2025-10-30");
+    const [userId, setUserId] = useState<number | null>();
+    const [fromDate, setFromDate] = useState<string | null>();
+    const [toDate, setToDate] = useState<string | null>();
     const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
+    const navigate = useNavigate();
 
     const { data: users } = useUsersByRole(5);
 
@@ -286,7 +289,7 @@ export default function TenderExecutivePerformance() {
 
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Select value={userId ? userId.toString() : undefined} onValueChange={v => setUserId(Number(v))}>
@@ -316,9 +319,6 @@ export default function TenderExecutivePerformance() {
                                     <Input type="date" className="pl-9" value={toDate ?? ""} onChange={e => setToDate(e.target.value || null)} />
                                 </div>
                             </div>
-                            <Button className="w-full md:w-auto">
-                                <Filter className="mr-2 h-4 w-4" /> Apply Filters
-                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -337,6 +337,56 @@ export default function TenderExecutivePerformance() {
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">{POST_BID_KPIS.map(renderKpiCard)}</div>
                     </div>
                 </div>
+
+                {/* ===== TENDER LIST TABLE ===== */}
+                <Card className="shadow-sm border-0 ring-1 ring-border/50">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                        <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                {[...PRE_BID_KPIS, ...POST_BID_KPIS].find(k => k.key === selectedMetric)?.label ?? "All"} Tenders
+                                <Badge variant="secondary">{tenders.length}</Badge>
+                            </CardTitle>
+                        </div>
+                        <div className="relative w-64 hidden sm:block">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search tenders..." className="pl-8 h-9" />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead>Tender No</TableHead>
+                                    <TableHead>Organization</TableHead>
+                                    <TableHead>Tender Name</TableHead>
+                                    <TableHead className="text-right">Value</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {tenders.map(tender => (
+                                    <TableRow key={tender.id}>
+                                        <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
+                                        <TableCell>{tender.organizationName}</TableCell>
+                                        <TableCell className="max-w-[300px] truncate" title={tender.tenderName}>
+                                            {tender.tenderName}
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={tender.status === "Won" ? "default" : tender.status === "Lost" ? "destructive" : "secondary"}>{tender.status}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(paths.tendering.tenderView(tender.id))}>
+                                                <Eye className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
 
                 {/* ===== STAGE MATRIX / KANBAN METRICS ===== */}
                 <div className="space-y-4">
@@ -593,56 +643,6 @@ export default function TenderExecutivePerformance() {
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* ===== TENDER LIST TABLE ===== */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
-                        <div>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                {[...PRE_BID_KPIS, ...POST_BID_KPIS].find(k => k.key === selectedMetric)?.label ?? "All"} Tenders
-                                <Badge variant="secondary">{tenders.length}</Badge>
-                            </CardTitle>
-                        </div>
-                        <div className="relative w-64 hidden sm:block">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search tenders..." className="pl-8 h-9" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Tender No</TableHead>
-                                    <TableHead>Organization</TableHead>
-                                    <TableHead>Tender Name</TableHead>
-                                    <TableHead className="text-right">Value</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tenders.map(tender => (
-                                    <TableRow key={tender.id}>
-                                        <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
-                                        <TableCell>{tender.organizationName}</TableCell>
-                                        <TableCell className="max-w-[300px] truncate" title={tender.tenderName}>
-                                            {tender.tenderName}
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={tender.status === "Won" ? "default" : tender.status === "Lost" ? "destructive" : "secondary"}>{tender.status}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                <Eye className="h-4 w-4 text-muted-foreground" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
             </div>
         </div>
     );

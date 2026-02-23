@@ -1,6 +1,6 @@
 // ImprestEmployeeDashboard.tsx
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { data, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,23 +8,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft, Pencil } from "lucide-react";
 
-import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "./imprest.hooks";
+import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest } from "./imprest.hooks";
 
-import type { ImprestRow } from "./imprest.types";
+import type { ImprestProof, ImprestRow, ProofItem } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import type { GridApi } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser } from "@/hooks/api/useUsers";
+import SelectField from "@/components/form/SelectField";
+import { imprestCategoriesKey, useImprestCategories } from "@/hooks/api/useImprestCategories";
+import { useProjectOptions } from "@/hooks/useSelectOptions";
+import SelectInput from "@/components/SelectInput";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -106,15 +109,24 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
+//pdf helpers
+const isPdf = (file: string) => file.toLowerCase().endsWith(".pdf");
+
+const fileUrl = (file: string) => `/uploads/employeeimprest/${file}`;
+
 const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user, hasPermission, canUpdate } = useAuth();
+    const { user, hasPermission, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
     const [isMobile, setIsMobile] = useState(false);
 
+    const projectOptions = useProjectOptions();
+    const { data: imprestCategories = [] } = useImprestCategories();
+
     let userDetails = null;
 
-    const canMutateStatus = canUpdate("shared.imprests");
+    const canMutateStatus = canUpdate("accounts.imprests");
+    const canDeleteStatus = canDelete("accounts.imprests");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
 
@@ -146,6 +158,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const { data, isLoading, error } = useImprestList(numericUserId);
 
+    console.log("invoiceProof", data?.invoiceProof);
+
     const summary = data?.summary;
     console.log("summary", { summary });
     const rows = data?.imprests ?? [];
@@ -159,8 +173,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const MOBILE_PAGE_SIZE = 10;
 
     const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
-    const [lightboxOpen, setLightboxOpen] = useState(false);
-    const [lightboxSlides, setLightboxSlides] = useState<{ src: string }[]>([]);
+    const [proofModalOpen, setProofModalOpen] = useState(false);
+    const [proofs, setProofs] = useState<ProofItem[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
@@ -170,6 +185,10 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
     const [remarkText, setRemarkText] = useState("");
+
+    const [editOpen, setEditOpen] = useState(false);
+    const [editRow, setEditRow] = useState<ImprestRow | null>(null);
+    const updateImprestMutation = useUpdateImprest();
 
     /* -------------------- HANDLERS -------------------- */
 
@@ -225,9 +244,56 @@ const ImprestEmployeeDashboard: React.FC = () => {
         setRemarkOpen(false);
     };
 
-    const openLightboxForRow = (row: ImprestRow) => {
-        setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employeeimprest/${filename}` })));
-        setLightboxOpen(true);
+    const openEditModal = (row: ImprestRow) => {
+        setEditRow(row);
+        setEditOpen(true);
+    };
+
+    const submitEditImprest = (e?: React.FormEvent) => {
+        e?.preventDefault();
+
+        if (!editRow) return;
+
+        updateImprestMutation.mutate(
+            {
+                id: editRow.id,
+                data: {
+                    partyName: editRow.partyName?.trim() || null,
+                    projectName: editRow.projectName || null,
+                    categoryId: typeof editRow.categoryId === "number" ? editRow.categoryId : null,
+                    teamId: typeof editRow.teamId === "number" ? editRow.teamId : null,
+                    amount: Number(editRow.amount) || 0,
+                    remark: editRow.remark?.trim() || null,
+                },
+            },
+            {
+                onSuccess: () => {
+                    setEditOpen(false);
+                    setEditRow(null);
+                },
+            }
+        );
+    };
+
+    const openProofModal = (row: ImprestRow) => {
+        if (!Array.isArray(row.invoiceProof)) return;
+
+        const mapped: ProofItem[] = row.invoiceProof
+            .filter(file => typeof file === "string")
+            .map(file => ({
+                type: isPdf(file) ? "pdf" : "image",
+                url: fileUrl(file),
+                name: file,
+            }));
+
+        if (mapped.length === 0) {
+            alert("No proofs available.");
+            return;
+        }
+
+        setProofs(mapped);
+        setCurrentIndex(0);
+        setProofModalOpen(true);
     };
 
     /* -------------------- EXCEL -------------------- */
@@ -325,7 +391,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openLightboxForRow(row)}>
+                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openProofModal(row)}>
                                         <Eye className="h-3.5 w-3.5" />
                                         {row.invoiceProof.length}
                                     </button>
@@ -387,7 +453,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
+                            {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {canDeleteStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
                     );
                 },
@@ -417,7 +484,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                     <span>{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
 
                     {proofCount > 0 && (
-                        <button onClick={() => openLightboxForRow(row)} className="flex items-center gap-1 text-primary">
+                        <button onClick={() => openProofModal(row)} className="flex items-center gap-1 text-primary">
                             <Eye className="h-3.5 w-3.5" />
                             {proofCount} proof{proofCount > 1 && "s"}
                         </button>
@@ -511,6 +578,11 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Vouchers
+                                </Button>
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId))}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    View Payment History
                                 </Button>
 
                                 <Button variant="outline" size="sm" onClick={exportExcel}>
@@ -735,8 +807,169 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Lightbox */}
-            {lightboxOpen && <Lightbox open close={() => setLightboxOpen(false)} slides={lightboxSlides} />}
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Imprest</DialogTitle>
+                        <DialogDescription>Update imprest details before approval.</DialogDescription>
+                    </DialogHeader>
+
+                    {editRow && (
+                        <form onSubmit={submitEditImprest} className="space-y-4">
+                            {/* Party Name */}
+                            <Input
+                                value={editRow.partyName ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        partyName: e.target.value,
+                                    })
+                                }
+                                placeholder="Party Name"
+                            />
+
+                            <SelectInput
+                                label="Select Project"
+                                placeholder="-- Select Project --"
+                                value={editRow.projectName ?? ""}
+                                options={projectOptions}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        projectName: val,
+                                    })
+                                }
+                            />
+
+                            <SelectInput
+                                label="Select Category"
+                                placeholder="-- Select Category --"
+                                value={String(editRow.categoryId ?? "")}
+                                options={imprestCategories.map(i => ({
+                                    id: String(i.id),
+                                    name: i.name,
+                                }))}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        categoryId: Number(val),
+                                    })
+                                }
+                            />
+
+                            {/* Amount */}
+                            <Input
+                                type="number"
+                                value={editRow.amount}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        amount: Number(e.target.value),
+                                    })
+                                }
+                                placeholder="Amount"
+                            />
+
+                            {/* Remark */}
+                            <Textarea
+                                value={editRow.remark ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        remark: e.target.value,
+                                    })
+                                }
+                                placeholder="Remark"
+                            />
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                                    Cancel
+                                </Button>
+
+                                <Button type="submit">Save Changes</Button>
+                            </div>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={proofModalOpen} onOpenChange={setProofModalOpen}>
+                <DialogContent
+                    className="
+        max-w-none w-screen h-screen
+        p-0
+        overflow-hidden
+        flex flex-col
+        [&>[data-radix-dialog-close]]:hidden
+    "
+                    aria-describedby={undefined}
+                >
+                    {/* Accessibility (required by Radix) */}
+                    <DialogTitle className="sr-only">Proof Viewer</DialogTitle>
+                    <DialogDescription className="sr-only">View uploaded proof documents</DialogDescription>
+
+                    {/* Top Bar */}
+                    <div className="flex items-center justify-between h-14 px-4 border-b bg-background">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{proofs[currentIndex]?.name ?? "Document"}</p>
+                            <p className="text-xs text-muted-foreground">{proofs.length ? `${currentIndex + 1} of ${proofs.length}` : ""}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {proofs[currentIndex]?.url && (
+                                <Button variant="outline" size="sm" onClick={() => window.open(proofs[currentIndex].url, "_blank", "noopener,noreferrer")}>
+                                    Open in new tab
+                                </Button>
+                            )}
+
+                            <Button variant="ghost" size="icon" onClick={() => setProofModalOpen(false)} aria-label="Close">
+                                ✕
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Viewer */}
+                    <div className="flex-1 w-full bg-muted/30">
+                        {proofs[currentIndex] ? (
+                            proofs[currentIndex].type === "image" ? (
+                                <div className="w-full h-full flex items-center justify-center overflow-auto">
+                                    <img src={proofs[currentIndex].url} alt={proofs[currentIndex].name} className="max-w-full max-h-full object-contain bg-white" />
+                                </div>
+                            ) : (
+                                <iframe src={proofs[currentIndex].url} title={proofs[currentIndex].name} className="w-full h-full border-0 bg-white" />
+                            )
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No preview available</div>
+                        )}
+                    </div>
+
+                    {/* Navigation */}
+                    {proofs.length > 1 && (
+                        <div className="pointer-events-none absolute inset-y-14 left-0 right-0 flex items-center justify-between px-4">
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                className="pointer-events-auto shadow"
+                                disabled={currentIndex === 0}
+                                onClick={() => setCurrentIndex(i => i - 1)}
+                            >
+                                ‹
+                            </Button>
+
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                className="pointer-events-auto shadow"
+                                disabled={currentIndex === proofs.length - 1}
+                                onClick={() => setCurrentIndex(i => i + 1)}
+                            >
+                                ›
+                            </Button>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };

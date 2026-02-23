@@ -8,16 +8,6 @@ export interface EmployeeImprestSummary {
     amountLeft: number;
 }
 
-export interface ImprestPaymentHistoryRow {
-    id: number;
-    userId: number;
-
-    teamMemberName: string;
-    date: string; // ISO date
-    amount: number;
-    projectName: string | null;
-}
-
 export interface CreateImprestCreditPayload {
     userId: number;
     txnDate: string;

@@ -51,10 +51,10 @@ import { toast } from "sonner";
 const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "Twice a day",
+    4: "Weekly",
+    5: "Biweekly",
+    6: "Stop",
 };
 
 const STOP_REASON_LABELS: Record<number, string> = {
@@ -781,8 +781,8 @@ const FollowupPage: React.FC = () => {
                                         ? "This will mark the follow-up as successfully achieved."
                                         : "This action will stop all future follow-ups."
                                     : date
-                                    ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
-                                    : "Select a date for the next follow-up."}
+                                      ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
+                                      : "Select a date for the next follow-up."}
                             </p>
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 <Button

@@ -131,7 +131,6 @@ export const paths = {
     accounts: {
         imprests: "/accounts/imprests",
         imprestsUserView: (id: number) => `/accounts/imprests/user/${id}`,
-        imprestPaymentHistory: (id: number) => `/accounts/imprests/payment-history/${id}`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
         accountChecklists: "/accounts/account-checklists",
@@ -268,9 +267,14 @@ export const paths = {
         imprest: "/shared/imprests",
         imprestUser: (id: number) => `/shared/imprests/user/${id}`,
         imprestCreate: "/shared/imprests/create",
+        imprestPaymentHistory: "/shared/imprests/payment-history",
+        imprestPaymentHistoryByUser: (id: number) => `/shared/imprests/payment-history?userId=${id}`,
+
         imprestVoucher: "/shared/imprests/voucher",
         imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
-        imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
+
+        imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
+            `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
     },
 
     // ==================== DOCUMENT DASHBOARD ====================
