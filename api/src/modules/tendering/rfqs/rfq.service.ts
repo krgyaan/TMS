@@ -145,10 +145,8 @@ export class RfqsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderInfos.rfqTo), // NOT NULL
+            inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
             ne(tenderInfos.rfqTo, ""), // NOT empty string
-            ne(tenderInfos.rfqTo, "0"), // NOT '0'
-            ne(tenderInfos.rfqTo, "1"), // NOT '1'
         ];
 
         // Apply role-based filtering
@@ -261,6 +259,7 @@ export class RfqsService {
                 rfqTo: tenderInfos.rfqTo,
                 dueDate: tenderInfos.dueDate,
                 rfqId: rfqs.id,
+                rfqRequired: tenderInfos.rfqRequired,
                 vendorOrganizationIds: tenderInfos.rfqTo || null,
                 rfqCount: sql<number>`(SELECT count(*)::int FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
             })
@@ -701,26 +700,15 @@ export class RfqsService {
     /**
      * Get counts for all RFQ dashboard tabs
      */
-    async getDashboardCounts(
-        user?: ValidatedUser,
-        teamId?: number
-    ): Promise<{
-        pending: number;
-        sent: number;
-        "rfq-rejected": number;
-        "tender-dnb": number;
-        total: number;
-    }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; "rfq-rejected": number; "tender-dnb": number; total: number }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(tenderInfos.rfqTo),
-            ne(tenderInfos.rfqTo, "0"),
-            ne(tenderInfos.rfqTo, ""),
-            ...roleFilterConditions,
+            inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
+            ne(tenderInfos.rfqTo, ""), // NOT empty string
         ];
 
         // Count pending: status = 3, rfqId IS NULL

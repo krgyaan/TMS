@@ -243,7 +243,6 @@ export class TenderApprovalService {
             .offset(offset);
         // Execute query
         const rows = (await query) as unknown as TenderRow[];
-        console.log("rows", rows);
 
         // Get total count
         let countQuery: any = this.db
