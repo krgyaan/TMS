@@ -86,20 +86,57 @@ function mapStatusToKpi(statusCode: number): TenderKpiBucket {
 
 type EmdFinancialState = "LOCKED" | "RETURNED" | "SETTLED";
 
-function resolveEmdStateFromStatus(status: string | null): EmdFinancialState {
-    if (!status) return "LOCKED";
+function resolveEmdStateFromAction(instrumentType: number, action: number | null): EmdFinancialState {
+    switch (instrumentType) {
+        // ==========================
+        // DEMAND DRAFT (DD)
+        // ==========================
+        case 1: {
+            if (action === 3 || action === 4) return "RETURNED";
+            if (action === 5) return "SETTLED";
+            return "LOCKED";
+        }
 
-    const s = status.toUpperCase();
+        // ==========================
+        // FDR
+        // ==========================
+        case 2: {
+            if (action === 3 || action === 4) return "RETURNED";
+            if (action === 5) return "SETTLED";
+            return "LOCKED";
+        }
 
-    if (s.includes("RETURN") || s.includes("BANK_RETURN") || s.includes("COURIER_RETURN")) {
-        return "RETURNED";
+        // ==========================
+        // BANK GUARANTEE (BG)
+        // ==========================
+        case 4: {
+            if (action === 6) return "RETURNED";
+            // BG cancellations do NOT refund → treated as settled/closed
+            if (action === 7 || action === 8 || action === 9) return "SETTLED";
+            return "LOCKED";
+        }
+
+        // ==========================
+        // BANK TRANSFER (BT)
+        // ==========================
+        case 5: {
+            if (action === 3) return "RETURNED";
+            if (action === 4) return "SETTLED";
+            return "LOCKED";
+        }
+
+        // ==========================
+        // PAY ON PORTAL (POP)
+        // ==========================
+        case 6: {
+            if (action === 3) return "RETURNED";
+            if (action === 4) return "SETTLED";
+            return "LOCKED";
+        }
+
+        default:
+            return "LOCKED";
     }
-
-    if (s.includes("SETTLED") || s.includes("CANCELLED")) {
-        return "SETTLED";
-    }
-
-    return "LOCKED";
 }
 
 @Injectable()
@@ -1117,7 +1154,7 @@ export class TenderExecutiveService {
         const result = this.emptyEmdBalance();
 
         for (const r of rows) {
-            const stateAtTo = resolveEmdStateFromStatus(r.status);
+            const stateAtTo = resolveEmdStateFromAction(r.instrumentType, r.action);
 
             const meta = {
                 tenderId: r.tenderId,
