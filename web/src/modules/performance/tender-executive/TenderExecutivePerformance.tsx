@@ -40,6 +40,8 @@ import {
 import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import { StageBacklogTable } from "./components/StageBacklogTable";
+import { EmdBalanceTable } from "./components/EmdBalanceTable";
 
 /* ================================
    HELPERS
@@ -322,6 +324,12 @@ export default function TenderExecutivePerformance() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* ===== STAGE BACKLOG ===== */}
+                <StageBacklogTable userId={userId} fromDate={fromDate} toDate={toDate} />
+
+                {/* ===== EMD BACKLOG ===== */}
+                <EmdBalanceTable userId={userId} fromDate={fromDate} toDate={toDate} />
 
                 {/* ===== KPI CARDS ===== */}
                 <div className="space-y-6">

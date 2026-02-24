@@ -4,6 +4,8 @@ import { PerformanceQuerySchema, PerformanceQueryDto } from "./zod/performance-q
 import { z } from "zod";
 import { Public } from "@/modules/auth/decorators";
 import { TenderListQuerySchema } from "./zod/tender.dto";
+import { StageBacklogQuerySchema } from "./zod/stage-backlog-query.dto";
+import { EmdBalanceQuerySchema } from "./zod/emd-balance-query.dto";
 
 @Controller("performance/tender-executive")
 export class TenderExecutiveController {
@@ -72,5 +74,19 @@ export class TenderExecutiveController {
     async getScoring(@Query() query: unknown) {
         const parsed = PerformanceQuerySchema.parse(query);
         return this.tenderExecutiveService.getScoring(parsed);
+    }
+
+    @Public()
+    @Get("stage-backlog")
+    async getStageBacklog(@Query() query: unknown) {
+        const parsed = StageBacklogQuerySchema.parse(query);
+        return this.tenderExecutiveService.getStageBacklog(parsed);
+    }
+
+    @Public()
+    @Get("emd-balance")
+    async getEmdBalance(@Query() query: unknown) {
+        const parsed = EmdBalanceQuerySchema.parse(query);
+        return this.tenderExecutiveService.getEmdBalance(parsed);
     }
 }

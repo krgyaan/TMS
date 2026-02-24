@@ -1,5 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { getPerformanceSummary, getPerformanceOutcomes, getStageMatrix, getTenderList, getPerformanceTrends, getExecutiveScoring } from "./tender-executive.api";
+import {
+    getPerformanceSummary,
+    getPerformanceOutcomes,
+    getStageMatrix,
+    getTenderList,
+    getPerformanceTrends,
+    getExecutiveScoring,
+    getExecutiveBacklog,
+    getEmdBalance,
+} from "./tender-executive.api";
 import type { PerformanceQuery } from "./tender-executive.types";
 
 export const performanceKeys = {
@@ -63,3 +72,19 @@ export const useExecutiveScoring = (query: PerformanceQuery) =>
         queryFn: () => getExecutiveScoring(query),
         enabled: !!query.userId,
     });
+
+export function useStageBacklog(query: any) {
+    return useQuery({
+        queryKey: ["stage-backlog", query],
+        queryFn: () => getExecutiveBacklog(query),
+        enabled: !!query.userId,
+    });
+}
+
+export function useEmdBalance(query: any) {
+    return useQuery({
+        queryKey: ["emd-balance", query],
+        queryFn: () => getEmdBalance(query),
+        enabled: !!query.userId,
+    });
+}

@@ -123,6 +123,15 @@ export const STAGE_CONFIG: StageConfig[] = [
     },
 
     {
+        stageKey: "tender_approval",
+        timerName: "tender_approval",
+        type: "timer",
+        isApplicable: () => true,
+        resolveDeadline: tender => tender.dueDate,
+        tlStage: true,
+    },
+
+    {
         stageKey: "rfq",
         timerName: "rfq",
         type: "timer",
@@ -150,15 +159,6 @@ export const STAGE_CONFIG: StageConfig[] = [
     },
 
     {
-        stageKey: "costing_sheet",
-        timerName: "costing_sheet",
-        type: "timer",
-        isApplicable: () => true,
-        resolveDeadline: tender => tender.dueDate,
-        tlStage: false,
-    },
-
-    {
         stageKey: "document_checklist",
         timerName: "document_checklist",
         type: "timer",
@@ -167,6 +167,22 @@ export const STAGE_CONFIG: StageConfig[] = [
         tlStage: false,
     },
 
+    {
+        stageKey: "costing_sheet",
+        timerName: "costing_sheet",
+        type: "timer",
+        isApplicable: () => true,
+        resolveDeadline: tender => tender.dueDate,
+        tlStage: false,
+    },
+    {
+        stageKey: "costing_sheet_approval",
+        timerName: "costing_sheet_approval",
+        type: "timer",
+        isApplicable: () => true,
+        resolveDeadline: tender => tender.dueDate,
+        tlStage: true,
+    },
     {
         stageKey: "bid_submission",
         timerName: "bid_submission",
@@ -177,23 +193,7 @@ export const STAGE_CONFIG: StageConfig[] = [
     },
 
     //============= TL - STAGES =================
-    {
-        stageKey: "tender_approval",
-        timerName: "tender_approval",
-        type: "timer",
-        isApplicable: () => true,
-        resolveDeadline: tender => tender.dueDate,
-        tlStage: true,
-    },
 
-    {
-        stageKey: "costing_sheet_approval",
-        timerName: "costing_sheet_approval",
-        type: "timer",
-        isApplicable: () => true,
-        resolveDeadline: tender => tender.dueDate,
-        tlStage: true,
-    },
     // ============================================
 
     // ===== NON-TIMER STAGES =====

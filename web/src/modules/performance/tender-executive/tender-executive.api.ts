@@ -33,3 +33,14 @@ export const getExecutiveScoring = async (params: PerformanceQuery): Promise<Exe
     const res = await api.get("/performance/tender-executive/scoring", { params });
     return res.data;
 };
+
+export const getExecutiveBacklog = async (params: PerformanceQuery): Promise<ExecutiveScoring> => {
+    const res = await api.get("/performance/tender-executive/stage-backlog", { params });
+    return res.data;
+};
+
+export const getEmdBalance = async (params: PerformanceQuery): Promise<ExecutiveScoring> => {
+    const res = await api.get("/performance/tender-executive/emd-balance", { params });
+    console.log("EMD Balance API Response:", res.data);
+    return res.data;
+};
