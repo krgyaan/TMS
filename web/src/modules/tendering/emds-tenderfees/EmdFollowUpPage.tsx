@@ -8,16 +8,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Form } from "@/components/ui/form";
 import { usePaymentRequest } from "@/hooks/api/useEmds";
 import { useTender } from "@/hooks/api/useTenders";
 import { ContactPersonSchema } from "@/modules/shared/follow-up/follow-up.types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
-import { Form, useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import z from "zod";
+
+// Move schema outside component to prevent recreation on every render
+const EmdFollowupSchema = z.object({
+    area: z.string(),
+    followupFor: z.string(),
+    assignedToId: z.number(),
+    createdById: z.number(),
+    organization: z.string().optional(),
+    contacts: z.array(ContactPersonSchema).optional(),
+    startFrom: z.string().optional(),
+    comment: z.string().optional(),
+    assignmentStatus: z.string().optional(),
+    frequency: z.number().int().min(1).max(6).optional(),
+    stop_reason: z.number().int().min(1).max(4).optional().nullable(),
+    proof_text: z.string().optional().nullable(),
+    stop_remarks: z.string().optional().nullable(),
+    proof_image: z.any().optional(),
+});
+
+type EmdFollowupForm = z.infer<typeof EmdFollowupSchema>;
 
 function mapInstrumentTypeToMode(instrumentType: string | null): string | undefined {
     if (!instrumentType) return undefined;
@@ -36,89 +57,39 @@ const EmdFollowUpPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
 
-    if (!id) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>EMD ID is required</AlertDescription>
-            </Alert>
-        );
-    }
-
+    // All hooks must be called unconditionally at the top level
     const { data: paymentRequests, isLoading, error } = usePaymentRequest(id ? Number(id) : null);
 
-    if (isLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                </CardHeader>
-            </Card>
-        );
-    }
-    if (error) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Failed to load EMD</AlertDescription>
-            </Alert>
-        );
-    }
+    // Always call useTender - pass null when not ready
+    const tenderId = paymentRequests?.tenderId ?? null;
+    const { data: tender } = useTender(tenderId && tenderId > 0 ? tenderId : null);
 
-    let tender = null;
-    let tenderData = paymentRequests.tenderId > 0 ? useTender(paymentRequests.tenderId) : null;
-    if (tenderData) {
-        tender = tenderData.data;
-    }
-
-    const { emdData } = useMemo(() => {
+    // Compute emdData (kept for future use if needed)
+    const emdData = useMemo(() => {
         if (!paymentRequests) {
-            return { emdData: undefined, requestId: undefined };
+            return undefined;
         }
 
-        const emdData: any = {
-            emdMode: undefined,
-            emdAmount: 0,
-            requestId: null,
-        };
-
         const instrument = paymentRequests.instruments?.[0];
-        if (!instrument) return { emdData: undefined };
+        if (!instrument) return undefined;
 
         const mode = mapInstrumentTypeToMode(instrument.instrumentType);
 
         if (paymentRequests.purpose === 'EMD') {
-            emdData.emdMode = mode;
-            emdData.emdAmount = paymentRequests.amountRequired;
-            emdData.requestId = id
+            return {
+                emdMode: mode,
+                emdAmount: paymentRequests.amountRequired,
+                requestId: id,
+            };
         }
 
-        return { emdData };
-    }, [paymentRequests]);
-
-    const EmdFollowupSchema = z.object({
-        area: z.string(),
-        followupFor: z.string(),
-        assignedToId: z.number(),
-        createdById: z.number(),
-        organization: z.string().optional(),
-        contacts: z.array(ContactPersonSchema).optional(),
-        startFrom: z.string().optional(),
-        comment: z.string().optional(),
-        assignmentStatus: z.string().optional(),
-        frequency: z.number().int().min(1).max(6).optional(),
-        stop_reason: z.number().int().min(1).max(4).optional().nullable(),
-        proof_text: z.string().optional().nullable(),
-        stop_remarks: z.string().optional().nullable(),
-        proof_image: z.any().optional(), // File
-    })
-
-    type EmdFollowupForm = z.infer<typeof EmdFollowupSchema>;
+        return undefined;
+    }, [paymentRequests, id]);
 
     const form = useForm<EmdFollowupForm>({
         resolver: zodResolver(EmdFollowupSchema) as Resolver<EmdFollowupForm>,
         defaultValues: {
-            area: tender?.team == 1 ? 'AC Team' : 'DC Team',
+            area: '',
             followupFor: 'Emd Refund',
             organization: '',
             assignedToId: 0,
@@ -130,6 +101,14 @@ const EmdFollowUpPage = () => {
             contacts: [],
         },
     });
+
+    // Update form values when tender data loads
+    useEffect(() => {
+        if (tender) {
+            form.setValue('area', tender.team === 1 ? 'AC Team' : 'DC Team');
+        }
+    }, [tender, form]);
+
     const isSubmitting = form.formState.isSubmitting;
 
     const handleSubmit = async (values: EmdFollowupForm) => {
@@ -138,14 +117,16 @@ const EmdFollowUpPage = () => {
 
             Object.entries(values).forEach(([key, value]) => {
                 // Skip follow-up fields - handled by different service
-                if (key === 'contacts' ||
+                if (
+                    key === 'contacts' ||
                     key === 'organization' ||
                     key === 'startFrom' ||
                     key === 'frequency' ||
                     key === 'stop_reason' ||
                     key === 'proof_text' ||
                     key === 'stop_remarks' ||
-                    key === 'proof_image') {
+                    key === 'proof_image'
+                ) {
                     return;
                 }
 
@@ -172,6 +153,9 @@ const EmdFollowUpPage = () => {
                 }
             });
 
+            // TODO: Add actual API call here
+            // await submitEmdFollowUp(formData);
+
             toast.success('Action submitted successfully');
             navigate(-1);
             form.reset();
@@ -179,12 +163,49 @@ const EmdFollowUpPage = () => {
             toast.error(error?.message || 'Failed to submit action');
             console.error('Error submitting action:', error);
         }
+    };
+
+    // Conditional renders AFTER all hooks
+    if (!id) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>EMD ID is required</AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                </CardHeader>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Failed to load EMD</AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (!paymentRequests) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>No payment request data found</AlertDescription>
+            </Alert>
+        );
     }
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-
                 {/* Initiate Followup */}
                 <div className="space-y-4 border rounded-lg p-4">
                     <h4 className="font-semibold text-base">Initiate Followup</h4>
@@ -215,7 +236,12 @@ const EmdFollowUpPage = () => {
                 </div>
 
                 <div className="flex justify-end gap-4 pt-4">
-                    <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate(-1)}
+                        disabled={isSubmitting}
+                    >
                         Cancel
                     </Button>
                     <Button type="submit" disabled={isSubmitting}>
@@ -224,7 +250,7 @@ const EmdFollowUpPage = () => {
                 </div>
             </form>
         </Form>
-    )
-}
+    );
+};
 
-export default EmdFollowUpPage
+export default EmdFollowUpPage;
