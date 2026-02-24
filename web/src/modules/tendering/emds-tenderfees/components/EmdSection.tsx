@@ -375,7 +375,7 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                                 )
                             }
                             <FieldWrapper control={control} name="emd.details.chequeFavouring" label="Cheque in Favour of *">
-                                {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
+                                {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
                             </FieldWrapper>
                             <FieldWrapper control={control} name="emd.details.chequeDate" label="Cheque Date *">
                                 {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}

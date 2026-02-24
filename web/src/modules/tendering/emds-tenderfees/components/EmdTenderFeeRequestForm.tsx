@@ -189,8 +189,6 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                 <AlertDescription>Tender not found</AlertDescription>
             </Alert>
         );
-    } else {
-        console.log(tender);
     }
 
     const emdAmount = Number(tender.emd) || 0;
