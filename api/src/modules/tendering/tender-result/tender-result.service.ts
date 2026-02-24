@@ -753,7 +753,7 @@ export class TenderResultService {
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
-                cc: [{ type: 'user', userId: tender.teamMember }],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
             }
         );
     }
