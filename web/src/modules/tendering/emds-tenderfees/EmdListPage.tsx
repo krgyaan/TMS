@@ -5,7 +5,7 @@ import DataTable from "@/components/ui/data-table";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw, Search } from "lucide-react";
+import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -101,133 +101,33 @@ const EmdsAndTenderFeesPage = () => {
     const counts = dashboardData?.counts || countsFromHook;
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
 
-    const pendingColDefs = useMemo<ColDef<PendingTenderRowWithTimer>[]>(() => [
-        tenderNameCol<PendingTenderRowWithTimer>('tenderNo', {
+    const columnDefs = useMemo<ColDef<any>[]>(() => {
+        const isPendingTab = activeTab === 'pending' || activeTab === 'tender-dnb';
+
+        // ─── Shared columns ───
+        const tenderDetailsCol = tenderNameCol<any>('tenderNo', {
             headerName: 'Tender Details',
             filter: true,
-            width: 200,
-        }),
-        {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            width: 130,
-            cellRenderer: (params: any) => {
-                return <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>;
-            },
-            sortable: true,
-        },
-        {
-            field: 'emd',
-            colId: 'emd',
-            headerName: 'EMD',
-            width: 100,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.emdMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-            sortable: true,
-        },
-        {
-            field: 'tenderFee',
-            colId: 'tenderFee',
-            headerName: 'Tender Fee',
-            width: 120,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.tenderFeeMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-            sortable: true,
-        },
-        {
-            field: 'processingFee',
-            colId: 'processingFee',
-            headerName: 'Processing Fee',
-            width: 140,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.processingFeeMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-            sortable: true,
-        },
-        {
+            width: isPendingTab ? 200 : 250,
+        });
+
+        const teamMemberCol: ColDef<any> = {
             field: 'teamMember',
             headerName: 'Member',
-            width: 150,
+            width: isPendingTab ? 150 : 140,
             cellRenderer: (params: any) =>
                 params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
-        },
-        {
-            field: 'dueDate',
-            colId: 'dueDate',
-            headerName: 'Due Date',
-            width: 140,
-            cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400">—</span>;
-                const dueDate = new Date(params.value);
-                const isOverdue = dueDate < new Date();
-                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-                return (
-                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
-                        {formatDateTime(params.value)}
-                    </span>
-                );
-            },
-            sortable: true,
-        },
-        {
-            field: 'statusName',
-            headerName: 'Status',
-            width: 150,
-            cellRenderer: (params: any) => {
-                return <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>{params.value}</Badge>;
-            },
-        },
-        {
+        };
+
+        const timerCol: ColDef<any> = {
             field: 'timer',
             headerName: 'Timer',
             width: 110,
             cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
+                const timer = params.data?.timer;
                 if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
+                    return <TenderTimerDisplay remainingSeconds={0} status="NOT_STARTED" />;
                 }
-
                 return (
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
@@ -235,142 +135,152 @@ const EmdsAndTenderFeesPage = () => {
                     />
                 );
             },
-        },
-        {
-            headerName: '',
-            filter: false,
-            sortable: false,
-            width: 57,
-            cellRenderer: (params: any) => {
-                const actions: ActionItem<PendingTenderRowWithTimer>[] = [
-                    {
-                        label: 'Change Status',
-                        icon: <RefreshCw className="w-4 h-4" />,
-                        onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
+        };
+
+        // ─── Pending / DNB specific columns ───
+        if (isPendingTab) {
+            const actionCol: ColDef<any> = {
+                headerName: '',
+                filter: false,
+                sortable: false,
+                width: 57,
+                cellRenderer: (params: any) => {
+                    const actions: ActionItem<PendingTenderRowWithTimer>[] = [
+                        {
+                            label: 'Change Status',
+                            icon: <RefreshCw className="w-4 h-4" />,
+                            onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
+                        },
+                        {
+                            label: 'View Tender',
+                            icon: <EyeIcon className="w-4 h-4" />,
+                            onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+                        },
+                    ];
+                    if (activeTab === 'pending') {
+                        actions.unshift({
+                            label: 'Create Request',
+                            icon: <Plus className="w-4 h-4" />,
+                            onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
+                        });
+                    }
+                    const ActionRenderer = createActionColumnRenderer(actions);
+                    return <ActionRenderer data={params.data!} />;
+                },
+                pinned: 'right',
+            };
+
+            return [
+                tenderDetailsCol,
+                {
+                    field: 'gstValues',
+                    colId: 'gstValues',
+                    headerName: 'Tender Value',
+                    width: 130,
+                    cellRenderer: (params: any) => (
+                        <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>
+                    ),
+                    sortable: true,
+                },
+                {
+                    field: 'emd',
+                    colId: 'emd',
+                    headerName: 'EMD',
+                    width: 100,
+                    cellRenderer: (params: any) => {
+                        const amount = Number(params.value) || 0;
+                        if (amount <= 0) return <span className="text-gray-400">—</span>;
+                        return (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="font-medium">{formatINR(amount)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{params.data?.emdMode}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        );
                     },
-                    {
-                        label: 'View Tender',
-                        icon: <EyeIcon className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+                    sortable: true,
+                },
+                {
+                    field: 'tenderFee',
+                    colId: 'tenderFee',
+                    headerName: 'Tender Fee',
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const amount = Number(params.value) || 0;
+                        if (amount <= 0) return <span className="text-gray-400">—</span>;
+                        return (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="font-medium">{formatINR(amount)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{params.data?.tenderFeeMode}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        );
                     },
-                ];
-                // Only show "Create Request" for pending tab, not tender-dnb
-                if (activeTab === 'pending') {
-                    actions.unshift({
-                        label: 'Create Request',
-                        icon: <Plus className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
-                    });
-                }
-                const ActionRenderer = createActionColumnRenderer(actions);
-                return <ActionRenderer data={params.data!} />;
-            },
-            pinned: 'right',
-        },
-    ], [navigate, activeTab, setChangeStatusModal]);
+                    sortable: true,
+                },
+                {
+                    field: 'processingFee',
+                    colId: 'processingFee',
+                    headerName: 'Processing Fee',
+                    width: 140,
+                    cellRenderer: (params: any) => {
+                        const amount = Number(params.value) || 0;
+                        if (amount <= 0) return <span className="text-gray-400">—</span>;
+                        return (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="font-medium">{formatINR(amount)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{params.data?.processingFeeMode}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    },
+                    sortable: true,
+                },
+                teamMemberCol,
+                {
+                    field: 'dueDate',
+                    colId: 'dueDate',
+                    headerName: 'Due Date',
+                    width: 140,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        const dueDate = new Date(params.value);
+                        const isOverdue = dueDate < new Date();
+                        const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                        return (
+                            <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                                {formatDateTime(params.value)}
+                            </span>
+                        );
+                    },
+                    sortable: true,
+                },
+                {
+                    field: 'statusName',
+                    headerName: 'Status',
+                    width: 150,
+                    cellRenderer: (params: any) => (
+                        <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
+                            {params.value}
+                        </Badge>
+                    ),
+                },
+                timerCol,
+                actionCol,
+            ];
+        }
 
-    const requestColDefs = useMemo<ColDef<PaymentRequestRowWithTimer>[]>(() => [
-        tenderNameCol<PaymentRequestRowWithTimer>('tenderNo', {
-            headerName: 'Tender Details',
-            filter: true,
-            width: 250,
-        }),
-        {
-            field: 'purpose',
-            headerName: 'Type',
-            width: 130,
-            cellRenderer: (params: any) => {
-                const purpose = params.value as string;
-                return (
-                    <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
-                        {purpose}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: 'amountRequired',
-            colId: 'amountRequired',
-            headerName: 'Amount',
-            width: 100,
-            cellRenderer: (params: any) =>
-                params.value ? (
-                    <span className="font-medium">{formatINR(params.value)}</span>
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
-            sortable: true,
-        },
-        {
-            field: 'requestType',
-            headerName: 'Request Type',
-            width: 100,
-            cellRenderer: (params: any) => {
-                return <span>{params.value}</span>;
-            },
-        },
-        {
-            field: 'instrumentType',
-            headerName: 'Mode',
-            width: 120,
-            cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
-                return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
-            },
-        },
-        {
-            field: 'displayStatus',
-            headerName: 'Status',
-            width: 90,
-            cellRenderer: (params: any) => {
-                const status = params.value as string;
-                return (
-                    <Badge variant="outline" className={STATUS_COLORS[status] || ''}>
-                        {status}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: 'bidValid',
-            headerName: 'Bid Valid Till',
-            width: 150,
-            cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400">—</span>;
-                return (formatDateTime(params.value));
-            },
-        },
-        {
-            field: 'teamMember',
-            headerName: 'Member',
-            width: 140,
-            cellRenderer: (params: any) =>
-                params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 110,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
-
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
-            },
-        },
-        {
+        // ─── Request tabs (sent, rejected, approved, etc.) ───
+        const actionCol: ColDef<any> = {
             headerName: '',
             filter: false,
             sortable: false,
@@ -389,8 +299,6 @@ const EmdsAndTenderFeesPage = () => {
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
                     },
                 ];
-
-                // Add edit for Sent/Rejected
                 if (activeTab === 'sent' || activeTab === 'rejected') {
                     actions.unshift({
                         label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
@@ -398,15 +306,84 @@ const EmdsAndTenderFeesPage = () => {
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
                 }
-
+                if (activeTab === 'approved') {
+                    actions.unshift({
+                        label: 'Follow Up',
+                        icon: <Send className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesFollowUp(r.id)),
+                    });
+                }
                 const ActionRenderer = createActionColumnRenderer(actions);
                 return <ActionRenderer data={row} />;
             },
             pinned: 'right',
-        },
-    ], [navigate, activeTab, setChangeStatusModal]);
+        };
 
-    const columnDefs = (activeTab === 'pending' || activeTab === 'tender-dnb') ? pendingColDefs : requestColDefs;
+        return [
+            tenderDetailsCol,
+            {
+                field: 'purpose',
+                headerName: 'Type',
+                width: 130,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className={`${PURPOSE_COLORS[params.value] || ''} font-medium`}>
+                        {params.value}
+                    </Badge>
+                ),
+            },
+            {
+                field: 'amountRequired',
+                colId: 'amountRequired',
+                headerName: 'Amount',
+                width: 100,
+                cellRenderer: (params: any) =>
+                    params.value ? (
+                        <span className="font-medium">{formatINR(params.value)}</span>
+                    ) : (
+                        <span className="text-gray-400">—</span>
+                    ),
+                sortable: true,
+            },
+            {
+                field: 'requestType',
+                headerName: 'Request Type',
+                width: 100,
+                cellRenderer: (params: any) => <span>{params.value}</span>,
+            },
+            {
+                field: 'instrumentType',
+                headerName: 'Mode',
+                width: 120,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
+                    return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
+                },
+            },
+            {
+                field: 'displayStatus',
+                headerName: 'Status',
+                width: 90,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
+                        {params.value}
+                    </Badge>
+                ),
+            },
+            {
+                field: 'bidValid',
+                headerName: 'Bid Valid Till',
+                width: 150,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    return formatDateTime(params.value);
+                },
+            },
+            teamMemberCol,
+            timerCol,
+            actionCol,
+        ];
+    }, [navigate, activeTab, setChangeStatusModal]);
+
     const tableData = dashboardData?.data || [];
 
     const renderTabTrigger = (tab: typeof TABS[number]) => {

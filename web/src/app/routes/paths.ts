@@ -45,6 +45,7 @@ export const paths = {
         biOtherThanEmdsCreate: () => `/tendering/emds-tenderfees/bi-other-than-emds/create`,
         emdsTenderFeesEdit: (id: number | string) => `/tendering/emds-tenderfees/${id}/edit`,
         emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
+        emdsTenderFeesFollowUp: (id: number | string) => `/tendering/emds-tenderfees/follow-up/${id}`,
         checklists: "/tendering/document-checklists",
         documentChecklistCreate: (tenderId: number | string) => `/tendering/document-checklists/create/${tenderId}`,
         documentChecklistEdit: (tenderId: number | string) => `/tendering/document-checklists/edit/${tenderId}`,

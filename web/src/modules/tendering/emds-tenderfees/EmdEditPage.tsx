@@ -7,9 +7,6 @@ import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
-/**
- * Map instrument type to frontend mode code
- */
 function mapInstrumentTypeToMode(instrumentType: string | null): string | undefined {
     if (!instrumentType) return undefined;
     const mapping: Record<string, string> = {
@@ -23,10 +20,6 @@ function mapInstrumentTypeToMode(instrumentType: string | null): string | undefi
     return mapping[instrumentType];
 }
 
-/**
- * Map backend instrument and details to frontend form details structure
- * The instrument object has both instrument table fields and a details property
- */
 function mapDetailsToForm(instrumentType: string, instrument: any): any {
     if (!instrument) return {};
 
@@ -178,7 +171,6 @@ const EMDEditPage = () => {
             </Alert>
         );
     }
-    console.log("formData: ", formData);
 
     return (
         <EmdTenderFeeRequestForm
