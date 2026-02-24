@@ -217,14 +217,6 @@ export class TenderResultService {
             .limit(limit)
             .offset(offset);
 
-        let dataQuerySql = '';
-        try {
-            const sqlQuery = query.toSQL();
-            dataQuerySql = JSON.stringify(sqlQuery);
-        } catch (error) {
-            this.logger.debug(`[TenderResult] Could not generate SQL: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
         const rows = await query;
 
         if (!rows || rows.length === 0) {
