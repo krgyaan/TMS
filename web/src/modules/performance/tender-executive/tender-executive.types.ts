@@ -9,6 +9,13 @@ export interface PerformanceQuery {
     kpi?: string;
 }
 
+export interface StageQuery {
+    view: "user" | "team";
+    userId?: number;
+    teamId?: number;
+    fromDate: string;
+    toDate: string;
+}
 export interface PerformanceSummary {
     tendersHandled: number;
     stagesApplicable: number;

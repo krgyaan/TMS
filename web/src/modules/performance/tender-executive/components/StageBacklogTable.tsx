@@ -126,23 +126,25 @@ function MetricCell({ data, highlight, danger }: { data: any; highlight?: boolea
    MAIN COMPONENT
 ================================ */
 
-export function StageBacklogTable({ userId, fromDate, toDate }: { userId?: number; fromDate?: string; toDate?: string }) {
+export function StageBacklogTable({ view, userId, teamId, fromDate, toDate }: { view: "user" | "team"; userId?: number; teamId?: number; fromDate?: string; toDate?: string }) {
     if (!fromDate || !toDate) return null;
 
     const prev = getPreviousPeriod(fromDate, toDate);
 
     const { data: current = [] } = useStageBacklog({
+        view,
         userId,
+        teamId,
         fromDate,
         toDate,
-        view: "user",
     });
 
     const { data: previous = [] } = useStageBacklog({
+        view,
         userId,
+        teamId,
         fromDate: prev.fromDate,
         toDate: prev.toDate,
-        view: "user",
     });
 
     const prevMap = useMemo(() => {

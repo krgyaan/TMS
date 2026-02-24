@@ -1,5 +1,14 @@
 import api from "@/lib/axios";
-import type { PerformanceOutcomes, PerformanceQuery, PerformanceSummary, StageMatrixResponse, TenderListRow, ExecutiveScoring, PerformanceTrends } from "./tender-executive.types";
+import type {
+    PerformanceOutcomes,
+    PerformanceQuery,
+    PerformanceSummary,
+    StageMatrixResponse,
+    TenderListRow,
+    ExecutiveScoring,
+    PerformanceTrends,
+    StageQuery,
+} from "./tender-executive.types";
 
 /* ===================== API CALLS ===================== */
 
@@ -34,12 +43,12 @@ export const getExecutiveScoring = async (params: PerformanceQuery): Promise<Exe
     return res.data;
 };
 
-export const getExecutiveBacklog = async (params: PerformanceQuery): Promise<ExecutiveScoring> => {
+export const getExecutiveBacklog = async (params: StageQuery): Promise<ExecutiveScoring> => {
     const res = await api.get("/performance/tender-executive/stage-backlog", { params });
     return res.data;
 };
 
-export const getEmdBalance = async (params: PerformanceQuery): Promise<ExecutiveScoring> => {
+export const getEmdBalance = async (params: StageQuery): Promise<ExecutiveScoring> => {
     const res = await api.get("/performance/tender-executive/emd-balance", { params });
     console.log("EMD Balance API Response:", res.data);
     return res.data;

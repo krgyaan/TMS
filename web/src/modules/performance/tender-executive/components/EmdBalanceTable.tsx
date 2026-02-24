@@ -38,12 +38,13 @@ function ColumnHeader({ title, description }: { title: string; description: stri
    MAIN TABLE
 ================================ */
 
-export function EmdBalanceTable({ userId, fromDate, toDate }) {
+export function EmdBalanceTable({ view, userId, teamId, fromDate, toDate }: { view: "user" | "team"; userId?: number; teamId?: number; fromDate?: string; toDate?: string }) {
     const { data } = useEmdBalance({
+        view,
         userId,
+        teamId,
         fromDate,
         toDate,
-        view: "user",
     });
 
     if (!data || !fromDate || !toDate) return null;
