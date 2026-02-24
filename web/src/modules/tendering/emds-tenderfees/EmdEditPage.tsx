@@ -2,7 +2,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EmdTenderFeeRequestForm } from "./components/EmdTenderFeeRequestForm";
 import { useParams, useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
-import { usePaymentRequestsByTender } from "@/hooks/api/useEmds";
+import { usePaymentRequest } from "@/hooks/api/useEmds";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -35,7 +35,6 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
 
     switch (instrumentType) {
         case 'DD':
-        case 'Cheque':
             return {
                 ddFavouring: merged.favouring || '',
                 ddPayableAt: merged.payableAt || '',
@@ -45,6 +44,16 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
                 ddCourierHours: merged.courierDeadline || undefined,
                 ddDate: merged.ddDate || merged.issueDate || '',
                 ddRemarks: merged.ddRemarks || merged.remarks || '',
+            };
+        case 'Cheque':
+            return {
+                chequeFavouring: merged.favouring || '',
+                chequeAmount: merged.amountRequired || merged.amount || '',
+                chequeDeliverBy: merged.chequeNeeds || '',
+                chequePurpose: merged.chequeReason || '',
+                chequeDate: merged.chequeDate || merged.issueDate || '',
+                chequeNeededIn: merged.chequeNeeds || '',
+                chequeAccount: merged.bankName || '',
             };
         case 'FDR':
             return {
@@ -106,12 +115,10 @@ const EMDEditPage = () => {
         );
     }
 
-    const tenderId = Number(id);
-    const { data: paymentRequests, isLoading, error } = usePaymentRequestsByTender(tenderId);
-
+    const { data: paymentRequests, isLoading, error } = usePaymentRequest(id ? Number(id) : null);
     // Map payment requests to form data structure
     const { formData, requestIds } = useMemo(() => {
-        if (!paymentRequests || paymentRequests.length === 0) {
+        if (!paymentRequests) {
             return { formData: undefined, requestIds: undefined };
         }
 
@@ -122,25 +129,22 @@ const EMDEditPage = () => {
         };
         const requestIds: any = {};
 
-        paymentRequests.forEach((request: any) => {
-            // Get the first active instrument
-            const instrument = request.instruments?.[0];
-            if (!instrument) return;
+        const instrument = paymentRequests.instruments?.[0];
+        if (!instrument) return { formData: undefined, requestIds: undefined };
 
-            const mode = mapInstrumentTypeToMode(instrument.instrumentType);
-            const details = mapDetailsToForm(instrument.instrumentType, instrument);
+        const mode = mapInstrumentTypeToMode(instrument.instrumentType);
+        const details = mapDetailsToForm(instrument.instrumentType, instrument);
 
-            if (request.purpose === 'EMD') {
-                formData.emd = { mode, details };
-                requestIds.emd = request.id;
-            } else if (request.purpose === 'Tender Fee') {
-                formData.tenderFee = { mode, details };
-                requestIds.tenderFee = request.id;
-            } else if (request.purpose === 'Processing Fee') {
-                formData.processingFee = { mode, details };
-                requestIds.processingFee = request.id;
-            }
-        });
+        if (paymentRequests.purpose === 'EMD') {
+            formData.emd = { mode, details };
+            requestIds.emd = paymentRequests.id;
+        } else if (paymentRequests.purpose === 'Tender Fee') {
+            formData.tenderFee = { mode, details };
+            requestIds.tenderFee = paymentRequests.id;
+        } else if (paymentRequests.purpose === 'Processing Fee') {
+            formData.processingFee = { mode, details };
+            requestIds.processingFee = paymentRequests.id;
+        }
 
         return { formData, requestIds };
     }, [paymentRequests]);
@@ -165,7 +169,7 @@ const EMDEditPage = () => {
                 <AlertDescription>
                     No payment requests found for this tender.
                     <button
-                        onClick={() => navigate(`/tendering/emds-tenderfees/create/${tenderId}`)}
+                        onClick={() => navigate(`/tendering/emds-tenderfees/create/${paymentRequests?.tenderId}`)}
                         className="ml-2 text-blue-600 underline"
                     >
                         Create one instead
@@ -174,10 +178,11 @@ const EMDEditPage = () => {
             </Alert>
         );
     }
+    console.log("formData: ", formData);
 
     return (
         <EmdTenderFeeRequestForm
-            tenderId={tenderId}
+            tenderId={paymentRequests?.tenderId}
             requestIds={requestIds}
             initialData={formData}
             mode="edit"

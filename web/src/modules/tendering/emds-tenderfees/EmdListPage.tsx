@@ -395,7 +395,7 @@ const EmdsAndTenderFeesPage = () => {
                     actions.unshift({
                         label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
                         icon: activeTab === 'rejected' ? <RefreshCw className="w-4 h-4" /> : <Pencil className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.tenderId)),
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
                 }
 

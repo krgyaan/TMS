@@ -1518,7 +1518,6 @@ export class EmdsService {
                 };
             })
         );
-
         return { ...request, instruments: instrumentsWithDetails };
     }
 
