@@ -107,26 +107,25 @@ export class TenderResultService {
             conditions.push(
                 or(
                     isNull(tenderResults.id),
-                    eq(tenderResults.status, 'Result Awaited'),
-                    eq(tenderResults.status, 'Under Evaluation')
+                    inArray(tenderResults.status, ['Under Evaluation', 'Result Awaited'])
                 )!
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'won') {
             conditions.push(
                 isNotNull(tenderResults.id),
-                eq(tenderResults.status, 'Won')
+                inArray(tenderResults.status, ['Won', 'won'])
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'lost') {
             conditions.push(
                 isNotNull(tenderResults.id),
-                inArray(tenderResults.status, ['Lost', 'Lost - H1 Elimination'])
+                inArray(tenderResults.status, ['lost', 'Lost', 'Lost - H1 Elimination'])
             );
         } else if (activeTab === 'disqualified') {
             conditions.push(
                 isNotNull(tenderResults.id),
-                eq(tenderResults.status, 'Disqualified')
+                inArray(tenderResults.status, ['Disqualified', 'cancelled', 'disqualified'])
             );
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -284,27 +283,26 @@ export class TenderResultService {
             ...baseConditions,
             or(
                 isNull(tenderResults.id),
-                eq(tenderResults.status, 'Result Awaited'),
-                eq(tenderResults.status, 'Under Evaluation')
+                inArray(tenderResults.status, ['Under Evaluation', 'Result Awaited'])
             )!,
         ];
 
         const wonConditions = [
             ...baseConditions,
             isNotNull(tenderResults.id),
-            eq(tenderResults.status, 'Won'),
+            inArray(tenderResults.status, ['Won', 'won']),
         ];
 
         const lostConditions = [
             ...baseConditions,
             isNotNull(tenderResults.id),
-            inArray(tenderResults.status, ['Lost', 'Lost - H1 Elimination']),
+            inArray(tenderResults.status, ['Lost', 'Lost - H1 Elimination', 'lost']),
         ];
 
         const disqualifiedConditions = [
             ...baseConditions,
             isNotNull(tenderResults.id),
-            eq(tenderResults.status, 'Disqualified'),
+            inArray(tenderResults.status, ['Disqualified', 'cancelled', 'disqualified']),
         ];
 
         const counts = await Promise.all([
