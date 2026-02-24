@@ -173,9 +173,9 @@ export function StageBacklogTable({ userId, fromDate, toDate }: { userId?: numbe
                                 <TableHead className="text-center font-semibold">
                                     <ColumnHeader title="Closing" description="Pending work at the end of the period" />
                                 </TableHead>
-                                <TableHead className="text-center text-primary">
+                                {/* <TableHead className="text-center text-primary">
                                     <ColumnHeader title="Backlog Change" description="Net change in pending work vs previous period" />
-                                </TableHead>
+                                </TableHead> */}
                                 <TableHead className="text-center text-destructive">
                                     <ColumnHeader title="Overdue" description="Pending work past deadline" />
                                 </TableHead>
@@ -211,7 +211,7 @@ export function StageBacklogTable({ userId, fromDate, toDate }: { userId?: numbe
                                         <MetricCell data={row.metrics.completed} />
                                         <MetricCell data={row.metrics.closing} highlight />
 
-                                        <TableCell className="text-center">
+                                        {/* <TableCell className="text-center">
                                             <div
                                                 className={`
                                                     inline-flex flex-col items-center px-3 py-1 rounded-xl font-bold
@@ -226,7 +226,7 @@ export function StageBacklogTable({ userId, fromDate, toDate }: { userId?: numbe
                                                 </span>
                                                 <span className="text-[11px]">{formatCurrency(netValue)}</span>
                                             </div>
-                                        </TableCell>
+                                        </TableCell> */}
 
                                         <MetricCell data={row.metrics.overdue} danger />
                                     </TableRow>
