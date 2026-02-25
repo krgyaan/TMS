@@ -117,8 +117,8 @@ export class FollowUpController {
     // DELETE (SOFT DELETE)
     // ========================
     @Delete(":id")
-    async remove(@Param("id", ParseIntPipe) id: number) {
-        return this.service.remove(id);
+    async remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() user) {
+        return this.service.delete(id, user.sub);
     }
 
     // ========================
