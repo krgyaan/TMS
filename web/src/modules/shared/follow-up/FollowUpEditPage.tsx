@@ -114,7 +114,14 @@ const FollowUpEditPage: React.FC = () => {
     };
 
     const handleFiles = (items: any[]) => {
-        setNewFiles(items.map(i => i.file).filter(Boolean));
+        items.forEach(item => {
+            console.log({
+                name: item.file?.name,
+                type: item.file?.type,
+            });
+        });
+
+        setNewFiles(items.map(item => item.file).filter(Boolean));
     };
 
     /* ✅ SUBMIT HANDLER */
@@ -424,14 +431,46 @@ const FollowUpEditPage: React.FC = () => {
                                 allowMultiple
                                 instantUpload={false}
                                 acceptedFileTypes={[
+                                    /* ===== Images ===== */
                                     "image/*",
+
+                                    /* ===== PDFs ===== */
                                     "application/pdf",
+
+                                    /* ===== Word ===== */
                                     "application/msword",
                                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+                                    /* ===== PowerPoint ===== */
                                     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                    "application/vnd.ms-excel", // .xls
-                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+
+                                    /* ===== Excel (ALL formats) ===== */
+                                    "application/vnd.ms-excel",
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    "application/vnd.ms-excel.sheet.macroEnabled.12",
+                                    "application/vnd.ms-excel.template.macroEnabled.12",
+                                    "application/vnd.ms-excel.addin.macroEnabled.12",
+                                    "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+
+                                    /* ===== Text / Data Excel formats ===== */
+                                    "text/csv",
+                                    "text/tab-separated-values",
                                     "text/plain",
+
+                                    /* ===== Browser fallbacks ===== */
+                                    "application/octet-stream",
+
+                                    /* ===== Extension-based safety net ===== */
+                                    ".xls",
+                                    ".xlsx",
+                                    ".xlsm",
+                                    ".xlsb",
+                                    ".xltx",
+                                    ".xltm",
+                                    ".xlam",
+                                    ".csv",
+                                    ".tsv",
+                                    ".txt",
                                 ]}
                             />
                         </div>
