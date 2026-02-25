@@ -6,8 +6,12 @@ import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { tenderStatusHistory } from "@db/schemas/tendering/tender-status-history.schema";
 import { followUps } from "../shared";
 
-export const usersRelations = relations(users, ({ many }) => ({
-    userProfiles: many(userProfiles),
+export const usersRelations = relations(users, ({ many, one }) => ({
+    profile: one(userProfiles, {
+        fields: [users.id],
+        references: [userProfiles.userId],
+        relationName: 'user',
+    }),
     oauthAccounts: many(oauthAccounts),
     tenderInfos: many(tenderInfos, {
         relationName: "teamMember",
