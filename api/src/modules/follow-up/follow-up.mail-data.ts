@@ -155,7 +155,7 @@ export class FollowupMailDataBuilder {
         // Populate a fake followup context for the preview
         const baseContext = {
             for: "Refund EMD",
-            name: "Supplier/Organization Name",
+            name: "Sir/Madam",
             details: "Details for this follow-up goes here...",
             reminder: 1,
             since: 0,

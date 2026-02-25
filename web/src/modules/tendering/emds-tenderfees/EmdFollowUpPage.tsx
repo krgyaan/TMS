@@ -130,6 +130,7 @@ const EmdFollowUpPage = () => {
                 amount: emdData?.emdAmount,
                 assignedToId: Number(values.assignedToId),
                 createdById: Number(values.createdById),
+                followupFor: values.followupFor,
                 comment: values.comment,
                 contacts: values.contacts?.map(c => ({
                     name: c.name,
