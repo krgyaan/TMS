@@ -97,10 +97,10 @@ const EmdFollowUpPage = () => {
         defaultValues: {
             area: '',
             followupFor: 'Emd Refund',
-            organization: '',
+            organization: '',   
             assignedToId: 0,
             createdById: 0,
-            assignmentStatus: "assigned",
+            assignmentStatus: "initiated",
             comment: '',
             frequency: 1,
             startFrom: '',
