@@ -104,62 +104,67 @@ export class FollowUpService {
             const reminderCount = dto.reminderCount ?? 1;
 
             // ------------------------
-            // INSERT FOLLOW-UP
+            // TRANSACTIONAL INSERT
             // ------------------------
-            const [created] = await this.db
-                .insert(followUps)
-                .values({
-                    area: dto.area,
-                    partyName: dto.partyName,
-                    amount: dto.amount != null ? String(dto.amount) : "0",
-                    followupFor: dto.followupFor ?? null,
-                    assignedToId: dto.assignedToId || currentUserId,
-                    createdById: dto.createdById || currentUserId,
-                    assignmentStatus: dto.assignmentStatus ?? "assigned",
-                    comment: dto.comment ?? null,
-                    details: dto.details ?? null,
-                    latestComment: dto.latestComment ?? null,
-                    attachments: dto.attachments ?? [],
-                    followUpHistory: dto.followUpHistory ?? [],
-                    startFrom,
-                    nextFollowUpDate,
-                    frequency,
-                    reminderCount,
-                    stopReason,
-                    proofText: dto.proofText ?? null,
-                    proofImagePath: dto.proofImagePath ?? null,
-                    stopRemarks: dto.stopRemarks ?? null,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    deletedAt: null,
-                    emdId: dto.emdId ?? null,
-                })
-                .returning();
+            return await this.db.transaction(async tx => {
+                // 1. Insert main follow-up record
+                const [created] = await tx
+                    .insert(followUps)
+                    .values({
+                        area: dto.area,
+                        partyName: dto.partyName,
+                        amount: dto.amount != null ? String(dto.amount) : "0",
+                        followupFor: dto.followupFor ?? null,
+                        assignedToId: dto.assignedToId || currentUserId,
+                        createdById: dto.createdById || currentUserId,
+                        assignmentStatus: dto.assignmentStatus ?? "assigned",
+                        comment: dto.comment ?? null,
+                        details: dto.details ?? null,
+                        latestComment: dto.latestComment ?? null,
+                        contacts: contacts, // Populating the JSONB column
+                        attachments: dto.attachments ?? [],
+                        followUpHistory: dto.followUpHistory ?? [],
+                        startFrom,
+                        nextFollowUpDate,
+                        frequency,
+                        reminderCount,
+                        stopReason,
+                        proofText: dto.proofText ?? null,
+                        proofImagePath: dto.proofImagePath ?? null,
+                        stopRemarks: dto.stopRemarks ?? null,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        deletedAt: null,
+                        emdId: dto.emdId ?? null,
+                    })
+                    .returning();
 
-            // ------------------------
-            // INSERT CONTACTS (RELATIONAL ✅)
-            // ------------------------
-            if (contacts.length > 0) {
-                await this.db.insert(followUpPersons).values(
-                    contacts.map(c => ({
+                this.logger.debug("Follow-up main record inserted", { followUpId: created.id });
+
+                // 2. Insert relational contacts
+                if (contacts.length > 0) {
+                    await tx.insert(followUpPersons).values(
+                        contacts.map(c => ({
+                            followUpId: created.id,
+                            name: c.name,
+                            email: c.email,
+                            phone: c.phone,
+                            organization: c.org || dto.partyName, // Ensuring organization is set
+                        }))
+                    );
+
+                    this.logger.debug("Relational contacts inserted", {
                         followUpId: created.id,
-                        name: c.name,
-                        email: c.email,
-                        phone: c.phone,
-                    }))
-                );
+                        count: contacts.length,
+                    });
+                }
 
-                this.logger.debug("Contacts inserted", {
+                this.logger.info("Follow-up created successfully inside transaction", {
                     followUpId: created.id,
-                    count: contacts.length,
                 });
-            }
 
-            this.logger.info("Follow-up created successfully", {
-                followUpId: created.id,
+                return created;
             });
-
-            return created;
         } catch (error: any) {
             this.logger.error("Failed to create follow-up", {
                 error: error.message,
