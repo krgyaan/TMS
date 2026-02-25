@@ -30,6 +30,8 @@ export const createFollowUpSchema = z.object({
     comment: z.string().nullable().optional(),
     details: z.string().nullable().optional(),
 
+    assignmentStatus: z.string().optional(),
+
     contacts: z.array(contactPersonSchema).min(1, "At least one contact person is required"),
 
     startFrom: z.string().optional(), // validated later as date
