@@ -119,6 +119,7 @@ export class FollowUpService {
                     comment: dto.comment ?? null,
                     details: dto.details ?? null,
                     latestComment: dto.latestComment ?? null,
+                    contacts: contacts, // Populating the JSONB column
                     attachments: dto.attachments ?? [],
                     followUpHistory: dto.followUpHistory ?? [],
                     startFrom,
@@ -146,6 +147,7 @@ export class FollowUpService {
                         name: c.name,
                         email: c.email,
                         phone: c.phone,
+                        organization: c.org, // Mapping 'org' from DTO/Normalization to 'organization' in DB
                     }))
                 );
 
