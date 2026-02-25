@@ -26,6 +26,56 @@ const UpdateUserSchema = CreateUserSchema.partial().extend({
 
 type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
+const RegisterUserSchema = z.object({
+    firstName: z.string().min(1),
+    middleName: z.string().optional(),
+    lastName: z.string().min(1),
+    dateOfBirth: z.string().min(1),
+    gender: z.string().min(1),
+    maritalStatus: z.string().min(1),
+    nationality: z.string().min(1),
+    personalEmail: z.string().email(),
+    phoneNumber: z.string().min(10),
+    alternatePhone: z.string().optional(),
+    aadharNumber: z.string().optional(),
+    panNumber: z.string().optional(),
+    addresses: z.object({
+        current: z.object({
+            addressLine1: z.string().min(1),
+            addressLine2: z.string().optional(),
+            city: z.string().min(1),
+            state: z.string().min(1),
+            country: z.string().min(1),
+            postalCode: z.string().min(1),
+        }),
+        permanent: z.object({
+            sameAsCurrent: z.boolean(),
+            addressLine1: z.string().optional(),
+            addressLine2: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            country: z.string().optional(),
+            postalCode: z.string().optional(),
+        }),
+    }),
+    bankDetails: z.object({
+        bankName: z.string().min(1),
+        accountHolderName: z.string().min(1),
+        accountNumber: z.string().min(1),
+        ifscCode: z.string().min(1),
+        branchName: z.string().optional(),
+    }),
+    emergencyContacts: z.array(z.object({
+        contactName: z.string().min(1),
+        relationship: z.string().min(1),
+        phoneNumber: z.string().min(10),
+    })),
+    designationId: z.coerce.number().optional(),
+    primaryTeamId: z.coerce.number().optional(),
+});
+
+type RegisterUserDto = z.infer<typeof RegisterUserSchema>;
+
 @Controller("users")
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -142,6 +192,14 @@ export class UsersController {
 
         await this.usersService.deactivate(id);
         return { message: "User deactivated successfully" };
+    }
+
+    @Patch("register")
+    @HttpCode(HttpStatus.OK)
+    async register(@CurrentUser() currentUser: ValidatedUser, @Body() body: unknown) {
+        const parsed = RegisterUserSchema.parse(body);
+        await this.usersService.registerUser(currentUser.sub, parsed);
+        return { message: "Registration successful and account activated" };
     }
 
     // User Roles Management

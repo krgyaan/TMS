@@ -28,9 +28,8 @@ export type UserProfileSummary = {
     designationId?: number | null;
     primaryTeamId?: number | null;
     oldTeamId?: number | null;
-    altEmail?: string | null;
-    emergencyContactName?: string | null;
-    emergencyContactPhone?: string | null;
+    personalEmail?: string | null;
+    emergencyContacts?: any[] | null;
     image?: string | null;
     signature?: string | null;
     dateOfJoining?: Date | string | null;
@@ -97,9 +96,8 @@ export class UsersService {
                 profileEmployeeCode: userProfiles.employeeCode,
                 profileDesignationId: userProfiles.designationId,
                 profilePrimaryTeamId: userProfiles.primaryTeamId,
-                profileAltEmail: userProfiles.altEmail,
-                profileEmergencyContactName: userProfiles.emergencyContactName,
-                profileEmergencyContactPhone: userProfiles.emergencyContactPhone,
+                profilePersonalEmail: userProfiles.personalEmail,
+                profileEmergencyContacts: userProfiles.emergencyContacts,
                 profileImage: userProfiles.image,
                 profileSignature: userProfiles.signature,
                 profileDateOfJoining: userProfiles.dateOfJoining,
@@ -140,9 +138,8 @@ export class UsersService {
                   designationId: row.profileDesignationId,
                   primaryTeamId: row.profilePrimaryTeamId,
                   oldTeamId: row.team,
-                  altEmail: row.profileAltEmail,
-                  emergencyContactName: row.profileEmergencyContactName,
-                  emergencyContactPhone: row.profileEmergencyContactPhone,
+                  personalEmail: row.profilePersonalEmail,
+                  emergencyContacts: row.profileEmergencyContacts,
                   image: row.profileImage,
                   signature: row.profileSignature,
                   dateOfJoining: row.profileDateOfJoining,
@@ -508,7 +505,7 @@ export class UsersService {
                 name,
                 email: payload.email,
                 password: hashed,
-                isActive: true,
+                isActive: false,
             })
             .returning()) as unknown as User[];
         return rows[0];
@@ -563,5 +560,57 @@ export class UsersService {
             .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
             .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
             .orderBy(asc(users.name));
+    }
+
+    async registerUser(userId: number, data: any): Promise<void> {
+        await this.db.transaction(async (tx) => {
+            // 1. Update/Upsert profile
+            const [existingProfile] = await tx
+                .select()
+                .from(userProfiles)
+                .where(eq(userProfiles.userId, userId))
+                .limit(1);
+
+            const profileData = {
+                userId,
+                firstName: data.firstName,
+                middleName: data.middleName || null,
+                lastName: data.lastName,
+                dateOfBirth: data.dateOfBirth,
+                gender: data.gender,
+                maritalStatus: data.maritalStatus,
+                nationality: data.nationality,
+                personalEmail: data.personalEmail,
+                phoneNumber: data.phoneNumber,
+                alternatePhone: data.alternatePhone || null,
+                aadharNumber: data.aadharNumber || null,
+                panNumber: data.panNumber || null,
+                addresses: data.addresses,
+                bankDetails: data.bankDetails,
+                emergencyContacts: data.emergencyContacts,
+                designationId: data.designationId || null,
+                primaryTeamId: data.primaryTeamId || null,
+                updatedAt: new Date(),
+            };
+
+            if (existingProfile) {
+                await tx
+                    .update(userProfiles)
+                    .set(profileData)
+                    .where(eq(userProfiles.userId, userId));
+            } else {
+                await tx.insert(userProfiles).values(profileData);
+            }
+
+            // 2. Activate user and update name if needed
+            await tx
+                .update(users)
+                .set({
+                    isActive: true,
+                    name: `${data.firstName} ${data.lastName}`,
+                    updatedAt: new Date(),
+                })
+                .where(eq(users.id, userId));
+        });
     }
 }

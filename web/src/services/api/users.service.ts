@@ -64,6 +64,9 @@ class UsersService extends BaseApiService {
     async getUsersByRole(roleId: number): Promise<User[]> {
         return this.get<User[]>(`/by-role/${roleId}`);
     }
+    async register(data: any): Promise<{ message: string }> {
+        return this.patch<{ message: string }>("/register", data);
+    }
 }
 
 export const usersService = new UsersService();
