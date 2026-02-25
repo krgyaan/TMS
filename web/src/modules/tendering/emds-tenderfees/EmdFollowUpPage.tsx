@@ -131,6 +131,7 @@ const EmdFollowUpPage = () => {
                 assignedToId: Number(values.assignedToId),
                 createdById: Number(values.createdById),
                 followupFor: values.followupFor,
+                assignmentStatus: 'initiated',
                 comment: values.comment,
                 contacts: values.contacts?.map(c => ({
                     name: c.name,
@@ -139,6 +140,7 @@ const EmdFollowUpPage = () => {
                 })) || [],
                 emdId: emdIdNumber,
                 details: previewData?.html ?? '',
+                attachments: ["2025_cancelled_check_n_yes_bank_mandate.pdf"]
             };
 
             if (values.startFrom) {
