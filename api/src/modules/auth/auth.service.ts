@@ -69,7 +69,7 @@ export class AuthService {
     async getPermissionsWithId(id: number): Promise<UserWithRelations & { permissions: string[] }> {
         const user = await this.usersService.findDetailById(id);
         console.log("User fetched in getPermissionsWithId:", user);
-        
+
         if (!user) {
             throw new NotFoundException("User not found");
         }
@@ -162,10 +162,6 @@ export class AuthService {
         const userWithRelations = await this.usersService.findDetailById(userId);
         if (!userWithRelations) {
             throw new UnauthorizedException("User not found");
-        }
-
-        if (!userWithRelations.isActive) {
-            throw new UnauthorizedException("Account is inactive");
         }
 
         const authInfo = await this.usersService.getUserAuthInfo(userId);

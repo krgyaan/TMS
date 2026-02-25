@@ -5,6 +5,7 @@ import { setStoredUser, clearAuthSession } from "@/lib/auth";
 import type { AuthUser } from "@/types/auth.types";
 import { authKeys } from "@/hooks/api/useAuth";
 import { authService } from "@/services/api";
+import { paths } from "@/app/routes/paths";
 import { toast } from "sonner";
 
 const GoogleLoginCallback = () => {
@@ -61,8 +62,18 @@ const GoogleLoginCallback = () => {
                     setStoredUser(user);
                     queryClient.setQueryData(authKeys.currentUser, user);
 
+                    // If user is inactive, redirect to registration
+                    if (!user.isActive) {
+                        setMessage("Redirecting to registration...");
+                        toast.info("Please complete your registration to activate your account.");
+                        setTimeout(() => {
+                            navigate(paths.hrms.registration, { replace: true });
+                        }, 500);
+                        return;
+                    }
+
                     setMessage("Success! Redirecting...");
-                    toast.success(`Welcome, ${user.name}!`);
+                    toast.success(`Welcome back, ${user.name}!`);
 
                     // Clean up stored redirect and navigate
                     sessionStorage.removeItem("auth_redirect");
@@ -103,6 +114,16 @@ const GoogleLoginCallback = () => {
                 // Store user data
                 setStoredUser(user);
                 queryClient.setQueryData(authKeys.currentUser, user);
+
+                // If user is inactive, redirect to registration
+                if (!user.isActive) {
+                    setMessage("Redirecting to registration...");
+                    toast.info("Please complete your registration to activate your account.");
+                    setTimeout(() => {
+                        navigate(paths.hrms.registration, { replace: true });
+                    }, 500);
+                    return;
+                }
 
                 setMessage("Success! Redirecting...");
                 toast.success(`Welcome, ${user.name}!`);
