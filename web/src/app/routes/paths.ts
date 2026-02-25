@@ -293,4 +293,12 @@ export const paths = {
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
     },
+
+    // ==================== HRMS ====================
+    hrms: {
+        root: "/hrms",
+        registration: "/hrms/registration",
+        documents: "/hrms/documents",
+        assets: "/hrms/assets",
+    },
 };

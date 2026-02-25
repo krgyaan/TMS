@@ -22,7 +22,8 @@ const CRMRoutes = lazy(() => import("./sections/crm.routes"));
 const PerformanceRoutes = lazy(() => import("./sections/performance.routes"));
 const IntegrationsRoutes = lazy(() => import("./sections/integrations.routes"));
 const SharedRoutes = lazy(() => import("./sections/shared.routes"));
-const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard.routes"));
+const DocumentDashboardRoutes = lazy(() => import("@/app/routes/sections/document-dashboard.routes"));
+const HrmsRoutes = lazy(() => import("@/app/routes/sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
 
 export default function AppRoutes() {
@@ -44,6 +45,16 @@ export default function AppRoutes() {
 
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route element={<ProtectedRoute />}>
+                {/* HRMS - Moved outside DashboardLayout to allow inactive users a dedicated registration view */}
+                <Route
+                    path="hrms/*"
+                    element={
+                        <RouteWrapper>
+                            <HrmsRoutes />
+                        </RouteWrapper>
+                    }
+                />
+
                 <Route element={<DashboardLayout />}>
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
