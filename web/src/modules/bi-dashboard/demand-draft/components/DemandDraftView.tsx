@@ -131,28 +131,28 @@ export function DemandDraftView({
                             <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                 {data.courierAddress || '—'}
                             </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Docket No
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.docketNo || '—'}
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Issue Date
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.issueDate ? formatDate(data.issueDate) : '—'}
                             </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Expiry Date
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.expiryDate ? formatDate(data.expiryDate) : '—'}
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Request Status
                             </TableCell>
