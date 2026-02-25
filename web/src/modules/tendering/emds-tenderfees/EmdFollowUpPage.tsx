@@ -12,7 +12,7 @@ import { Form } from "@/components/ui/form";
 import { usePaymentRequest } from "@/hooks/api/useEmds";
 import { useTender } from "@/hooks/api/useTenders";
 import { ContactPersonSchema } from "@/modules/shared/follow-up/follow-up.types";
-import { useCreateFollowUp, useUpdateFollowUp } from "@/modules/shared/follow-up/follow-up.hooks";
+import { useCreateFollowUp, useUpdateFollowUp, useEmdMailPreview } from "@/modules/shared/follow-up/follow-up.hooks";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useMemo } from "react";
@@ -28,9 +28,9 @@ const EmdFollowupSchema = z.object({
     followupFor: z.string(),
     assignedToId: z.number(),
     createdById: z.number(),
-    organization: z.string().optional(),
-    contacts: z.array(ContactPersonSchema).optional(),
-    startFrom: z.string().optional(),
+    organization: z.string().min(1, "Organization is required"),
+    contacts: z.array(ContactPersonSchema).min(1, "Contact is required"),
+    startFrom: z.string().min(1, "Start Date is required"),
     comment: z.string().optional(),
     assignmentStatus: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
@@ -58,17 +58,21 @@ function mapInstrumentTypeToMode(instrumentType: string | null): string | undefi
 const EmdFollowUpPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
+    const emdIdNumber = id ? Number(id) : null;
 
     // Follow-up mutations
     const { mutateAsync: createFollowUp } = useCreateFollowUp();
     const { mutateAsync: updateFollowUp } = useUpdateFollowUp();
 
     // All hooks must be called unconditionally at the top level
-    const { data: paymentRequests, isLoading, error } = usePaymentRequest(id ? Number(id) : null);
+    const { data: paymentRequests, isLoading, error } = usePaymentRequest(emdIdNumber);
 
     // Always call useTender - pass null when not ready
     const tenderId = paymentRequests?.tenderId ?? null;
     const { data: tender } = useTender(tenderId && tenderId > 0 ? tenderId : null);
+
+    // Fetch template string for the specific EMD
+    const { data: previewData, isLoading: isLoadingPreview } = useEmdMailPreview(emdIdNumber);
 
     // Compute emdData (kept for future use if needed)
     const emdData = useMemo(() => {
@@ -98,9 +102,9 @@ const EmdFollowUpPage = () => {
             area: '',
             followupFor: 'Emd Refund',
             organization: '',
-            assignedToId: 0,
-            createdById: 0,
-            assignmentStatus: "assigned",
+            assignedToId: tender?.teamMember ?? 0,
+            createdById: tender?.teamMember ?? 0,
+            assignmentStatus: "initiated",
             comment: '',
             frequency: 1,
             startFrom: '',
@@ -125,13 +129,15 @@ const EmdFollowUpPage = () => {
                 partyName: values.organization || '',
                 amount: emdData?.emdAmount,
                 assignedToId: Number(values.assignedToId),
+                createdById: Number(values.createdById),
                 comment: values.comment,
                 contacts: values.contacts?.map(c => ({
                     name: c.name,
                     email: c.email || null,
                     phone: c.phone || null,
                 })) || [],
-                emdId: Number(id),
+                emdId: emdIdNumber,
+                details: previewData?.html ?? '',
             };
 
             if (values.startFrom) {
@@ -188,7 +194,7 @@ const EmdFollowUpPage = () => {
         );
     }
 
-    if (isLoading) {
+    if (isLoading || isLoadingPreview) {
         return (
             <Card>
                 <CardHeader>

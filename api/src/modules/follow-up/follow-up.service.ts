@@ -113,9 +113,9 @@ export class FollowUpService {
                     partyName: dto.partyName,
                     amount: dto.amount != null ? String(dto.amount) : "0",
                     followupFor: dto.followupFor ?? null,
-                    assignedToId: dto.assignedToId ?? null,
-                    createdById: currentUserId,
-                    assignmentStatus: "assigned",
+                    assignedToId: dto.assignedToId || currentUserId,
+                    createdById: dto.createdById || currentUserId,
+                    assignmentStatus: dto.assignmentStatus ?? "assigned",
                     comment: dto.comment ?? null,
                     details: dto.details ?? null,
                     latestComment: dto.latestComment ?? null,
@@ -643,6 +643,28 @@ export class FollowUpService {
                 error: error.message,
                 stack: error.stack,
             });
+        }
+    }
+
+    async getPreviewHtml(emdId: number) {
+        this.logger.debug("Generating email template preview via builder", { emdId });
+
+        try {
+            const builder = new FollowupMailDataBuilder(this.db);
+            const html = await builder.buildPreview(emdId);
+
+            if (!html) {
+                return { html: null, message: "Could not generate preview. Instrument missing." };
+            }
+
+            return { html };
+        } catch (error: any) {
+            this.logger.error("Error generating preview html", {
+                emdId,
+                error: error.message,
+                stack: error.stack,
+            });
+            throw new BadRequestException("Failed to generate preview");
         }
     }
 

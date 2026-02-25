@@ -29,6 +29,18 @@ export const useFollowUp = (id: number) => {
 };
 
 // =====================================
+// GET EMD MAIL PREVIEW
+// =====================================
+export const useEmdMailPreview = (emdId: number | null) => {
+    return useQuery({
+        queryKey: ["emdMailPreview", emdId],
+        queryFn: () => import("./follow-up.api").then(m => m.getEmdMailPreview(emdId!)),
+        enabled: !!emdId,
+        staleTime: 1000 * 60 * 5, // 5 mins
+    });
+};
+
+// =====================================
 // LIST HOOK ✅ (TYPED)
 // =====================================
 export const useFollowUpList = (query: FollowUpQueryDto) => {

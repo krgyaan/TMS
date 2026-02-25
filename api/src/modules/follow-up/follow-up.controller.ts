@@ -57,7 +57,7 @@ export class FollowUpController {
 
     @Post()
     async create(@Body() dto: CreateFollowUpDto, @Req() req) {
-        console.log("Follow up called");
+        console.log("Follow up called. User:", req.user);
         return this.service.create(dto, req.user.id);
     }
 
@@ -119,6 +119,15 @@ export class FollowUpController {
     @Delete(":id")
     async remove(@Param("id", ParseIntPipe) id: number) {
         return this.service.remove(id);
+    }
+
+    // ========================
+    // MAILING AND PREVIEWS
+    // ========================
+
+    @Get("preview-mail/:emdId")
+    async previewEmdMail(@Param("emdId", ParseIntPipe) emdId: number) {
+        return this.service.getPreviewHtml(emdId);
     }
 
     @Get("test-followup/:id")

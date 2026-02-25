@@ -1,3 +1,25 @@
 <div>
-    {{! Gyan is gay!}}
+    <p>Dear {{name}},</p>
+    <p>{{#if status}}The FDR submitted against {{#if tenderNo}} Wo no. {{tenderNo}} {{/if}}, Project name {{projectName}}, has expired.
+        {{else}}The status of the Tender no. {{tenderNo}}, project name {{projectName}}, is {{status}}.
+        {{/if}}
+    </p>
+    <p>Please initiate the process of releasing the EMD in the form of FDR for Rs. {{amount}} submitted against the tender.</p>
+    <p>The details of the EMD in the form of FDR submitted are as follows:</p>
+    <ul>
+        <li>FDR no.: {{fdrNo}}</li>
+        <li>FDR Date: {{date}}</li>
+        <li>FDR Expiry Date: {{expiryDate}}</li>
+        <li>Amount: Rs. {{amount}}</li>
+    </ul>
+    <p>Please courier the FDR back to our address mentioned below:</p>
+    <p>
+        Volks Energie Pvt. Ltd.<br />
+        B1/D8, 2nd Floor,<br />
+        Mohan Cooperative Industrial Estate,<br />
+        New Delhi - 110044<br />
+        Phone no.: +91-8882591733
+    </p>
+    <p>Please reply to this mail with the Courier Docket Number and the Courier Docket Slip so that we can effectively track the envelope and ensure its preservation in transit.</p>
+    <p>Best Regards,<br />Accounts team,<br />Volks Energie Pvt. Ltd.</p>
 </div>

@@ -122,7 +122,7 @@ export class FollowupMailDataBuilder {
         const rows = await this.db.execute(sql`
         SELECT id, instrument_type, request_id, amount
         FROM payment_instruments
-        WHERE id = ${instrumentId}
+        WHERE request_id = ${instrumentId}
     `);
 
         const instrument = rows.rows[0] as {
@@ -140,12 +140,39 @@ export class FollowupMailDataBuilder {
             BG: this.bgResolver.bind(this),
             "Bank Transfer": this.btResolver.bind(this),
             "Portal Payment": this.popResolver.bind(this),
-            FDR: async () => null,
+            FDR: this.fdrResolver.bind(this),
             "Surety Bond": async () => null,
         };
 
         return resolvers[instrument.instrument_type](instrument.id, instrument.request_id, instrument.amount);
     }
+
+    //NEW PREVIEW METHOD FOR API
+    async buildPreview(emdId: number): Promise<string | null> {
+        const instrument = await this.resolveInstrumentData(emdId);
+        if (!instrument) return null;
+
+        // Populate a fake followup context for the preview
+        const baseContext = {
+            for: "Refund EMD",
+            name: "Supplier/Organization Name",
+            details: "Details for this follow-up goes here...",
+            reminder: 1,
+            since: 0,
+        };
+
+        const template = instrument.template ?? FollowupMailTemplates.DEFAULT;
+
+        const context = {
+            ...baseContext,
+            ...instrument.context,
+        };
+
+        // This requires the template renderer from mailer.service.ts
+        const { renderTemplateFromPath } = require("../../mailer/template-renderer");
+        return renderTemplateFromPath(template.basePath, template.name, context);
+    }
+
     //RESOLVERS TO BE IMPLEMENTED TO GET THE DATA WE ARE LOOKING FORRRRR
     private async ddResolver(instrumentId: number, _: number, amount: string) {
         const rows = await this.db.execute(sql`
@@ -257,6 +284,37 @@ export class FollowupMailDataBuilder {
             context: {
                 date: r.transaction_date,
                 utr: r.utr_num,
+                amount,
+                tenderNo: r.tender_no,
+                projectName: r.project_name,
+                status: r.status,
+            },
+        };
+    }
+
+    private async fdrResolver(instrumentId: number, _: number, amount: string) {
+        const rows = await this.db.execute(sql`
+        SELECT
+            f.fdr_no,
+            f.fdr_date,
+            f.fdr_expiry_date,
+            pr.tender_no,
+            pr.project_name,
+            pr.status
+        FROM instrument_fdr_details f
+        JOIN payment_instruments pi ON pi.id = f.instrument_id
+        JOIN payment_requests pr ON pr.id = pi.request_id
+        WHERE f.instrument_id = ${instrumentId}
+    `);
+
+        const r: any = rows.rows[0] || {};
+
+        return {
+            template: FollowupMailTemplates.FDR,
+            context: {
+                fdrNo: r.fdr_no,
+                date: r.fdr_date,
+                expiryDate: r.fdr_expiry_date,
                 amount,
                 tenderNo: r.tender_no,
                 projectName: r.project_name,
