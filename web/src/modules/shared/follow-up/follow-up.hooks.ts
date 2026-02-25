@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getFollowUps, createFollowUp, updateFollowUp, updateFollowUpStatus, deleteFollowUp, getFollowUpDetail } from "./follow-up.api";
 
 import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto, FollowUpRow, FollowUpDetailsDto } from "./follow-up.types";
+import { toast } from "sonner";
 
 // =====================================
 // API RESPONSE TYPE (LIST)
@@ -94,6 +95,14 @@ export const useDeleteFollowUp = () => {
 
     return useMutation({
         mutationFn: (id: number) => deleteFollowUp(id),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["follow-ups"] }),
+
+        onSuccess: (_, id) => {
+            toast.success(`Follow-up deleted successfully`);
+            qc.invalidateQueries({ queryKey: ["follow-ups"] });
+        },
+
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message ?? error?.message ?? "Failed to delete follow-up");
+        },
     });
 };
