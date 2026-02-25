@@ -28,5 +28,17 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
+    // Handle inactive users - redirect to registration
+    if (!user.isActive && !location.pathname.startsWith("/hrms/registration")) {
+        console.log("👤 User is inactive, redirecting to registration");
+        return <Navigate to="/hrms/registration" replace />;
+    }
+
+    // Handle active users trying to access registration (optional, but good for UX)
+    if (user.isActive && location.pathname.startsWith("/hrms/registration")) {
+        console.log("✅ User is active, redirecting from registration to dashboard");
+        return <Navigate to="/" replace />;
+    }
+
     return <Outlet />;
 }

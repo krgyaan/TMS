@@ -18,11 +18,13 @@ export function PermissionSelector({
     selectedPermissions = [],
     rolePermissions = [],
     onChange,
+    disabled = false,
 }: {
     permissions: Permission[];
     selectedPermissions: UserPermission[];
-    rolePermissions: UserPermission[];
+    rolePermissions: Permission[];
     onChange: (permissionId: number, granted: boolean) => void;
+    disabled?: boolean;
 }) {
     // 1. Group by subject only (one row per subject)
     const grouped = permissions.reduce((acc, perm) => {
@@ -97,6 +99,7 @@ export function PermissionSelector({
                                                 <Checkbox
                                                     checked={checked}
                                                     onCheckedChange={() => toggle(perm.id)}
+                                                    disabled={disabled}
                                                 />
                                             </TooltipTrigger>
                                             <TooltipContent
