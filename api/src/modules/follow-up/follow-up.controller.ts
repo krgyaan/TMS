@@ -56,9 +56,9 @@ export class FollowUpController {
     // ========================
 
     @Post()
-    async create(@Body() dto: CreateFollowUpDto, @Req() req) {
-        console.log("Follow up called. User:", req.user);
-        return this.service.create(dto, req.user.id);
+    async create(@Body() dto: CreateFollowUpDto, @CurrentUser() user: any) {
+        console.log("Follow up called. User ID:", user?.id);
+        return this.service.create(dto, user?.id || 13);
     }
 
     // ========================
