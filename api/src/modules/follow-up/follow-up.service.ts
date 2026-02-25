@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
 import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -208,8 +208,6 @@ export class FollowUpService {
                 limit,
                 offset,
             });
-
-            this.logger.debug("Follow-ups fetched", { count: results.length });
 
             const [{ count }] = await this.db
                 .select({ count: sql<number>`count(*)` })
@@ -480,11 +478,35 @@ export class FollowUpService {
     // DELETE
     // ========================
 
-    async remove(id: number) {
-        const existing = await this.findOne(id);
-        this.logger.warn("Soft deleting follow-up", { followUpId: id });
-        await this.db.update(followUps).set({ deletedAt: new Date() }).where(eq(followUps.id, id));
-        return { message: "Follow-up deleted successfully" };
+    async delete(id: number, userId: number) {
+        this.logger.warn("Hard deleting follow-up", { followUpId: id, userId });
+
+        try {
+            const existing = await this.findOne(id);
+            if (!existing) {
+                throw new NotFoundException("Follow-up not found");
+            }
+
+            await this.db.transaction(async tx => {
+                // 1️⃣ Delete child records first (FK safety)
+                await tx.delete(followUpPersons).where(eq(followUpPersons.followUpId, id));
+
+                // 2️⃣ Delete follow_up
+                await tx.delete(followUps).where(eq(followUps.id, id));
+            });
+
+            this.logger.warn("Follow-up hard deleted successfully", { followUpId: id });
+
+            return { message: "Follow-up and related persons deleted successfully" };
+        } catch (error: any) {
+            this.logger.error("Failed to hard delete follow-up", {
+                followUpId: id,
+                userId,
+                error: error.message,
+            });
+
+            throw new InternalServerErrorException(error.message);
+        }
     }
 
     // ========================
