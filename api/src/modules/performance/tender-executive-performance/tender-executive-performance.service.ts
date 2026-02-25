@@ -935,9 +935,11 @@ export class TenderExecutiveService {
                 // OPENING — OLD TENDERS ONLY
                 // ===============================
                 if (isOldTender) {
+                    const applicable = stage.isApplicable?.(tender) ?? true;
+
                     const completedByStatus = STAGE_BACKLOG_KPI_RANK[bucket] >= STAGE_BACKLOG_KPI_RANK[stage.autoCompleteAfter];
 
-                    if (!completedByStatus) {
+                    if (applicable && !completedByStatus) {
                         metrics.opening.count++;
                         metrics.opening.value += value;
                         metrics.opening.drilldown.push(meta);
@@ -1161,6 +1163,8 @@ export class TenderExecutiveService {
                 tenderId: paymentRequests.tenderId,
                 amount: paymentRequests.amountRequired,
                 createdAt: paymentRequests.createdAt,
+
+                action: paymentInstruments.action,
 
                 instrumentType: paymentInstruments.instrumentType,
                 status: paymentInstruments.status,
