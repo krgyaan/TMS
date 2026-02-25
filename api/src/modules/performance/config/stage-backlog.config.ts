@@ -32,6 +32,7 @@ export const STAGE_BACKLOG_CONFIG = [
         stageKey: "tender_approval",
         label: "Tender Approval",
         autoCompleteAfter: "APPROVED" as TenderKpiBucket,
+        isApplicable: tender => tender.tlStatus === 0,
     },
     {
         stageKey: "rfq",
