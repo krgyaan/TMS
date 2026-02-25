@@ -121,7 +121,6 @@ export class FollowUpService {
                         comment: dto.comment ?? null,
                         details: dto.details ?? null,
                         latestComment: dto.latestComment ?? null,
-                        contacts: contacts, // Populating the JSONB column
                         attachments: dto.attachments ?? [],
                         followUpHistory: dto.followUpHistory ?? [],
                         startFrom,
@@ -142,21 +141,30 @@ export class FollowUpService {
                 this.logger.debug("Follow-up main record inserted", { followUpId: created.id });
 
                 // 2. Insert relational contacts
-                if (contacts.length > 0) {
-                    await tx.insert(followUpPersons).values(
-                        contacts.map(c => ({
-                            followUpId: created.id,
-                            name: c.name,
-                            email: c.email,
-                            phone: c.phone,
-                            organization: c.org || dto.partyName, // Ensuring organization is set
-                        }))
-                    );
+                this.logger.debug("Preparing to insert relational contacts", {
+                    count: contacts.length,
+                    followUpId: created.id
+                });
 
-                    this.logger.debug("Relational contacts inserted", {
+                if (contacts.length > 0) {
+                    const mappedContacts = contacts.map(c => ({
                         followUpId: created.id,
-                        count: contacts.length,
+                        name: c.name,
+                        email: c.email,
+                        phone: c.phone,
+                        organization: c.org || dto.partyName, // Ensuring organization is set
+                    }));
+
+                    this.logger.debug("Mapped contacts for relational insert", { mappedContacts });
+
+                    const insertResult = await tx.insert(followUpPersons).values(mappedContacts).returning();
+
+                    this.logger.debug("Relational contacts insert result", {
+                        followUpId: created.id,
+                        insertedCount: insertResult.length,
                     });
+                } else {
+                    this.logger.warn("No contacts found to insert relationally", { followUpId: created.id });
                 }
 
                 this.logger.info("Follow-up created successfully inside transaction", {
@@ -296,7 +304,12 @@ export class FollowUpService {
             stopRemarks: result.stopRemarks ?? null,
 
             // ✅ CORRECT SOURCE
-            contacts: result.contacts ?? [],
+            contacts: (result.contacts ?? []).map(c => ({
+                name: c.name ?? null,
+                email: c.email ?? null,
+                phone: c.phone ?? null,
+                org: c.org ?? null,
+            })),
 
             attachments: Array.isArray(result.attachments) ? result.attachments : [],
             followUpHistory: Array.isArray(result.followUpHistory) ? result.followUpHistory : [],

@@ -126,6 +126,12 @@ export function DemandDraftView({
                                 {data.requestedByName || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
+                                Courier Address
+                            </TableCell>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
+                                {data.courierAddress || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
                                 Docket No
                             </TableCell>
                             <TableCell className="text-sm">
