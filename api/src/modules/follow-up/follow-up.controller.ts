@@ -121,6 +121,15 @@ export class FollowUpController {
         return this.service.remove(id);
     }
 
+    // ========================
+    // MAILING AND PREVIEWS
+    // ========================
+
+    @Get("preview-mail/:emdId")
+    async previewEmdMail(@Param("emdId", ParseIntPipe) emdId: number) {
+        return this.service.getPreviewHtml(emdId);
+    }
+
     @Get("test-followup/:id")
     async test(@Param("id") id: number) {
         await this.service.processFollowupMail(id);

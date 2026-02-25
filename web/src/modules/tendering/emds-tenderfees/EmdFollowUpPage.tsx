@@ -12,7 +12,7 @@ import { Form } from "@/components/ui/form";
 import { usePaymentRequest } from "@/hooks/api/useEmds";
 import { useTender } from "@/hooks/api/useTenders";
 import { ContactPersonSchema } from "@/modules/shared/follow-up/follow-up.types";
-import { useCreateFollowUp, useUpdateFollowUp } from "@/modules/shared/follow-up/follow-up.hooks";
+import { useCreateFollowUp, useUpdateFollowUp, useEmdMailPreview } from "@/modules/shared/follow-up/follow-up.hooks";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useMemo } from "react";
@@ -58,17 +58,21 @@ function mapInstrumentTypeToMode(instrumentType: string | null): string | undefi
 const EmdFollowUpPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
+    const emdIdNumber = id ? Number(id) : null;
 
     // Follow-up mutations
     const { mutateAsync: createFollowUp } = useCreateFollowUp();
     const { mutateAsync: updateFollowUp } = useUpdateFollowUp();
 
     // All hooks must be called unconditionally at the top level
-    const { data: paymentRequests, isLoading, error } = usePaymentRequest(id ? Number(id) : null);
+    const { data: paymentRequests, isLoading, error } = usePaymentRequest(emdIdNumber);
 
     // Always call useTender - pass null when not ready
     const tenderId = paymentRequests?.tenderId ?? null;
     const { data: tender } = useTender(tenderId && tenderId > 0 ? tenderId : null);
+
+    // Fetch template string for the specific EMD
+    const { data: previewData, isLoading: isLoadingPreview } = useEmdMailPreview(emdIdNumber);
 
     // Compute emdData (kept for future use if needed)
     const emdData = useMemo(() => {
@@ -97,7 +101,7 @@ const EmdFollowUpPage = () => {
         defaultValues: {
             area: '',
             followupFor: 'Emd Refund',
-            organization: '',   
+            organization: '',
             assignedToId: 0,
             createdById: 0,
             assignmentStatus: "initiated",
@@ -131,7 +135,8 @@ const EmdFollowUpPage = () => {
                     email: c.email || null,
                     phone: c.phone || null,
                 })) || [],
-                emdId: Number(id),
+                emdId: emdIdNumber,
+                details: previewData?.html ?? '',
             };
 
             if (values.startFrom) {
@@ -188,7 +193,7 @@ const EmdFollowUpPage = () => {
         );
     }
 
-    if (isLoading) {
+    if (isLoading || isLoadingPreview) {
         return (
             <Card>
                 <CardHeader>

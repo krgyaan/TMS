@@ -646,6 +646,28 @@ export class FollowUpService {
         }
     }
 
+    async getPreviewHtml(emdId: number) {
+        this.logger.debug("Generating email template preview via builder", { emdId });
+
+        try {
+            const builder = new FollowupMailDataBuilder(this.db);
+            const html = await builder.buildPreview(emdId);
+
+            if (!html) {
+                return { html: null, message: "Could not generate preview. Instrument missing." };
+            }
+
+            return { html };
+        } catch (error: any) {
+            this.logger.error("Error generating preview html", {
+                emdId,
+                error: error.message,
+                stack: error.stack,
+            });
+            throw new BadRequestException("Failed to generate preview");
+        }
+    }
+
     async getDueFollowupsForCurrentWindow(frequency: number) {
         const today = new Date().toLocaleDateString("en-CA");
 

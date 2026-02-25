@@ -23,4 +23,8 @@ export const FollowupMailTemplates = {
         name: "followup-pop",
         basePath: "modules/follow-up/mails",
     },
+    FDR: {
+        name: "followup-fdr",
+        basePath: "modules/follow-up/mails",
+    },
 };
