@@ -24,8 +24,8 @@ export const createFollowUpSchema = z.object({
     // VARCHAR(50) in DB
     followupFor: z.string().nullable().optional(),
 
-    assignedToId: z.number().positive().nullable(), // DB allows NULL
-    createdById: z.number().positive().nullable(), // DB allows NULL
+    assignedToId: z.number().nonnegative().nullable(), // DB allows NULL
+    createdById: z.number().nonnegative().nullable(), // DB allows NULL
 
     comment: z.string().nullable().optional(),
     details: z.string().nullable().optional(),
