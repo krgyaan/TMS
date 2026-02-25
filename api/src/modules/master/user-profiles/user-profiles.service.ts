@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
+import { users } from "@db/schemas/auth/users.schema";
 import { userProfiles, type NewUserProfile, type UserProfile } from "@db/schemas/auth/user-profiles.schema";
 
 function stripUndefined<T extends Record<string, any>>(obj: T): T {
@@ -49,7 +50,23 @@ export class UserProfilesService {
         if (existingProfile) {
             return this.updateByUserId(userId, { image: filePath });
         } else {
-            return this.create({ userId, image: filePath });
+            // Fetch user name to provide mandatory firstName/lastName
+            const user = await this.db.query.users.findFirst({
+                where: eq(users.id, userId),
+                columns: { name: true },
+            });
+
+            const fullName = user?.name || "User";
+            const nameParts = fullName.trim().split(/\s+/);
+            const firstName = nameParts[0] || "User";
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : " ";
+
+            return this.create({
+                userId,
+                firstName,
+                lastName,
+                image: filePath,
+            });
         }
     }
 }

@@ -13,8 +13,9 @@ function toDateString(date?: Date | null): string | null {
 const CreateUserProfileSchema = z.object({
     userId: z.number(),
 
-    firstName: z.string().nullable().optional(),
-    lastName: z.string().nullable().optional(),
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    middleName: z.string().nullable().optional(),
 
     dateOfBirth: z.coerce.date().nullable().optional(),
     gender: z.string().nullable().optional(),
@@ -24,10 +25,9 @@ const CreateUserProfileSchema = z.object({
     designationId: z.number().nullable().optional(),
     primaryTeamId: z.number().nullable().optional(),
 
-    altEmail: z.string().email().nullable().optional(),
-
-    emergencyContactName: z.string().nullable().optional(),
-    emergencyContactPhone: z.string().nullable().optional(),
+    personalEmail: z.string().email().nullable().optional(),
+    phoneNumber: z.string().nullable().optional(),
+    alternatePhone: z.string().nullable().optional(),
 
     image: z.string().nullable().optional(),
     signature: z.string().nullable().optional(),
@@ -35,8 +35,8 @@ const CreateUserProfileSchema = z.object({
     dateOfJoining: z.coerce.date().nullable().optional(),
     dateOfExit: z.coerce.date().nullable().optional(),
 
-    timezone: z.string().optional(), // DB default handles it
-    locale: z.string().optional(), // DB default handles it
+    timezone: z.string().optional(),
+    locale: z.string().optional(),
 });
 
 type CreateUserProfileDto = z.infer<typeof CreateUserProfileSchema>;

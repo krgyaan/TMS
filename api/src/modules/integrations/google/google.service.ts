@@ -246,9 +246,16 @@ export class GoogleService {
                 // Update existing profile
                 await this.db.update(userProfiles).set({ image: profile.picture, updatedAt: new Date() }).where(eq(userProfiles.userId, userId));
             } else {
-                // Create profile with Google avatar
+                // Create profile with Google avatar and names
+                const fullName = profile.name || "";
+                const nameParts = fullName.trim().split(/\s+/);
+                const firstName = nameParts[0] || (profile.given_name ?? "User");
+                const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : (profile.family_name ?? " ");
+
                 await this.db.insert(userProfiles).values({
                     userId,
+                    firstName,
+                    lastName,
                     image: profile.picture,
                 });
             }
