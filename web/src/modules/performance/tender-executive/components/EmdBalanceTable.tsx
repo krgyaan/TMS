@@ -2,8 +2,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Eye, Info } from "lucide-react";
 import { useEmdBalance } from "../tender-executive.hooks";
+import { paths } from "@/app/routes/paths";
 
 /* ================================
    HELPERS
@@ -138,18 +139,34 @@ function MetricCell({ data, strong = false, danger = false }: { data: any; stron
 
                         {data.drilldown?.length ? (
                             data.drilldown.map(e => (
-                                <div key={`${e.tenderId}-${e.instrumentType}`} className="border-b pb-2 text-xs space-y-1">
-                                    <div className="font-medium">{e.tenderNo ?? `Tender #${e.tenderId}`}</div>
+                                <div key={`${e.tenderId}-${e.instrumentType}`} className="border-b pb-2 text-xs space-y-1 flex justify-between gap-2">
+                                    {/* LEFT: Tender + Instrument Info */}
+                                    <div className="min-w-0 space-y-0.5">
+                                        <div className="font-medium truncate">{e.tenderNo ?? `Tender #${e.tenderId}`}</div>
 
-                                    {e.tenderName && <div className="text-muted-foreground truncate">{e.tenderName}</div>}
+                                        {e.tenderName && <div className="text-muted-foreground truncate">{e.tenderName}</div>}
 
-                                    <div>
-                                        {e.instrumentType} · {formatCurrency(e.amount)}
+                                        <div>
+                                            {e.instrumentType} · {formatCurrency(e.amount)}
+                                        </div>
+
+                                        {e.daysLocked !== null && <div className="text-destructive font-medium">Locked for {e.daysLocked} days</div>}
                                     </div>
 
-                                    {/* <div className="text-muted-foreground">Status: {e.status}</div> */}
-
-                                    {e.daysLocked !== null && <div className="text-destructive font-medium">Locked for {e.daysLocked} days</div>}
+                                    {/* RIGHT: View Icon */}
+                                    <button
+                                        onClick={event => {
+                                            event.stopPropagation();
+                                            window.open(paths.tendering.tenderView(e.tenderId), "_blank", "noopener,noreferrer");
+                                        }}
+                                        className="
+                    shrink-0 h-7 w-7 flex items-center justify-center rounded-md
+                    text-muted-foreground hover:text-primary hover:bg-muted transition
+                "
+                                        title="View tender in new tab"
+                                    >
+                                        <Eye className="h-4 w-4" />
+                                    </button>
                                 </div>
                             ))
                         ) : (
