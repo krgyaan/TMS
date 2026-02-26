@@ -1,7 +1,5 @@
-import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb, boolean, integer, decimal } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb, boolean, decimal } from "drizzle-orm/pg-core";
 import { users } from "@db/schemas/auth/users.schema";
-import { designations } from "@db/schemas/master/designations.schema";
-import { teams } from "@db/schemas/master/teams.schema";
 
 // JSONB Type Definitions (imported/defined similarly to before)
 export interface Address {
@@ -87,6 +85,7 @@ export const userProfiles = pgTable("user_profiles", {
     primaryTeamId: bigint("primary_team_id", { mode: "number" }),
     employeeType: varchar("employee_type", { length: 50 }),
     employeeStatus: varchar("employee_status", { length: 50 }).default("Active"),
+    rejectionReason: varchar("rejection_reason", { length: 500 }),
     reportingManagerId: bigint("reporting_manager_id", { mode: "number" }),
     workLocation: varchar("work_location", { length: 100 }),
 
