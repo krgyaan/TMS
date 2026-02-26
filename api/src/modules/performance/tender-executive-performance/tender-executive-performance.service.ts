@@ -103,53 +103,33 @@ function classifyStage(row?: StagePerformance): StageState {
 
 type EmdFinancialState = "LOCKED" | "RETURNED" | "SETTLED";
 
-function resolveEmdStateFromAction(instrumentType: number, action: number | null): EmdFinancialState {
+function resolveEmdFinancialState(instrumentType: string, action: number | null): EmdFinancialState {
     switch (instrumentType) {
-        // ==========================
-        // DEMAND DRAFT (DD)
-        // ==========================
-        case 1: {
-            if (action === 3 || action === 4) return "RETURNED";
-            if (action === 5) return "SETTLED";
+        case "Portal Payment":
+        case "Bank Transfer":
+            if (action === 3) return "RETURNED";
+            if (action === 4) return "SETTLED";
             return "LOCKED";
-        }
 
-        // ==========================
-        // FDR
-        // ==========================
-        case 2: {
-            if (action === 3 || action === 4) return "RETURNED";
-            if (action === 5) return "SETTLED";
+        case "DD":
+            if ([3, 4, 5].includes(action ?? -1)) return "RETURNED";
+            if ([6, 7].includes(action ?? -1)) return "SETTLED";
             return "LOCKED";
-        }
 
-        // ==========================
-        // BANK GUARANTEE (BG)
-        // ==========================
-        case 4: {
+        case "FDR":
+            if ([3, 4, 5].includes(action ?? -1)) return "RETURNED";
+            if ([6, 7].includes(action ?? -1)) return "SETTLED";
+            return "LOCKED";
+
+        case "Cheque":
+            if ([3, 4, 5].includes(action ?? -1)) return "RETURNED";
+            if ([6, 7].includes(action ?? -1)) return "SETTLED";
+            return "LOCKED";
+
+        case "BG":
             if (action === 6) return "RETURNED";
-            // BG cancellations do NOT refund → treated as settled/closed
-            if (action === 7 || action === 8 || action === 9) return "SETTLED";
+            if ([8, 9].includes(action ?? -1)) return "SETTLED";
             return "LOCKED";
-        }
-
-        // ==========================
-        // BANK TRANSFER (BT)
-        // ==========================
-        case 5: {
-            if (action === 3) return "RETURNED";
-            if (action === 4) return "SETTLED";
-            return "LOCKED";
-        }
-
-        // ==========================
-        // PAY ON PORTAL (POP)
-        // ==========================
-        case 6: {
-            if (action === 3) return "RETURNED";
-            if (action === 4) return "SETTLED";
-            return "LOCKED";
-        }
 
         default:
             return "LOCKED";
@@ -1132,18 +1112,70 @@ export class TenderExecutiveService {
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
+
+    private async resolveTenderIdsForView(view: "user" | "team" | "all", userId?: number, teamId?: number): Promise<number[]> {
+        const conditions = [eq(tenderInfos.deleteStatus, 0)];
+
+        if (view === "user" && userId) {
+            conditions.push(eq(tenderInfos.teamMember, userId));
+        }
+
+        if (view === "team" && teamId) {
+            conditions.push(eq(tenderInfos.team, teamId));
+        }
+
+        // view === "all" → no ownership filter
+
+        const tenders = await this.db
+            .select({ id: tenderInfos.id })
+            .from(tenderInfos)
+            .where(and(...conditions));
+
+        return tenders.map(t => t.id);
+    }
+
+    private async fetchEmdRequestsForTenders(tenderIds: number[], to: Date) {
+        if (!tenderIds.length) return [];
+
+        return this.db
+            .select({
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                amount: paymentRequests.amountRequired,
+                createdAt: paymentRequests.createdAt,
+                dueDate: paymentRequests.dueDate,
+
+                instrumentType: paymentInstruments.instrumentType,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                statusUpdatedAt: paymentInstruments.updatedAt,
+
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+            })
+            .from(paymentRequests)
+            .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .where(and(inArray(paymentRequests.tenderId, tenderIds), eq(paymentRequests.purpose, "EMD"), lte(paymentRequests.createdAt, to)));
+    }
+
     async getEmdBalance(query: EmdBalanceQueryDto) {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
-        // 1️⃣ Fetch all relevant EMD instruments (past + present)
-        const emds = await this.fetchEmdUniverse(query, to);
-        if (!emds.length) {
+        const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
+
+        if (!tenderIds.length) {
             return this.emptyEmdBalance();
         }
 
-        // 2️⃣ Aggregate into balance-sheet style buckets
-        return this.aggregateEmdBalance(emds, from, to);
+        const rows = await this.fetchEmdRequestsForTenders(tenderIds, to);
+
+        if (!rows.length) {
+            return this.emptyEmdBalance();
+        }
+
+        return this.aggregateEmdBalance(rows, from, to);
     }
 
     private async fetchEmdUniverse(query: EmdBalanceQueryDto, to: Date) {
@@ -1181,7 +1213,7 @@ export class TenderExecutiveService {
     }
 
     private emptyEmdBalance() {
-        const bucket = () => ({ count: 0, value: 0, drilldown: [] });
+        const bucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
 
         return {
             opening: bucket(),
@@ -1197,7 +1229,7 @@ export class TenderExecutiveService {
         const result = this.emptyEmdBalance();
 
         for (const r of rows) {
-            const stateAtTo = resolveEmdStateFromAction(r.instrumentType, r.action);
+            const state = resolveEmdFinancialState(r.instrumentType, r.action);
 
             const meta = {
                 tenderId: r.tenderId,
@@ -1208,26 +1240,31 @@ export class TenderExecutiveService {
                 status: r.status,
                 requestedAt: r.createdAt,
                 lastUpdatedAt: r.statusUpdatedAt,
-                daysLocked: stateAtTo === "LOCKED" ? Math.ceil((to.getTime() - r.createdAt.getTime()) / 86400000) : null,
+                daysLocked: state === "LOCKED" ? Math.ceil((to.getTime() - r.createdAt.getTime()) / 86400000) : null,
             };
 
-            // 🔹 Requested during period
+            // 🔹 OPENING (locked before period)
+            if (r.createdAt < from && state === "LOCKED") {
+                this.add(result.opening, meta);
+            }
+
+            // 🔹 REQUESTED (during period)
             if (r.createdAt >= from && r.createdAt <= to) {
                 this.add(result.requested, meta);
             }
 
-            // 🔹 Returned during period
-            if (stateAtTo === "RETURNED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
+            // 🔹 RETURNED (during period)
+            if (state === "RETURNED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.returned, meta);
             }
 
-            // 🔹 Settled during period
-            if (stateAtTo === "SETTLED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
+            // 🔹 SETTLED (during period)
+            if (state === "SETTLED" && r.statusUpdatedAt && r.statusUpdatedAt >= from && r.statusUpdatedAt <= to) {
                 this.add(result.settled, meta);
             }
 
-            // 🔹 Closing balance (still locked)
-            if (stateAtTo === "LOCKED") {
+            // 🔹 CLOSING (still locked)
+            if (state === "LOCKED") {
                 this.add(result.closing, meta);
 
                 if (r.dueDate && r.dueDate < to) {
