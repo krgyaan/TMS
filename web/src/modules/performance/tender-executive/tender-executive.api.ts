@@ -48,8 +48,22 @@ export const getExecutiveBacklog = async (params: StageQuery): Promise<Executive
     return res.data;
 };
 
+export const getStageBacklogV2 = async (params: ExecutiveScoring) => {
+    const res = await api.get("/performance/tender-executive/stage-backlog", {
+        params,
+    });
+    return res.data;
+};
+
 export const getEmdBalance = async (params: StageQuery): Promise<ExecutiveScoring> => {
     const res = await api.get("/performance/tender-executive/emd-balance", { params });
     console.log("EMD Balance API Response:", res.data);
+    return res.data;
+};
+
+export const getEmdCashFlow = async (params: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) => {
+    const res = await api.get("/performance/tender-executive/emd-cashflow", { params });
+
+    console.log("EMD Cash Flow API Response:", res.data);
     return res.data;
 };

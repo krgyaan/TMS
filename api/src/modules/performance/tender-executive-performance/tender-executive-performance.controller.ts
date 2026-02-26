@@ -80,7 +80,7 @@ export class TenderExecutiveController {
     @Get("stage-backlog")
     async getStageBacklog(@Query() query: unknown) {
         const parsed = StageBacklogQuerySchema.parse(query);
-        return this.tenderExecutiveService.getStageBacklog(parsed);
+        return this.tenderExecutiveService.getStageBacklogV2(parsed);
     }
 
     @Public()
@@ -88,5 +88,12 @@ export class TenderExecutiveController {
     async getEmdBalance(@Query() query: unknown) {
         const parsed = EmdBalanceQuerySchema.parse(query);
         return this.tenderExecutiveService.getEmdBalance(parsed);
+    }
+
+    @Public()
+    @Get("emd-cashflow")
+    async getEmdCashFlow(@Query() query: unknown) {
+        const parsed = EmdBalanceQuerySchema.parse(query);
+        return this.tenderExecutiveService.getEmdCashFlow(parsed);
     }
 }

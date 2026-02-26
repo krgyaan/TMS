@@ -13,14 +13,65 @@ import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { TenderListQuery } from "./zod/tender.dto";
 import { TenderOutcomeStatus } from "./zod/stage-performance.type";
 import { fa } from "zod/v4/locales";
-import { paymentInstruments, paymentRequests, reverseAuctions, tenderQueries, users } from "@/db/schemas";
+import { paymentInstruments, paymentRequests, reverseAuctions, tenderCostingSheets, tenderInformation, tenderQueries, users } from "@/db/schemas";
 import type { TenderKpiBucket } from "./zod/tender-buckets.type";
 import { TenderMeta } from "./zod/tender.types";
 import { StageBacklogQueryDto } from "./zod/stage-backlog-query.dto";
 import { EmdBalanceQueryDto } from "./zod/emd-balance-query.dto";
 import { STAGE_BACKLOG_CONFIG, STAGE_BACKLOG_KPI_RANK } from "../config/stage-backlog.config";
 
+function isWon(status: number) {
+    return [25, 26, 27, 28].includes(status);
+}
+
+function isLost(status: number) {
+    return [18, 21, 22, 24].includes(status);
+}
+
+function isDisqualified(status: number) {
+    return [33, 38, 39, 41].includes(status);
+}
+
+function resolvePeriod(type: "MONTH" | "QUARTER" | "FY", year: number, month?: number, quarter?: number): Period {
+    if (type === "MONTH") {
+        const from = new Date(Date.UTC(year, month! - 1, 1));
+        const to = new Date(Date.UTC(year, month!, 0, 23, 59, 59));
+        return { from, to, label: `${from.toLocaleString("en", { month: "short" })} ${year}` };
+    }
+
+    if (type === "QUARTER") {
+        const qStartMonth = (quarter! - 1) * 3;
+        const from = new Date(Date.UTC(year, qStartMonth, 1));
+        const to = new Date(Date.UTC(year, qStartMonth + 3, 0, 23, 59, 59));
+        return { from, to, label: `Q${quarter} ${year}` };
+    }
+
+    // FY (Apr–Mar)
+    const from = new Date(Date.UTC(year, 3, 1));
+    const to = new Date(Date.UTC(year + 1, 2, 31, 23, 59, 59));
+    return { from, to, label: `FY ${year}-${year + 1}` };
+}
+
+type Period = {
+    from: Date;
+    to: Date;
+    label: string;
+};
+
+type Bucket = {
+    count: number;
+    value: number;
+    drilldown: any[];
+};
+
+const emptyBucket = (): Bucket => ({
+    count: 0,
+    value: 0,
+    drilldown: [],
+});
+
 const EMD_OVERDUE_GRACE_DAYS = 14;
+
 export interface TenderListRow {
     id: number;
     tenderNo: string;
@@ -1102,6 +1153,175 @@ export class TenderExecutiveService {
         return aggregated;
     }
 
+    async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+        const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+        const to = new Date(`${query.toDate}T23:59:59.999Z`);
+
+        /* =====================================================
+       0️⃣ Tender universe conditions
+    ===================================================== */
+        const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
+
+        if (query.view === "user" && query.userId) {
+            tenderConditions.push(eq(tenderInfos.teamMember, query.userId));
+        }
+
+        if (query.view === "team" && query.teamId) {
+            tenderConditions.push(eq(tenderInfos.team, query.teamId));
+        }
+
+        /* =====================================================
+       1️⃣ Fetch Tender Universe
+    ===================================================== */
+        const tenders = await this.db
+            .select()
+            .from(tenderInfos)
+            .where(and(...tenderConditions));
+
+        if (!tenders.length) {
+            return { from, to, stages: {} };
+        }
+
+        const tenderIds = tenders.map(t => t.id);
+
+        /* =====================================================
+       2️⃣ Fetch Info Sheets
+    ===================================================== */
+        const infos = await this.db
+            .select({
+                tenderId: tenderInformation.tenderId,
+                createdAt: tenderInformation.createdAt,
+            })
+            .from(tenderInformation)
+            .where(inArray(tenderInformation.tenderId, tenderIds));
+
+        const infoMap = new Map<number, Date>();
+        infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
+
+        /* =====================================================
+       3️⃣ Fetch Costing Sheets
+    ===================================================== */
+        const costings = await this.db.select().from(tenderCostingSheets).where(inArray(tenderCostingSheets.tenderId, tenderIds));
+
+        const costingMap = new Map<number, (typeof costings)[number]>();
+        costings.forEach(c => costingMap.set(Number(c.tenderId), c));
+
+        /* =====================================================
+       4️⃣ Fetch Bid Submissions
+    ===================================================== */
+        const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
+
+        const bidMap = new Map<number, (typeof bids)[number]>();
+        bids.forEach(b => bidMap.set(Number(b.tenderId), b));
+
+        /* =====================================================
+       5️⃣ Fetch Results (AUTHORITATIVE)
+    ===================================================== */
+        const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
+
+        const resultMap = new Map<number, (typeof results)[number]>();
+        results.forEach(r => resultMap.set(Number(r.tenderId), r));
+
+        /* =====================================================
+       6️⃣ Status helpers (ONLY for non-result stages)
+    ===================================================== */
+        const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
+        const isDnb = (s: number) => DNB_CODES.has(s);
+
+        /* =====================================================
+       7️⃣ Buckets
+    ===================================================== */
+        const empty = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+
+        const stages = {
+            assigned: { opening: empty(), during: empty(), total: empty() },
+            approved: { opening: empty(), during: empty(), total: empty() },
+            bid: { opening: empty(), during: empty(), total: empty() },
+            resultAwaited: { opening: empty(), during: empty(), total: empty() },
+            won: { opening: empty(), during: empty(), total: empty() },
+            lost: { opening: empty(), during: empty(), total: empty() },
+            disqualified: { opening: empty(), during: empty(), total: empty() },
+        };
+
+        /* =====================================================
+       8️⃣ Ledger Processing (FINAL, CLEAN FLOW)
+    ===================================================== */
+        for (const t of tenders) {
+            const value = Number(t.gstValues ?? 0);
+            const baseDate = t.createdAt; // 🔒 SINGLE TIME AXIS
+
+            const infoAt = infoMap.get(t.id) ?? null;
+            const costing = costingMap.get(t.id);
+            const bid = bidMap.get(t.id);
+            const result = resultMap.get(t.id);
+
+            const bidSubmitted = bid?.status === "Bid Submitted" && bid.submissionDatetime;
+
+            const meta = {
+                tenderId: t.id,
+                tenderNo: t.tenderNo,
+                tenderName: t.tenderName,
+                value,
+            };
+
+            /* ---------- ASSIGNED ---------- */
+            if (t.tlStatus === 0 && !infoAt && !isDnb(t.status)) {
+                this.push(stages.assigned, baseDate, from, to, meta);
+            }
+
+            /* ---------- APPROVED (PENDING TL) ---------- */
+            if (infoAt && t.tlStatus === 0 && !isDnb(t.status)) {
+                this.push(stages.approved, baseDate, from, to, meta);
+            }
+
+            /* ---------- BID (PENDING SUBMISSION) ---------- */
+            if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(t.status)) {
+                this.push(stages.bid, baseDate, from, to, meta);
+            }
+
+            /* ---------- RESULT AWAITED ---------- */
+            if (bidSubmitted && !result) {
+                this.push(stages.resultAwaited, baseDate, from, to, meta);
+            }
+
+            /* ---------- TERMINAL RESULTS (PURE FROM tender_results) ---------- */
+            if (result) {
+                if (result.status === "Won") {
+                    this.push(stages.won, baseDate, from, to, meta);
+                }
+
+                if (result.status === "Lost") {
+                    this.push(stages.lost, baseDate, from, to, meta);
+                }
+
+                if (result.status === "Disqualified") {
+                    this.push(stages.disqualified, baseDate, from, to, meta);
+                }
+            }
+        }
+
+        return { from, to, stages };
+    }
+    /* =====================================================
+   Helper
+===================================================== */
+    private push(stage, date: Date, from: Date, to: Date, meta: any) {
+        stage.total.count++;
+        stage.total.value += meta.value;
+        stage.total.drilldown.push({ ...meta, at: date });
+
+        if (date < from) {
+            stage.opening.count++;
+            stage.opening.value += meta.value;
+            stage.opening.drilldown.push({ ...meta, at: date });
+        }
+
+        if (date >= from && date <= to) {
+            stage.during.count++;
+            stage.during.value += meta.value;
+            stage.during.drilldown.push({ ...meta, at: date });
+        }
+    }
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
@@ -1310,5 +1530,114 @@ export class TenderExecutiveService {
         bucket.count += 1;
         bucket.value += meta.amount;
         bucket.drilldown.push(meta);
+    }
+
+    async getEmdCashFlow(query: EmdBalanceQueryDto) {
+        const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+        const to = new Date(`${query.toDate}T23:59:59.999Z`);
+
+        const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
+
+        const emptyBucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+
+        const result = {
+            paid: {
+                prior: emptyBucket(),
+                during: emptyBucket(),
+            },
+            received: {
+                priorPaid: emptyBucket(),
+                duringPaid: emptyBucket(),
+            },
+        };
+
+        if (!tenderIds.length) {
+            return result;
+        }
+
+        const rows = await this.db
+            .select({
+                tenderId: paymentRequests.tenderId,
+                amount: paymentRequests.amountRequired,
+                createdAt: paymentRequests.createdAt,
+
+                instrumentType: paymentInstruments.instrumentType,
+                action: paymentInstruments.action,
+                updatedAt: paymentInstruments.updatedAt,
+
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+            })
+            .from(paymentRequests)
+            .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .where(
+                and(
+                    inArray(paymentRequests.tenderId, tenderIds),
+                    eq(paymentRequests.purpose, "EMD"),
+
+                    // ✅ Only real EMD instruments
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"]),
+
+                    lte(paymentRequests.createdAt, to)
+                )
+            );
+
+        for (const r of rows) {
+            if (!r.createdAt) continue; // ⬅️ hard guard, required
+
+            const createdAt = r.createdAt;
+            const updatedAt = r.updatedAt ?? null;
+
+            const state = resolveEmdFinancialState(r.instrumentType, r.action);
+
+            const meta = {
+                tenderId: r.tenderId,
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                instrumentType: r.instrumentType,
+                amount: Number(r.amount),
+                paidAt: createdAt,
+                receivedAt: updatedAt,
+            };
+
+            // ============================
+            // EMD PAID
+            // ============================
+
+            if (r.createdAt < from) {
+                result.paid.prior.count++;
+                result.paid.prior.value += meta.amount;
+                result.paid.prior.drilldown.push(meta);
+            }
+
+            if (r.createdAt >= from && r.createdAt <= to) {
+                result.paid.during.count++;
+                result.paid.during.value += meta.amount;
+                result.paid.during.drilldown.push(meta);
+            }
+
+            // ============================
+            // EMD RECEIVED BACK (ONLY RETURNED)
+            // ============================
+
+            if (state === "RETURNED" && r.updatedAt && r.updatedAt >= from && r.updatedAt <= to) {
+                // Paid before period → received now
+                if (r.createdAt < from) {
+                    result.received.priorPaid.count++;
+                    result.received.priorPaid.value += meta.amount;
+                    result.received.priorPaid.drilldown.push(meta);
+                }
+
+                // Paid during period → received during same period
+                if (r.createdAt >= from && r.createdAt <= to) {
+                    result.received.duringPaid.count++;
+                    result.received.duringPaid.value += meta.amount;
+                    result.received.duringPaid.drilldown.push(meta);
+                }
+            }
+        }
+
+        return result;
     }
 }

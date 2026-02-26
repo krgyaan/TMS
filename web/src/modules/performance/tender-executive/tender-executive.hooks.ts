@@ -8,6 +8,8 @@ import {
     getExecutiveScoring,
     getExecutiveBacklog,
     getEmdBalance,
+    getEmdCashFlow,
+    getStageBacklogV2,
 } from "./tender-executive.api";
 import type { PerformanceQuery } from "./tender-executive.types";
 
@@ -21,7 +23,9 @@ export const performanceKeys = {
     trends: (q: PerformanceQuery | null) => [...performanceKeys.root, "trends", q] as const,
     scoring: (q: PerformanceQuery | null) => [...performanceKeys.root, "scoring", q] as const,
     stageBacklog: (q: any) => ["stage-backlog", q] as const,
+    stageBacklogV2: (q: any) => ["performance", "stage-backlog-v2", q],
     emdBalance: (q: any) => ["emd-balance", q] as const,
+    emdCashFlow: (query: any) => ["performance", "emd-cashflow", query],
 };
 
 /* ===================== SUMMARY ===================== */
@@ -79,9 +83,32 @@ export const useStageBacklog = (query: any) =>
         enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
+export const useStageBacklogV2 = (query: any) =>
+    useQuery({
+        queryKey: performanceKeys.stageBacklogV2(query),
+        queryFn: () => getStageBacklogV2(query),
+        enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+    });
+
 export const useEmdBalance = (query: any) =>
     useQuery({
         queryKey: performanceKeys.emdBalance(query),
         queryFn: () => getEmdBalance(query),
+        enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+    });
+
+export const useEmdCashFlow = (query: { view: "user" | "team"; userId?: number; teamId?: number; fromDate?: string; toDate?: string }) =>
+    useQuery({
+        queryKey: performanceKeys.emdCashFlow(query),
+        queryFn: () =>
+            getEmdCashFlow(
+                query as {
+                    view: "user" | "team";
+                    userId?: number;
+                    teamId?: number;
+                    fromDate: string;
+                    toDate: string;
+                }
+            ),
         enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
