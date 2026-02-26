@@ -59,6 +59,27 @@ export function currencyCol<T = any>(
     return {
         field: field as string,
         valueFormatter: (p: ValueFormatterParams) => currencyFormatter(p, options),
+        comparator: (valueA, valueB) => {
+            const numA = valueA ? parseFloat(String(valueA)) : 0;
+            const numB = valueB ? parseFloat(String(valueB)) : 0;
+            return numA - numB;
+        },
+        ...overrides,
+    } as ColDef<T>;
+}
+
+export function numericCol<T = any>(
+    field: Field<T>,
+    overrides: ColDef<T> = {}
+): ColDef<T> {
+    return {
+        field: field as string,
+        comparator: (valueA, valueB) => {
+            const numA = valueA ? parseFloat(String(valueA)) : 0;
+            const numB = valueB ? parseFloat(String(valueB)) : 0;
+            return numA - numB;
+        },
+        filter: 'agNumberColumnFilter',
         ...overrides,
     } as ColDef<T>;
 }
