@@ -28,15 +28,44 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
-    // Handle inactive users - redirect to registration
-    if (!user.isActive && !location.pathname.startsWith("/hrms/registration")) {
-        console.log("👤 User is inactive, redirecting to registration");
-        return <Navigate to="/hrms/registration" replace />;
+    // Handle inactive users
+    if (!user.isActive) {
+        const profileStatus = user.profile?.employeeStatus;
+        const isHrmsPath = location.pathname.startsWith("/hrms");
+        const isRegistrationPath = location.pathname.startsWith("/hrms/registration");
+        const isStatusPath = location.pathname.startsWith("/hrms/status");
+
+        // Case 1: New user (no profile or status)
+        if (!profileStatus) {
+            if (!isRegistrationPath) {
+                console.log("👤 New inactive user, redirecting to registration");
+                return <Navigate to="/hrms/registration" replace />;
+            }
+        }
+        // Case 2: Pending Approval
+        else if (profileStatus === "Pending Approval") {
+            if (!isStatusPath) {
+                console.log("⏳ User pending approval, redirecting to status page");
+                return <Navigate to="/hrms/status" replace />;
+            }
+        }
+        // Case 3: Rejected
+        else if (profileStatus === "Rejected") {
+            // Allow both Status and Registration (for resubmission)
+            if (!isStatusPath && !isRegistrationPath) {
+                console.log("❌ User rejected, redirecting to status page");
+                return <Navigate to="/hrms/status" replace />;
+            }
+        }
+        // Case 4: Other inactive (shouldn't happen with HRMS flow)
+        else if (!isHrmsPath) {
+            return <Navigate to="/hrms/status" replace />;
+        }
     }
 
-    // Handle active users trying to access registration (optional, but good for UX)
-    if (user.isActive && location.pathname.startsWith("/hrms/registration")) {
-        console.log("✅ User is active, redirecting from registration to dashboard");
+    // Handle active users trying to access HRMS flow
+    if (user.isActive && location.pathname.startsWith("/hrms")) {
+        console.log("✅ User is active, redirecting from HRMS flow to dashboard");
         return <Navigate to="/" replace />;
     }
 

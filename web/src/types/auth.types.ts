@@ -41,6 +41,8 @@ export interface UserProfile {
     signature: string | null;
     dateOfJoining: string | null;
     dateOfExit: string | null;
+    employeeStatus: string | null;
+    rejectionReason: string | null;
     timezone: string | null;
     locale: string | null;
     createdAt: string | null;
