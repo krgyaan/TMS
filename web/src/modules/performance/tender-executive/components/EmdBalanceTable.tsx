@@ -80,7 +80,7 @@ export function EmdBalanceTable({ view, userId, teamId, fromDate, toDate }: { vi
                                 </TableHead>
 
                                 <TableHead className="text-center text-destructive">
-                                    <ColumnHeader title="Overdue" description="Locked EMDs past tender due date" />
+                                    <ColumnHeader title="Overdue" description="EMDs that are overdue beyond the grace period" />
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
@@ -147,7 +147,7 @@ function MetricCell({ data, strong = false, danger = false }: { data: any; stron
                                         {e.instrumentType} · {formatCurrency(e.amount)}
                                     </div>
 
-                                    <div className="text-muted-foreground">Status: {e.status}</div>
+                                    {/* <div className="text-muted-foreground">Status: {e.status}</div> */}
 
                                     {e.daysLocked !== null && <div className="text-destructive font-medium">Locked for {e.daysLocked} days</div>}
                                 </div>
