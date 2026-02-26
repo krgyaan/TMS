@@ -77,12 +77,12 @@ export class TenderResultService {
         return roleFilterConditions;
     }
 
-async getDashboardData(
+    async getDashboardData(
     user?: ValidatedUser,
     teamId?: number,
     tab?: ResultDashboardType,
     filters?: ResultDashboardFilters
-): Promise<PaginatedResult<ResultDashboardRow>> {
+    ): Promise<PaginatedResult<ResultDashboardRow>> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
     const offset = (page - 1) * limit;
@@ -312,117 +312,120 @@ async getDashboardData(
 
     const total = Number(totalResult?.count || 0);
     return wrapPaginatedResponse(data, total, page, limit);
-}
+    }
 
     async getCounts(user?: ValidatedUser, teamId?: number): Promise<ResultDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
+        // Subqueries copied from getDashboardData for consistency
+        const latestBidSubmissionSq = this.db
+            .selectDistinctOn([bidSubmissions.tenderId], {
+                tenderId: bidSubmissions.tenderId,
+                submissionDatetime: bidSubmissions.submissionDatetime,
+                status: bidSubmissions.status,
+            })
+            .from(bidSubmissions)
+            .where(eq(bidSubmissions.status, 'Bid Submitted'))
+            .orderBy(bidSubmissions.tenderId, desc(bidSubmissions.submissionDatetime))
+            .as('latestBidSubmission');
+
+        const latestTenderResultSq = this.db
+            .selectDistinctOn([tenderResults.tenderId], {
+                tenderId: tenderResults.tenderId,
+                id: tenderResults.id,
+                status: tenderResults.status,
+                result: tenderResults.result,
+                createdAt: tenderResults.createdAt,
+            })
+            .from(tenderResults)
+            .orderBy(tenderResults.tenderId, desc(tenderResults.createdAt))
+            .as('latestTenderResult');
+
+        const latestCostingSheetSq = this.db
+            .selectDistinctOn([tenderCostingSheets.tenderId], {
+                tenderId: tenderCostingSheets.tenderId,
+                finalPrice: tenderCostingSheets.finalPrice,
+            })
+            .from(tenderCostingSheets)
+            .orderBy(tenderCostingSheets.tenderId, desc(tenderCostingSheets.createdAt))
+            .as('latestCostingSheet');
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb']),
-            eq(bidSubmissions.status, 'Bid Submitted'),
+            isNotNull(latestBidSubmissionSq.tenderId),
             ...roleFilterConditions,
         ];
 
-        const resultAwaitedConditions = [
-            ...baseConditions,
-            or(
-                isNull(tenderResults.id),
-                inArray(tenderResults.status, ['Under Evaluation', 'Result Awaited'])
-            )!,
-        ];
+        const amountSql = sql<number>`coalesce(${latestCostingSheetSq.finalPrice}, ${tenderInfos.gstValues})`;
 
-        const wonConditions = [
-            ...baseConditions,
-            isNotNull(tenderResults.id),
-            inArray(tenderResults.status, ['Won', 'won']),
-        ];
+        const getTabCounts = async (tab: ResultDashboardType) => {
+            const conditions = [...baseConditions];
 
-        const lostConditions = [
-            ...baseConditions,
-            isNotNull(tenderResults.id),
-            inArray(tenderResults.status, ['Lost', 'Lost - H1 Elimination', 'lost']),
-        ];
+            if (tab === 'result-awaited') {
+                conditions.push(
+                    or(
+                        isNull(latestTenderResultSq.id),
+                        inArray(latestTenderResultSq.status, ['Under Evaluation', 'Result Awaited'])
+                    )!
+                );
+                conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            } else if (tab === 'won') {
+                conditions.push(
+                    isNotNull(latestTenderResultSq.id),
+                    inArray(latestTenderResultSq.status, ['Won', 'won'])
+                );
+                conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            } else if (tab === 'lost') {
+                conditions.push(
+                    isNotNull(latestTenderResultSq.id),
+                    inArray(latestTenderResultSq.status, ['lost', 'Lost', 'Lost - H1 Elimination'])
+                );
+            } else if (tab === 'disqualified') {
+                conditions.push(
+                    isNotNull(latestTenderResultSq.id),
+                    inArray(latestTenderResultSq.status, ['Disqualified', 'cancelled', 'disqualified'])
+                );
+            }
 
-        const disqualifiedConditions = [
-            ...baseConditions,
-            isNotNull(tenderResults.id),
-            inArray(tenderResults.status, ['Disqualified', 'cancelled', 'disqualified']),
-        ];
-
-        const amountSql = sql<number>`coalesce(${tenderCostingSheets.finalPrice}, ${tenderInfos.gstValues})`;
-
-        const counts = await Promise.all([
-            this.db
+            const result = await this.db
                 .select({
-                    count: sql<number>`count(distinct ${tenderInfos.id})`,
+                    count: sql<number>`count(*)`,
                     amount: sql<number>`sum(${amountSql})`
                 })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
+                .leftJoin(latestTenderResultSq, eq(latestTenderResultSq.tenderId, tenderInfos.id))
+                .leftJoin(latestCostingSheetSq, eq(latestCostingSheetSq.tenderId, tenderInfos.id))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...resultAwaitedConditions))
-                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
-            this.db
-                .select({
-                    count: sql<number>`count(distinct ${tenderInfos.id})`,
-                    amount: sql<number>`sum(${amountSql})`
-                })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...wonConditions))
-                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
-            this.db
-                .select({
-                    count: sql<number>`count(distinct ${tenderInfos.id})`,
-                    amount: sql<number>`sum(${amountSql})`
-                })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...lostConditions))
-                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
-            this.db
-                .select({
-                    count: sql<number>`count(distinct ${tenderInfos.id})`,
-                    amount: sql<number>`sum(${amountSql})`
-                })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...disqualifiedConditions))
-                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
+                .where(and(...conditions));
+
+            return {
+                count: Number(result[0]?.count || 0),
+                amount: Number(result[0]?.amount || 0)
+            };
+        };
+
+        const [pending, won, lost, disqualified] = await Promise.all([
+            getTabCounts('result-awaited'),
+            getTabCounts('won'),
+            getTabCounts('lost'),
+            getTabCounts('disqualified'),
         ]);
 
         return {
-            pending: counts[0].count,
-            won: counts[1].count,
-            lost: counts[2].count,
-            disqualified: counts[3].count,
-            total: counts.reduce((sum, c) => sum + c.count, 0),
+            pending: pending.count,
+            won: won.count,
+            lost: lost.count,
+            disqualified: disqualified.count,
+            total: pending.count + won.count + lost.count + disqualified.count,
             totalAmounts: {
-                pending: counts[0].amount,
-                won: counts[1].amount,
-                lost: counts[2].amount,
-                disqualified: counts[3].amount,
+                pending: pending.amount,
+                won: won.amount,
+                lost: lost.amount,
+                disqualified: disqualified.amount,
             }
         };
     }
