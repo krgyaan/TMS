@@ -8,7 +8,8 @@ import { useTender } from '@/hooks/api/useTenders';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { useRfqByTenderId, useRfqResponses } from '@/hooks/api/useRfqs';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useRfqResponses } from '@/hooks/api/useRfqResponses';
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
@@ -19,7 +20,7 @@ import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoShe
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
 import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
 import { RfqView } from './components/RfqView';
-import { RfqResponsesTable } from './components/RfqResponsesTable';
+import { RfqResponsesTable } from '@/modules/tendering/rfq-response/components/RfqResponsesTable';
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
