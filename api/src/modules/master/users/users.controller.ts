@@ -164,7 +164,7 @@ export class UsersController {
     }
 
     // User Activation/Deactivation
-    @Patch(":id/activate")
+    @Patch(":id/activate") // Also used for approval
     @HttpCode(HttpStatus.OK)
     @CanUpdate("users")
     async activate(@Param("id", ParseIntPipe) id: number, @CurrentUser() currentUser: ValidatedUser) {
@@ -175,8 +175,33 @@ export class UsersController {
             throw new ForbiddenException("You do not have permission to activate users");
         }
 
-        await this.usersService.activate(id);
-        return { message: "User activated successfully" };
+        await this.usersService.approveUser(id);
+        return { message: "User activated/approved successfully" };
+    }
+
+    @Patch(":id/approve")
+    @HttpCode(HttpStatus.OK)
+    @CanUpdate("users")
+    async approve(@Param("id", ParseIntPipe) id: number, @CurrentUser() currentUser: ValidatedUser) {
+        return this.activate(id, currentUser);
+    }
+
+    @Patch(":id/reject")
+    @HttpCode(HttpStatus.OK)
+    @CanUpdate("users")
+    async reject(@Param("id", ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser() currentUser: ValidatedUser) {
+        const canReject = hasMinimumRole(currentUser.role ?? "", RoleName.COORDINATOR);
+        if (!canReject) {
+            throw new ForbiddenException("You do not have permission to reject users");
+        }
+
+        const schema = z.object({
+            reason: z.string().min(1, "Rejection reason is required"),
+        });
+        const parsed = schema.parse(body);
+
+        await this.usersService.rejectUser(id, parsed.reason);
+        return { message: "User registration rejected" };
     }
 
     @Patch(":id/deactivate")
@@ -199,7 +224,7 @@ export class UsersController {
     async register(@CurrentUser() currentUser: ValidatedUser, @Body() body: unknown) {
         const parsed = RegisterUserSchema.parse(body);
         await this.usersService.registerUser(currentUser.sub, parsed);
-        return { message: "Registration successful and account activated" };
+        return { message: "Registration successful, application pending administrator approval" };
     }
 
     // User Roles Management

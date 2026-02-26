@@ -15,7 +15,7 @@ import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
 
-export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "team" | "isActive" | "createdAt" | "updatedAt">;
+export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "isActive" | "createdAt" | "updatedAt">;
 
 export type UserProfileSummary = {
     id: number;
@@ -34,6 +34,8 @@ export type UserProfileSummary = {
     signature?: string | null;
     dateOfJoining?: Date | string | null;
     dateOfExit?: Date | string | null;
+    employeeStatus?: string | null;
+    rejectionReason?: string | null;
     timezone?: string | null;
     locale?: string | null;
     createdAt?: Date | string | null;
@@ -63,7 +65,6 @@ export type UserAuthInfo = {
     roleName: string | null;
     roleId: number | null;
     primaryTeamId: number | null;
-    oldTeamId: number | null;
     dataScope: DataScope;
     canSwitchTeams: boolean;
 };
@@ -81,7 +82,6 @@ export class UsersService {
                 name: users.name,
                 email: users.email,
                 username: users.username,
-                oldTeamId: users.team,
                 mobile: users.mobile,
                 isActive: users.isActive,
                 createdAt: users.createdAt,
@@ -102,6 +102,8 @@ export class UsersService {
                 profileSignature: userProfiles.signature,
                 profileDateOfJoining: userProfiles.dateOfJoining,
                 profileDateOfExit: userProfiles.dateOfExit,
+                profileEmployeeStatus: userProfiles.employeeStatus,
+                profileRejectionReason: userProfiles.rejectionReason,
                 profileTimezone: userProfiles.timezone,
                 profileLocale: userProfiles.locale,
                 profileCreatedAt: userProfiles.createdAt,
@@ -144,6 +146,8 @@ export class UsersService {
                   signature: row.profileSignature,
                   dateOfJoining: row.profileDateOfJoining,
                   dateOfExit: row.profileDateOfExit,
+                  employeeStatus: row.profileEmployeeStatus,
+                  rejectionReason: row.profileRejectionReason,
                   timezone: row.profileTimezone,
                   locale: row.profileLocale,
                   createdAt: row.profileCreatedAt,
@@ -203,7 +207,6 @@ export class UsersService {
                 roleName: roles.name,
                 roleId: roles.id,
                 primaryTeamId: userProfiles.primaryTeamId,
-                oldTeamId: users.team,
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
@@ -221,7 +224,6 @@ export class UsersService {
             roleName: row.roleName,
             roleId: row.roleId,
             primaryTeamId: row.primaryTeamId,
-            oldTeamId: row.oldTeamId,
             dataScope: getDataScope(row.roleName ?? ""),
             canSwitchTeams: canSwitchTeams(row.roleName ?? ""),
         };
@@ -389,12 +391,11 @@ export class UsersService {
 
     // Keep original for backward compatibility
     sanitizeUser(user: User): SafeUser {
-        const { id, name, email, username, mobile, team, isActive, createdAt, updatedAt } = user;
+        const { id, name, email, username, mobile, isActive, createdAt, updatedAt } = user;
         return {
             id,
             name,
             email,
-            team,
             username,
             mobile,
             isActive,
@@ -539,11 +540,11 @@ export class UsersService {
                 name: users.name,
                 email: users.email,
                 mobile: users.mobile,
-                team: users.team,
                 isActive: users.isActive,
             })
             .from(users)
-            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))) as User[];
+            .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .where(and(eq(userProfiles.primaryTeamId, teamId), isNull(users.deletedAt)))) as User[];
         return result;
     }
 
@@ -590,6 +591,8 @@ export class UsersService {
                 emergencyContacts: data.emergencyContacts,
                 designationId: data.designationId || null,
                 primaryTeamId: data.primaryTeamId || null,
+                employeeStatus: "Pending Approval",
+                rejectionReason: null,
                 updatedAt: new Date(),
             };
 
@@ -602,15 +605,40 @@ export class UsersService {
                 await tx.insert(userProfiles).values(profileData);
             }
 
-            // 2. Activate user and update name if needed
+            // 2. Keep user inactive (needs admin approval) and update name
             await tx
                 .update(users)
                 .set({
-                    isActive: true,
+                    isActive: false,
                     name: `${data.firstName} ${data.lastName}`,
                     updatedAt: new Date(),
                 })
                 .where(eq(users.id, userId));
         });
+    }
+
+    async approveUser(userId: number): Promise<void> {
+        await this.db.transaction(async (tx) => {
+            await tx
+                .update(users)
+                .set({ isActive: true, updatedAt: new Date() })
+                .where(eq(users.id, userId));
+
+            await tx
+                .update(userProfiles)
+                .set({ employeeStatus: "Active", updatedAt: new Date() })
+                .where(eq(userProfiles.userId, userId));
+        });
+    }
+
+    async rejectUser(userId: number, reason: string): Promise<void> {
+        await this.db
+            .update(userProfiles)
+            .set({
+                employeeStatus: "Rejected",
+                rejectionReason: reason,
+                updatedAt: new Date()
+            })
+            .where(eq(userProfiles.userId, userId));
     }
 }
