@@ -10,9 +10,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ClipboardList, Eye, FileX2, List, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useRfqResponses, useRfq, useAllRfqResponses } from '@/hooks/api/useRfqs';
+import { useRfqResponses, useRfq, useAllRfqResponses, useRfqVendors } from '@/hooks/api/useRfqs';
 import { paths } from '@/app/routes/paths';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRfqResponseListColumnDefs } from './helpers/rfqResponseListColDefs';
 import type { RfqResponseListItem } from './helpers/rfq.types';
 
@@ -29,22 +31,31 @@ export default function RfqResponseListPage() {
     const { data: responsesByRfq = [], isLoading: loadingByRfq, error: errorByRfq } = useRfqResponses(rfqIdNum);
     const { data: allResponses = [], isLoading: loadingAll, error: errorAll } = useAllRfqResponses();
     const { data: rfq, isLoading: rfqLoading } = useRfq(rfqIdNum);
+    const { data: rfqVendors } = useRfqVendors(rfq?.requestedVendor || undefined);
 
     const responses = isGlobalList ? allResponses : responsesByRfq;
     const isLoading = isGlobalList ? loadingAll : (loadingByRfq || rfqLoading);
     const error = isGlobalList ? errorAll : errorByRfq;
 
     const filteredResponses = useMemo(() => {
-        if (!search.trim()) return responses;
-        const s = search.trim().toLowerCase();
-        return responses.filter(
-            (row) =>
-                (row.tenderName?.toLowerCase().includes(s)) ||
-                (row.tenderNo?.toLowerCase().includes(s)) ||
-                (row.vendorName?.toLowerCase().includes(s)) ||
-                (row.itemSummary?.toLowerCase().includes(s))
-        );
+        let result = responses;
+        if (search.trim()) {
+            const s = search.trim().toLowerCase();
+            result = responses.filter(
+                (row) =>
+                    (row.tenderName?.toLowerCase().includes(s)) ||
+                    (row.tenderNo?.toLowerCase().includes(s)) ||
+                    (row.vendorName?.toLowerCase().includes(s)) ||
+                    (row.itemSummary?.toLowerCase().includes(s))
+            );
+        }
+        return result;
     }, [responses, search]);
+
+    const paginatedResponses = useMemo(() => {
+        const start = pagination.pageIndex * pagination.pageSize;
+        return filteredResponses.slice(start, start + pagination.pageSize);
+    }, [filteredResponses, pagination]);
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -131,8 +142,8 @@ export default function RfqResponseListPage() {
     const title = isGlobalList
         ? 'All RFQ Responses'
         : rfq?.tenderName
-          ? `Responses: ${rfq.tenderName}`
-          : 'RFQ Responses';
+            ? `Responses: ${rfq.tenderName}`
+            : 'RFQ Responses';
     const description = isGlobalList
         ? 'All responses recorded across RFQs.'
         : 'Responses recorded for this RFQ.';
@@ -159,15 +170,57 @@ export default function RfqResponseListPage() {
                         )}
                     </CardAction>
                 </div>
+
+                {!isGlobalList && rfq && (
+                    <div className="mt-4 px-6 pb-2">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm bg-muted/20 p-4 rounded-lg border border-dashed">
+                            <div>
+                                <span className="text-muted-foreground block text-xs uppercase font-bold mb-1">Tender Number</span>
+                                <span className="font-semibold text-primary">{rfq.tenderNo}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs uppercase font-bold mb-1">Tender Name</span>
+                                <span className="font-semibold">{rfq.tenderName}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs uppercase font-bold mb-1">Item Name</span>
+                                <span className="font-semibold italic">{rfq.itemName}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs uppercase font-bold mb-1">Vendors</span>
+                                <div className="mt-1">
+                                    {(rfqVendors && rfqVendors.length > 0) ? (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="secondary" className="cursor-default">
+                                                    {rfqVendors.length} vendors
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <ul className="list-disc list-inside font-medium">
+                                                    {rfqVendors.map(v => (
+                                                        <li key={v.id}>{v.name}</li>
+                                                    ))}
+                                                </ul>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs italic">No vendors selected</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value="responses" className="space-y-4">
+                <Tabs value="responses" onValueChange={() => { }}>
                     <TabsList className="m-auto mb-4">
                         <TabsTrigger value="responses" className="data-[state=active]:shadow-md flex items-center gap-1">
                             <span className="font-semibold text-sm">{tabLabel}</span>
-                            {filteredResponses.length > 0 && (
-                                <span className="text-xs text-muted-foreground">({filteredResponses.length})</span>
-                            )}
+                            <Badge variant="secondary" className="text-xs">
+                                {filteredResponses.length}
+                            </Badge>
                         </TabsTrigger>
                     </TabsList>
 
@@ -180,7 +233,7 @@ export default function RfqResponseListPage() {
                                     { label: 'This Year', value: 'this-year' },
                                 ]}
                                 value={search}
-                                onChange={(value) => setSearch(value)}
+                                onChange={(value: string) => setSearch(value)}
                             />
                             <div className="flex-1 flex justify-end">
                                 <div className="relative">
@@ -218,12 +271,13 @@ export default function RfqResponseListPage() {
                             </div>
                         ) : (
                             <DataTable
-                                data={filteredResponses}
+                                data={paginatedResponses}
                                 columnDefs={colDefs as ColDef<RfqResponseListItem>[]}
                                 loading={isLoading}
-                                manualPagination={false}
-                                enablePagination={filteredResponses.length > 10}
-                                pageSize={pagination.pageSize}
+                                manualPagination={true}
+                                rowCount={filteredResponses.length}
+                                paginationState={pagination}
+                                onPaginationChange={setPagination}
                                 onPageSizeChange={handlePageSizeChange}
                                 showTotalCount={true}
                                 showLengthChange={true}
