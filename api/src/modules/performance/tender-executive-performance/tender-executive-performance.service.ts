@@ -1157,33 +1157,34 @@ export class TenderExecutiveService {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
-        // ----------------------------------------
-        // 1️⃣ Fetch Tender Universe
-        // ----------------------------------------
-        const conditions = [eq(tenderInfos.deleteStatus, 0)];
+        /* =====================================================
+       0️⃣ Tender universe conditions (GLOBAL, DO NOT FILTER STATUS)
+    ===================================================== */
+        const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (query.view === "user" && query.userId) {
-            conditions.push(eq(tenderInfos.teamMember, query.userId));
+            tenderConditions.push(eq(tenderInfos.teamMember, query.userId));
         }
 
         if (query.view === "team" && query.teamId) {
-            conditions.push(eq(tenderInfos.team, query.teamId));
+            tenderConditions.push(eq(tenderInfos.team, query.teamId));
         }
 
+        /* =====================================================
+       1️⃣ Fetch Tender Universe
+    ===================================================== */
         const tenders = await this.db
             .select()
             .from(tenderInfos)
-            .where(and(...conditions));
+            .where(and(...tenderConditions));
 
         if (!tenders.length) {
             return { from, to, stages: {} };
         }
 
-        const tenderIds = tenders.map(t => t.id);
-
-        // ----------------------------------------
-        // 2️⃣ Fetch Approval Data
-        // ----------------------------------------
+        /* =====================================================
+       2️⃣ Fetch Approvals (Tender Info Approved Time)
+    ===================================================== */
         const approvals = await this.db
             .select({
                 tenderId: tenderInformation.tenderId,
@@ -1191,72 +1192,80 @@ export class TenderExecutiveService {
             })
             .from(tenderInformation)
             .innerJoin(tenderInfos, eq(tenderInfos.id, tenderInformation.tenderId))
-            .where(and(...conditions));
+            .where(and(...tenderConditions));
 
         const approvalMap = new Map<number, Date>();
         approvals.forEach(a => approvalMap.set(Number(a.tenderId), a.approvedAt));
 
-        // ----------------------------------------
-        // 3️⃣ Fetch Bid Submissions (FIXED)
-        // ----------------------------------------
+        /* =====================================================
+       3️⃣ Fetch Bid Submissions
+    ===================================================== */
         const bids = await this.db
             .select()
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .where(and(...conditions));
+            .where(and(...tenderConditions));
 
         const bidMap = new Map<number, (typeof bids)[number]["bid_submissions"]>();
-        bids.forEach(b => {
-            bidMap.set(Number(b.bid_submissions.tenderId), b.bid_submissions);
-        });
+        bids.forEach(b => bidMap.set(Number(b.bid_submissions.tenderId), b.bid_submissions));
 
-        // ----------------------------------------
-        // 4️⃣ Fetch Results (FIXED)
-        // ----------------------------------------
+        /* =====================================================
+       4️⃣ Fetch Results
+    ===================================================== */
         const results = await this.db
             .select()
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderInfos.id, tenderResults.tenderId))
-            .where(and(...conditions));
+            .where(and(...tenderConditions));
 
         const resultMap = new Map<number, (typeof results)[number]["tender_results"]>();
-        results.forEach(r => {
-            resultMap.set(Number(r.tender_results.tenderId), r.tender_results);
+        results.forEach(r => resultMap.set(Number(r.tender_results.tenderId), r.tender_results));
+
+        /* =====================================================
+       5️⃣ Status Helpers
+    ===================================================== */
+        const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
+        const DISQUALIFIED_CODES = new Set([33, 38, 39, 41]);
+        const WON_CODES = new Set([25, 26, 27, 28]);
+        const LOST_CODES = new Set([18, 21, 22, 24]);
+
+        const isDnb = (s: number) => DNB_CODES.has(s);
+        const isDisqualified = (s: number) => DISQUALIFIED_CODES.has(s);
+        const isWon = (s: number) => WON_CODES.has(s);
+        const isLost = (s: number) => LOST_CODES.has(s);
+        const isTerminal = (s: number) => isWon(s) || isLost(s) || isDisqualified(s);
+
+        /* =====================================================
+       6️⃣ Stage Buckets
+    ===================================================== */
+        const emptyBucket = () => ({
+            count: 0,
+            value: 0,
+            drilldown: [] as any[],
         });
 
-        // ----------------------------------------
-        // 5️⃣ Helpers
-        // ----------------------------------------
-        const emptyBucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
-
         const stages = {
-            assigned: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            approved: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            missed: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            bid: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            resultAwaited: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            won: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            lost: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
-            disqualified: { total: emptyBucket(), opening: emptyBucket(), during: emptyBucket() },
+            assigned: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            approved: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            bid: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            resultAwaited: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            won: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            lost: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            disqualified: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
         };
 
-        const isWon = (s: number) => [25, 26, 27, 28].includes(s);
-        const isLost = (s: number) => [18, 21, 22, 24].includes(s);
-        const isDisqualified = (s: number) => [33, 38, 39, 41].includes(s);
-
-        // ----------------------------------------
-        // 6️⃣ Ledger Processing
-        // ----------------------------------------
+        /* =====================================================
+       7️⃣ Ledger Processing (STAGE-WISE ELIGIBILITY)
+    ===================================================== */
         for (const t of tenders) {
+            const status = Number(t.status);
             const value = Number(t.gstValues ?? 0);
 
             const assignedAt = t.createdAt;
-            const isApproved = t.tlStatus === 1;
             const approvedAt = approvalMap.get(t.id) ?? null;
 
             const bid = bidMap.get(t.id);
             const bidAt = bid?.status === "Bid Submitted" ? bid.submissionDatetime : null;
-            const missedAt = bid?.status === "Tender Missed" ? bid.updatedAt : null;
 
             const result = resultMap.get(t.id);
             const resultAt = result?.resultUploadedAt ?? null;
@@ -1268,20 +1277,18 @@ export class TenderExecutiveService {
                 value,
             };
 
-            // ---------- ASSIGNED (NOT APPROVED ONLY) ----------
-            if (assignedAt <= to && !isApproved) {
+            /* ---------------- ASSIGNED (tlStatus = 0 only) ---------------- */
+            if (t.tlStatus === 0 && !isDnb(status) && !isTerminal(status) && assignedAt <= to) {
                 stages.assigned.total.count++;
                 stages.assigned.total.value += value;
                 stages.assigned.total.drilldown.push({ ...meta, assignedAt });
 
-                // Opening = assigned before period and still not approved
                 if (assignedAt < from) {
                     stages.assigned.opening.count++;
                     stages.assigned.opening.value += value;
                     stages.assigned.opening.drilldown.push({ ...meta, assignedAt });
                 }
 
-                // During = assigned during period
                 if (assignedAt >= from && assignedAt <= to) {
                     stages.assigned.during.count++;
                     stages.assigned.during.value += value;
@@ -1289,13 +1296,13 @@ export class TenderExecutiveService {
                 }
             }
 
-            // ---------- APPROVED ----------
-            if (approvedAt && approvedAt <= to) {
+            /* ---------------- APPROVED (tlStatus = 1 only) ---------------- */
+            if (t.tlStatus === 1 && approvedAt && !isDnb(status) && !isTerminal(status) && approvedAt <= to) {
                 stages.approved.total.count++;
                 stages.approved.total.value += value;
                 stages.approved.total.drilldown.push({ ...meta, approvedAt });
 
-                if (approvedAt < from && !bidAt && !missedAt) {
+                if (approvedAt < from) {
                     stages.approved.opening.count++;
                     stages.approved.opening.value += value;
                     stages.approved.opening.drilldown.push({ ...meta, approvedAt });
@@ -1308,77 +1315,62 @@ export class TenderExecutiveService {
                 }
             }
 
-            // ---------- MISSED ----------
-            if (missedAt && missedAt <= to) {
-                const target = approvedAt && approvedAt < from ? stages.missed.opening : stages.missed.during;
-
-                stages.missed.total.count++;
-                stages.missed.total.value += value;
-                stages.missed.total.drilldown.push({ ...meta, missedAt });
-
-                target.count++;
-                target.value += value;
-                target.drilldown.push({ ...meta, missedAt });
-            }
-
-            // ---------- BID ----------
+            /* ---------------- BID (historical + current) ---------------- */
             if (bidAt && bidAt <= to) {
-                const target = approvedAt && approvedAt < from ? stages.bid.opening : stages.bid.during;
-
                 stages.bid.total.count++;
                 stages.bid.total.value += value;
                 stages.bid.total.drilldown.push({ ...meta, bidAt });
 
-                target.count++;
-                target.value += value;
-                target.drilldown.push({ ...meta, bidAt });
+                if (bidAt < from) {
+                    stages.bid.opening.count++;
+                    stages.bid.opening.value += value;
+                    stages.bid.opening.drilldown.push({ ...meta, bidAt });
+                }
+
+                if (bidAt >= from && bidAt <= to) {
+                    stages.bid.during.count++;
+                    stages.bid.during.value += value;
+                    stages.bid.during.drilldown.push({ ...meta, bidAt });
+                }
             }
 
-            // ---------- RESULT AWAITED ----------
-            if (bidAt && !resultAt && !isWon(t.status) && !isLost(t.status) && !isDisqualified(t.status)) {
-                const target = bidAt < from ? stages.resultAwaited.opening : stages.resultAwaited.during;
-
+            /* ---------------- RESULT AWAITED ---------------- */
+            if (bidAt && !resultAt && !isTerminal(status)) {
                 stages.resultAwaited.total.count++;
                 stages.resultAwaited.total.value += value;
                 stages.resultAwaited.total.drilldown.push({ ...meta, bidAt });
 
-                target.count++;
-                target.value += value;
-                target.drilldown.push({ ...meta, bidAt });
+                if (bidAt < from) {
+                    stages.resultAwaited.opening.count++;
+                    stages.resultAwaited.opening.value += value;
+                    stages.resultAwaited.opening.drilldown.push({ ...meta, bidAt });
+                }
+
+                if (bidAt >= from && bidAt <= to) {
+                    stages.resultAwaited.during.count++;
+                    stages.resultAwaited.during.value += value;
+                    stages.resultAwaited.during.drilldown.push({ ...meta, bidAt });
+                }
             }
 
-            // ---------- TERMINALS ----------
+            /* ---------------- TERMINALS ---------------- */
             if (resultAt && resultAt <= to) {
-                const target = bidAt && bidAt < from ? null : null;
-
-                if (isWon(t.status)) {
-                    const bucket = bidAt && bidAt < from ? stages.won.opening : stages.won.during;
+                if (isWon(status)) {
                     stages.won.total.count++;
                     stages.won.total.value += value;
                     stages.won.total.drilldown.push({ ...meta, resultAt });
-                    bucket.count++;
-                    bucket.value += value;
-                    bucket.drilldown.push({ ...meta, resultAt, bidAt });
                 }
 
-                if (isLost(t.status)) {
-                    const bucket = bidAt && bidAt < from ? stages.lost.opening : stages.lost.during;
+                if (isLost(status)) {
                     stages.lost.total.count++;
                     stages.lost.total.value += value;
                     stages.lost.total.drilldown.push({ ...meta, resultAt });
-                    bucket.count++;
-                    bucket.value += value;
-                    bucket.drilldown.push({ ...meta, resultAt, bidAt });
                 }
 
-                if (isDisqualified(t.status)) {
-                    const bucket = bidAt && bidAt < from ? stages.disqualified.opening : stages.disqualified.during;
+                if (isDisqualified(status)) {
                     stages.disqualified.total.count++;
                     stages.disqualified.total.value += value;
                     stages.disqualified.total.drilldown.push({ ...meta, resultAt });
-                    bucket.count++;
-                    bucket.value += value;
-                    bucket.drilldown.push({ ...meta, resultAt, bidAt });
                 }
             }
         }
@@ -1389,7 +1381,6 @@ export class TenderExecutiveService {
             stages,
         };
     }
-
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
