@@ -9,6 +9,7 @@ import {
     getExecutiveBacklog,
     getEmdBalance,
     getEmdCashFlow,
+    getStageBacklogV2,
 } from "./tender-executive.api";
 import type { PerformanceQuery } from "./tender-executive.types";
 
@@ -22,6 +23,7 @@ export const performanceKeys = {
     trends: (q: PerformanceQuery | null) => [...performanceKeys.root, "trends", q] as const,
     scoring: (q: PerformanceQuery | null) => [...performanceKeys.root, "scoring", q] as const,
     stageBacklog: (q: any) => ["stage-backlog", q] as const,
+    stageBacklogV2: (q: any) => ["performance", "stage-backlog-v2", q],
     emdBalance: (q: any) => ["emd-balance", q] as const,
     emdCashFlow: (query: any) => ["performance", "emd-cashflow", query],
 };
@@ -79,6 +81,13 @@ export const useStageBacklog = (query: any) =>
         queryKey: performanceKeys.stageBacklog(query),
         queryFn: () => getExecutiveBacklog(query),
         enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+    });
+
+export const useStageBacklogV2 = (query: any) =>
+    useQuery({
+        queryKey: performanceKeys.stageBacklogV2(query),
+        queryFn: () => getStageBacklogV2(query),
+        enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
 export const useEmdBalance = (query: any) =>

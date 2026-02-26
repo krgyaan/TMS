@@ -44,6 +44,7 @@ import { StageBacklogTable } from "./components/StageBacklogTable";
 import { EmdBalanceTable } from "./components/EmdBalanceTable";
 import { EmdPaidTable } from "./components/EmdPaidTable";
 import { EmdReceivedTable } from "./components/EmdReceivedTable";
+import { StageBacklogV2Table } from "./components/StageBacklogV2Table";
 
 /* ================================
    HELPERS
@@ -381,7 +382,8 @@ export default function TenderExecutivePerformance() {
                 </Card>
 
                 {/* ===== STAGE BACKLOG ===== */}
-                {sharedQuery && <StageBacklogTable {...sharedQuery} />}
+                {/* {sharedQuery && <StageBacklogTable {...sharedQuery} />} */}
+                {sharedQuery && <StageBacklogV2Table {...sharedQuery} />}
 
                 {/* ===== EMD BACKLOG ===== */}
 
