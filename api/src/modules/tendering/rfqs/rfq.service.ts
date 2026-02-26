@@ -12,17 +12,11 @@ import {
     rfqDocuments,
     NewRfqItem,
     NewRfqDocument,
-    rfqResponses,
-    rfqResponseItems,
-    rfqResponseDocuments,
-    NewRfqResponse,
-    NewRfqResponseItem,
-    NewRfqResponseDocument,
 } from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@db/schemas/vendors/vendors.schema";
-import { CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from "./dto/rfq.dto";
+import { CreateRfqDto, UpdateRfqDto } from "./dto/rfq.dto";
 import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
@@ -564,148 +558,7 @@ export class RfqsService {
         return result;
     }
 
-    async createResponse(rfqId: number, data: CreateRfqResponseBodyDto) {
-        const rfq = await this.findById(rfqId);
-        if (!rfq) {
-            throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
-        }
 
-        const responseData: NewRfqResponse = {
-            rfqId,
-            vendorId: data.vendorId,
-            receiptDatetime: new Date(data.receiptDatetime),
-            gstPercentage: data.gstPercentage != null ? String(data.gstPercentage) : null,
-            gstType: data.gstType ?? null,
-            deliveryTime: data.deliveryTime ?? null,
-            freightType: data.freightType ?? null,
-            notes: data.notes ?? null,
-        };
-
-        const [newResponse] = await this.db.insert(rfqResponses).values(responseData).returning();
-
-        if (data.items && data.items.length > 0) {
-            const itemsData: NewRfqResponseItem[] = data.items.map(item => ({
-                rfqResponseId: newResponse.id,
-                rfqItemId: item.itemId,
-                requirement: item.requirement,
-                unit: item.unit ?? null,
-                qty: item.qty != null ? String(item.qty) : null,
-                unitPrice: item.unitPrice != null ? String(item.unitPrice) : null,
-                totalPrice: item.totalPrice != null ? String(item.totalPrice) : null,
-            }));
-            await this.db.insert(rfqResponseItems).values(itemsData);
-        }
-
-        if (data.documents && data.documents.length > 0) {
-            const documentsData: NewRfqResponseDocument[] = data.documents.map(doc => ({
-                rfqResponseId: newResponse.id,
-                docType: doc.docType,
-                path: doc.path.length > 255 ? doc.path.slice(0, 255) : doc.path,
-                metadata: doc.metadata ?? {},
-            }));
-            await this.db.insert(rfqResponseDocuments).values(documentsData);
-        }
-
-        return { id: newResponse.id, rfqId, vendorId: data.vendorId };
-    }
-
-    async findAllResponses() {
-        const rows = await this.db
-            .select({
-                id: rfqResponses.id,
-                rfqId: rfqResponses.rfqId,
-                vendorId: rfqResponses.vendorId,
-                vendorName: vendors.name,
-                receiptDatetime: rfqResponses.receiptDatetime,
-                tenderId: rfqs.tenderId,
-                tenderName: tenderInfos.tenderName,
-                tenderNo: tenderInfos.tenderNo,
-                dueDate: tenderInfos.dueDate,
-                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
-            })
-            .from(rfqResponses)
-            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
-            .leftJoin(rfqs, eq(rfqResponses.rfqId, rfqs.id))
-            .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
-            .orderBy(desc(rfqResponses.createdAt));
-        return rows;
-    }
-
-    async findResponsesByRfqId(rfqId: number) {
-        const rfq = await this.findById(rfqId);
-        if (!rfq) {
-            throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
-        }
-        const rows = await this.db
-            .select({
-                id: rfqResponses.id,
-                rfqId: rfqResponses.rfqId,
-                vendorId: rfqResponses.vendorId,
-                vendorName: vendors.name,
-                receiptDatetime: rfqResponses.receiptDatetime,
-                tenderName: tenderInfos.tenderName,
-                tenderNo: tenderInfos.tenderNo,
-                dueDate: tenderInfos.dueDate,
-                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
-            })
-            .from(rfqResponses)
-            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
-            .leftJoin(rfqs, eq(rfqResponses.rfqId, rfqs.id))
-            .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
-            .where(eq(rfqResponses.rfqId, rfqId))
-            .orderBy(desc(rfqResponses.createdAt));
-        return rows;
-    }
-
-    async findResponseById(responseId: number) {
-        const [row] = await this.db
-            .select({
-                id: rfqResponses.id,
-                rfqId: rfqResponses.rfqId,
-                vendorId: rfqResponses.vendorId,
-                vendorName: vendors.name,
-                receiptDatetime: rfqResponses.receiptDatetime,
-                gstPercentage: rfqResponses.gstPercentage,
-                gstType: rfqResponses.gstType,
-                deliveryTime: rfqResponses.deliveryTime,
-                freightType: rfqResponses.freightType,
-                notes: rfqResponses.notes,
-                createdAt: rfqResponses.createdAt,
-                updatedAt: rfqResponses.updatedAt,
-            })
-            .from(rfqResponses)
-            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
-            .where(eq(rfqResponses.id, responseId));
-        if (!row) {
-            throw new NotFoundException(`RFQ response with ID ${responseId} not found`);
-        }
-        const items = await this.db.select().from(rfqResponseItems).where(eq(rfqResponseItems.rfqResponseId, responseId));
-        const documents = await this.db.select().from(rfqResponseDocuments).where(eq(rfqResponseDocuments.rfqResponseId, responseId));
-        const rfqDetails = await this.findById(row.rfqId);
-        return {
-            ...row,
-            items: items.map(i => ({
-                id: i.id,
-                rfqResponseId: i.rfqResponseId,
-                rfqItemId: i.rfqItemId,
-                requirement: i.requirement,
-                unit: i.unit,
-                qty: i.qty,
-                unitPrice: i.unitPrice,
-                totalPrice: i.totalPrice,
-                createdAt: i.createdAt,
-            })),
-            documents: documents.map(d => ({
-                id: d.id,
-                rfqResponseId: d.rfqResponseId,
-                docType: d.docType,
-                path: d.path,
-                metadata: d.metadata,
-                createdAt: d.createdAt,
-            })),
-            rfq: rfqDetails ?? undefined,
-        };
-    }
 
     async delete(id: number): Promise<void> {
         const result = await this.db.delete(rfqs).where(eq(rfqs.id, id)).returning();
