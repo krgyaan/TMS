@@ -13,7 +13,7 @@ import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { TenderListQuery } from "./zod/tender.dto";
 import { TenderOutcomeStatus } from "./zod/stage-performance.type";
 import { fa } from "zod/v4/locales";
-import { paymentInstruments, paymentRequests, reverseAuctions, tenderInformation, tenderQueries, users } from "@/db/schemas";
+import { paymentInstruments, paymentRequests, reverseAuctions, tenderCostingSheets, tenderInformation, tenderQueries, users } from "@/db/schemas";
 import type { TenderKpiBucket } from "./zod/tender-buckets.type";
 import { TenderMeta } from "./zod/tender.types";
 import { StageBacklogQueryDto } from "./zod/stage-backlog-query.dto";
@@ -1158,7 +1158,7 @@ export class TenderExecutiveService {
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
         /* =====================================================
-       0️⃣ Tender universe conditions (GLOBAL, DO NOT FILTER STATUS)
+       0️⃣ Tender universe conditions
     ===================================================== */
         const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
 
@@ -1182,47 +1182,48 @@ export class TenderExecutiveService {
             return { from, to, stages: {} };
         }
 
+        const tenderIds = tenders.map(t => t.id);
+
         /* =====================================================
-       2️⃣ Fetch Approvals (Tender Info Approved Time)
+       2️⃣ Fetch Info Sheets (Approval Pending)
     ===================================================== */
-        const approvals = await this.db
+        const infos = await this.db
             .select({
                 tenderId: tenderInformation.tenderId,
-                approvedAt: tenderInformation.createdAt,
+                createdAt: tenderInformation.createdAt,
             })
             .from(tenderInformation)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderInformation.tenderId))
-            .where(and(...tenderConditions));
+            .where(inArray(tenderInformation.tenderId, tenderIds));
 
-        const approvalMap = new Map<number, Date>();
-        approvals.forEach(a => approvalMap.set(Number(a.tenderId), a.approvedAt));
+        const infoMap = new Map<number, Date>();
+        infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
 
         /* =====================================================
-       3️⃣ Fetch Bid Submissions
+       3️⃣ Fetch Costing Sheets
     ===================================================== */
-        const bids = await this.db
-            .select()
-            .from(bidSubmissions)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .where(and(...tenderConditions));
+        const costings = await this.db.select().from(tenderCostingSheets).where(inArray(tenderCostingSheets.tenderId, tenderIds));
 
-        const bidMap = new Map<number, (typeof bids)[number]["bid_submissions"]>();
-        bids.forEach(b => bidMap.set(Number(b.bid_submissions.tenderId), b.bid_submissions));
+        const costingMap = new Map<number, (typeof costings)[number]>();
+        costings.forEach(c => costingMap.set(Number(c.tenderId), c));
 
         /* =====================================================
-       4️⃣ Fetch Results
+       4️⃣ Fetch Bid Submissions
     ===================================================== */
-        const results = await this.db
-            .select()
-            .from(tenderResults)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderResults.tenderId))
-            .where(and(...tenderConditions));
+        const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
 
-        const resultMap = new Map<number, (typeof results)[number]["tender_results"]>();
-        results.forEach(r => resultMap.set(Number(r.tender_results.tenderId), r.tender_results));
+        const bidMap = new Map<number, (typeof bids)[number]>();
+        bids.forEach(b => bidMap.set(Number(b.tenderId), b));
 
         /* =====================================================
-       5️⃣ Status Helpers
+       5️⃣ Fetch Results
+    ===================================================== */
+        const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
+
+        const resultMap = new Map<number, (typeof results)[number]>();
+        results.forEach(r => resultMap.set(Number(r.tenderId), r));
+
+        /* =====================================================
+       6️⃣ Status helpers
     ===================================================== */
         const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
         const DISQUALIFIED_CODES = new Set([33, 38, 39, 41]);
@@ -1236,38 +1237,35 @@ export class TenderExecutiveService {
         const isTerminal = (s: number) => isWon(s) || isLost(s) || isDisqualified(s);
 
         /* =====================================================
-       6️⃣ Stage Buckets
+       7️⃣ Buckets
     ===================================================== */
-        const emptyBucket = () => ({
-            count: 0,
-            value: 0,
-            drilldown: [] as any[],
-        });
+        const empty = () => ({ count: 0, value: 0, drilldown: [] as any[] });
 
         const stages = {
-            assigned: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            approved: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            bid: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            resultAwaited: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            won: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            lost: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
-            disqualified: { opening: emptyBucket(), during: emptyBucket(), total: emptyBucket() },
+            assigned: { opening: empty(), during: empty(), total: empty() },
+            approved: { opening: empty(), during: empty(), total: empty() },
+            bid: { opening: empty(), during: empty(), total: empty() },
+            resultAwaited: { opening: empty(), during: empty(), total: empty() },
+            won: { opening: empty(), during: empty(), total: empty() },
+            lost: { opening: empty(), during: empty(), total: empty() },
+            disqualified: { opening: empty(), during: empty(), total: empty() },
         };
 
         /* =====================================================
-       7️⃣ Ledger Processing (STAGE-WISE ELIGIBILITY)
+       8️⃣ Ledger Processing
     ===================================================== */
         for (const t of tenders) {
             const status = Number(t.status);
             const value = Number(t.gstValues ?? 0);
 
             const assignedAt = t.createdAt;
-            const approvedAt = approvalMap.get(t.id) ?? null;
-
+            const infoAt = infoMap.get(t.id) ?? null;
+            const costing = costingMap.get(t.id);
             const bid = bidMap.get(t.id);
-            const bidAt = bid?.status === "Bid Submitted" ? bid.submissionDatetime : null;
-
             const result = resultMap.get(t.id);
+
+            const bidSubmittedAt = bid?.status === "Bid Submitted" ? bid.submissionDatetime : null;
+
             const resultAt = result?.resultUploadedAt ?? null;
 
             const meta = {
@@ -1277,152 +1275,58 @@ export class TenderExecutiveService {
                 value,
             };
 
-            /* ---------------- ASSIGNED (tlStatus = 0 only) ---------------- */
-            if (t.tlStatus === 0 && !isDnb(status) && !isTerminal(status) && assignedAt <= to) {
-                stages.assigned.total.count++;
-                stages.assigned.total.value += value;
-                stages.assigned.total.drilldown.push({ ...meta, assignedAt });
-
-                if (assignedAt < from) {
-                    stages.assigned.opening.count++;
-                    stages.assigned.opening.value += value;
-                    stages.assigned.opening.drilldown.push({ ...meta, assignedAt });
-                }
-
-                if (assignedAt >= from && assignedAt <= to) {
-                    stages.assigned.during.count++;
-                    stages.assigned.during.value += value;
-                    stages.assigned.during.drilldown.push({ ...meta, assignedAt });
-                }
+            /* ---------- ASSIGNED ---------- */
+            if (t.tlStatus === 0 && !infoAt && !isDnb(status) && !isTerminal(status)) {
+                this.push(stages.assigned, assignedAt, from, to, meta);
             }
 
-            /* ---------------- APPROVED (tlStatus = 1 only) ---------------- */
-            if (t.tlStatus === 1 && approvedAt && !isDnb(status) && !isTerminal(status) && approvedAt <= to) {
-                stages.approved.total.count++;
-                stages.approved.total.value += value;
-                stages.approved.total.drilldown.push({ ...meta, approvedAt });
-
-                if (approvedAt < from) {
-                    stages.approved.opening.count++;
-                    stages.approved.opening.value += value;
-                    stages.approved.opening.drilldown.push({ ...meta, approvedAt });
-                }
-
-                if (approvedAt >= from && approvedAt <= to) {
-                    stages.approved.during.count++;
-                    stages.approved.during.value += value;
-                    stages.approved.during.drilldown.push({ ...meta, approvedAt });
-                }
+            /* ---------- APPROVED (PENDING TL) ---------- */
+            if (infoAt && t.tlStatus === 0 && !isDnb(status) && !isTerminal(status)) {
+                this.push(stages.approved, infoAt, from, to, meta);
             }
 
-            /* ---------------- BID (historical + current) ---------------- */
-            if (bidAt && bidAt <= to) {
-                stages.bid.total.count++;
-                stages.bid.total.value += value;
-                stages.bid.total.drilldown.push({ ...meta, bidAt });
-
-                if (bidAt < from) {
-                    stages.bid.opening.count++;
-                    stages.bid.opening.value += value;
-                    stages.bid.opening.drilldown.push({ ...meta, bidAt });
-                }
-
-                if (bidAt >= from && bidAt <= to) {
-                    stages.bid.during.count++;
-                    stages.bid.during.value += value;
-                    stages.bid.during.drilldown.push({ ...meta, bidAt });
-                }
+            /* ---------- BID (PENDING SUBMISSION) ---------- */
+            if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(status) && !isTerminal(status)) {
+                this.push(stages.bid, costing.approvedAt!, from, to, meta);
             }
 
-            /* ---------------- RESULT AWAITED ---------------- */
-            if (bidAt && !resultAt && !isTerminal(status)) {
-                stages.resultAwaited.total.count++;
-                stages.resultAwaited.total.value += value;
-                stages.resultAwaited.total.drilldown.push({ ...meta, bidAt });
-
-                if (bidAt < from) {
-                    stages.resultAwaited.opening.count++;
-                    stages.resultAwaited.opening.value += value;
-                    stages.resultAwaited.opening.drilldown.push({ ...meta, bidAt });
-                }
-
-                if (bidAt >= from && bidAt <= to) {
-                    stages.resultAwaited.during.count++;
-                    stages.resultAwaited.during.value += value;
-                    stages.resultAwaited.during.drilldown.push({ ...meta, bidAt });
-                }
+            /* ---------- RESULT AWAITED ---------- */
+            if (bidSubmittedAt && !resultAt && !isDnb(status) && !isTerminal(status)) {
+                this.push(stages.resultAwaited, bidSubmittedAt, from, to, meta);
             }
 
-            /* ---------------- TERMINALS (OPENING / DURING / TOTAL) ---------------- */
+            /* ---------- TERMINALS ---------- */
             if (resultAt && resultAt <= to) {
-                const isOpening = resultAt < from;
-                const isDuring = resultAt >= from && resultAt <= to;
+                const bucket = isWon(status) ? stages.won : isLost(status) ? stages.lost : isDisqualified(status) ? stages.disqualified : null;
 
-                if (isWon(status)) {
-                    // TOTAL
-                    stages.won.total.count++;
-                    stages.won.total.value += value;
-                    stages.won.total.drilldown.push({ ...meta, resultAt });
-
-                    // OPENING
-                    if (isOpening) {
-                        stages.won.opening.count++;
-                        stages.won.opening.value += value;
-                        stages.won.opening.drilldown.push({ ...meta, resultAt });
-                    }
-
-                    // DURING
-                    if (isDuring) {
-                        stages.won.during.count++;
-                        stages.won.during.value += value;
-                        stages.won.during.drilldown.push({ ...meta, resultAt });
-                    }
-                }
-
-                if (isLost(status)) {
-                    stages.lost.total.count++;
-                    stages.lost.total.value += value;
-                    stages.lost.total.drilldown.push({ ...meta, resultAt });
-
-                    if (isOpening) {
-                        stages.lost.opening.count++;
-                        stages.lost.opening.value += value;
-                        stages.lost.opening.drilldown.push({ ...meta, resultAt });
-                    }
-
-                    if (isDuring) {
-                        stages.lost.during.count++;
-                        stages.lost.during.value += value;
-                        stages.lost.during.drilldown.push({ ...meta, resultAt });
-                    }
-                }
-
-                if (isDisqualified(status)) {
-                    stages.disqualified.total.count++;
-                    stages.disqualified.total.value += value;
-                    stages.disqualified.total.drilldown.push({ ...meta, resultAt });
-
-                    if (isOpening) {
-                        stages.disqualified.opening.count++;
-                        stages.disqualified.opening.value += value;
-                        stages.disqualified.opening.drilldown.push({ ...meta, resultAt });
-                    }
-
-                    if (isDuring) {
-                        stages.disqualified.during.count++;
-                        stages.disqualified.during.value += value;
-                        stages.disqualified.during.value += value;
-                        stages.disqualified.during.drilldown.push({ ...meta, resultAt });
-                    }
+                if (bucket) {
+                    this.push(bucket, resultAt, from, to, meta);
                 }
             }
         }
 
-        return {
-            from,
-            to,
-            stages,
-        };
+        return { from, to, stages };
+    }
+
+    /* =====================================================
+   Helper
+===================================================== */
+    private push(stage, date: Date, from: Date, to: Date, meta: any) {
+        stage.total.count++;
+        stage.total.value += meta.value;
+        stage.total.drilldown.push({ ...meta, at: date });
+
+        if (date < from) {
+            stage.opening.count++;
+            stage.opening.value += meta.value;
+            stage.opening.drilldown.push({ ...meta, at: date });
+        }
+
+        if (date >= from && date <= to) {
+            stage.during.count++;
+            stage.during.value += meta.value;
+            stage.during.drilldown.push({ ...meta, at: date });
+        }
     }
     // =======================================================
     // EMD BALANCE SHEET VIEW
