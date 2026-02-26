@@ -80,7 +80,7 @@ export class TenderExecutiveController {
     @Get("stage-backlog")
     async getStageBacklog(@Query() query: unknown) {
         const parsed = StageBacklogQuerySchema.parse(query);
-        return this.tenderExecutiveService.getStageBacklog(parsed);
+        return this.tenderExecutiveService.getStageBacklogV2(parsed);
     }
 
     @Public()
