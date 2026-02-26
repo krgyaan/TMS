@@ -1353,24 +1353,67 @@ export class TenderExecutiveService {
                 }
             }
 
-            /* ---------------- TERMINALS ---------------- */
+            /* ---------------- TERMINALS (OPENING / DURING / TOTAL) ---------------- */
             if (resultAt && resultAt <= to) {
+                const isOpening = resultAt < from;
+                const isDuring = resultAt >= from && resultAt <= to;
+
                 if (isWon(status)) {
+                    // TOTAL
                     stages.won.total.count++;
                     stages.won.total.value += value;
                     stages.won.total.drilldown.push({ ...meta, resultAt });
+
+                    // OPENING
+                    if (isOpening) {
+                        stages.won.opening.count++;
+                        stages.won.opening.value += value;
+                        stages.won.opening.drilldown.push({ ...meta, resultAt });
+                    }
+
+                    // DURING
+                    if (isDuring) {
+                        stages.won.during.count++;
+                        stages.won.during.value += value;
+                        stages.won.during.drilldown.push({ ...meta, resultAt });
+                    }
                 }
 
                 if (isLost(status)) {
                     stages.lost.total.count++;
                     stages.lost.total.value += value;
                     stages.lost.total.drilldown.push({ ...meta, resultAt });
+
+                    if (isOpening) {
+                        stages.lost.opening.count++;
+                        stages.lost.opening.value += value;
+                        stages.lost.opening.drilldown.push({ ...meta, resultAt });
+                    }
+
+                    if (isDuring) {
+                        stages.lost.during.count++;
+                        stages.lost.during.value += value;
+                        stages.lost.during.drilldown.push({ ...meta, resultAt });
+                    }
                 }
 
                 if (isDisqualified(status)) {
                     stages.disqualified.total.count++;
                     stages.disqualified.total.value += value;
                     stages.disqualified.total.drilldown.push({ ...meta, resultAt });
+
+                    if (isOpening) {
+                        stages.disqualified.opening.count++;
+                        stages.disqualified.opening.value += value;
+                        stages.disqualified.opening.drilldown.push({ ...meta, resultAt });
+                    }
+
+                    if (isDuring) {
+                        stages.disqualified.during.count++;
+                        stages.disqualified.during.value += value;
+                        stages.disqualified.during.value += value;
+                        stages.disqualified.during.drilldown.push({ ...meta, resultAt });
+                    }
                 }
             }
         }
