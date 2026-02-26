@@ -1151,7 +1151,16 @@ export class TenderExecutiveService {
             .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
             .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(tenderResults, eq(tenderResults.tenderId, paymentRequests.tenderId))
-            .where(and(inArray(paymentRequests.tenderId, tenderIds), eq(paymentRequests.purpose, "EMD"), lte(paymentRequests.createdAt, to)));
+            .where(
+                and(
+                    inArray(paymentRequests.tenderId, tenderIds),
+                    eq(paymentRequests.purpose, "EMD"),
+                    lte(paymentRequests.createdAt, to),
+
+                    // ✅ IMPORTANT: Only real EMD instruments
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"])
+                )
+            );
     }
 
     async getEmdBalance(query: EmdBalanceQueryDto) {
