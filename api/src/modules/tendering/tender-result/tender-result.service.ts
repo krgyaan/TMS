@@ -297,9 +297,14 @@ export class TenderResultService {
             inArray(tenderResults.status, ['Disqualified', 'cancelled', 'disqualified']),
         ];
 
+        const amountSql = sql<number>`coalesce(${tenderCostingSheets.finalPrice}, ${tenderInfos.gstValues})`;
+
         const counts = await Promise.all([
             this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .select({
+                    count: sql<number>`count(distinct ${tenderInfos.id})`,
+                    amount: sql<number>`sum(${amountSql})`
+                })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
@@ -308,9 +313,12 @@ export class TenderResultService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...resultAwaitedConditions))
-                .then(([result]) => Number(result?.count || 0)),
+                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
             this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .select({
+                    count: sql<number>`count(distinct ${tenderInfos.id})`,
+                    amount: sql<number>`sum(${amountSql})`
+                })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
@@ -319,9 +327,12 @@ export class TenderResultService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...wonConditions))
-                .then(([result]) => Number(result?.count || 0)),
+                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
             this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .select({
+                    count: sql<number>`count(distinct ${tenderInfos.id})`,
+                    amount: sql<number>`sum(${amountSql})`
+                })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
@@ -330,9 +341,12 @@ export class TenderResultService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...lostConditions))
-                .then(([result]) => Number(result?.count || 0)),
+                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
             this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .select({
+                    count: sql<number>`count(distinct ${tenderInfos.id})`,
+                    amount: sql<number>`sum(${amountSql})`
+                })
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
@@ -341,15 +355,21 @@ export class TenderResultService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...disqualifiedConditions))
-                .then(([result]) => Number(result?.count || 0)),
+                .then(([result]) => ({ count: Number(result?.count || 0), amount: Number(result?.amount || 0) })),
         ]);
 
         return {
-            pending: counts[0],
-            won: counts[1],
-            lost: counts[2],
-            disqualified: counts[3],
-            total: counts.reduce((sum, count) => sum + count, 0),
+            pending: counts[0].count,
+            won: counts[1].count,
+            lost: counts[2].count,
+            disqualified: counts[3].count,
+            total: counts.reduce((sum, c) => sum + c.count, 0),
+            totalAmounts: {
+                pending: counts[0].amount,
+                won: counts[1].amount,
+                lost: counts[2].amount,
+                disqualified: counts[3].amount,
+            }
         };
     }
 

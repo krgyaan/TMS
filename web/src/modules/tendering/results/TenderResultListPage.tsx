@@ -274,25 +274,31 @@ const TenderResultListPage = () => {
     const tabsWithData = useMemo(() => {
         return TABS_CONFIG.map((tab) => {
             let count = 0;
+            let totalAmount = 0;
             if (counts) {
                 switch (tab.key) {
                     case 'result-awaited':
                         count = counts.pending ?? 0;
+                        totalAmount = counts.totalAmounts?.pending ?? 0;
                         break;
                     case 'won':
                         count = counts.won ?? 0;
+                        totalAmount = counts.totalAmounts?.won ?? 0;
                         break;
                     case 'lost':
                         count = counts.lost ?? 0;
+                        totalAmount = counts.totalAmounts?.lost ?? 0;
                         break;
                     case 'disqualified':
                         count = counts.disqualified ?? 0;
+                        totalAmount = counts.totalAmounts?.disqualified ?? 0;
                         break;
                 }
             }
             return {
                 ...tab,
                 count,
+                totalAmount,
             };
         });
     }, [counts]);
@@ -354,7 +360,7 @@ const TenderResultListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as ResultDashboardType)}
                     >
-                        <TabsList className="m-auto mb-4">
+                        <TabsList className="m-auto">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -371,6 +377,11 @@ const TenderResultListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+                        <div className="flex items-center justify-center">
+                            {tabsWithData.map((tab) => (
+                                <p key={tab.key} className='px-4 text-sm'>{formatINR(tab.totalAmount)}</p>
+                            ))}
+                        </div>
 
                         {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
                         <div className="flex items-center gap-4 px-6 pb-4">
