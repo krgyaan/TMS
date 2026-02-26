@@ -298,6 +298,7 @@ export const paths = {
     hrms: {
         root: "/hrms",
         registration: "/hrms/registration",
+        status: "/hrms/status",
         documents: "/hrms/documents",
         assets: "/hrms/assets",
     },
