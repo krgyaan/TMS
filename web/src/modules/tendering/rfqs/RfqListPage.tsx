@@ -23,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Button } from '@/components/ui/button';
 
 const Rfqs = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -76,7 +76,7 @@ const Rfqs = () => {
                 if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
             },
             icon: <ClipboardList className="h-4 w-4" />,
-            visible: (row: RfqDashboardRowWithTimer) => activeTab === 'sent' && row.rfqId != null,
+            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
         },
         {
             label: 'Change Status',
@@ -117,6 +117,11 @@ const Rfqs = () => {
                 key: 'sent' as const,
                 name: 'RFQ Sent',
                 count: counts?.sent ?? 0,
+            },
+            {
+                key: 'responses' as const,
+                name: 'Responses Recorded',
+                count: counts?.responses ?? 0,
             },
             {
                 key: 'rfq-rejected' as const,
@@ -167,7 +172,24 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            visible: activeTab === 'sent',
+            visible: activeTab === 'sent' || activeTab === 'responses',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'responseCount',
+            headerName: 'Resp Recorded',
+            width: 130,
+            colId: 'responseCount',
+            cellRenderer: (params: any) => {
+                const count = params.data?.responseCount ?? 0;
+                return (
+                    <Badge variant={count > 0 ? 'success' : 'secondary'}>
+                        {count} Responses
+                    </Badge>
+                );
+            },
+            visible: activeTab === 'responses',
             sortable: true,
             filter: true,
         },
@@ -308,8 +330,8 @@ const Rfqs = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb')}>
-                    <TabsList className="m-auto mb-4">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb')}>
+                    <TabsList className="m-auto mb-4 flex flex-wrap justify-center h-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -366,7 +388,9 @@ const Rfqs = () => {
                                                     ? 'Tenders requiring RFQs will appear here'
                                                     : tab.key === 'sent'
                                                         ? 'Sent RFQs will be shown here'
-                                                        : tab.key === 'rfq-rejected'
+                                                        : tab.key === 'responses'
+                                                            ? 'RFQs with recorded responses will be shown here'
+                                                            : tab.key === 'rfq-rejected'
                                                             ? 'Rejected RFQs will be shown here'
                                                             : 'Tender DNB RFQs will be shown here'}
                                             </p>
