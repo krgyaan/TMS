@@ -89,4 +89,11 @@ export class TenderExecutiveController {
         const parsed = EmdBalanceQuerySchema.parse(query);
         return this.tenderExecutiveService.getEmdBalance(parsed);
     }
+
+    @Public()
+    @Get("emd-cashflow")
+    async getEmdCashFlow(@Query() query: unknown) {
+        const parsed = EmdBalanceQuerySchema.parse(query);
+        return this.tenderExecutiveService.getEmdCashFlow(parsed);
+    }
 }

@@ -1311,4 +1311,113 @@ export class TenderExecutiveService {
         bucket.value += meta.amount;
         bucket.drilldown.push(meta);
     }
+
+    async getEmdCashFlow(query: EmdBalanceQueryDto) {
+        const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+        const to = new Date(`${query.toDate}T23:59:59.999Z`);
+
+        const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
+
+        const emptyBucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+
+        const result = {
+            paid: {
+                prior: emptyBucket(),
+                during: emptyBucket(),
+            },
+            received: {
+                priorPaid: emptyBucket(),
+                duringPaid: emptyBucket(),
+            },
+        };
+
+        if (!tenderIds.length) {
+            return result;
+        }
+
+        const rows = await this.db
+            .select({
+                tenderId: paymentRequests.tenderId,
+                amount: paymentRequests.amountRequired,
+                createdAt: paymentRequests.createdAt,
+
+                instrumentType: paymentInstruments.instrumentType,
+                action: paymentInstruments.action,
+                updatedAt: paymentInstruments.updatedAt,
+
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+            })
+            .from(paymentRequests)
+            .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .where(
+                and(
+                    inArray(paymentRequests.tenderId, tenderIds),
+                    eq(paymentRequests.purpose, "EMD"),
+
+                    // ✅ Only real EMD instruments
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"]),
+
+                    lte(paymentRequests.createdAt, to)
+                )
+            );
+
+        for (const r of rows) {
+            if (!r.createdAt) continue; // ⬅️ hard guard, required
+
+            const createdAt = r.createdAt;
+            const updatedAt = r.updatedAt ?? null;
+
+            const state = resolveEmdFinancialState(r.instrumentType, r.action);
+
+            const meta = {
+                tenderId: r.tenderId,
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                instrumentType: r.instrumentType,
+                amount: Number(r.amount),
+                paidAt: createdAt,
+                receivedAt: updatedAt,
+            };
+
+            // ============================
+            // EMD PAID
+            // ============================
+
+            if (r.createdAt < from) {
+                result.paid.prior.count++;
+                result.paid.prior.value += meta.amount;
+                result.paid.prior.drilldown.push(meta);
+            }
+
+            if (r.createdAt >= from && r.createdAt <= to) {
+                result.paid.during.count++;
+                result.paid.during.value += meta.amount;
+                result.paid.during.drilldown.push(meta);
+            }
+
+            // ============================
+            // EMD RECEIVED BACK (ONLY RETURNED)
+            // ============================
+
+            if (state === "RETURNED" && r.updatedAt && r.updatedAt >= from && r.updatedAt <= to) {
+                // Paid before period → received now
+                if (r.createdAt < from) {
+                    result.received.priorPaid.count++;
+                    result.received.priorPaid.value += meta.amount;
+                    result.received.priorPaid.drilldown.push(meta);
+                }
+
+                // Paid during period → received during same period
+                if (r.createdAt >= from && r.createdAt <= to) {
+                    result.received.duringPaid.count++;
+                    result.received.duringPaid.value += meta.amount;
+                    result.received.duringPaid.drilldown.push(meta);
+                }
+            }
+        }
+
+        return result;
+    }
 }
