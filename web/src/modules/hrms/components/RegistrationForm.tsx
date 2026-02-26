@@ -13,7 +13,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { usersService } from "@/services/api/users.service";
 import { toast } from "sonner";
-import { getStoredUser, setStoredUser } from "@/lib/auth";
+import { paths } from "@/app/routes/paths";
 
 // Schema for registration form
 const RegistrationSchema = z.object({
@@ -109,17 +109,11 @@ export const RegistrationForm = () => {
 
     const onSubmit = async (values: RegistrationValues) => {
         try {
-            await usersService.register(values);
-            toast.success("Account activated successfully!");
+            const data = await usersService.register(values);
+            toast.success(data.message || "Registration submitted for approval!");
 
-            // Update local user state to isActive: true
-            const user = getStoredUser();
-            if (user) {
-                setStoredUser({ ...user, isActive: true });
-            }
-
-            // Redirect to dashboard
-            navigate("/", { replace: true });
+            // Redirect to status page
+            navigate(paths.hrms.status, { replace: true });
         } catch (error) {
             console.error("Registration failed:", error);
             toast.error("Failed to complete registration. Please try again.");
