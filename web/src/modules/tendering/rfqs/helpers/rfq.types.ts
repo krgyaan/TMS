@@ -21,6 +21,7 @@ export interface RfqDashboardRow {
     dueDate: Date;
     rfqId: number | null;
     rfqCount?: number;
+    responseCount?: number;
 }
 
 export interface RfqDashboardRowWithTimer extends RfqDashboardRow {
@@ -33,7 +34,7 @@ export interface RfqDashboardRowWithTimer extends RfqDashboardRow {
 }
 
 export type RfqDashboardFilters = {
-    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb';
+    tab?: 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb' | 'responses';
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -201,5 +202,6 @@ export interface RfqDashboardCounts {
     sent: number;
     "rfq-rejected": number;
     "tender-dnb": number;
+    responses: number;
     total: number;
 }
