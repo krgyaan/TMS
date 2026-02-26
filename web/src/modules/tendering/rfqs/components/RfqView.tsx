@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { Rfq } from '../helpers/rfq.types';
 import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -145,28 +145,50 @@ export function RfqView({
                                         Documents ({rfq.documents.length})
                                     </TableCell>
                                 </TableRow>
-                                {rfq.documents.map((doc) => (
-                                    <TableRow key={doc.id} className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm" colSpan={2}>
-                                            <span className="text-xs text-muted-foreground font-mono break-all">
-                                                {doc.docType.split('_')}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            {doc.path.split("\\").pop()}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
-                                            >
-                                                <ExternalLink className="h-4 w-4 mr-1" />
-                                                View
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                <TableRow>
+                                    <TableCell colSpan={4} className="p-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                            {rfq.documents.map((doc) => (
+                                                <div key={doc.id} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                    <div className="flex items-start gap-2 overflow-hidden">
+                                                        <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                        <div className="flex flex-col overflow-hidden">
+                                                            <span className="font-medium text-sm truncate" title={doc.docType.replace(/_/g, ' ')}>
+                                                                {doc.docType.replace(/_/g, ' ')}
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground truncate" title={doc.path.split("\\").pop() || doc.path}>
+                                                                {doc.path.split("\\").pop() || doc.path}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-auto">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="flex-1 h-8 text-xs gap-1"
+                                                            onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
+                                                        >
+                                                            <ExternalLink className="h-3 w-3" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="flex-1 h-8 text-xs gap-1"
+                                                            onClick={() => {
+                                                                const a = document.createElement('a');
+                                                                a.href = "/uploads/tendering/" + doc.path;
+                                                                a.download = doc.path.split("\\").pop() || doc.docType;
+                                                                a.click();
+                                                            }}
+                                                        >
+                                                            <Download className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
                             </>
                         )}
 

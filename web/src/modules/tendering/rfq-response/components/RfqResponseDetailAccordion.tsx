@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileText, Download } from 'lucide-react';
+import { AlertCircle, FileText, Download, ExternalLink } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -156,24 +156,43 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                                         <FileText className="h-4 w-4" />
                                         Attached Documents ({response.documents.length})
                                     </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                                         {response.documents.map((doc) => (
-                                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/10">
-                                                <div className="flex flex-col overflow-hidden">
-                                                    <span className="font-medium text-sm truncate">{doc.docType.replace(/_/g, ' ')}</span>
-                                                    <span className="text-xs text-muted-foreground truncate" title={doc.path}>
-                                                        {doc.path.split("\\").pop() || doc.path}
-                                                    </span>
+                                            <div key={doc.id} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                <div className="flex items-start gap-2 overflow-hidden">
+                                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                    <div className="flex flex-col overflow-hidden">
+                                                        <span className="font-medium text-sm truncate" title={doc.docType.replace(/_/g, ' ')}>
+                                                            {doc.docType.replace(/_/g, ' ')}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground truncate" title={doc.path.split("\\").pop() || doc.path}>
+                                                            {doc.path.split("\\").pop() || doc.path}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="shrink-0 ml-2 h-8 w-8"
-                                                    onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
-                                                    title="Download document"
-                                                >
-                                                    <Download className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
+                                                <div className="flex items-center gap-2 mt-auto">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => {
+                                                            const a = document.createElement('a');
+                                                            a.href = "/uploads/tendering/" + doc.path;
+                                                            a.download = doc.path.split("\\").pop() || doc.docType;
+                                                            a.click();
+                                                        }}
+                                                    >
+                                                        <Download className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
