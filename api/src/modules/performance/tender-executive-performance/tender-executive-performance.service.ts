@@ -1185,7 +1185,7 @@ export class TenderExecutiveService {
         const tenderIds = tenders.map(t => t.id);
 
         /* =====================================================
-       2️⃣ Fetch Info Sheets (Approval Pending)
+       2️⃣ Fetch Info Sheets
     ===================================================== */
         const infos = await this.db
             .select({
@@ -1215,7 +1215,7 @@ export class TenderExecutiveService {
         bids.forEach(b => bidMap.set(Number(b.tenderId), b));
 
         /* =====================================================
-       5️⃣ Fetch Results
+       5️⃣ Fetch Results (AUTHORITATIVE)
     ===================================================== */
         const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
@@ -1223,18 +1223,10 @@ export class TenderExecutiveService {
         results.forEach(r => resultMap.set(Number(r.tenderId), r));
 
         /* =====================================================
-       6️⃣ Status helpers
+       6️⃣ Status helpers (ONLY for non-result stages)
     ===================================================== */
         const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
-        const DISQUALIFIED_CODES = new Set([33, 38, 39, 41]);
-        const WON_CODES = new Set([25, 26, 27, 28]);
-        const LOST_CODES = new Set([18, 21, 22, 24]);
-
         const isDnb = (s: number) => DNB_CODES.has(s);
-        const isDisqualified = (s: number) => DISQUALIFIED_CODES.has(s);
-        const isWon = (s: number) => WON_CODES.has(s);
-        const isLost = (s: number) => LOST_CODES.has(s);
-        const isTerminal = (s: number) => isWon(s) || isLost(s) || isDisqualified(s);
 
         /* =====================================================
        7️⃣ Buckets
@@ -1252,21 +1244,18 @@ export class TenderExecutiveService {
         };
 
         /* =====================================================
-       8️⃣ Ledger Processing
+       8️⃣ Ledger Processing (FINAL, CLEAN FLOW)
     ===================================================== */
         for (const t of tenders) {
-            const status = Number(t.status);
             const value = Number(t.gstValues ?? 0);
+            const baseDate = t.createdAt; // 🔒 SINGLE TIME AXIS
 
-            const assignedAt = t.createdAt;
             const infoAt = infoMap.get(t.id) ?? null;
             const costing = costingMap.get(t.id);
             const bid = bidMap.get(t.id);
             const result = resultMap.get(t.id);
 
-            const bidSubmittedAt = bid?.status === "Bid Submitted" ? bid.submissionDatetime : null;
-
-            const resultAt = result?.resultUploadedAt ?? null;
+            const bidSubmitted = bid?.status === "Bid Submitted" && bid.submissionDatetime;
 
             const meta = {
                 tenderId: t.id,
@@ -1276,38 +1265,43 @@ export class TenderExecutiveService {
             };
 
             /* ---------- ASSIGNED ---------- */
-            if (t.tlStatus === 0 && !infoAt && !isDnb(status) && !isTerminal(status)) {
-                this.push(stages.assigned, assignedAt, from, to, meta);
+            if (t.tlStatus === 0 && !infoAt && !isDnb(t.status)) {
+                this.push(stages.assigned, baseDate, from, to, meta);
             }
 
             /* ---------- APPROVED (PENDING TL) ---------- */
-            if (infoAt && t.tlStatus === 0 && !isDnb(status) && !isTerminal(status)) {
-                this.push(stages.approved, infoAt, from, to, meta);
+            if (infoAt && t.tlStatus === 0 && !isDnb(t.status)) {
+                this.push(stages.approved, baseDate, from, to, meta);
             }
 
             /* ---------- BID (PENDING SUBMISSION) ---------- */
-            if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(status) && !isTerminal(status)) {
-                this.push(stages.bid, costing.approvedAt!, from, to, meta);
+            if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(t.status)) {
+                this.push(stages.bid, baseDate, from, to, meta);
             }
 
             /* ---------- RESULT AWAITED ---------- */
-            if (bidSubmittedAt && !resultAt && !isDnb(status) && !isTerminal(status)) {
-                this.push(stages.resultAwaited, bidSubmittedAt, from, to, meta);
+            if (bidSubmitted && !result) {
+                this.push(stages.resultAwaited, baseDate, from, to, meta);
             }
 
-            /* ---------- TERMINALS ---------- */
-            if (resultAt && resultAt <= to) {
-                const bucket = isWon(status) ? stages.won : isLost(status) ? stages.lost : isDisqualified(status) ? stages.disqualified : null;
+            /* ---------- TERMINAL RESULTS (PURE FROM tender_results) ---------- */
+            if (result) {
+                if (result.status === "Won") {
+                    this.push(stages.won, baseDate, from, to, meta);
+                }
 
-                if (bucket) {
-                    this.push(bucket, resultAt, from, to, meta);
+                if (result.status === "Lost") {
+                    this.push(stages.lost, baseDate, from, to, meta);
+                }
+
+                if (result.status === "Disqualified") {
+                    this.push(stages.disqualified, baseDate, from, to, meta);
                 }
             }
         }
 
         return { from, to, stages };
     }
-
     /* =====================================================
    Helper
 ===================================================== */
