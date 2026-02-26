@@ -167,9 +167,9 @@ export function StageBacklogTable({ view, userId, teamId, fromDate, toDate }: { 
                                 <TableHead className="text-center">
                                     <ColumnHeader title="Opening" description="Pending work at the start of the period" />
                                 </TableHead>
-                                <TableHead className="text-center">
+                                {/* <TableHead className="text-center">
                                     <ColumnHeader title="Current" description="Total applicable tenders" />
-                                </TableHead>
+                                </TableHead> */}
                                 <TableHead className="text-center">
                                     <ColumnHeader title="Completed" description="Completed as of period end" />
                                 </TableHead>
@@ -198,7 +198,7 @@ export function StageBacklogTable({ view, userId, teamId, fromDate, toDate }: { 
                                     </TableCell>
 
                                     <MetricCell data={row.metrics.opening} />
-                                    <MetricCell data={row.metrics.current} />
+                                    {/* <MetricCell data={row.metrics.current} /> */}
                                     <MetricCell data={row.metrics.completed} />
                                     <MetricCell data={row.metrics.pending} highlight />
                                     <MetricCell data={row.metrics.overdue} danger />
