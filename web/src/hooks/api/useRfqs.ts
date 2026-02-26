@@ -4,7 +4,7 @@ import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
 import { vendorOrganizationsService } from "@/services/api";
-import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto, CreateRfqResponseBodyDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
+import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 
 export const rfqsKey = {
@@ -15,9 +15,7 @@ export const rfqsKey = {
     detail: (id: number) => [...rfqsKey.details(), id] as const,
     byTender: (tenderId: number) => [...rfqsKey.all, "by-tender", tenderId] as const,
     dashboardCounts: () => [...rfqsKey.all, "dashboard-counts"] as const,
-    responsesByRfq: (rfqId: number) => [...rfqsKey.all, "responses", rfqId] as const,
-    allResponses: () => [...rfqsKey.all, "responses", "all"] as const,
-    responseDetail: (responseId: number) => [...rfqsKey.all, "response", responseId] as const,
+
 };
 
 export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
@@ -113,47 +111,7 @@ export const useDeleteRfq = () => {
     });
 };
 
-export const useCreateRfqResponse = () => {
-    const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ rfqId, data }: { rfqId: number; data: CreateRfqResponseBodyDto }) =>
-            rfqsService.createRfqResponse(rfqId, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: rfqsKey.lists() });
-            queryClient.invalidateQueries({ queryKey: rfqsKey.detail(variables.rfqId) });
-            queryClient.invalidateQueries({ queryKey: rfqsKey.responsesByRfq(variables.rfqId) });
-            queryClient.invalidateQueries({ queryKey: rfqsKey.allResponses() });
-            toast.success("RFQ response recorded successfully");
-        },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
-    });
-};
-
-export const useRfqResponses = (rfqId: number | null) => {
-    return useQuery({
-        queryKey: rfqsKey.responsesByRfq(rfqId ?? 0),
-        queryFn: () => rfqsService.getResponsesByRfqId(rfqId ?? 0),
-        enabled: !!rfqId,
-    });
-};
-
-export const useAllRfqResponses = () => {
-    return useQuery({
-        queryKey: rfqsKey.allResponses(),
-        queryFn: () => rfqsService.getAllResponses(),
-    });
-};
-
-export const useRfqResponse = (responseId: number | null) => {
-    return useQuery({
-        queryKey: rfqsKey.responseDetail(responseId ?? 0),
-        queryFn: () => rfqsService.getResponseById(responseId ?? 0),
-        enabled: !!responseId,
-    });
-};
 
 export const useRfqVendors = (rfqToIds: string | undefined) => {
     return useQuery({
