@@ -821,11 +821,22 @@ export class TenderResultService {
             isWon: dto.result === 'Won',
         };
 
+        const attachments = [
+            {
+                filename: 'qualified_parties_screenshot.pdf',
+                path: resultRecord.qualifiedPartiesScreenshot,
+            },
+            {
+                filename: 'final_result_screenshot.pdf',
+                path: resultRecord.finalResultScreenshot,
+            },
+        ];
+
         await this.sendEmail(
             'tender.result',
             tenderId,
             uploadedBy,
-            `Tender Result: ${tender.tenderNo}`,
+            `Tender Result - ${emailData.result} - ${tender.tenderName}`,
             'tender-result',
             emailData,
             {
