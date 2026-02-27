@@ -11,20 +11,15 @@ import { paths } from "@/app/routes/paths";
 ================================ */
 
 const formatCurrencySafe = (amount: unknown) => {
-    if (amount === null || amount === undefined || Number.isNaN(amount)) {
-        return "-";
-    }
-
-    const value = Number(amount);
-    if (!Number.isFinite(value)) {
-        return "-";
-    }
+    if (amount === null || amount === undefined) return "-";
+    const v = Number(amount);
+    if (!Number.isFinite(v)) return "-";
 
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0,
-    }).format(value);
+    }).format(v);
 };
 
 /* ================================
@@ -61,9 +56,20 @@ function MetricCell({ bucket, color }: { bucket?: any; color?: "green" | "red" |
         <TableCell className="text-center">
             <Popover>
                 <PopoverTrigger asChild>
-                    <div className={`mx-auto min-w-[72px] px-3 py-1 rounded-xl cursor-pointer ${colorCls}`}>
-                        <div className="font-bold text-sm">{bucket.count}</div>
-                        <div className="text-[11px] opacity-80">{formatCurrencySafe(bucket.value)}</div>
+                    <div
+                        className={`
+              mx-auto
+              min-w-[96px]
+              max-w-[140px]
+              px-3 py-1.5
+              rounded-xl
+              cursor-pointer
+              ${colorCls}
+            `}
+                    >
+                        <div className="font-bold text-sm leading-tight whitespace-nowrap">{bucket.count}</div>
+
+                        <div className="text-[11px] leading-tight whitespace-nowrap opacity-80">{formatCurrencySafe(bucket.value)}</div>
                     </div>
                 </PopoverTrigger>
 
@@ -80,7 +86,7 @@ function MetricCell({ bucket, color }: { bucket?: any; color?: "green" | "red" |
 
                                     {t.tenderName && <div className="text-muted-foreground truncate">{t.tenderName}</div>}
 
-                                    <div>{formatCurrencySafe(t.value)}</div>
+                                    <div className="whitespace-nowrap">{formatCurrencySafe(t.value)}</div>
                                 </div>
 
                                 <button
@@ -110,12 +116,14 @@ export function StageBacklogV2Table({ view, userId, teamId, fromDate, toDate }: 
     if (!data) return null;
 
     const { stages } = data;
+
     const terminalStages = new Set(["won", "lost", "disqualified", "missed"]);
+    const negativeStages = new Set(["lost", "missed", "disqualified"]);
 
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
-            <CardContent className="p-0 overflow-x-auto">
-                <Table className="min-w-[1400px]">
+            <CardContent className="p-0">
+                <Table className="w-full table-fixed">
                     <TableHeader className="bg-muted/30">
                         <TableRow>
                             <TableHead rowSpan={2} />
@@ -141,26 +149,27 @@ export function StageBacklogV2Table({ view, userId, teamId, fromDate, toDate }: 
                         {Object.entries(stages).map(([key, stage]: any) => {
                             const isTerminal = terminalStages.has(key);
                             const isWon = key === "won";
-                            const isNegative = ["lost", "missed", "disqualified"].includes(key);
+                            const isNegative = negativeStages.has(key);
+                            const isPendingStage = !isTerminal;
 
                             return (
                                 <TableRow key={key} className="hover:bg-muted/20">
                                     <TableCell className="font-semibold capitalize">{key.replace(/([A-Z])/g, " $1")}</TableCell>
 
-                                    {/* OPENING */}
+                                    {/* OPENING — Pending */}
                                     <MetricCell bucket={stage.opening} />
 
-                                    {/* DURING – ALLOCATED */}
+                                    {/* DURING — Allocated */}
                                     <MetricCell bucket={stage.during.total} />
 
-                                    {/* DURING – COMPLETED */}
+                                    {/* DURING — Completed */}
                                     <MetricCell bucket={stage.during.completed} color={isWon ? "green" : isNegative ? "red" : undefined} />
 
-                                    {/* DURING – PENDING */}
+                                    {/* DURING — Pending */}
                                     {!isTerminal ? <MetricCell bucket={stage.during.pending} color="yellow" /> : <TableCell />}
 
                                     {/* CLOSING */}
-                                    <MetricCell bucket={stage.total} color={isWon ? "green" : isNegative ? "red" : key === "bid" ? "yellow" : undefined} />
+                                    <MetricCell bucket={stage.total} color={isWon ? "green" : isNegative ? "red" : isPendingStage ? "yellow" : undefined} />
                                 </TableRow>
                             );
                         })}
