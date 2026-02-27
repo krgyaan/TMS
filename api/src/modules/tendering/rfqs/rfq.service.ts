@@ -64,6 +64,7 @@ type RfqDetails = {
     tenderId: number;
     dueDate: Date;
     docList: string | null;
+    requestedOrganization: string | null;
     requestedVendor: string | null;
     createdAt: Date;
     updatedAt: Date;
