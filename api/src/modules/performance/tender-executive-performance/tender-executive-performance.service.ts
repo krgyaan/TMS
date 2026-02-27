@@ -1492,12 +1492,229 @@ export class TenderExecutiveService {
     //         return { from, to, stages };
     //     }
 
+    // async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+    //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+    //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
+
+    //     /* =====================================================
+    //    1️⃣ Build base WHERE conditions
+    // ===================================================== */
+    //     const conditions = [eq(tenderInfos.deleteStatus, 0)];
+
+    //     if (query.view === "user" && query.userId) {
+    //         conditions.push(eq(tenderInfos.teamMember, query.userId));
+    //     }
+
+    //     if (query.view === "team" && query.teamId) {
+    //         conditions.push(eq(tenderInfos.team, query.teamId));
+    //     }
+
+    //     /* =====================================================
+    //    2️⃣ Subqueries: latest bid & latest result
+    // ===================================================== */
+    //     const latestBid = this.db
+    //         .select({
+    //             tenderId: bidSubmissions.tenderId,
+    //             status: bidSubmissions.status,
+    //             bidRn: sql<number>`
+    //             row_number() over (
+    //                 partition by ${bidSubmissions.tenderId}
+    //                 order by ${bidSubmissions.createdAt} desc
+    //             )
+    //         `.as("bid_rn"),
+    //         })
+    //         .from(bidSubmissions)
+    //         .as("latest_bid");
+
+    //     const latestResult = this.db
+    //         .select({
+    //             tenderId: tenderResults.tenderId,
+    //             status: tenderResults.status,
+    //             resultRn: sql<number>`
+    //             row_number() over (
+    //                 partition by ${tenderResults.tenderId}
+    //                 order by ${tenderResults.createdAt} desc
+    //             )
+    //         `.as("result_rn"),
+    //         })
+    //         .from(tenderResults)
+    //         .as("latest_result");
+
+    //     /* =====================================================
+    //    3️⃣ Single flat query
+    // ===================================================== */
+    //     const rows = await this.db
+    //         .select({
+    //             id: tenderInfos.id,
+    //             tenderNo: tenderInfos.tenderNo,
+    //             tenderName: tenderInfos.tenderName,
+    //             createdAt: tenderInfos.createdAt,
+    //             tlStatus: tenderInfos.tlStatus,
+    //             tenderStatus: tenderInfos.status,
+    //             value: tenderInfos.gstValues,
+    //             infoId: tenderInformation.id,
+    //             bidStatus: latestBid.status,
+    //             resultStatus: latestResult.status,
+    //         })
+    //         .from(tenderInfos)
+    //         .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+    //         .leftJoin(latestBid, and(eq(latestBid.tenderId, tenderInfos.id), eq(latestBid.bidRn, 1)))
+    //         .leftJoin(latestResult, and(eq(latestResult.tenderId, tenderInfos.id), eq(latestResult.resultRn, 1)))
+    //         .where(and(...conditions));
+
+    //     if (!rows.length) {
+    //         return { from, to, stages: {} };
+    //     }
+
+    //     /* =====================================================
+    //    4️⃣ Buckets
+    // ===================================================== */
+    //     const empty = () => ({
+    //         opening: { count: 0, value: 0, drilldown: [] as any[] },
+    //         total: { count: 0, value: 0, drilldown: [] as any[] },
+    //         during: {
+    //             total: { count: 0, value: 0, drilldown: [] as any[] },
+    //             completed: { count: 0, value: 0, drilldown: [] as any[] },
+    //             pending: { count: 0, value: 0, drilldown: [] as any[] },
+    //         },
+    //     });
+
+    //     const stages = {
+    //         assigned: empty(),
+    //         approved: empty(),
+    //         bid: empty(),
+    //         missed: empty(),
+    //         resultAwaited: empty(),
+    //         won: empty(),
+    //         lost: empty(),
+    //         disqualified: empty(),
+    //     };
+
+    //     const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
+    //     const isDnb = (s: number) => DNB_CODES.has(s);
+
+    //     /* =====================================================
+    //    5️⃣ Drilldown-safe helpers
+    // ===================================================== */
+    //     const pushBucket = (bucket, meta, at: Date) => {
+    //         bucket.count++;
+    //         bucket.value += meta.value;
+    //         bucket.drilldown.push({ ...meta, at });
+    //     };
+
+    //     const pushStage = (stage, date: Date, meta) => {
+    //         // TOTAL
+    //         pushBucket(stage.total, meta, date);
+
+    //         // DURING (allocated)
+    //         if (date >= from && date <= to) {
+    //             pushBucket(stage.during.total, meta, date);
+    //         }
+    //     };
+
+    //     /* =====================================================
+    //    6️⃣ Ledger
+    // ===================================================== */
+    //     for (const r of rows) {
+    //         if (isDnb(r.tenderStatus)) continue;
+
+    //         const meta = {
+    //             tenderId: r.id,
+    //             tenderNo: r.tenderNo,
+    //             tenderName: r.tenderName,
+    //             value: Number(r.value ?? 0),
+    //         };
+
+    //         const inDuring = r.createdAt >= from && r.createdAt <= to;
+    //         const hasInfo = !!r.infoId;
+    //         const hasBid = !!r.bidStatus;
+    //         const hasResult = !!r.resultStatus;
+
+    //         /* ASSIGNED */
+    //         if (r.tlStatus === 0) {
+    //             pushStage(stages.assigned, r.createdAt, meta);
+
+    //             if (inDuring) {
+    //                 hasInfo ? pushBucket(stages.assigned.during.completed, meta, r.createdAt) : pushBucket(stages.assigned.during.pending, meta, r.createdAt);
+    //             }
+    //         }
+
+    //         /* APPROVED */
+    //         /* APPROVED */
+    //         if (hasInfo) {
+    //             pushStage(stages.approved, r.createdAt, meta);
+
+    //             const isPending = r.tlStatus === 0;
+    //             const isCompleted = r.tlStatus === 1 || r.tlStatus === 2;
+
+    //             /* OPENING — ONLY PENDING */
+    //             if (r.createdAt < from && isPending) {
+    //                 pushBucket(stages.approved.opening, meta, r.createdAt);
+    //             }
+
+    //             /* DURING — classification */
+    //             if (inDuring) {
+    //                 if (isCompleted) {
+    //                     pushBucket(stages.approved.during.completed, meta, r.createdAt);
+    //                 } else if (isPending) {
+    //                     pushBucket(stages.approved.during.pending, meta, r.createdAt);
+    //                 }
+    //             }
+    //         }
+    //         /* BID */
+    //         if (hasInfo && !hasBid) {
+    //             pushStage(stages.bid, r.createdAt, meta);
+
+    //             if (inDuring) {
+    //                 pushBucket(stages.bid.during.pending, meta, r.createdAt);
+    //             }
+    //         }
+
+    //         /* MISSED */
+    //         if (r.bidStatus === "Tender Missed") {
+    //             pushStage(stages.missed, r.createdAt, meta);
+
+    //             if (inDuring) {
+    //                 pushBucket(stages.missed.during.completed, meta, r.createdAt);
+    //             }
+    //         }
+
+    //         /* RESULT AWAITED */
+    //         if (hasInfo) {
+    //             pushStage(stages.resultAwaited, r.createdAt, meta);
+
+    //             if (inDuring) {
+    //                 hasResult ? pushBucket(stages.resultAwaited.during.completed, meta, r.createdAt) : pushBucket(stages.resultAwaited.during.pending, meta, r.createdAt);
+    //             }
+    //         }
+
+    //         /* TERMINAL */
+    //         if (r.resultStatus === "Won" || r.resultStatus === "Lost" || r.resultStatus === "Disqualified") {
+    //             const terminalStageMap = {
+    //                 Won: stages.won,
+    //                 Lost: stages.lost,
+    //                 Disqualified: stages.disqualified,
+    //             };
+
+    //             const stage = terminalStageMap[r.resultStatus];
+
+    //             pushStage(stage, r.createdAt, meta);
+
+    //             if (inDuring) {
+    //                 pushBucket(stage.during.completed, meta, r.createdAt);
+    //             }
+    //         }
+    //     }
+
+    //     return { from, to, stages };
+    // }
+
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
         /* =====================================================
-       1️⃣ Build base WHERE conditions
+       1️⃣ Base conditions
     ===================================================== */
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
@@ -1510,18 +1727,18 @@ export class TenderExecutiveService {
         }
 
         /* =====================================================
-       2️⃣ Subqueries: latest bid & latest result
+       2️⃣ Latest bid & result (window functions)
     ===================================================== */
         const latestBid = this.db
             .select({
                 tenderId: bidSubmissions.tenderId,
-                status: bidSubmissions.status,
+                bidStatus: bidSubmissions.status,
                 bidRn: sql<number>`
-                row_number() over (
-                    partition by ${bidSubmissions.tenderId}
-                    order by ${bidSubmissions.createdAt} desc
-                )
-            `.as("bid_rn"),
+            row_number() over (
+                partition by ${bidSubmissions.tenderId}
+                order by ${bidSubmissions.createdAt} desc
+            )
+        `.as("bid_rn"),
             })
             .from(bidSubmissions)
             .as("latest_bid");
@@ -1529,19 +1746,19 @@ export class TenderExecutiveService {
         const latestResult = this.db
             .select({
                 tenderId: tenderResults.tenderId,
-                status: tenderResults.status,
+                resultStatus: tenderResults.status,
                 resultRn: sql<number>`
-                row_number() over (
-                    partition by ${tenderResults.tenderId}
-                    order by ${tenderResults.createdAt} desc
-                )
-            `.as("result_rn"),
+            row_number() over (
+                partition by ${tenderResults.tenderId}
+                order by ${tenderResults.createdAt} desc
+            )
+        `.as("result_rn"),
             })
             .from(tenderResults)
             .as("latest_result");
 
         /* =====================================================
-       3️⃣ Single flat query
+       3️⃣ Flat tender ledger
     ===================================================== */
         const rows = await this.db
             .select({
@@ -1552,9 +1769,10 @@ export class TenderExecutiveService {
                 tlStatus: tenderInfos.tlStatus,
                 tenderStatus: tenderInfos.status,
                 value: tenderInfos.gstValues,
+
                 infoId: tenderInformation.id,
-                bidStatus: latestBid.status,
-                resultStatus: latestResult.status,
+                bidStatus: latestBid.bidStatus,
+                resultStatus: latestResult.resultStatus,
             })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
@@ -1570,8 +1788,8 @@ export class TenderExecutiveService {
        4️⃣ Buckets
     ===================================================== */
         const empty = () => ({
-            opening: { count: 0, value: 0, drilldown: [] as any[] },
-            total: { count: 0, value: 0, drilldown: [] as any[] },
+            opening: { count: 0, value: 0, drilldown: [] as any[] }, // pending only
+            total: { count: 0, value: 0, drilldown: [] as any[] }, // closing pending or snapshot
             during: {
                 total: { count: 0, value: 0, drilldown: [] as any[] },
                 completed: { count: 0, value: 0, drilldown: [] as any[] },
@@ -1583,8 +1801,8 @@ export class TenderExecutiveService {
             assigned: empty(),
             approved: empty(),
             bid: empty(),
-            missed: empty(),
             resultAwaited: empty(),
+            missed: empty(),
             won: empty(),
             lost: empty(),
             disqualified: empty(),
@@ -1594,31 +1812,16 @@ export class TenderExecutiveService {
         const isDnb = (s: number) => DNB_CODES.has(s);
 
         /* =====================================================
-       5️⃣ Drilldown-safe helpers
+       5️⃣ Helpers
     ===================================================== */
-        const pushBucket = (bucket, meta, at: Date) => {
+        const push = (bucket, meta, at: Date) => {
             bucket.count++;
             bucket.value += meta.value;
             bucket.drilldown.push({ ...meta, at });
         };
 
-        const pushStage = (stage, date: Date, meta) => {
-            // TOTAL
-            pushBucket(stage.total, meta, date);
-
-            // OPENING
-            if (date < from) {
-                pushBucket(stage.opening, meta, date);
-            }
-
-            // DURING (allocated)
-            if (date >= from && date <= to) {
-                pushBucket(stage.during.total, meta, date);
-            }
-        };
-
         /* =====================================================
-       6️⃣ Ledger
+       6️⃣ Ledger evaluation
     ===================================================== */
         for (const r of rows) {
             if (isDnb(r.tenderStatus)) continue;
@@ -1631,71 +1834,82 @@ export class TenderExecutiveService {
             };
 
             const inDuring = r.createdAt >= from && r.createdAt <= to;
+            const beforeFrom = r.createdAt < from;
+
             const hasInfo = !!r.infoId;
             const hasBid = !!r.bidStatus;
             const hasResult = !!r.resultStatus;
 
-            /* ASSIGNED */
+            /* ================= ASSIGNED ================= */
             if (r.tlStatus === 0) {
-                pushStage(stages.assigned, r.createdAt, meta);
+                // Opening & Closing → pending only
+                if (beforeFrom) push(stages.assigned.opening, meta, r.createdAt);
+                push(stages.assigned.total, meta, r.createdAt);
 
+                // During
                 if (inDuring) {
-                    hasInfo ? pushBucket(stages.assigned.during.completed, meta, r.createdAt) : pushBucket(stages.assigned.during.pending, meta, r.createdAt);
+                    push(stages.assigned.during.total, meta, r.createdAt);
+                    hasInfo ? push(stages.assigned.during.completed, meta, r.createdAt) : push(stages.assigned.during.pending, meta, r.createdAt);
                 }
             }
 
-            /* APPROVED */
+            /* ================= APPROVED ================= */
             if (hasInfo) {
-                pushStage(stages.approved, r.createdAt, meta);
+                const pending = r.tlStatus === 0;
+                const completed = r.tlStatus === 1 || r.tlStatus === 2;
+
+                if (beforeFrom && pending) push(stages.approved.opening, meta, r.createdAt);
+                if (pending) push(stages.approved.total, meta, r.createdAt);
 
                 if (inDuring) {
-                    r.tlStatus === 1 || r.tlStatus === 2
-                        ? pushBucket(stages.approved.during.completed, meta, r.createdAt)
-                        : pushBucket(stages.approved.during.pending, meta, r.createdAt);
+                    push(stages.approved.during.total, meta, r.createdAt);
+                    completed ? push(stages.approved.during.completed, meta, r.createdAt) : push(stages.approved.during.pending, meta, r.createdAt);
                 }
             }
 
-            /* BID */
+            /* ================= BID ================= */
             if (hasInfo && !hasBid) {
-                pushStage(stages.bid, r.createdAt, meta);
+                if (beforeFrom) push(stages.bid.opening, meta, r.createdAt);
+                push(stages.bid.total, meta, r.createdAt);
 
                 if (inDuring) {
-                    pushBucket(stages.bid.during.pending, meta, r.createdAt);
+                    push(stages.bid.during.total, meta, r.createdAt);
+                    push(stages.bid.during.pending, meta, r.createdAt);
                 }
             }
 
-            /* MISSED */
+            /* ================= RESULT AWAITED ================= */
+            if (hasInfo && !hasResult) {
+                if (beforeFrom) push(stages.resultAwaited.opening, meta, r.createdAt);
+                push(stages.resultAwaited.total, meta, r.createdAt);
+
+                if (inDuring) {
+                    push(stages.resultAwaited.during.total, meta, r.createdAt);
+                    push(stages.resultAwaited.during.pending, meta, r.createdAt);
+                }
+            }
+
+            /* ================= MISSED (terminal) ================= */
             if (r.bidStatus === "Tender Missed") {
-                pushStage(stages.missed, r.createdAt, meta);
+                if (beforeFrom) push(stages.missed.opening, meta, r.createdAt);
+                push(stages.missed.total, meta, r.createdAt);
 
                 if (inDuring) {
-                    pushBucket(stages.missed.during.completed, meta, r.createdAt);
+                    push(stages.missed.during.total, meta, r.createdAt);
+                    push(stages.missed.during.completed, meta, r.createdAt);
                 }
             }
 
-            /* RESULT AWAITED */
-            if (hasInfo) {
-                pushStage(stages.resultAwaited, r.createdAt, meta);
-
-                if (inDuring) {
-                    hasResult ? pushBucket(stages.resultAwaited.during.completed, meta, r.createdAt) : pushBucket(stages.resultAwaited.during.pending, meta, r.createdAt);
-                }
-            }
-
-            /* TERMINAL */
+            /* ================= TERMINAL RESULTS ================= */
             if (r.resultStatus === "Won" || r.resultStatus === "Lost" || r.resultStatus === "Disqualified") {
-                const terminalStageMap = {
-                    Won: stages.won,
-                    Lost: stages.lost,
-                    Disqualified: stages.disqualified,
-                };
+                const stage = r.resultStatus === "Won" ? stages.won : r.resultStatus === "Lost" ? stages.lost : stages.disqualified;
 
-                const stage = terminalStageMap[r.resultStatus];
-
-                pushStage(stage, r.createdAt, meta);
+                if (beforeFrom) push(stage.opening, meta, r.createdAt);
+                push(stage.total, meta, r.createdAt);
 
                 if (inDuring) {
-                    pushBucket(stage.during.completed, meta, r.createdAt);
+                    push(stage.during.total, meta, r.createdAt);
+                    push(stage.during.completed, meta, r.createdAt);
                 }
             }
         }
