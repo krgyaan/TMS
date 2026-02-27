@@ -1,22 +1,10 @@
 import { useState } from 'react';
 import { useRfqResponse } from '@/hooks/api/useRfqResponses';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger
-} from '@/components/ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, FileText, Download, ExternalLink } from 'lucide-react';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -47,7 +35,7 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                     <div className="flex items-center justify-between w-full pr-4 text-left">
                         <div className="flex flex-col gap-1">
                             <span className="font-semibold text-base">
-                                {responseSummary.vendorName ?? 'Unknown Vendor'}
+                                Response Details
                             </span>
                             <span className="text-sm text-muted-foreground">
                                 Receipt: {formatDateTime(responseSummary.receiptDatetime)}
