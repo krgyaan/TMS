@@ -96,9 +96,9 @@ export class ReverseAuctionService {
      */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
-        
+
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.roleId === 1 || user.roleId === 2 || user.roleId === 4) {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
@@ -122,7 +122,7 @@ export class ReverseAuctionService {
             // No user provided - return empty for security
             roleFilterConditions.push(sql`1 = 0`);
         }
-        
+
         return roleFilterConditions;
     }
 
@@ -345,7 +345,7 @@ export class ReverseAuctionService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<RaDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
