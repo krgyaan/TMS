@@ -88,12 +88,6 @@ export class RfqsController {
         return rfqs;
     }
 
-
-
-
-
-
-
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         const rfq = await this.rfqsService.findById(id);

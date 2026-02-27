@@ -1,19 +1,11 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, or, inArray, notInArray } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
 import { users } from "@db/schemas/auth/users.schema";
-import {
-    NewRfq,
-    rfqs,
-    rfqItems,
-    rfqDocuments,
-    rfqResponses,
-    NewRfqItem,
-    NewRfqDocument,
-} from "@db/schemas/tendering/rfqs.schema";
+import { NewRfq, rfqs, rfqItems, rfqDocuments, rfqResponses, NewRfqItem, NewRfqDocument } from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@db/schemas/vendors/vendors.schema";
@@ -66,6 +58,8 @@ type RfqDetails = {
     docList: string | null;
     requestedOrganization: string | null;
     requestedVendor: string | null;
+    requestedOrganizationNames: string[] | null;
+    requestedVendorNames: string[] | null;
     createdAt: Date;
     updatedAt: Date;
     items: Array<{
@@ -325,6 +319,60 @@ export class RfqsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    // Private helper method
+    private async getVendorAndOrgNames(
+        requestedVendor: string | null,
+        requestedOrganization: string | null
+    ): Promise<{ vendorNames: string[]; organizationNames: string[] }> {
+        const vendorNames: string[] = [];
+        const organizationNames: string[] = [];
+
+        // Fetch vendor names
+        if (requestedVendor) {
+            const vendorIds = requestedVendor
+                .split(',')
+                .map(id => parseInt(id.trim(), 10))
+                .filter(id => !isNaN(id));
+
+            if (vendorIds.length > 0) {
+                const vendorRows = await this.db
+                    .select({ id: vendors.id, name: vendors.name })
+                    .from(vendors)
+                    .where(inArray(vendors.id, vendorIds));
+
+                const vendorMap = new Map(vendorRows.map(v => [v.id, v.name]));
+                vendorIds.forEach(id => {
+                    const name = vendorMap.get(id);
+                    if (name) vendorNames.push(name);
+                });
+            }
+        }
+
+        // Fetch organization names
+        if (requestedOrganization) {
+            const orgIds = requestedOrganization
+                .split(',')
+                .map(id => parseInt(id.trim(), 10))
+                .filter(id => !isNaN(id));
+
+            if (orgIds.length > 0) {
+                const orgRows = await this.db
+                    .select({ id: vendorOrganizations.id, name: vendorOrganizations.name })
+                    .from(vendorOrganizations)
+                    .where(inArray(vendorOrganizations.id, orgIds));
+
+                const orgMap = new Map(orgRows.map(o => [o.id, o.name]));
+                orgIds.forEach(id => {
+                    const name = orgMap.get(id);
+                    if (name) organizationNames.push(name);
+                });
+            }
+        }
+
+        return { vendorNames, organizationNames };
+    }
+
+    // Updated findById
     async findById(id: number): Promise<RfqDetails | null> {
         const rfqData = await this.db.select().from(rfqs).where(eq(rfqs.id, id)).limit(1);
 
@@ -332,16 +380,24 @@ export class RfqsService {
             return null;
         }
 
-        const rfqItemsData = await this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id));
-        const rfqDocumentsData = await this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id));
+        const rfqRow = rfqData[0];
+
+        const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames }] = await Promise.all([
+            this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id)),
+            this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id)),
+            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+        ]);
 
         return {
-            ...rfqData[0],
+            ...rfqRow,
             items: rfqItemsData,
             documents: rfqDocumentsData,
+            requestedVendorNames: vendorNames,
+            requestedOrganizationNames: organizationNames,
         } as RfqDetails;
     }
 
+    // Updated findByTenderId
     async findByTenderId(tenderId: number): Promise<RfqDetails | null> {
         const rfqData = await this.db.select().from(rfqs).where(eq(rfqs.tenderId, tenderId)).limit(1);
 
@@ -349,17 +405,24 @@ export class RfqsService {
             return null;
         }
 
-        const rfqItemsData = await this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqData[0].id));
+        const rfqRow = rfqData[0];
 
-        const rfqDocumentsData = await this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqData[0].id));
+        const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames }] = await Promise.all([
+            this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
+            this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
+            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+        ]);
 
         return {
-            ...rfqData[0],
+            ...rfqRow,
             items: rfqItemsData,
             documents: rfqDocumentsData,
+            requestedVendorNames: vendorNames,
+            requestedOrganizationNames: organizationNames,
         } as RfqDetails;
     }
 
+    // Updated findAllByTenderId
     async findAllByTenderId(tenderId: number): Promise<RfqDetails[]> {
         const rfqRows = await this.db.select().from(rfqs).where(eq(rfqs.tenderId, tenderId));
 
@@ -367,16 +430,24 @@ export class RfqsService {
             return [];
         }
 
-        const result: RfqDetails[] = [];
-        for (const rfqRow of rfqRows) {
-            const rfqItemsData = await this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id));
-            const rfqDocumentsData = await this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id));
-            result.push({
-                ...rfqRow,
-                items: rfqItemsData,
-                documents: rfqDocumentsData,
-            } as RfqDetails);
-        }
+        const result: RfqDetails[] = await Promise.all(
+            rfqRows.map(async (rfqRow) => {
+                const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames }] = await Promise.all([
+                    this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
+                    this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
+                    this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+                ]);
+
+                return {
+                    ...rfqRow,
+                    items: rfqItemsData,
+                    documents: rfqDocumentsData,
+                    requestedVendorNames: vendorNames,
+                    requestedOrganizationNames: organizationNames,
+                } as RfqDetails;
+            })
+        );
+
         return result;
     }
 
