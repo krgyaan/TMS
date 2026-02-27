@@ -26,6 +26,7 @@ export { tenderInfosService } from './tenders.service';
 export { infoSheetsService } from './info-sheet.service';
 export { emdsService } from './emds.service';
 export { rfqsService } from './rfqs.service';
+export { rfqResponseService } from './rfqResponse.service';
 export { emdResponsibilityService } from './emd-responsibility.service';
 export { financialYearService } from './financial-year.service';
 export { vendorGstsService } from './vendor-gsts.service';

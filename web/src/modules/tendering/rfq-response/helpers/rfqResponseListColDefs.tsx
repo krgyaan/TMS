@@ -2,7 +2,9 @@ import type { ColDef } from 'ag-grid-community';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
-import type { RfqResponseListItem } from './rfq.types';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { RfqResponseListItem } from './rfqResponse.types';
 
 export function getRfqResponseListColumnDefs(
     responseActions: ActionItem<RfqResponseListItem>[]
@@ -20,18 +22,35 @@ export function getRfqResponseListColumnDefs(
             headerName: 'ITEM',
             width: 200,
             colId: 'itemSummary',
-            valueGetter: (params) => params.data?.itemSummary ?? '—',
+            cellRenderer: (params: any) => {
+                const text = params.data?.itemSummary ?? '—';
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="truncate block">{text}</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px] whitespace-pre-wrap">
+                            {text}
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            },
             sortable: true,
             filter: true,
-            wrapText: true,
-            autoHeight: true,
         },
         {
             field: 'vendorName',
-            headerName: 'VENDOR NAME',
+            headerName: 'VENDOR',
             width: 180,
             colId: 'vendorName',
-            valueGetter: (params) => params.data?.vendorName ?? '—',
+            cellRenderer: (params: any) => {
+                const name = params.data?.vendorName ?? '—';
+                return (
+                    <Badge variant="secondary" className="font-medium">
+                        {name}
+                    </Badge>
+                );
+            },
             sortable: true,
             filter: true,
         },

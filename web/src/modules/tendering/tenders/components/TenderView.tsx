@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -222,28 +222,50 @@ export function TenderView({
                             </TableCell>
                         </TableRow>
                         {documents.length > 0 ? (
-                            documents.map((filePath, index) => (
-                                <TableRow key={index} className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Document {index + 1}
-                                    </TableCell>
-                                    <TableCell className="text-sm" colSpan={2}>
-                                        <span className="text-xs text-muted-foreground font-mono break-all">
-                                            {getFileName(filePath)}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
-                                        >
-                                            <ExternalLink className="h-4 w-4 mr-1" />
-                                            View
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                            <TableRow>
+                                <TableCell colSpan={4} className="p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                        {documents.map((filePath, index) => (
+                                            <div key={index} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                <div className="flex items-start gap-2 overflow-hidden">
+                                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                    <div className="flex flex-col overflow-hidden">
+                                                        <span className="font-medium text-sm truncate" title={getFileName(filePath)}>
+                                                            {getFileName(filePath)}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground truncate">
+                                                            {filePath.split('.').pop()?.toUpperCase() || `Document ${index + 1}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-auto">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => {
+                                                            const a = document.createElement('a');
+                                                            a.href = tenderFilesService.getFileUrl(filePath);
+                                                            a.download = getFileName(filePath);
+                                                            a.click();
+                                                        }}
+                                                    >
+                                                        <Download className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm text-muted-foreground" colSpan={4}>

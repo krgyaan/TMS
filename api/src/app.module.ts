@@ -45,6 +45,7 @@ import { TenderApprovalModule } from "@/modules/tendering/tender-approval/tender
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { PhysicalDocsModule } from "@/modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "@/modules/tendering/rfqs/rfq.module";
+import { RfqResponseModule } from "@/modules/tendering/rfq-response/rfq-response.module";
 import { CourierModule } from "@/modules/courier/courier.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
@@ -147,6 +148,7 @@ import { ProjectsMasterModule } from "./modules/master/projects-master/projects-
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
+        RfqResponseModule,
         RfqsModule,
         CourierModule,
         MailerModule,

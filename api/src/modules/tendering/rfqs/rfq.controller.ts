@@ -14,7 +14,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { RfqsService } from '@/modules/tendering/rfqs/rfq.service';
-import type { CreateRfqDto, UpdateRfqDto, CreateRfqResponseBodyDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
+import type { CreateRfqDto, UpdateRfqDto } from '@/modules/tendering/rfqs/dto/rfq.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -88,20 +88,11 @@ export class RfqsController {
         return rfqs;
     }
 
-    @Get('responses')
-    async getAllResponses() {
-        return this.rfqsService.findAllResponses();
-    }
 
-    @Get('responses/:responseId')
-    async getResponseById(@Param('responseId', ParseIntPipe) responseId: number) {
-        return this.rfqsService.findResponseById(responseId);
-    }
 
-    @Get(':rfqId/responses')
-    async getResponsesByRfqId(@Param('rfqId', ParseIntPipe) rfqId: number) {
-        return this.rfqsService.findResponsesByRfqId(rfqId);
-    }
+
+
+
 
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
@@ -132,12 +123,4 @@ export class RfqsController {
         await this.rfqsService.delete(id);
     }
 
-    @Post(':rfqId/responses')
-    @HttpCode(HttpStatus.CREATED)
-    async createResponse(
-        @Param('rfqId', ParseIntPipe) rfqId: number,
-        @Body() body: CreateRfqResponseBodyDto,
-    ) {
-        return this.rfqsService.createResponse(rfqId, body);
-    }
 }

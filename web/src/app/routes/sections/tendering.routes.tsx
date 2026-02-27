@@ -20,9 +20,9 @@ const Tendering_RFQs = lazy(() => import('@/modules/tendering/rfqs/RfqListPage')
 const Tendering_RFQs_Create = lazy(() => import('@/modules/tendering/rfqs/RfqCreatePage'));
 const Tendering_RFQs_Edit = lazy(() => import('@/modules/tendering/rfqs/RfqEditPage'));
 const Tendering_RFQs_Show = lazy(() => import('@/modules/tendering/rfqs/RfqShowPage'));
-const Tendering_RFQs_Response_New = lazy(() => import('@/modules/tendering/rfqs/RfqResponseCreatePage'));
-const Tendering_RFQs_Response_List = lazy(() => import('@/modules/tendering/rfqs/RfqResponseListPage'));
-const Tendering_RFQs_Response_Show = lazy(() => import('@/modules/tendering/rfqs/RfqResponseShowPage'));
+const Tendering_RFQs_Response_New = lazy(() => import('@/modules/tendering/rfq-response/RfqResponseCreatePage'));
+const Tendering_RFQs_Response_List = lazy(() => import('@/modules/tendering/rfq-response/RfqResponseListPage'));
+const Tendering_RFQs_Response_Show = lazy(() => import('@/modules/tendering/rfq-response/RfqResponseShowPage'));
 const Tendering_EMD = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdListPage'));
 const Tendering_EMD_Create = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdCreatePage'));
 const Tendering_EMD_Edit = lazy(() => import('@/modules/tendering/emds-tenderfees/EmdEditPage'));

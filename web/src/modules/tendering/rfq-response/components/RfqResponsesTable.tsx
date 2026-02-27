@@ -7,7 +7,7 @@ import { ClipboardList, Eye, FileX2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
 import { getRfqResponseListColumnDefs } from '../helpers/rfqResponseListColDefs';
-import type { RfqResponseListItem } from '../helpers/rfq.types';
+import type { RfqResponseListItem } from '../helpers/rfqResponse.types';
 
 export interface RfqResponsesTableProps {
     responses: RfqResponseListItem[];

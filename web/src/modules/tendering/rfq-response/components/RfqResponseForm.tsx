@@ -16,9 +16,9 @@ import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import { Input } from '@/components/ui/input';
 
-import { useCreateRfqResponse } from '@/hooks/api/useRfqs';
+import { useCreateRfqResponse } from '@/hooks/api/useRfqResponses';
 import { useItemOptions } from '@/hooks/useSelectOptions';
-import type { Rfq } from '../helpers/rfq.types';
+import type { Rfq } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { RfqResponseFormSchema, type RfqResponseFormValues } from '../helpers/rfq-response.schema';
 
 const GST_TYPE_FREIGHT_OPTIONS = [

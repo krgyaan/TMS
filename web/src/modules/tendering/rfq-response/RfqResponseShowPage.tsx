@@ -12,7 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { useRfqResponse } from '@/hooks/api/useRfqs';
+import { useRfqResponse } from '@/hooks/api/useRfqResponses';
 import { paths } from '@/app/routes/paths';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
