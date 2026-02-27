@@ -10,12 +10,22 @@ import { paths } from "@/app/routes/paths";
    HELPERS
 ================================ */
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("en-IN", {
+const formatCurrencySafe = (amount: unknown) => {
+    if (amount === null || amount === undefined || Number.isNaN(amount)) {
+        return "-";
+    }
+
+    const value = Number(amount);
+    if (!Number.isFinite(value)) {
+        return "-";
+    }
+
+    return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(value);
+};
 
 /* ================================
    COLUMN HEADER
@@ -36,119 +46,124 @@ function ColumnHeader({ title, description }: { title: string; description: stri
 }
 
 /* ================================
-   METRIC CELL (WITH DRILLDOWN)
+   METRIC CELL
 ================================ */
 
-function MetricCell({ bucket }: { bucket: any }) {
+function MetricCell({ bucket, color }: { bucket?: any; color?: "green" | "red" | "yellow" }) {
     if (!bucket || bucket.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }
+
+    const colorCls =
+        color === "green" ? "bg-emerald-100 text-emerald-700" : color === "red" ? "bg-rose-100 text-rose-700" : color === "yellow" ? "bg-yellow-100 text-yellow-800" : "bg-muted";
 
     return (
         <TableCell className="text-center">
             <Popover>
                 <PopoverTrigger asChild>
-                    <div className="mx-auto min-w-[72px] px-3 py-1 rounded-xl bg-muted cursor-pointer">
+                    <div className={`mx-auto min-w-[72px] px-3 py-1 rounded-xl cursor-pointer ${colorCls}`}>
                         <div className="font-bold text-sm">{bucket.count}</div>
-                        <div className="text-[11px] text-muted-foreground">{formatCurrency(bucket.value)}</div>
+                        <div className="text-[11px] opacity-80">{formatCurrencySafe(bucket.value)}</div>
                     </div>
                 </PopoverTrigger>
 
                 <PopoverContent className="w-96 max-h-72 overflow-auto">
                     <div className="space-y-2">
                         <div className="font-semibold text-sm">
-                            {bucket.count} tenders · {formatCurrency(bucket.value)}
+                            {bucket.count} tenders · {formatCurrencySafe(bucket.value)}
                         </div>
 
-                        {bucket.drilldown?.length ? (
-                            bucket.drilldown.map((t: any) => (
-                                <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1 flex justify-between gap-2">
-                                    {/* LEFT */}
-                                    <div className="min-w-0 space-y-0.5">
-                                        <div className="font-medium truncate">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
+                        {bucket.drilldown?.map((t: any) => (
+                            <div key={t.tenderId} className="border-b pb-2 text-xs flex justify-between gap-2">
+                                <div className="min-w-0 space-y-0.5">
+                                    <div className="font-medium truncate">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
 
-                                        {t.tenderName && <div className="text-muted-foreground truncate">{t.tenderName}</div>}
+                                    {t.tenderName && <div className="text-muted-foreground truncate">{t.tenderName}</div>}
 
-                                        <div>{formatCurrency(t.value)}</div>
-
-                                        {t.assignedAt && <div>Assigned: {new Date(t.assignedAt).toLocaleDateString()}</div>}
-                                        {t.approvedAt && <div>Approved: {new Date(t.approvedAt).toLocaleDateString()}</div>}
-                                        {t.bidAt && <div>Bid: {new Date(t.bidAt).toLocaleDateString()}</div>}
-                                        {t.resultAt && <div>Result: {new Date(t.resultAt).toLocaleDateString()}</div>}
-                                    </div>
-
-                                    {/* RIGHT */}
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            window.open(paths.tendering.tenderView(t.tenderId), "_blank", "noopener,noreferrer");
-                                        }}
-                                        className="h-7 w-7 flex items-center justify-center rounded-md
-                                                   text-muted-foreground hover:text-primary hover:bg-muted"
-                                    >
-                                        <Eye className="h-4 w-4" />
-                                    </button>
+                                    <div>{formatCurrencySafe(t.value)}</div>
                                 </div>
-                            ))
-                        ) : (
-                            <p className="text-xs text-muted-foreground">No records</p>
-                        )}
+
+                                <button
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        window.open(paths.tendering.tenderView(t.tenderId), "_blank", "noopener,noreferrer");
+                                    }}
+                                    className="h-7 w-7 flex items-center justify-center rounded-md
+                             text-muted-foreground hover:text-primary hover:bg-muted"
+                                >
+                                    <Eye className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </PopoverContent>
             </Popover>
         </TableCell>
     );
 }
-
 /* ================================
    MAIN TABLE
 ================================ */
 
 export function StageBacklogV2Table({ view, userId, teamId, fromDate, toDate }: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-    const { data } = useStageBacklogV2({
-        view,
-        userId,
-        teamId,
-        fromDate,
-        toDate,
-    });
-
+    const { data } = useStageBacklogV2({ view, userId, teamId, fromDate, toDate });
     if (!data) return null;
 
-    const stages = data.stages;
+    const { stages } = data;
+    const terminalStages = new Set(["won", "lost", "disqualified", "missed"]);
 
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0 overflow-x-auto">
-                <Table className="min-w-[1100px]">
+                <Table className="min-w-[1400px]">
                     <TableHeader className="bg-muted/30">
                         <TableRow>
-                            <TableHead />
-
-                            <TableHead className="text-center">
-                                <ColumnHeader title="Opening" description="Pending at the start of the period" />
+                            <TableHead rowSpan={2} />
+                            <TableHead rowSpan={2} className="text-center">
+                                <ColumnHeader title="Opening" description="Pending at start" />
                             </TableHead>
-
-                            <TableHead className="text-center">
-                                <ColumnHeader title="During" description="New activity during the period" />
+                            <TableHead colSpan={3} className="text-center">
+                                <ColumnHeader title="During" description="Movement during period" />
                             </TableHead>
-
-                            <TableHead className="text-center font-semibold">
-                                <ColumnHeader title="Total" description="Total till end of period" />
+                            <TableHead rowSpan={2} className="text-center">
+                                <ColumnHeader title="Closing" description="Final state" />
                             </TableHead>
+                        </TableRow>
+
+                        <TableRow>
+                            <TableHead className="text-center">Allocated</TableHead>
+                            <TableHead className="text-center">Completed</TableHead>
+                            <TableHead className="text-center">Pending</TableHead>
                         </TableRow>
                     </TableHeader>
 
                     <TableBody>
-                        {Object.entries(stages).map(([key, stage]: any) => (
-                            <TableRow key={key} className="hover:bg-muted/20">
-                                <TableCell className="font-semibold capitalize">{key.replace(/([A-Z])/g, " $1")}</TableCell>
+                        {Object.entries(stages).map(([key, stage]: any) => {
+                            const isTerminal = terminalStages.has(key);
+                            const isWon = key === "won";
+                            const isNegative = ["lost", "missed", "disqualified"].includes(key);
 
-                                <MetricCell bucket={stage.opening} />
-                                <MetricCell bucket={stage.during} />
-                                <MetricCell bucket={stage.total} />
-                            </TableRow>
-                        ))}
+                            return (
+                                <TableRow key={key} className="hover:bg-muted/20">
+                                    <TableCell className="font-semibold capitalize">{key.replace(/([A-Z])/g, " $1")}</TableCell>
+
+                                    {/* OPENING */}
+                                    <MetricCell bucket={stage.opening} />
+
+                                    {/* DURING – ALLOCATED */}
+                                    <MetricCell bucket={stage.during.total} />
+
+                                    {/* DURING – COMPLETED */}
+                                    <MetricCell bucket={stage.during.completed} color={isWon ? "green" : isNegative ? "red" : undefined} />
+
+                                    {/* DURING – PENDING */}
+                                    {!isTerminal ? <MetricCell bucket={stage.during.pending} color="yellow" /> : <TableCell />}
+
+                                    {/* CLOSING */}
+                                    <MetricCell bucket={stage.total} color={isWon ? "green" : isNegative ? "red" : key === "bid" ? "yellow" : undefined} />
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>
