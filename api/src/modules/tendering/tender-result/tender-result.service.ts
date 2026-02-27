@@ -49,13 +49,13 @@ export class TenderResultService {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2 || user.roleId === 4) {
+                // Super User or Admin, Coordinator: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+            } else if (user.roleId === 3 || user.roleId === 6) {
+                // Team Leader, Engineer: Filter by primary_team_id
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
@@ -754,7 +754,7 @@ export class TenderResultService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } },
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -766,6 +766,7 @@ export class TenderResultService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -821,16 +822,14 @@ export class TenderResultService {
             isWon: dto.result === 'Won',
         };
 
-        const attachments = [
-            {
-                filename: 'qualified_parties_screenshot.pdf',
-                path: resultRecord.qualifiedPartiesScreenshot,
-            },
-            {
-                filename: 'final_result_screenshot.pdf',
-                path: resultRecord.finalResultScreenshot,
-            },
-        ];
+    // attachments?: { files: string[]; baseDir?: string }
+    const attachments = {
+        files: [
+            resultRecord.qualifiedPartiesScreenshot ? resultRecord.qualifiedPartiesScreenshot : '',
+            resultRecord.finalResultScreenshot ? resultRecord.finalResultScreenshot : '',
+        ],
+        baseDir: 'public',
+    };
 
         await this.sendEmail(
             'tender.result',
@@ -842,6 +841,7 @@ export class TenderResultService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+                attachments,
             }
         );
     }

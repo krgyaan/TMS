@@ -135,15 +135,15 @@ export class CostingApprovalsService {
         // Apply role-based filtering
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided
+            // Role ID 1 = Super User, 2 = Admin, 4 = Coordinator: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2 || user.roleId === 4) {
+                // Super User or Admin or Coordinator: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
                 // If no teamId filter, show all (no additional condition added)
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+            } else if (user.roleId === 3 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 6 = Engineer: Filter by primary_team_id
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
