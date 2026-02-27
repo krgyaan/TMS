@@ -54,6 +54,7 @@ export interface Rfq {
     statusName: string;
     dueDate: Date;
     rfqId: number | null;
+    requestedOrganization: string | null;
     requestedVendor: string | null;
     items: RfqItem[];
     documents: RfqDocument[];
@@ -149,6 +150,7 @@ export interface RfqDetailForResponse {
     tenderId: number;
     dueDate: string | null;
     docList: string | null;
+    requestedOrganization: string | null;
     requestedVendor: string | null;
     items: RfqItem[];
     documents: RfqDocument[];
