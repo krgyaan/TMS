@@ -92,7 +92,7 @@ export function RfqView({
                                 Requested Organisation
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {rfq.requestedOrganization || '—'}
+                                {rfq.requestedOrganizationNames.join(', ') || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -100,7 +100,7 @@ export function RfqView({
                                 Requested Vendor
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {rfq.requestedVendor || '—'}
+                                {rfq.requestedVendorNames.join(', ') || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">

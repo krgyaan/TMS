@@ -54,8 +54,8 @@ export interface Rfq {
     statusName: string;
     dueDate: Date;
     rfqId: number | null;
-    requestedOrganization: string | null;
-    requestedVendor: string | null;
+    requestedOrganizationNames: string[];
+    requestedVendorNames: string[];
     items: RfqItem[];
     documents: RfqDocument[];
     docList: string | null;
