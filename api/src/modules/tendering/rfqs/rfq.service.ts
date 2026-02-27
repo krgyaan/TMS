@@ -98,13 +98,13 @@ export class RfqsService {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2 || user.roleId === 4) {
-                // Super User or Admin or Coordinator: Show all, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 6) {
-                // Team Leader, Engineer: Filter by primary_team_id
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {

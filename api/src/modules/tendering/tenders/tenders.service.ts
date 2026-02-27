@@ -377,12 +377,12 @@ export class TenderInfosService {
         // Apply role-based filtering
         if (filters?.user) {
             const user = filters.user;
-            // Role ID 1 = Super User, 2 = Admin, 4 = Coordinator: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2 || user.roleId === 4) {
-                // Super User or Admin or Coordinator: Show all, respect teamId filter if provided from frontend
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided from frontend
                 // The teamId filter is already applied below if provided
-            } else if (user.roleId === 3 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 6 = Engineer: Filter by primary_team_id
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
                 if (user.teamId) {
                     conditions.push(eq(tenderInfos.team, user.teamId));
                 }
