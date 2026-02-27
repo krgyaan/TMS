@@ -1153,13 +1153,163 @@ export class TenderExecutiveService {
         return aggregated;
     }
 
+    // async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+    //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
+    //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
+
+    //     /* =====================================================
+    //    0️⃣ Tender universe conditions
+    // ===================================================== */
+    //     const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
+
+    //     if (query.view === "user" && query.userId) {
+    //         tenderConditions.push(eq(tenderInfos.teamMember, query.userId));
+    //     }
+
+    //     if (query.view === "team" && query.teamId) {
+    //         tenderConditions.push(eq(tenderInfos.team, query.teamId));
+    //     }
+
+    //     /* =====================================================
+    //    1️⃣ Fetch Tender Universe
+    // ===================================================== */
+    //     const tenders = await this.db
+    //         .select()
+    //         .from(tenderInfos)
+    //         .where(and(...tenderConditions));
+
+    //     if (!tenders.length) {
+    //         return { from, to, stages: {} };
+    //     }
+
+    //     const tenderIds = tenders.map(t => t.id);
+
+    //     /* =====================================================
+    //    2️⃣ Fetch Info Sheets
+    // ===================================================== */
+    //     const infos = await this.db
+    //         .select({
+    //             tenderId: tenderInformation.tenderId,
+    //             createdAt: tenderInformation.createdAt,
+    //         })
+    //         .from(tenderInformation)
+    //         .where(inArray(tenderInformation.tenderId, tenderIds));
+
+    //     const infoMap = new Map<number, Date>();
+    //     infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
+
+    //     /* =====================================================
+    //    3️⃣ Fetch Costing Sheets
+    // ===================================================== */
+    //     const costings = await this.db.select().from(tenderCostingSheets).where(inArray(tenderCostingSheets.tenderId, tenderIds));
+
+    //     const costingMap = new Map<number, (typeof costings)[number]>();
+    //     costings.forEach(c => costingMap.set(Number(c.tenderId), c));
+
+    //     /* =====================================================
+    //    4️⃣ Fetch Bid Submissions
+    // ===================================================== */
+    //     const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
+
+    //     const bidMap = new Map<number, (typeof bids)[number]>();
+    //     bids.forEach(b => bidMap.set(Number(b.tenderId), b));
+
+    //     /* =====================================================
+    //    5️⃣ Fetch Results (AUTHORITATIVE)
+    // ===================================================== */
+    //     const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
+
+    //     const resultMap = new Map<number, (typeof results)[number]>();
+    //     results.forEach(r => resultMap.set(Number(r.tenderId), r));
+
+    //     /* =====================================================
+    //    6️⃣ Status helpers (ONLY for non-result stages)
+    // ===================================================== */
+    //     const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
+    //     const isDnb = (s: number) => DNB_CODES.has(s);
+
+    //     /* =====================================================
+    //    7️⃣ Buckets
+    // ===================================================== */
+    //     const empty = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+
+    //     const stages = {
+    //         assigned: { opening: empty(), during: empty(), total: empty() },
+    //         approved: { opening: empty(), during: empty(), total: empty() },
+    //         bid: { opening: empty(), during: empty(), total: empty() },
+    //         resultAwaited: { opening: empty(), during: empty(), total: empty() },
+    //         won: { opening: empty(), during: empty(), total: empty() },
+    //         lost: { opening: empty(), during: empty(), total: empty() },
+    //         disqualified: { opening: empty(), during: empty(), total: empty() },
+    //     };
+
+    //     /* =====================================================
+    //    8️⃣ Ledger Processing (FINAL, CLEAN FLOW)
+    // ===================================================== */
+    //     for (const t of tenders) {
+    //         const value = Number(t.gstValues ?? 0);
+    //         const baseDate = t.createdAt; // 🔒 SINGLE TIME AXIS
+
+    //         const infoAt = infoMap.get(t.id) ?? null;
+    //         const costing = costingMap.get(t.id);
+    //         const bid = bidMap.get(t.id);
+    //         const result = resultMap.get(t.id);
+
+    //         const bidSubmitted = bid?.status === "Bid Submitted" && bid.submissionDatetime;
+
+    //         const meta = {
+    //             tenderId: t.id,
+    //             tenderNo: t.tenderNo,
+    //             tenderName: t.tenderName,
+    //             value,
+    //         };
+
+    //         /* ---------- ASSIGNED ---------- */
+    //         if (t.tlStatus === 0 && !infoAt && !isDnb(t.status)) {
+    //             this.push(stages.assigned, baseDate, from, to, meta);
+    //         }
+
+    //         /* ---------- APPROVED (PENDING TL) ---------- */
+    //         if (infoAt && t.tlStatus === 0 && !isDnb(t.status)) {
+    //             this.push(stages.approved, baseDate, from, to, meta);
+    //         }
+
+    //         /* ---------- BID (PENDING SUBMISSION) ---------- */
+    //         if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(t.status)) {
+    //             this.push(stages.bid, baseDate, from, to, meta);
+    //         }
+
+    //         /* ---------- RESULT AWAITED ---------- */
+    //         if (bidSubmitted && !result) {
+    //             this.push(stages.resultAwaited, baseDate, from, to, meta);
+    //         }
+
+    //         /* ---------- TERMINAL RESULTS (PURE FROM tender_results) ---------- */
+    //         if (result) {
+    //             if (result.status === "Won") {
+    //                 this.push(stages.won, baseDate, from, to, meta);
+    //             }
+
+    //             if (result.status === "Lost") {
+    //                 this.push(stages.lost, baseDate, from, to, meta);
+    //             }
+
+    //             if (result.status === "Disqualified") {
+    //                 this.push(stages.disqualified, baseDate, from, to, meta);
+    //             }
+    //         }
+    //     }
+
+    //     return { from, to, stages };
+    // }
+
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const from = new Date(`${query.fromDate}T00:00:00.000Z`);
         const to = new Date(`${query.toDate}T23:59:59.999Z`);
 
         /* =====================================================
-       0️⃣ Tender universe conditions
-    ===================================================== */
+     0️⃣ Tender universe conditions
+  ===================================================== */
         const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (query.view === "user" && query.userId) {
@@ -1171,8 +1321,8 @@ export class TenderExecutiveService {
         }
 
         /* =====================================================
-       1️⃣ Fetch Tender Universe
-    ===================================================== */
+     1️⃣ Fetch Tender Universe
+  ===================================================== */
         const tenders = await this.db
             .select()
             .from(tenderInfos)
@@ -1185,8 +1335,8 @@ export class TenderExecutiveService {
         const tenderIds = tenders.map(t => t.id);
 
         /* =====================================================
-       2️⃣ Fetch Info Sheets
-    ===================================================== */
+     2️⃣ Fetch Info Sheets
+  ===================================================== */
         const infos = await this.db
             .select({
                 tenderId: tenderInformation.tenderId,
@@ -1199,63 +1349,65 @@ export class TenderExecutiveService {
         infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
 
         /* =====================================================
-       3️⃣ Fetch Costing Sheets
-    ===================================================== */
-        const costings = await this.db.select().from(tenderCostingSheets).where(inArray(tenderCostingSheets.tenderId, tenderIds));
-
-        const costingMap = new Map<number, (typeof costings)[number]>();
-        costings.forEach(c => costingMap.set(Number(c.tenderId), c));
-
-        /* =====================================================
-       4️⃣ Fetch Bid Submissions
-    ===================================================== */
+     3️⃣ Fetch Bid Submissions
+  ===================================================== */
         const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
 
         const bidMap = new Map<number, (typeof bids)[number]>();
         bids.forEach(b => bidMap.set(Number(b.tenderId), b));
 
         /* =====================================================
-       5️⃣ Fetch Results (AUTHORITATIVE)
-    ===================================================== */
+     4️⃣ Fetch Results
+  ===================================================== */
         const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
 
         const resultMap = new Map<number, (typeof results)[number]>();
         results.forEach(r => resultMap.set(Number(r.tenderId), r));
 
         /* =====================================================
-       6️⃣ Status helpers (ONLY for non-result stages)
-    ===================================================== */
+     5️⃣ Helpers
+  ===================================================== */
         const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
         const isDnb = (s: number) => DNB_CODES.has(s);
 
-        /* =====================================================
-       7️⃣ Buckets
-    ===================================================== */
-        const empty = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+        const empty = () => ({
+            opening: { count: 0, value: 0, drilldown: [] },
+            total: { count: 0, value: 0, drilldown: [] },
+            during: {
+                total: { count: 0, value: 0, drilldown: [] },
+                completed: { count: 0, value: 0, drilldown: [] },
+                pending: { count: 0, value: 0, drilldown: [] },
+            },
+        });
 
         const stages = {
-            assigned: { opening: empty(), during: empty(), total: empty() },
-            approved: { opening: empty(), during: empty(), total: empty() },
-            bid: { opening: empty(), during: empty(), total: empty() },
-            resultAwaited: { opening: empty(), during: empty(), total: empty() },
-            won: { opening: empty(), during: empty(), total: empty() },
-            lost: { opening: empty(), during: empty(), total: empty() },
-            disqualified: { opening: empty(), during: empty(), total: empty() },
+            assigned: empty(),
+            approved: empty(),
+            bid: empty(), // pending submission only
+            missed: empty(), // NEW terminal-like stage
+            resultAwaited: empty(),
+            won: empty(),
+            lost: empty(),
+            disqualified: empty(),
+        };
+
+        const pushDuring = (bucket, meta, date) => {
+            bucket.count++;
+            bucket.value += meta.value;
+            bucket.drilldown.push({ ...meta, at: date });
         };
 
         /* =====================================================
-       8️⃣ Ledger Processing (FINAL, CLEAN FLOW)
-    ===================================================== */
+     6️⃣ Ledger
+  ===================================================== */
         for (const t of tenders) {
             const value = Number(t.gstValues ?? 0);
-            const baseDate = t.createdAt; // 🔒 SINGLE TIME AXIS
+            const baseDate = t.createdAt;
+            const inDuring = baseDate >= from && baseDate <= to;
 
             const infoAt = infoMap.get(t.id) ?? null;
-            const costing = costingMap.get(t.id);
             const bid = bidMap.get(t.id);
             const result = resultMap.get(t.id);
-
-            const bidSubmitted = bid?.status === "Bid Submitted" && bid.submissionDatetime;
 
             const meta = {
                 tenderId: t.id,
@@ -1264,47 +1416,85 @@ export class TenderExecutiveService {
                 value,
             };
 
-            /* ---------- ASSIGNED ---------- */
-            if (t.tlStatus === 0 && !infoAt && !isDnb(t.status)) {
+            /* ================= ASSIGNED ================= */
+            if (t.tlStatus === 0 && !isDnb(t.status)) {
                 this.push(stages.assigned, baseDate, from, to, meta);
+
+                if (inDuring) {
+                    pushDuring(stages.assigned.during.total, meta, baseDate);
+                    infoAt ? pushDuring(stages.assigned.during.completed, meta, baseDate) : pushDuring(stages.assigned.during.pending, meta, baseDate);
+                }
             }
 
-            /* ---------- APPROVED (PENDING TL) ---------- */
-            if (infoAt && t.tlStatus === 0 && !isDnb(t.status)) {
+            /* ================= APPROVED ================= */
+            if (infoAt && !isDnb(t.status)) {
                 this.push(stages.approved, baseDate, from, to, meta);
+
+                if (inDuring) {
+                    pushDuring(stages.approved.during.total, meta, baseDate);
+                    t.tlStatus === 1 || t.tlStatus === 2
+                        ? pushDuring(stages.approved.during.completed, meta, baseDate)
+                        : pushDuring(stages.approved.during.pending, meta, baseDate);
+                }
             }
 
-            /* ---------- BID (PENDING SUBMISSION) ---------- */
-            if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(t.status)) {
+            /* ================= BID (PENDING SUBMISSION ONLY) ================= */
+            if (infoAt && !bid && !isDnb(t.status)) {
                 this.push(stages.bid, baseDate, from, to, meta);
+
+                if (inDuring) {
+                    pushDuring(stages.bid.during.total, meta, baseDate);
+                    pushDuring(stages.bid.during.pending, meta, baseDate);
+                }
             }
 
-            /* ---------- RESULT AWAITED ---------- */
-            if (bidSubmitted && !result) {
+            /* ================= MISSED (TERMINAL-LIKE) ================= */
+            if (bid) {
+                this.push(stages.missed, baseDate, from, to, meta);
+
+                if (inDuring) {
+                    pushDuring(stages.missed.during.total, meta, baseDate);
+                    if (bid.status === "Tender Missed") {
+                        pushDuring(stages.missed.during.completed, meta, baseDate);
+                    }
+                }
+            }
+
+            /* ================= RESULT AWAITED ================= */
+            if (infoAt && !isDnb(t.status)) {
                 this.push(stages.resultAwaited, baseDate, from, to, meta);
+
+                if (inDuring) {
+                    pushDuring(stages.resultAwaited.during.total, meta, baseDate);
+                    result ? pushDuring(stages.resultAwaited.during.completed, meta, baseDate) : pushDuring(stages.resultAwaited.during.pending, meta, baseDate);
+                }
             }
 
-            /* ---------- TERMINAL RESULTS (PURE FROM tender_results) ---------- */
+            /* ================= TERMINAL RESULTS ================= */
             if (result) {
-                if (result.status === "Won") {
-                    this.push(stages.won, baseDate, from, to, meta);
-                }
+                const terminalMap = {
+                    Won: stages.won,
+                    Lost: stages.lost,
+                    Disqualified: stages.disqualified,
+                };
 
-                if (result.status === "Lost") {
-                    this.push(stages.lost, baseDate, from, to, meta);
-                }
-
-                if (result.status === "Disqualified") {
-                    this.push(stages.disqualified, baseDate, from, to, meta);
+                const stage = terminalMap[result.status];
+                if (stage) {
+                    this.push(stage, baseDate, from, to, meta);
+                    if (inDuring) {
+                        pushDuring(stage.during.total, meta, baseDate);
+                        pushDuring(stage.during.completed, meta, baseDate);
+                    }
                 }
             }
         }
 
         return { from, to, stages };
     }
+
     /* =====================================================
-   Helper
-===================================================== */
+        Helper
+     ===================================================== */
     private push(stage, date: Date, from: Date, to: Date, meta: any) {
         stage.total.count++;
         stage.total.value += meta.value;
