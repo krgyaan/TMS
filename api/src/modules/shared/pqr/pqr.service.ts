@@ -2,8 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { Pqr, pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import type { CreatePqrDto, UpdatePqrDto } from './dto/pqr.dto';
+import { teams } from '@/db/schemas';
 
 export type PqrListFilters = {
     page?: number;
@@ -12,8 +13,25 @@ export type PqrListFilters = {
     sortOrder?: 'asc' | 'desc';
     search?: string;
 };
-
-export type PqrRow = typeof pqrDocuments.$inferSelect;
+export type PqrRow = Pqr;
+export type PqrResponse = {
+    id: number;
+    teamId: number | null;
+    teamName: string | null;
+    projectName: string | null;
+    value: string;
+    item: string | null;
+    poDate: string | null;
+    uploadPo: string | null;
+    sapGemPoDate: string | null;
+    uploadSapGemPo: string | null;
+    completionDate: string | null;
+    uploadCompletion: string | null;
+    performanceCertificate: string | null;
+    remarks: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
 
 @Injectable()
 export class PqrService {
@@ -28,7 +46,7 @@ export class PqrService {
     private mapCreateToDb(data: CreatePqrDto) {
         const now = new Date();
         return {
-            teamName: String(data.teamName),
+            teamId: data.teamId,
             projectName: data.projectName ?? null,
             value: String(data.value),
             item: data.item ?? null,
@@ -47,7 +65,7 @@ export class PqrService {
 
     private mapUpdateToDb(data: UpdatePqrDto) {
         const out: Record<string, unknown> = { updatedAt: new Date() };
-        if (data.teamName !== undefined) out.teamName = String(data.teamName);
+        if (data.teamId !== undefined) out.teamId = data.teamId;
         if (data.projectName !== undefined) out.projectName = data.projectName;
         if (data.value !== undefined) out.value = String(data.value);
         if (data.item !== undefined) out.item = data.item;
@@ -62,10 +80,11 @@ export class PqrService {
         return out as Partial<typeof pqrDocuments.$inferInsert>;
     }
 
-    private mapRowToResponse(row: PqrRow) {
+    private mapRowToResponse(row: any): PqrResponse {
         return {
             id: row.id,
-            teamName: row.teamName,
+            teamId: row.teamId,
+            teamName: row?.teamName ?? null,
             projectName: row.projectName,
             value: row.value,
             item: row.item,
@@ -75,7 +94,7 @@ export class PqrService {
             uploadSapGemPo: row.uploadSapGemPo,
             completionDate: row.completionDate,
             uploadCompletion: row.uploadCompletion,
-            uploadPerformanceCertificate: row.performanceCertificate,
+            performanceCertificate: row.performanceCertificate,
             remarks: row.remarks,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
@@ -106,7 +125,7 @@ export class PqrService {
                 or(
                     ilike(pqrDocuments.projectName, `%${search}%`),
                     ilike(pqrDocuments.item, `%${search}%`),
-                    ilike(pqrDocuments.teamName, `%${search}%`),
+                    ilike(teams.name, `%${search}%`),
                     ilike(pqrDocuments.value, `%${search}%`),
                     ilike(pqrDocuments.remarks, `%${search}%`),
                 ) as never,
@@ -121,8 +140,26 @@ export class PqrService {
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
-                .select()
+                .select({
+                    id: pqrDocuments.id,
+                    teamId: pqrDocuments.teamId,
+                    teamName: teams.name,
+                    projectName: pqrDocuments.projectName,
+                    value: pqrDocuments.value,
+                    item: pqrDocuments.item,
+                    poDate: pqrDocuments.poDate,
+                    uploadPo: pqrDocuments.uploadPo,
+                    sapGemPoDate: pqrDocuments.sapGemPoDate,
+                    uploadSapGemPo: pqrDocuments.uploadSapGemPo,
+                    completionDate: pqrDocuments.completionDate,
+                    uploadCompletion: pqrDocuments.uploadCompletion,
+                    performanceCertificate: pqrDocuments.performanceCertificate,
+                    remarks: pqrDocuments.remarks,
+                    createdAt: pqrDocuments.createdAt,
+                    updatedAt: pqrDocuments.updatedAt,
+                })
                 .from(pqrDocuments)
+                .innerJoin(teams, eq(pqrDocuments.teamId, teams.id))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
@@ -144,9 +181,26 @@ export class PqrService {
     }
 
     async findById(id: number) {
-        const [row] = await this.db
-            .select()
+        const [row] = await this.db.select({
+                id: pqrDocuments.id,
+                teamId: pqrDocuments.teamId,
+                teamName: teams.name,
+                projectName: pqrDocuments.projectName,
+                value: pqrDocuments.value,
+                item: pqrDocuments.item,
+                poDate: pqrDocuments.poDate,
+                uploadPo: pqrDocuments.uploadPo,
+                sapGemPoDate: pqrDocuments.sapGemPoDate,
+                uploadSapGemPo: pqrDocuments.uploadSapGemPo,
+                completionDate: pqrDocuments.completionDate,
+                uploadCompletion: pqrDocuments.uploadCompletion,
+                performanceCertificate: pqrDocuments.performanceCertificate,
+                remarks: pqrDocuments.remarks,
+                createdAt: pqrDocuments.createdAt,
+                updatedAt: pqrDocuments.updatedAt,
+            })
             .from(pqrDocuments)
+            .innerJoin(teams, eq(pqrDocuments.teamId, teams.id))
             .where(eq(pqrDocuments.id, id))
             .limit(1);
 
@@ -159,23 +213,22 @@ export class PqrService {
 
     async create(data: CreatePqrDto) {
         const insertValues = this.mapCreateToDb(data);
-        const [row] = await this.db.insert(pqrDocuments).values(insertValues as never).returning();
-        return this.mapRowToResponse(row!);
+        const [inserted] = await this.db
+            .insert(pqrDocuments)
+            .values(insertValues as never)
+            .returning({ id: pqrDocuments.id });
+
+        return this.findById(inserted.id);
     }
 
     async update(id: number, data: UpdatePqrDto) {
         const updateValues = this.mapUpdateToDb(data);
-        const [row] = await this.db
-            .update(pqrDocuments)
-            .set(updateValues)
-            .where(eq(pqrDocuments.id, id))
-            .returning();
+        await this.db
+        .update(pqrDocuments)
+        .set(updateValues)
+        .where(eq(pqrDocuments.id, id));
 
-        if (!row) {
-            throw new NotFoundException(`PQR with ID ${id} not found`);
-        }
-
-        return this.mapRowToResponse(row);
+        return this.findById(id);
     }
 
     async delete(id: number): Promise<void> {
