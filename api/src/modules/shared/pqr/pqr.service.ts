@@ -22,12 +22,12 @@ export type PqrResponse = {
     value: string;
     item: string | null;
     poDate: string | null;
-    uploadPo: string | null;
+    uploadPo: string[] | null;
     sapGemPoDate: string | null;
-    uploadSapGemPo: string | null;
+    uploadSapGemPo: string[] | null;
     completionDate: string | null;
-    uploadCompletion: string | null;
-    performanceCertificate: string | null;
+    uploadCompletion: string[] | null;
+    performanceCertificate: string[] | null;
     remarks: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -43,6 +43,29 @@ export class PqrService {
         return isNaN(d.getTime()) ? null : d;
     }
 
+    private normalizeFilePaths(value: string[] | string | null | undefined): string[] | null {
+        if (!value) return null;
+
+        let paths: string[] = [];
+
+        if (Array.isArray(value)) {
+            paths = value;
+        } else if (typeof value === 'string') {
+            paths = [value];
+        }
+
+        // Normalize each path
+        const normalized = paths
+            .filter(p => p && typeof p === 'string' && p.trim() !== '')
+            .map(p =>
+                p.trim()
+                    .replace(/\\/g, '/')      // Replace backslashes
+                    .replace(/\/+/g, '/')     // Remove duplicate slashes
+            );
+
+        return normalized.length > 0 ? normalized : null;
+    }
+
     private mapCreateToDb(data: CreatePqrDto) {
         const now = new Date();
         return {
@@ -51,12 +74,12 @@ export class PqrService {
             value: String(data.value),
             item: data.item ?? null,
             poDate: this.parseDate(data.poDate),
-            uploadPo: data.uploadPo ?? null,
+            uploadPo: this.normalizeFilePaths(data.uploadPo),
             sapGemPoDate: this.parseDate(data.sapGemPoDate),
-            uploadSapGemPo: data.uploadSapGemPo ?? null,
+            uploadSapGemPo: this.normalizeFilePaths(data.uploadSapGemPo),
             completionDate: this.parseDate(data.completionDate),
-            uploadCompletion: data.uploadCompletion ?? null,
-            performanceCertificate: data.performanceCertificate ?? null,
+            uploadCompletion: this.normalizeFilePaths(data.uploadCompletion),
+            performanceCertificate: this.normalizeFilePaths(data.performanceCertificate),
             remarks: data.remarks ?? null,
             createdAt: now,
             updatedAt: now,
@@ -65,18 +88,20 @@ export class PqrService {
 
     private mapUpdateToDb(data: UpdatePqrDto) {
         const out: Record<string, unknown> = { updatedAt: new Date() };
+
         if (data.teamId !== undefined) out.teamId = data.teamId;
         if (data.projectName !== undefined) out.projectName = data.projectName;
         if (data.value !== undefined) out.value = String(data.value);
         if (data.item !== undefined) out.item = data.item;
         if (data.poDate !== undefined) out.poDate = this.parseDate(data.poDate);
-        if (data.uploadPo !== undefined) out.uploadPo = data.uploadPo;
+        if (data.uploadPo !== undefined) out.uploadPo = this.normalizeFilePaths(data.uploadPo);
         if (data.sapGemPoDate !== undefined) out.sapGemPoDate = this.parseDate(data.sapGemPoDate);
-        if (data.uploadSapGemPo !== undefined) out.uploadSapGemPo = data.uploadSapGemPo;
+        if (data.uploadSapGemPo !== undefined) out.uploadSapGemPo = this.normalizeFilePaths(data.uploadSapGemPo);
         if (data.completionDate !== undefined) out.completionDate = this.parseDate(data.completionDate);
-        if (data.uploadCompletion !== undefined) out.uploadCompletion = data.uploadCompletion;
-        if (data.performanceCertificate !== undefined) out.performanceCertificate = data.performanceCertificate;
+        if (data.uploadCompletion !== undefined) out.uploadCompletion = this.normalizeFilePaths(data.uploadCompletion);
+        if (data.performanceCertificate !== undefined) out.performanceCertificate = this.normalizeFilePaths(data.performanceCertificate);
         if (data.remarks !== undefined) out.remarks = data.remarks;
+
         return out as Partial<typeof pqrDocuments.$inferInsert>;
     }
 

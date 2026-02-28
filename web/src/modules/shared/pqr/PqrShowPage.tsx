@@ -4,22 +4,8 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Edit } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { usePqr } from "@/hooks/api/usePqrs";
-
-const parsePgTextArray = (value?: string | null): string[] => {
-    if (!value) return [];
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-        return [trimmed];
-    }
-    const inner = trimmed.slice(1, -1);
-    if (!inner) return [];
-    return inner
-        .split(",")
-        .map((part) => part.trim().replace(/^"(.*)"$/, "$1"))
-        .filter((part) => part.length > 0);
-};
 
 const PqrShowPage = () => {
     const navigate = useNavigate();
@@ -79,10 +65,10 @@ const PqrShowPage = () => {
     const formatDateTime = (value?: string | null) =>
         value ? new Date(value).toLocaleString() : "—";
 
-    const poFiles = parsePgTextArray(pqr.uploadPo);
-    const sapGemPoFiles = parsePgTextArray(pqr.uploadSapGemPo);
-    const completionFiles = parsePgTextArray(pqr.uploadCompletion);
-    const performanceCertFiles = parsePgTextArray(pqr.performanceCertificate);
+    const poFiles = pqr.uploadPo ? Array.isArray(pqr.uploadPo) ? pqr.uploadPo : [pqr.uploadPo] : [];
+    const sapGemPoFiles = pqr.uploadSapGemPo ? Array.isArray(pqr.uploadSapGemPo) ? pqr.uploadSapGemPo : [pqr.uploadSapGemPo] : [];
+    const completionFiles = pqr.uploadCompletion ? Array.isArray(pqr.uploadCompletion) ? pqr.uploadCompletion : [pqr.uploadCompletion] : [];
+    const performanceCertFiles = pqr.performanceCertificate ? Array.isArray(pqr.performanceCertificate) ? pqr.performanceCertificate : [pqr.performanceCertificate] : [];
 
     return (
         <Card>
@@ -97,14 +83,6 @@ const PqrShowPage = () => {
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                navigate(`/document-dashboard/pqr/${pqrId}/edit`)
-                            }
-                        >
-                            <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     </div>
                 </div>
@@ -176,7 +154,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {poFiles.length > 0 ? (
                                         poFiles.map((file, index) => {
-                                            const url = `/uploads/${file}`;
+                                            const url = `/api/v1/tender-files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -203,7 +181,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {sapGemPoFiles.length > 0 ? (
                                         sapGemPoFiles.map((file, index) => {
-                                            const url = `/uploads/${file}`;
+                                            const url = `/api/v1/tender-files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -232,7 +210,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {completionFiles.length > 0 ? (
                                         completionFiles.map((file, index) => {
-                                            const url = `/uploads/${file}`;
+                                            const url = `/api/v1/tender-files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -261,7 +239,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {performanceCertFiles.length > 0 ? (
                                         performanceCertFiles.map((file, index) => {
-                                            const url = `/uploads/${file}`;
+                                            const url = `/api/v1/tender-files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
