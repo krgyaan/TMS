@@ -10,7 +10,7 @@ export interface FinanceDocumentResponse {
     documentName: string;
     documentType: number;
     financialYear: number;
-    uploadFile: string | null;
+    uploadFile?: string[] | null;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -21,7 +21,7 @@ export interface FinanceDocumentListRow {
     documentName: string | null;
     documentType: string;
     financialYear: string;
-    uploadFile: string | null;
+    uploadFile?: string[] | null;
     createdAt?: string | null;
     updatedAt?: string | null;
 }
@@ -31,7 +31,7 @@ export interface CreateFinanceDocumentDto {
     documentName: string;
     documentType: number;
     financialYear: number;
-    uploadFile?: string | null;
+    uploadFile?: string[] | null;
 }
 
 // Update DTO
@@ -40,7 +40,7 @@ export interface UpdateFinanceDocumentDto {
     documentName?: string;
     documentType?: number;
     financialYear?: number;
-    uploadFile?: string | null;
+    uploadFile?: string[] | null;
 }
 
 // List params
