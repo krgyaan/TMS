@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, or, ilike, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { Pqr, pqrDocuments } from '@db/schemas/shared/pqr.schema';
@@ -119,7 +119,7 @@ export class PqrService {
                         : pqrDocuments.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
-        const conditions = [];
+        const conditions: (SQL<any> | undefined)[] = [];
         if (search) {
             conditions.push(
                 or(
@@ -128,15 +128,20 @@ export class PqrService {
                     ilike(teams.name, `%${search}%`),
                     ilike(pqrDocuments.value, `%${search}%`),
                     ilike(pqrDocuments.remarks, `%${search}%`),
-                ) as never,
+                ),
             );
         }
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        const whereClause = conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
+
+        // Build the base query with JOIN — needed for both count and data
+        // since search may reference the teams table
+        const baseQuery = this.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(pqrDocuments)
+            .innerJoin(teams, eq(pqrDocuments.teamId, teams.id));
 
         const [countResult, rows] = await Promise.all([
-            this.db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(pqrDocuments)
+            baseQuery
                 .where(whereClause)
                 .then(([r]) => Number(r?.count ?? 0)),
             this.db
