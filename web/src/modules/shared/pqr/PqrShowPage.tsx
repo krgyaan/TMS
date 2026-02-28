@@ -82,7 +82,7 @@ const PqrShowPage = () => {
     const poFiles = parsePgTextArray(pqr.uploadPo);
     const sapGemPoFiles = parsePgTextArray(pqr.uploadSapGemPo);
     const completionFiles = parsePgTextArray(pqr.uploadCompletion);
-    const performanceCertFiles = parsePgTextArray(pqr.uploadPerformanceCertificate);
+    const performanceCertFiles = parsePgTextArray(pqr.performanceCertificate);
 
     return (
         <Card>
@@ -176,7 +176,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {poFiles.length > 0 ? (
                                         poFiles.map((file, index) => {
-                                            const url = `/uploads/pqr-po/${file}`;
+                                            const url = `/uploads/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -203,7 +203,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {sapGemPoFiles.length > 0 ? (
                                         sapGemPoFiles.map((file, index) => {
-                                            const url = `/uploads/pqr-sap-gem-po/${file}`;
+                                            const url = `/uploads/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -232,7 +232,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {completionFiles.length > 0 ? (
                                         completionFiles.map((file, index) => {
-                                            const url = `/uploads/pqr-completion/${file}`;
+                                            const url = `/uploads/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -261,7 +261,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {performanceCertFiles.length > 0 ? (
                                         performanceCertFiles.map((file, index) => {
-                                            const url = `/uploads/pqr-performance-certificate/${file}`;
+                                            const url = `/uploads/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a

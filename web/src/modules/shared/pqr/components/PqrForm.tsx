@@ -27,7 +27,7 @@ interface PqrFormProps {
 
 export function PqrForm({ mode, existingData }: PqrFormProps) {
     const navigate = useNavigate();
-    const teamOptions = useTeamOptions();
+    const teamOptions = useTeamOptions([1, 2]);
 
     const createMutation = useCreatePqr();
     const updateMutation = useUpdatePqr();
@@ -53,6 +53,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const handleSubmit: SubmitHandler<PqrFormValues> = async (values) => {
+        console.log('Form values on submit:', values);
         try {
             if (mode === 'create') {
                 const payload = mapFormToCreatePayload(values);
@@ -63,7 +64,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
             }
             navigate(paths.documentDashboard.pqr);
         } catch (error) {
-            // Error handled by mutation onError (toast)
+            console.error('Error submitting form:', error);
         }
     };
 
@@ -94,7 +95,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                         <div className="grid gap-4 md:grid-cols-3 items-start">
                             <SelectField
                                 control={form.control}
-                                name="teamName"
+                                name="teamId"
                                 label="Team Name"
                                 options={teamOptions}
                                 placeholder="Select Option"
@@ -202,7 +203,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="uploadPerformanceCertificate" label="Upload Performance Certificate">
+                            <FieldWrapper control={form.control} name="performanceCertificate" label="Upload Performance Certificate">
                                 {(field) => (
                                     <TenderFileUploader
                                         context="pqr-performance-certificate"
