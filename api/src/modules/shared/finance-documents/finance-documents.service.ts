@@ -22,13 +22,37 @@ export type FinanceDocumentRow = typeof financeDocuments.$inferSelect;
 export class FinanceDocumentsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
+    private normalizeFilePaths(value: string[] | string | null | undefined): string[] | null {
+        if (!value) return null;
+
+        let paths: string[] = [];
+
+        if (Array.isArray(value)) {
+            paths = value;
+        } else if (typeof value === 'string') {
+            paths = [value];
+        }
+
+        // Normalize each path
+        const normalized = paths
+            .filter(p => p && typeof p === 'string' && p.trim() !== '')
+            .map(p =>
+                p.trim()
+                    .replace(/\\/g, '/')      // Replace backslashes
+                    .replace(/\/+/g, '/')     // Remove duplicate slashes
+            );
+
+        return normalized.length > 0 ? normalized : null;
+    }
+
     private mapCreateToDb(data: CreateFinanceDocumentDto) {
         const now = new Date();
+        const normalizedPaths = this.normalizeFilePaths(data.uploadFile);
         return {
             documentName: data.documentName ?? null,
-            documentType: String(data.documentType),
-            financialYear: String(data.financialYear),
-            documentPath: data.uploadFile ?? null,
+            documentType: Number(data.documentType),
+            financialYear: Number(data.financialYear),
+            documentPath: normalizedPaths,
             createdAt: now,
             updatedAt: now,
         };
@@ -38,10 +62,13 @@ export class FinanceDocumentsService {
         const out: Record<string, unknown> = { updatedAt: new Date() };
         if (data.documentName !== undefined) out.documentName = data.documentName;
         if (data.documentType !== undefined)
-            out.documentType = String(data.documentType);
+            out.documentType = Number(data.documentType);
         if (data.financialYear !== undefined)
-            out.financialYear = String(data.financialYear);
-        if (data.uploadFile !== undefined) out.documentPath = data.uploadFile;
+            out.financialYear = Number(data.financialYear);
+        if (data.uploadFile !== undefined) {
+            const normalizedPaths = this.normalizeFilePaths(data.uploadFile);
+            out.documentPath = normalizedPaths;
+        }
         return out as Partial<typeof financeDocuments.$inferInsert>;
     }
 
