@@ -193,7 +193,7 @@ export class FollowUpService {
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
             if (search) {
-                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`), like(followUps.amount, `%${search}%`))!);
+                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`), sql`CAST(${followUps.amount} AS TEXT) LIKE ${`%${search}%`}`)!);
             }
 
             const today = new Date().toLocaleDateString("en-CA");
