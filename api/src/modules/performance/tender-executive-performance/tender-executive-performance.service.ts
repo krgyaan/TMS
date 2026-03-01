@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, inArray, between, lte } from "drizzle-orm";
+import { and, eq, inArray, between, lte, desc, sql, gte } from "drizzle-orm";
 import { PerformanceQueryDto } from "./zod/performance-query.dto";
 import { StagePerformance } from "./zod/stage-performance.type";
 import { TenderInfo, tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -19,6 +19,8 @@ import { TenderMeta } from "./zod/tender.types";
 import { StageBacklogQueryDto } from "./zod/stage-backlog-query.dto";
 import { EmdBalanceQueryDto } from "./zod/emd-balance-query.dto";
 import { STAGE_BACKLOG_CONFIG, STAGE_BACKLOG_KPI_RANK } from "../config/stage-backlog.config";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
 
 function isWon(status: number) {
     return [25, 26, 27, 28].includes(status);
@@ -179,7 +181,6 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
             return "LOCKED";
     }
 }
-
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
@@ -187,6 +188,9 @@ type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
 @Injectable()
 export class TenderExecutiveService {
     constructor(
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger,
+
         @Inject(DRIZZLE)
         private readonly db: DbInstance
     ) {}
@@ -1153,365 +1157,1273 @@ export class TenderExecutiveService {
         return aggregated;
     }
 
-    // async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-    //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
-    //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
+    //     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
+    //         const from = `${query.fromDate}T00:00:00.000Z`;
+    //         const to = `${query.toDate}T23:59:59.999Z`;
 
-    //     /* =====================================================
-    //    0️⃣ Tender universe conditions
-    // ===================================================== */
-    //     const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
-
-    //     if (query.view === "user" && query.userId) {
-    //         tenderConditions.push(eq(tenderInfos.teamMember, query.userId));
-    //     }
-
-    //     if (query.view === "team" && query.teamId) {
-    //         tenderConditions.push(eq(tenderInfos.team, query.teamId));
-    //     }
-
-    //     /* =====================================================
-    //    1️⃣ Fetch Tender Universe
-    // ===================================================== */
-    //     const tenders = await this.db
-    //         .select()
-    //         .from(tenderInfos)
-    //         .where(and(...tenderConditions));
-
-    //     if (!tenders.length) {
-    //         return { from, to, stages: {} };
-    //     }
-
-    //     const tenderIds = tenders.map(t => t.id);
-
-    //     /* =====================================================
-    //    2️⃣ Fetch Info Sheets
-    // ===================================================== */
-    //     const infos = await this.db
-    //         .select({
-    //             tenderId: tenderInformation.tenderId,
-    //             createdAt: tenderInformation.createdAt,
-    //         })
-    //         .from(tenderInformation)
-    //         .where(inArray(tenderInformation.tenderId, tenderIds));
-
-    //     const infoMap = new Map<number, Date>();
-    //     infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
-
-    //     /* =====================================================
-    //    3️⃣ Fetch Costing Sheets
-    // ===================================================== */
-    //     const costings = await this.db.select().from(tenderCostingSheets).where(inArray(tenderCostingSheets.tenderId, tenderIds));
-
-    //     const costingMap = new Map<number, (typeof costings)[number]>();
-    //     costings.forEach(c => costingMap.set(Number(c.tenderId), c));
-
-    //     /* =====================================================
-    //    4️⃣ Fetch Bid Submissions
-    // ===================================================== */
-    //     const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
-
-    //     const bidMap = new Map<number, (typeof bids)[number]>();
-    //     bids.forEach(b => bidMap.set(Number(b.tenderId), b));
-
-    //     /* =====================================================
-    //    5️⃣ Fetch Results (AUTHORITATIVE)
-    // ===================================================== */
-    //     const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
-
-    //     const resultMap = new Map<number, (typeof results)[number]>();
-    //     results.forEach(r => resultMap.set(Number(r.tenderId), r));
-
-    //     /* =====================================================
-    //    6️⃣ Status helpers (ONLY for non-result stages)
-    // ===================================================== */
-    //     const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
-    //     const isDnb = (s: number) => DNB_CODES.has(s);
-
-    //     /* =====================================================
-    //    7️⃣ Buckets
-    // ===================================================== */
-    //     const empty = () => ({ count: 0, value: 0, drilldown: [] as any[] });
-
-    //     const stages = {
-    //         assigned: { opening: empty(), during: empty(), total: empty() },
-    //         approved: { opening: empty(), during: empty(), total: empty() },
-    //         bid: { opening: empty(), during: empty(), total: empty() },
-    //         resultAwaited: { opening: empty(), during: empty(), total: empty() },
-    //         won: { opening: empty(), during: empty(), total: empty() },
-    //         lost: { opening: empty(), during: empty(), total: empty() },
-    //         disqualified: { opening: empty(), during: empty(), total: empty() },
-    //     };
-
-    //     /* =====================================================
-    //    8️⃣ Ledger Processing (FINAL, CLEAN FLOW)
-    // ===================================================== */
-    //     for (const t of tenders) {
-    //         const value = Number(t.gstValues ?? 0);
-    //         const baseDate = t.createdAt; // 🔒 SINGLE TIME AXIS
-
-    //         const infoAt = infoMap.get(t.id) ?? null;
-    //         const costing = costingMap.get(t.id);
-    //         const bid = bidMap.get(t.id);
-    //         const result = resultMap.get(t.id);
-
-    //         const bidSubmitted = bid?.status === "Bid Submitted" && bid.submissionDatetime;
-
-    //         const meta = {
-    //             tenderId: t.id,
-    //             tenderNo: t.tenderNo,
-    //             tenderName: t.tenderName,
-    //             value,
+    //         const baseWhere = () => {
+    //             let w = `ti.delete_status = 0`;
+    //             if (query.view === "user" && query.userId) {
+    //                 w += ` AND ti.team_member = ${query.userId}`;
+    //             }
+    //             if (query.view === "team" && query.teamId) {
+    //                 w += ` AND ti.team = ${query.teamId}`;
+    //             }
+    //             return w;
     //         };
 
-    //         /* ---------- ASSIGNED ---------- */
-    //         if (t.tlStatus === 0 && !infoAt && !isDnb(t.status)) {
-    //             this.push(stages.assigned, baseDate, from, to, meta);
-    //         }
+    //         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
 
-    //         /* ---------- APPROVED (PENDING TL) ---------- */
-    //         if (infoAt && t.tlStatus === 0 && !isDnb(t.status)) {
-    //             this.push(stages.approved, baseDate, from, to, meta);
-    //         }
+    //         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.gst_values ?? 0), 0);
 
-    //         /* ---------- BID (PENDING SUBMISSION) ---------- */
-    //         if (costing?.status === "Approved" && (!bid || bid.status === "Submission Pending") && !isDnb(t.status)) {
-    //             this.push(stages.bid, baseDate, from, to, meta);
-    //         }
+    //         /* =====================================================
+    //         ASSIGNED
+    //         Completed: tender_information exists
+    //     ===================================================== */
 
-    //         /* ---------- RESULT AWAITED ---------- */
-    //         if (bidSubmitted && !result) {
-    //             this.push(stages.resultAwaited, baseDate, from, to, meta);
-    //         }
+    //         const assignedOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at < '${from}'
+    //         AND tin.id IS NULL
+    //     `);
 
-    //         /* ---------- TERMINAL RESULTS (PURE FROM tender_results) ---------- */
-    //         if (result) {
-    //             if (result.status === "Won") {
-    //                 this.push(stages.won, baseDate, from, to, meta);
-    //             }
+    //         const assignedDuringTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     `);
 
-    //             if (result.status === "Lost") {
-    //                 this.push(stages.lost, baseDate, from, to, meta);
-    //             }
+    //         const assignedDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     `);
 
-    //             if (result.status === "Disqualified") {
-    //                 this.push(stages.disqualified, baseDate, from, to, meta);
-    //             }
-    //         }
+    //         const assignedDuringPending = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND tin.id IS NULL
+    //     `);
+
+    //         const assignedTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND tin.id IS NULL
+    //     `);
+
+    //         /* =====================================================
+    //         APPROVED
+    //         Completed: bid submitted
+    //     ===================================================== */
+
+    //         const approvedOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at < '${from}'
+    //         AND ti.tl_status = 0
+    //     `);
+
+    //         const approvedDuringTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM tender_information te
+    //         WHERE ti.id = te.tender_id
+    //         )
+    //     `);
+
+    //         const approvedDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND ti.tl_status IN (1, 2)
+    //     `);
+
+    //         const approvedDuringPending = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND ti.tl_status = 0
+    //     `);
+
+    //         const approvedTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     JOIN tender_information tin ON tin.tender_id = ti.id
+    //     WHERE ${baseWhere()}
+    //             AND ti.tl_status = 0
+    //     `);
+
+    //         /* =====================================================
+    //         BID
+    //         Completed: bid submitted
+    //     ===================================================== */
+
+    //         const bidOpening = await exec(`
+    //             SELECT ti.*
+    //             FROM tender_infos ti
+    //             JOIN tender_information tin
+    //             ON tin.tender_id = ti.id
+    //             WHERE ${baseWhere()}
+    //             AND ti.created_at < '${from}'
+    //             AND EXISTS (
+    //                 SELECT 1
+    //                 FROM tender_costing_sheets tcs
+    //                 WHERE tcs.tender_id = ti.id
+    //                     AND tcs.status = 'Approved'
+    //             )
+    //             AND NOT EXISTS (
+    //                 SELECT 1
+    //                 FROM bid_submissions bs
+    //                 WHERE bs.tender_id = ti.id
+    //             );
+    //         `);
+
+    //         //         const bidDuringTotal = await exec(`
+    //         //     SELECT ti.*
+    //         //     FROM tender_infos ti
+    //         //     LEFT JOIN tender_costing_sheet tcos ON tcos.tender_id = ti.id
+    //         //     WHERE ${baseWhere()}
+    //         //       AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         //       AND tcos.id IS NULL
+    //         //   `);
+
+    //         //we'll use total tenders approved
+
+    //         const bidDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Bid Submitted'
+    //         )
+    //     `);
+
+    //         const bidDuringPending = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND NOT EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Bid Submitted'
+    //         )
+    //         AND ti.tl_status = 1
+    //     `);
+
+    //         const bidTotal = await exec(`
+    //             SELECT ti.*
+    //             FROM tender_infos ti
+    //             JOIN tender_information tin
+    //             ON tin.tender_id = ti.id
+    //             WHERE ${baseWhere()}
+    //             AND ti.tl_status = 1
+    //             AND NOT EXISTS (
+    //                 SELECT 1
+    //                 FROM bid_submissions bs
+    //                 WHERE bs.tender_id = ti.id
+    //             );
+    //     `);
+
+    //         /* =====================================================
+    //         RESULT AWAITED
+    //         Completed: result declared
+    //     ===================================================== */
+
+    //         const resultAwaitedOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at < '${from}'
+    //         AND ti.tl_status = 1
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Bid Submitted'
+    //         )
+    //         AND NOT EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //             AND tr.status IN ('Won','Lost','Disqualified')
+    //         )
+    //     `);
+
+    //         //         const resultAwaitedDuringTotal = await exec(`
+    //         //     SELECT ti.*
+    //         //     FROM tender_infos ti
+    //         //     WHERE ${baseWhere()}
+    //         //       AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         //   `);
+
+    //         const resultAwaitedDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //             AND tr.status IN ('Won','Lost','Disqualified')
+    //         )
+    //     `);
+
+    //         const resultAwaitedDuringPending = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.tl_status = 1
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Bid Submitted'
+    //         )
+    //         AND NOT EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         )
+    //     `);
+
+    //         const resultAwaitedTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Bid Submitted'
+    //         )
+    //         AND NOT EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //             AND tr.status IN ('Won','Lost','Disqualified')
+    //         )
+    //     `);
+
+    //         /* =====================================================
+    //         MISSED / WON / LOST / DISQUALIFIED (terminal)
+    //     ===================================================== */
+
+    //         const missedOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at < '${from}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Tender Missed'
+    //         )
+    //     `);
+
+    //         const missedDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //         AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //         AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //             AND bs.status = 'Tender Missed'
+    //         )
+    //     `);
+
+    //         // DURING → TOTAL (pending results, shared logic)
+    //         const terminalDuringTotal = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM bid_submissions bs
+    //         WHERE bs.tender_id = ti.id
+    //         AND bs.status = 'Bid Submitted'
+    //     )
+    //     AND NOT EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status IN ('Won','Lost','Disqualified')
+    //     )
+    // `);
+
+    //         // OPENING
+    //         const wonOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at < '${from}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Won'
+    //     )
+    // `);
+
+    //         // DURING → COMPLETED (won only)
+    //         const wonDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Won'
+    //     )
+    // `);
+    //         // loss OPENING
+    //         const lostOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at < '${from}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Lost'
+    //     )
+    // `);
+
+    //         // DURING → COMPLETED (lost only)
+    //         const lostDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Lost'
+    //     )
+    // `);
+    //         // loss OPENING
+    //         const disqualifiedOpening = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at < '${from}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Disqualified'
+    //     )
+    // `);
+
+    //         // DURING → COMPLETED (disqualified only)
+    //         const disqualifiedDuringCompleted = await exec(`
+    //     SELECT ti.*
+    //     FROM tender_infos ti
+    //     WHERE ${baseWhere()}
+    //     AND ti.created_at BETWEEN '${from}' AND '${to}'
+    //     AND EXISTS (
+    //         SELECT 1 FROM tender_results tr
+    //         WHERE tr.tender_id = ti.id
+    //         AND tr.status = 'Disqualified'
+    //     )
+    // `);
+
+    //         /* =====================================================
+    //         FINAL RESPONSE
+    //     ===================================================== */
+
+    //         return {
+    //             from: new Date(from),
+    //             to: new Date(to),
+    //             stages: {
+    //                 assigned: {
+    //                     opening: {
+    //                         count: assignedOpening.length,
+    //                         value: sumValue(assignedOpening),
+    //                         drilldown: assignedOpening,
+    //                     },
+    //                     total: {
+    //                         count: assignedTotal.length,
+    //                         value: sumValue(assignedTotal),
+    //                         drilldown: assignedTotal,
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: assignedDuringTotal.length,
+    //                             value: sumValue(assignedDuringTotal),
+    //                             drilldown: assignedDuringTotal,
+    //                         },
+    //                         completed: {
+    //                             count: assignedDuringCompleted.length,
+    //                             value: sumValue(assignedDuringCompleted),
+    //                             drilldown: assignedDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: assignedDuringPending.length,
+    //                             value: sumValue(assignedDuringPending),
+    //                             drilldown: assignedDuringPending,
+    //                         },
+    //                     },
+    //                 },
+
+    //                 approved: {
+    //                     opening: {
+    //                         count: approvedOpening.length,
+    //                         value: sumValue(approvedOpening),
+    //                         drilldown: approvedOpening,
+    //                     },
+    //                     total: {
+    //                         count: approvedTotal.length,
+    //                         value: sumValue(approvedTotal),
+    //                         drilldown: approvedTotal,
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: approvedDuringTotal.length,
+    //                             value: sumValue(approvedDuringTotal),
+    //                             drilldown: approvedDuringTotal,
+    //                         },
+    //                         completed: {
+    //                             count: approvedDuringCompleted.length,
+    //                             value: sumValue(approvedDuringCompleted),
+    //                             drilldown: approvedDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: approvedDuringPending.length,
+    //                             value: sumValue(approvedDuringPending),
+    //                             drilldown: approvedDuringPending,
+    //                         },
+    //                     },
+    //                 },
+
+    //                 bid: {
+    //                     opening: {
+    //                         count: bidOpening.length,
+    //                         value: sumValue(bidOpening),
+    //                         drilldown: bidOpening,
+    //                     },
+    //                     total: {
+    //                         count: bidTotal.length,
+    //                         value: sumValue(bidTotal),
+    //                         drilldown: bidTotal,
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: approvedDuringCompleted.length,
+    //                             value: sumValue(approvedDuringCompleted),
+    //                             drilldown: approvedDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: bidDuringPending.length,
+    //                             value: sumValue(bidDuringPending),
+    //                             drilldown: bidDuringPending,
+    //                         },
+    //                     },
+    //                 },
+
+    //                 missed: {
+    //                     opening: { count: missedOpening.length, value: sumValue(missedOpening), drilldown: missedOpening },
+    //                     total: {
+    //                         count: missedOpening.length + missedDuringCompleted.length,
+    //                         value: sumValue(missedOpening) + sumValue(missedDuringCompleted),
+    //                         drilldown: [...missedOpening, ...missedDuringCompleted],
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: missedDuringCompleted.length,
+    //                             value: sumValue(missedDuringCompleted),
+    //                             drilldown: missedDuringCompleted,
+    //                         },
+    //                         pending: { count: 0, value: 0, drilldown: [] },
+    //                     },
+    //                 },
+
+    //                 resultAwaited: {
+    //                     opening: {
+    //                         count: resultAwaitedOpening.length,
+    //                         value: sumValue(resultAwaitedOpening),
+    //                         drilldown: resultAwaitedOpening,
+    //                     },
+    //                     total: {
+    //                         count: resultAwaitedTotal.length,
+    //                         value: sumValue(resultAwaitedTotal),
+    //                         drilldown: resultAwaitedTotal,
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: resultAwaitedDuringCompleted.length,
+    //                             value: sumValue(resultAwaitedDuringCompleted),
+    //                             drilldown: resultAwaitedDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: resultAwaitedDuringPending.length,
+    //                             value: sumValue(resultAwaitedDuringPending),
+    //                             drilldown: resultAwaitedDuringPending,
+    //                         },
+    //                     },
+    //                 },
+
+    //                 won: {
+    //                     opening: {
+    //                         count: wonOpening.length,
+    //                         value: sumValue(wonOpening),
+    //                         drilldown: wonOpening,
+    //                     },
+    //                     total: {
+    //                         count: wonOpening.length + wonDuringCompleted.length,
+    //                         value: sumValue(wonOpening) + sumValue(wonDuringCompleted),
+    //                         drilldown: [...wonOpening, ...wonDuringCompleted],
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: wonDuringCompleted.length,
+    //                             value: sumValue(wonDuringCompleted),
+    //                             drilldown: wonDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: 0,
+    //                             value: 0,
+    //                             drilldown: [],
+    //                         },
+    //                     },
+    //                 },
+    //                 lost: {
+    //                     opening: {
+    //                         count: lostOpening.length,
+    //                         value: sumValue(lostOpening),
+    //                         drilldown: lostOpening,
+    //                     },
+    //                     total: {
+    //                         count: lostOpening.length + lostDuringCompleted.length,
+    //                         value: sumValue(lostOpening) + sumValue(lostDuringCompleted),
+    //                         drilldown: [...lostOpening, ...lostDuringCompleted],
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: lostDuringCompleted.length,
+    //                             value: sumValue(lostDuringCompleted),
+    //                             drilldown: lostDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: 0,
+    //                             value: 0,
+    //                             drilldown: [],
+    //                         },
+    //                     },
+    //                 },
+
+    //                 disqualified: {
+    //                     opening: {
+    //                         count: disqualifiedOpening.length,
+    //                         value: sumValue(disqualifiedOpening),
+    //                         drilldown: disqualifiedOpening,
+    //                     },
+    //                     total: {
+    //                         count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
+    //                         value: sumValue(disqualifiedOpening) + sumValue(disqualifiedDuringCompleted),
+    //                         drilldown: [...disqualifiedOpening, ...disqualifiedDuringCompleted],
+    //                     },
+    //                     during: {
+    //                         total: {
+    //                             count: bidDuringCompleted.length,
+    //                             value: sumValue(bidDuringCompleted),
+    //                             drilldown: bidDuringCompleted,
+    //                         },
+    //                         completed: {
+    //                             count: disqualifiedDuringCompleted.length,
+    //                             value: sumValue(disqualifiedDuringCompleted),
+    //                             drilldown: disqualifiedDuringCompleted,
+    //                         },
+    //                         pending: {
+    //                             count: 0,
+    //                             value: 0,
+    //                             drilldown: [],
+    //                         },
+    //                     },
+    //                 },
+    //             },
+    //         };
     //     }
 
-    //     return { from, to, stages };
-    // }
-
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        const from = new Date(`${query.fromDate}T00:00:00.000Z`);
-        const to = new Date(`${query.toDate}T23:59:59.999Z`);
+        const from = `${query.fromDate}T00:00:00.000Z`;
+        const to = `${query.toDate}T23:59:59.999Z`;
+
+        const baseWhere = () => {
+            let w = `ti.delete_status = 0`;
+            if (query.view === "user" && query.userId) {
+                w += ` AND ti.team_member = ${query.userId}`;
+            }
+            if (query.view === "team" && query.teamId) {
+                w += ` AND ti.team = ${query.teamId}`;
+            }
+            return w;
+        };
+
+        const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
+
+        const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.gst_values ?? 0), 0);
 
         /* =====================================================
-     0️⃣ Tender universe conditions
-  ===================================================== */
-        const tenderConditions = [eq(tenderInfos.deleteStatus, 0)];
+        ASSIGNED
+        Completed: tender_information exists
+    ===================================================== */
 
-        if (query.view === "user" && query.userId) {
-            tenderConditions.push(eq(tenderInfos.teamMember, query.userId));
-        }
+        const assignedOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at < '${from}'
+        AND tin.id IS NULL
+        AND tl_status = 0
+    `);
 
-        if (query.view === "team" && query.teamId) {
-            tenderConditions.push(eq(tenderInfos.team, query.teamId));
-        }
+        const assignedDuringTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+    `);
 
-        /* =====================================================
-     1️⃣ Fetch Tender Universe
-  ===================================================== */
-        const tenders = await this.db
-            .select()
-            .from(tenderInfos)
-            .where(and(...tenderConditions));
+        const assignedDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+    `);
 
-        if (!tenders.length) {
-            return { from, to, stages: {} };
-        }
+        const assignedDuringPending = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.id IS NULL
+    `);
 
-        const tenderIds = tenders.map(t => t.id);
-
-        /* =====================================================
-     2️⃣ Fetch Info Sheets
-  ===================================================== */
-        const infos = await this.db
-            .select({
-                tenderId: tenderInformation.tenderId,
-                createdAt: tenderInformation.createdAt,
-            })
-            .from(tenderInformation)
-            .where(inArray(tenderInformation.tenderId, tenderIds));
-
-        const infoMap = new Map<number, Date>();
-        infos.forEach(i => infoMap.set(Number(i.tenderId), i.createdAt));
-
-        /* =====================================================
-     3️⃣ Fetch Bid Submissions
-  ===================================================== */
-        const bids = await this.db.select().from(bidSubmissions).where(inArray(bidSubmissions.tenderId, tenderIds));
-
-        const bidMap = new Map<number, (typeof bids)[number]>();
-        bids.forEach(b => bidMap.set(Number(b.tenderId), b));
+        const assignedTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND tin.id IS NULL
+    `);
 
         /* =====================================================
-     4️⃣ Fetch Results
-  ===================================================== */
-        const results = await this.db.select().from(tenderResults).where(inArray(tenderResults.tenderId, tenderIds));
+        APPROVED
+        Completed: bid submitted
+    ===================================================== */
 
-        const resultMap = new Map<number, (typeof results)[number]>();
-        results.forEach(r => resultMap.set(Number(r.tenderId), r));
+        const approvedOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at < '${from}'
+        AND ti.tl_status = 0
+    `);
+
+        const approvedDuringTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+        SELECT 1 FROM tender_information te
+        WHERE ti.id = te.tender_id
+        )
+    `);
+
+        const approvedDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_status IN (1, 2)
+    `);
+
+        const approvedDuringPending = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_status = 0
+    `);
+
+        const approvedTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+            AND ti.tl_status = 0
+    `);
 
         /* =====================================================
-     5️⃣ Helpers
-  ===================================================== */
-        const DNB_CODES = new Set([8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36]);
-        const isDnb = (s: number) => DNB_CODES.has(s);
+        BID
+        Completed: bid submitted
+    ===================================================== */
 
-        const empty = () => ({
-            opening: { count: 0, value: 0, drilldown: [] },
-            total: { count: 0, value: 0, drilldown: [] },
-            during: {
-                total: { count: 0, value: 0, drilldown: [] },
-                completed: { count: 0, value: 0, drilldown: [] },
-                pending: { count: 0, value: 0, drilldown: [] },
+        const bidOpening = await exec(`
+            SELECT ti.*
+            FROM tender_infos ti
+            JOIN tender_information tin
+            ON tin.tender_id = ti.id
+            WHERE ${baseWhere()}
+            AND ti.created_at < '${from}'
+            AND EXISTS (
+                SELECT 1
+                FROM tender_costing_sheets tcs
+                WHERE tcs.tender_id = ti.id
+                    AND tcs.status = 'Approved'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+            );
+        `);
+
+        //         const bidDuringTotal = await exec(`
+        //     SELECT ti.*
+        //     FROM tender_infos ti
+        //     LEFT JOIN tender_costing_sheet tcos ON tcos.tender_id = ti.id
+        //     WHERE ${baseWhere()}
+        //       AND ti.created_at BETWEEN '${from}' AND '${to}'
+        //       AND tcos.id IS NULL
+        //   `);
+
+        //we'll use total tenders approved
+
+        const bidDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Bid Submitted'
+        )
+    `);
+
+        const bidDuringPending = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND NOT EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Bid Submitted'
+        )
+        AND ti.tl_status = 1
+    `);
+
+        const bidTotal = await exec(`
+            SELECT ti.*
+            FROM tender_infos ti
+            JOIN tender_information tin
+            ON tin.tender_id = ti.id
+            WHERE ${baseWhere()}
+            AND ti.tl_status = 1
+            AND NOT EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+            );
+    `);
+
+        /* =====================================================
+        RESULT AWAITED
+        Completed: result declared
+    ===================================================== */
+
+        const resultAwaitedOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at < '${from}'
+        AND ti.tl_status = 1
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Bid Submitted'
+        )
+        AND NOT EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+            AND tr.status IN ('Won','Lost','Disqualified')
+        )
+    `);
+
+        //         const resultAwaitedDuringTotal = await exec(`
+        //     SELECT ti.*
+        //     FROM tender_infos ti
+        //     WHERE ${baseWhere()}
+        //       AND ti.created_at BETWEEN '${from}' AND '${to}'
+        //   `);
+
+        const resultAwaitedDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+            AND tr.status IN ('Won','Lost','Disqualified')
+        )
+    `);
+
+        const resultAwaitedDuringPending = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.tl_status = 1
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Bid Submitted'
+        )
+        AND NOT EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        )
+    `);
+
+        const resultAwaitedTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Bid Submitted'
+        )
+        AND NOT EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+            AND tr.status IN ('Won','Lost','Disqualified')
+        )
+    `);
+
+        /* =====================================================
+        MISSED / WON / LOST / DISQUALIFIED (terminal)
+    ===================================================== */
+
+        const missedOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at < '${from}'
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Tender Missed'
+        )
+    `);
+
+        const missedDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+            AND bs.status = 'Tender Missed'
+        )
+    `);
+
+        // DURING → TOTAL (pending results, shared logic)
+        const terminalDuringTotal = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at BETWEEN '${from}' AND '${to}'
+    AND EXISTS (
+        SELECT 1 FROM bid_submissions bs
+        WHERE bs.tender_id = ti.id
+        AND bs.status = 'Bid Submitted'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status IN ('Won','Lost','Disqualified')
+    )
+`);
+
+        // OPENING
+        const wonOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at < '${from}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Won'
+    )
+`);
+
+        // DURING → COMPLETED (won only)
+        const wonDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at BETWEEN '${from}' AND '${to}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Won'
+    )
+`);
+        // loss OPENING
+        const lostOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at < '${from}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Lost'
+    )
+`);
+
+        // DURING → COMPLETED (lost only)
+        const lostDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at BETWEEN '${from}' AND '${to}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Lost'
+    )
+`);
+        // loss OPENING
+        const disqualifiedOpening = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at < '${from}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Disqualified'
+    )
+`);
+
+        // DURING → COMPLETED (disqualified only)
+        const disqualifiedDuringCompleted = await exec(`
+    SELECT ti.*
+    FROM tender_infos ti
+    WHERE ${baseWhere()}
+    AND ti.created_at BETWEEN '${from}' AND '${to}'
+    AND EXISTS (
+        SELECT 1 FROM tender_results tr
+        WHERE tr.tender_id = ti.id
+        AND tr.status = 'Disqualified'
+    )
+`);
+
+        /* =====================================================
+        FINAL RESPONSE
+    ===================================================== */
+
+        return {
+            from: new Date(from),
+            to: new Date(to),
+            stages: {
+                assigned: {
+                    opening: {
+                        count: assignedOpening.length,
+                        value: this.sumValue(assignedOpening),
+                        drilldown: this.mapDrilldown(assignedOpening),
+                    },
+                    total: {
+                        count: assignedTotal.length,
+                        value: this.sumValue(assignedTotal),
+                        drilldown: this.mapDrilldown(assignedTotal),
+                    },
+                    during: {
+                        total: {
+                            count: assignedDuringTotal.length,
+                            value: this.sumValue(assignedDuringTotal),
+                            drilldown: this.mapDrilldown(assignedDuringTotal),
+                        },
+                        completed: {
+                            count: assignedDuringCompleted.length,
+                            value: this.sumValue(assignedDuringCompleted),
+                            drilldown: this.mapDrilldown(assignedDuringCompleted),
+                        },
+                        pending: {
+                            count: assignedDuringPending.length,
+                            value: this.sumValue(assignedDuringPending),
+                            drilldown: this.mapDrilldown(assignedDuringPending),
+                        },
+                    },
+                },
+
+                approved: {
+                    opening: {
+                        count: approvedOpening.length,
+                        value: this.sumValue(approvedOpening),
+                        drilldown: this.mapDrilldown(approvedOpening),
+                    },
+                    total: {
+                        count: approvedTotal.length,
+                        value: this.sumValue(approvedTotal),
+                        drilldown: this.mapDrilldown(approvedTotal),
+                    },
+                    during: {
+                        total: {
+                            count: approvedDuringTotal.length,
+                            value: this.sumValue(approvedDuringTotal),
+                            drilldown: this.mapDrilldown(approvedDuringTotal),
+                        },
+                        completed: {
+                            count: approvedDuringCompleted.length,
+                            value: this.sumValue(approvedDuringCompleted),
+                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                        },
+                        pending: {
+                            count: approvedDuringPending.length,
+                            value: this.sumValue(approvedDuringPending),
+                            drilldown: this.mapDrilldown(approvedDuringPending),
+                        },
+                    },
+                },
+
+                bid: {
+                    opening: {
+                        count: bidOpening.length,
+                        value: this.sumValue(bidOpening),
+                        drilldown: this.mapDrilldown(bidOpening),
+                    },
+                    total: {
+                        count: bidTotal.length,
+                        value: this.sumValue(bidTotal),
+                        drilldown: this.mapDrilldown(bidTotal),
+                    },
+                    during: {
+                        total: {
+                            count: approvedDuringCompleted.length,
+                            value: this.sumValue(approvedDuringCompleted),
+                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                        },
+                        completed: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        pending: {
+                            count: bidDuringPending.length,
+                            value: this.sumValue(bidDuringPending),
+                            drilldown: this.mapDrilldown(bidDuringPending),
+                        },
+                    },
+                },
+
+                missed: {
+                    opening: {
+                        count: missedOpening.length,
+                        value: this.sumValue(missedOpening),
+                        drilldown: this.mapDrilldown(missedOpening),
+                    },
+                    total: {
+                        count: missedOpening.length + missedDuringCompleted.length,
+                        value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
+                        drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
+                    },
+                    during: {
+                        total: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        completed: {
+                            count: missedDuringCompleted.length,
+                            value: this.sumValue(missedDuringCompleted),
+                            drilldown: this.mapDrilldown(missedDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
+
+                resultAwaited: {
+                    opening: {
+                        count: resultAwaitedOpening.length,
+                        value: this.sumValue(resultAwaitedOpening),
+                        drilldown: this.mapDrilldown(resultAwaitedOpening),
+                    },
+                    total: {
+                        count: resultAwaitedTotal.length,
+                        value: this.sumValue(resultAwaitedTotal),
+                        drilldown: this.mapDrilldown(resultAwaitedTotal),
+                    },
+                    during: {
+                        total: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        completed: {
+                            count: resultAwaitedDuringCompleted.length,
+                            value: this.sumValue(resultAwaitedDuringCompleted),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
+                        },
+                        pending: {
+                            count: resultAwaitedDuringPending.length,
+                            value: this.sumValue(resultAwaitedDuringPending),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringPending),
+                        },
+                    },
+                },
+
+                won: {
+                    opening: {
+                        count: wonOpening.length,
+                        value: this.sumValue(wonOpening),
+                        drilldown: this.mapDrilldown(wonOpening),
+                    },
+                    total: {
+                        count: wonOpening.length + wonDuringCompleted.length,
+                        value: this.sumValue([...wonOpening, ...wonDuringCompleted]),
+                        drilldown: this.mapDrilldown([...wonOpening, ...wonDuringCompleted]),
+                    },
+                    during: {
+                        total: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        completed: {
+                            count: wonDuringCompleted.length,
+                            value: this.sumValue(wonDuringCompleted),
+                            drilldown: this.mapDrilldown(wonDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
+
+                lost: {
+                    opening: {
+                        count: lostOpening.length,
+                        value: this.sumValue(lostOpening),
+                        drilldown: this.mapDrilldown(lostOpening),
+                    },
+                    total: {
+                        count: lostOpening.length + lostDuringCompleted.length,
+                        value: this.sumValue([...lostOpening, ...lostDuringCompleted]),
+                        drilldown: this.mapDrilldown([...lostOpening, ...lostDuringCompleted]),
+                    },
+                    during: {
+                        total: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        completed: {
+                            count: lostDuringCompleted.length,
+                            value: this.sumValue(lostDuringCompleted),
+                            drilldown: this.mapDrilldown(lostDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
+
+                disqualified: {
+                    opening: {
+                        count: disqualifiedOpening.length,
+                        value: this.sumValue(disqualifiedOpening),
+                        drilldown: this.mapDrilldown(disqualifiedOpening),
+                    },
+                    total: {
+                        count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
+                        value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                        drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                    },
+                    during: {
+                        total: {
+                            count: bidDuringCompleted.length,
+                            value: this.sumValue(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                        },
+                        completed: {
+                            count: disqualifiedDuringCompleted.length,
+                            value: this.sumValue(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
             },
-        });
-
-        const stages = {
-            assigned: empty(),
-            approved: empty(),
-            bid: empty(), // pending submission only
-            missed: empty(), // NEW terminal-like stage
-            resultAwaited: empty(),
-            won: empty(),
-            lost: empty(),
-            disqualified: empty(),
         };
-
-        const pushDuring = (bucket, meta, date) => {
-            bucket.count++;
-            bucket.value += meta.value;
-            bucket.drilldown.push({ ...meta, at: date });
-        };
-
-        /* =====================================================
-     6️⃣ Ledger
-  ===================================================== */
-        for (const t of tenders) {
-            const value = Number(t.gstValues ?? 0);
-            const baseDate = t.createdAt;
-            const inDuring = baseDate >= from && baseDate <= to;
-
-            const infoAt = infoMap.get(t.id) ?? null;
-            const bid = bidMap.get(t.id);
-            const result = resultMap.get(t.id);
-
-            const meta = {
-                tenderId: t.id,
-                tenderNo: t.tenderNo,
-                tenderName: t.tenderName,
-                value,
-            };
-
-            /* ================= ASSIGNED ================= */
-            if (t.tlStatus === 0 && !isDnb(t.status)) {
-                this.push(stages.assigned, baseDate, from, to, meta);
-
-                if (inDuring) {
-                    pushDuring(stages.assigned.during.total, meta, baseDate);
-                    infoAt ? pushDuring(stages.assigned.during.completed, meta, baseDate) : pushDuring(stages.assigned.during.pending, meta, baseDate);
-                }
-            }
-
-            /* ================= APPROVED ================= */
-            if (infoAt && !isDnb(t.status)) {
-                this.push(stages.approved, baseDate, from, to, meta);
-
-                if (inDuring) {
-                    pushDuring(stages.approved.during.total, meta, baseDate);
-                    t.tlStatus === 1 || t.tlStatus === 2
-                        ? pushDuring(stages.approved.during.completed, meta, baseDate)
-                        : pushDuring(stages.approved.during.pending, meta, baseDate);
-                }
-            }
-
-            /* ================= BID (PENDING SUBMISSION ONLY) ================= */
-            if (infoAt && !bid && !isDnb(t.status)) {
-                this.push(stages.bid, baseDate, from, to, meta);
-
-                if (inDuring) {
-                    pushDuring(stages.bid.during.total, meta, baseDate);
-                    pushDuring(stages.bid.during.pending, meta, baseDate);
-                }
-            }
-
-            /* ================= MISSED (TERMINAL-LIKE) ================= */
-            if (bid) {
-                this.push(stages.missed, baseDate, from, to, meta);
-
-                if (inDuring) {
-                    pushDuring(stages.missed.during.total, meta, baseDate);
-                    if (bid.status === "Tender Missed") {
-                        pushDuring(stages.missed.during.completed, meta, baseDate);
-                    }
-                }
-            }
-
-            /* ================= RESULT AWAITED ================= */
-            if (infoAt && !isDnb(t.status)) {
-                this.push(stages.resultAwaited, baseDate, from, to, meta);
-
-                if (inDuring) {
-                    pushDuring(stages.resultAwaited.during.total, meta, baseDate);
-                    result ? pushDuring(stages.resultAwaited.during.completed, meta, baseDate) : pushDuring(stages.resultAwaited.during.pending, meta, baseDate);
-                }
-            }
-
-            /* ================= TERMINAL RESULTS ================= */
-            if (result) {
-                const terminalMap = {
-                    Won: stages.won,
-                    Lost: stages.lost,
-                    Disqualified: stages.disqualified,
-                };
-
-                const stage = terminalMap[result.status];
-                if (stage) {
-                    this.push(stage, baseDate, from, to, meta);
-                    if (inDuring) {
-                        pushDuring(stage.during.total, meta, baseDate);
-                        pushDuring(stage.during.completed, meta, baseDate);
-                    }
-                }
-            }
-        }
-
-        return { from, to, stages };
     }
 
-    /* =====================================================
-        Helper
-     ===================================================== */
-    private push(stage, date: Date, from: Date, to: Date, meta: any) {
-        stage.total.count++;
-        stage.total.value += meta.value;
-        stage.total.drilldown.push({ ...meta, at: date });
-
-        if (date < from) {
-            stage.opening.count++;
-            stage.opening.value += meta.value;
-            stage.opening.drilldown.push({ ...meta, at: date });
-        }
-
-        if (date >= from && date <= to) {
-            stage.during.count++;
-            stage.during.value += meta.value;
-            stage.during.drilldown.push({ ...meta, at: date });
-        }
+    private mapDrilldown(rows: any[]) {
+        return rows.map(t => ({
+            tenderId: t.id,
+            tenderNo: t.tender_no ?? t.tenderNo,
+            tenderName: t.tender_name ?? t.tenderName,
+            value: Number(t.gst_values ?? 0),
+        }));
     }
+
+    private sumValue(rows: any[]) {
+        return rows.reduce((sum, r) => sum + Number(r.gst_values ?? 0), 0);
+    }
+
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
@@ -1591,40 +2503,6 @@ export class TenderExecutiveService {
 
         return this.aggregateEmdBalance(rows, from, to);
     }
-
-    // private async fetchEmdUniverse(query: EmdBalanceQueryDto, to: Date) {
-    //     const conditions = [eq(paymentRequests.purpose, "EMD"), lte(paymentRequests.createdAt, to)];
-
-    //     if (query.view === "user" && query.userId) {
-    //         conditions.push(eq(paymentRequests.requestedBy, query.userId));
-    //     }
-
-    //     if (query.view !== "user" && query.teamId) {
-    //         conditions.push(eq(tenderInfos.team, query.teamId));
-    //     }
-
-    //     return this.db
-    //         .select({
-    //             requestId: paymentRequests.id,
-    //             tenderId: paymentRequests.tenderId,
-    //             amount: paymentRequests.amountRequired,
-    //             createdAt: paymentRequests.createdAt,
-
-    //             action: paymentInstruments.action,
-
-    //             instrumentType: paymentInstruments.instrumentType,
-    //             status: paymentInstruments.status,
-    //             statusUpdatedAt: paymentInstruments.updatedAt,
-
-    //             tenderNo: tenderInfos.tenderNo,
-    //             tenderName: tenderInfos.tenderName,
-    //             dueDate: tenderInfos.dueDate,
-    //         })
-    //         .from(paymentRequests)
-    //         .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
-    //         .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-    //         .where(and(...conditions));
-    // }
 
     private emptyEmdBalance() {
         const bucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
@@ -1728,17 +2606,20 @@ export class TenderExecutiveService {
 
         const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
 
-        const emptyBucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+        const emptyBucket = () => ({
+            count: 0,
+            value: 0,
+            drilldown: [] as any[],
+        });
 
         const result = {
-            paid: {
-                prior: emptyBucket(),
-                during: emptyBucket(),
+            opening: emptyBucket(),
+            during: {
+                pending: emptyBucket(),
+                completed: emptyBucket(),
+                total: emptyBucket(), // derived later
             },
-            received: {
-                priorPaid: emptyBucket(),
-                duringPaid: emptyBucket(),
-            },
+            closing: emptyBucket(), // derived later
         };
 
         if (!tenderIds.length) {
@@ -1749,11 +2630,11 @@ export class TenderExecutiveService {
             .select({
                 tenderId: paymentRequests.tenderId,
                 amount: paymentRequests.amountRequired,
-                createdAt: paymentRequests.createdAt,
+                paidAt: paymentRequests.createdAt,
 
                 instrumentType: paymentInstruments.instrumentType,
                 action: paymentInstruments.action,
-                updatedAt: paymentInstruments.updatedAt,
+                receivedAt: paymentInstruments.updatedAt,
 
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
@@ -1765,21 +2646,20 @@ export class TenderExecutiveService {
                 and(
                     inArray(paymentRequests.tenderId, tenderIds),
                     eq(paymentRequests.purpose, "EMD"),
-
-                    // ✅ Only real EMD instruments
-                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"]),
-
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG", "Cheque"]),
                     lte(paymentRequests.createdAt, to)
                 )
             );
 
         for (const r of rows) {
-            if (!r.createdAt) continue; // ⬅️ hard guard, required
+            if (!r.paidAt) continue;
 
-            const createdAt = r.createdAt;
-            const updatedAt = r.updatedAt ?? null;
+            const paidAt = r.paidAt;
+            const receivedAt = r.receivedAt ?? null;
 
-            const state = resolveEmdFinancialState(r.instrumentType, r.action);
+            const financialState = resolveEmdFinancialState(r.instrumentType, r.action);
+
+            const isReceived = financialState === "RETURNED" || financialState === "SETTLED";
 
             const meta = {
                 tenderId: r.tenderId,
@@ -1787,46 +2667,49 @@ export class TenderExecutiveService {
                 tenderName: r.tenderName,
                 instrumentType: r.instrumentType,
                 amount: Number(r.amount),
-                paidAt: createdAt,
-                receivedAt: updatedAt,
+                paidAt,
+                receivedAt,
             };
 
-            // ============================
-            // EMD PAID
-            // ============================
-
-            if (r.createdAt < from) {
-                result.paid.prior.count++;
-                result.paid.prior.value += meta.amount;
-                result.paid.prior.drilldown.push(meta);
+            // =========================
+            // OPENING
+            // =========================
+            if (paidAt < from && (!isReceived || (receivedAt && receivedAt >= from))) {
+                result.opening.count++;
+                result.opening.value += meta.amount;
+                result.opening.drilldown.push(meta);
             }
 
-            if (r.createdAt >= from && r.createdAt <= to) {
-                result.paid.during.count++;
-                result.paid.during.value += meta.amount;
-                result.paid.during.drilldown.push(meta);
+            // =========================
+            // DURING.PENDING
+            // =========================
+            if (paidAt >= from && paidAt <= to && (!isReceived || (receivedAt && receivedAt > to))) {
+                result.during.pending.count++;
+                result.during.pending.value += meta.amount;
+                result.during.pending.drilldown.push(meta);
             }
 
-            // ============================
-            // EMD RECEIVED BACK (ONLY RETURNED)
-            // ============================
-
-            if (state === "RETURNED" && r.updatedAt && r.updatedAt >= from && r.updatedAt <= to) {
-                // Paid before period → received now
-                if (r.createdAt < from) {
-                    result.received.priorPaid.count++;
-                    result.received.priorPaid.value += meta.amount;
-                    result.received.priorPaid.drilldown.push(meta);
-                }
-
-                // Paid during period → received during same period
-                if (r.createdAt >= from && r.createdAt <= to) {
-                    result.received.duringPaid.count++;
-                    result.received.duringPaid.value += meta.amount;
-                    result.received.duringPaid.drilldown.push(meta);
-                }
+            // =========================
+            // DURING.COMPLETED
+            // =========================
+            if (paidAt >= from && paidAt <= to && isReceived && receivedAt && receivedAt >= from && receivedAt <= to) {
+                result.during.completed.count++;
+                result.during.completed.value += meta.amount;
+                result.during.completed.drilldown.push(meta);
             }
         }
+
+        // =========================
+        // DERIVED TOTALS
+        // =========================
+
+        result.during.total.count = result.during.pending.count + result.during.completed.count;
+
+        result.during.total.value = result.during.pending.value + result.during.completed.value;
+
+        result.closing.count = result.opening.count + result.during.pending.count;
+
+        result.closing.value = result.opening.value + result.during.pending.value;
 
         return result;
     }
