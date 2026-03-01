@@ -181,7 +181,6 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
             return "LOCKED";
     }
 }
-
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
@@ -2607,17 +2606,20 @@ export class TenderExecutiveService {
 
         const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
 
-        const emptyBucket = () => ({ count: 0, value: 0, drilldown: [] as any[] });
+        const emptyBucket = () => ({
+            count: 0,
+            value: 0,
+            drilldown: [] as any[],
+        });
 
         const result = {
-            paid: {
-                prior: emptyBucket(),
-                during: emptyBucket(),
+            opening: emptyBucket(),
+            during: {
+                pending: emptyBucket(),
+                completed: emptyBucket(),
+                total: emptyBucket(), // derived later
             },
-            received: {
-                priorPaid: emptyBucket(),
-                duringPaid: emptyBucket(),
-            },
+            closing: emptyBucket(), // derived later
         };
 
         if (!tenderIds.length) {
@@ -2628,11 +2630,11 @@ export class TenderExecutiveService {
             .select({
                 tenderId: paymentRequests.tenderId,
                 amount: paymentRequests.amountRequired,
-                createdAt: paymentRequests.createdAt,
+                paidAt: paymentRequests.createdAt,
 
                 instrumentType: paymentInstruments.instrumentType,
                 action: paymentInstruments.action,
-                updatedAt: paymentInstruments.updatedAt,
+                receivedAt: paymentInstruments.updatedAt,
 
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
@@ -2644,21 +2646,20 @@ export class TenderExecutiveService {
                 and(
                     inArray(paymentRequests.tenderId, tenderIds),
                     eq(paymentRequests.purpose, "EMD"),
-
-                    // ✅ Only real EMD instruments
-                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG"]),
-
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG", "Cheque"]),
                     lte(paymentRequests.createdAt, to)
                 )
             );
 
         for (const r of rows) {
-            if (!r.createdAt) continue; // ⬅️ hard guard, required
+            if (!r.paidAt) continue;
 
-            const createdAt = r.createdAt;
-            const updatedAt = r.updatedAt ?? null;
+            const paidAt = r.paidAt;
+            const receivedAt = r.receivedAt ?? null;
 
-            const state = resolveEmdFinancialState(r.instrumentType, r.action);
+            const financialState = resolveEmdFinancialState(r.instrumentType, r.action);
+
+            const isReceived = financialState === "RETURNED" || financialState === "SETTLED";
 
             const meta = {
                 tenderId: r.tenderId,
@@ -2666,46 +2667,49 @@ export class TenderExecutiveService {
                 tenderName: r.tenderName,
                 instrumentType: r.instrumentType,
                 amount: Number(r.amount),
-                paidAt: createdAt,
-                receivedAt: updatedAt,
+                paidAt,
+                receivedAt,
             };
 
-            // ============================
-            // EMD PAID
-            // ============================
-
-            if (r.createdAt < from) {
-                result.paid.prior.count++;
-                result.paid.prior.value += meta.amount;
-                result.paid.prior.drilldown.push(meta);
+            // =========================
+            // OPENING
+            // =========================
+            if (paidAt < from && (!isReceived || (receivedAt && receivedAt >= from))) {
+                result.opening.count++;
+                result.opening.value += meta.amount;
+                result.opening.drilldown.push(meta);
             }
 
-            if (r.createdAt >= from && r.createdAt <= to) {
-                result.paid.during.count++;
-                result.paid.during.value += meta.amount;
-                result.paid.during.drilldown.push(meta);
+            // =========================
+            // DURING.PENDING
+            // =========================
+            if (paidAt >= from && paidAt <= to && (!isReceived || (receivedAt && receivedAt > to))) {
+                result.during.pending.count++;
+                result.during.pending.value += meta.amount;
+                result.during.pending.drilldown.push(meta);
             }
 
-            // ============================
-            // EMD RECEIVED BACK (ONLY RETURNED)
-            // ============================
-
-            if (state === "RETURNED" && r.updatedAt && r.updatedAt >= from && r.updatedAt <= to) {
-                // Paid before period → received now
-                if (r.createdAt < from) {
-                    result.received.priorPaid.count++;
-                    result.received.priorPaid.value += meta.amount;
-                    result.received.priorPaid.drilldown.push(meta);
-                }
-
-                // Paid during period → received during same period
-                if (r.createdAt >= from && r.createdAt <= to) {
-                    result.received.duringPaid.count++;
-                    result.received.duringPaid.value += meta.amount;
-                    result.received.duringPaid.drilldown.push(meta);
-                }
+            // =========================
+            // DURING.COMPLETED
+            // =========================
+            if (paidAt >= from && paidAt <= to && isReceived && receivedAt && receivedAt >= from && receivedAt <= to) {
+                result.during.completed.count++;
+                result.during.completed.value += meta.amount;
+                result.during.completed.drilldown.push(meta);
             }
         }
+
+        // =========================
+        // DERIVED TOTALS
+        // =========================
+
+        result.during.total.count = result.during.pending.count + result.during.completed.count;
+
+        result.during.total.value = result.during.pending.value + result.during.completed.value;
+
+        result.closing.count = result.opening.count + result.during.pending.count;
+
+        result.closing.value = result.opening.value + result.during.pending.value;
 
         return result;
     }
