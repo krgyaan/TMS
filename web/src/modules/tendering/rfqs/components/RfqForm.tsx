@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type Resolver, type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
@@ -23,7 +23,8 @@ import { NumberInput } from '@/components/form/NumberInput';
 
 // Hooks & Types
 import { useCreateRfq, useUpdateRfq } from '@/hooks/api/useRfqs';
-import { useRfqVendors } from '@/hooks/api/useRfqs';
+// import { useRfqVendors } from '@/hooks/api/useRfqs';
+import { useVendorOrganizationsWithRelations } from '@/hooks/api/useVendorOrganizations';
 import type { Rfq, RfqDashboardRow } from '../helpers/rfq.types';
 import { Input } from '@/components/ui/input';
 
@@ -78,7 +79,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const createRfq = useCreateRfq();
     const updateRfq = useUpdateRfq();
 
-    const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
+    // const { data: allowedVendors, isLoading: isLoadingVendors } = useRfqVendors(tenderData.rfqTo);
+    const { data: allVendorOrganizations, isLoading: isLoadingVendors, error: vendorOrgsError } = useVendorOrganizationsWithRelations();
 
     const isEditMode = !!initialData;
     const isSubmitting = createRfq.isPending || updateRfq.isPending;
@@ -116,15 +118,54 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
         name: "vendorRows"
     });
 
+    // Compute initial due date from tender data
+    const initialDueDate = useMemo(() => {
+        if (!isEditMode && tenderData?.dueDate) {
+            if (tenderData.dueDate instanceof Date) {
+                return isNaN(tenderData.dueDate.getTime()) ? undefined : tenderData.dueDate;
+            } else if (typeof tenderData.dueDate === 'string') {
+                const date = new Date(tenderData.dueDate);
+                return isNaN(date.getTime()) ? undefined : date;
+            }
+        }
+        return undefined;
+    }, [isEditMode, tenderData?.dueDate]);
+
+    // Initialize due date from tender data when creating new RFQ
     useEffect(() => {
-        if (initialData && allowedVendors) {
+        if (!isEditMode && initialDueDate) {
+            form.setValue('dueDate', initialDueDate, {
+                shouldValidate: false,
+                shouldDirty: false,
+                shouldTouch: false
+            });
+        }
+    }, [isEditMode, initialDueDate, form]);
+
+    useEffect(() => {
+        if (initialData && allVendorOrganizations) {
             // Map flat requestedVendor string ("101,102") back to structured rows
             const currentVendorIds = (initialData.requestedVendor || '').split(',').filter(Boolean);
 
             // Group IDs by Organization to rebuild the UI rows
             const reconstructedRows: FormValues['vendorRows'] = [];
 
-            allowedVendors.forEach(org => {
+            // if (initialData && allowedVendors) {
+            //     allowedVendors.forEach(org => {
+            //         const personsInThisOrg = org.persons
+            //             .filter(p => currentVendorIds.includes(String(p.id)))
+            //             .map(p => String(p.id));
+
+            //         if (personsInThisOrg.length > 0) {
+            //             reconstructedRows.push({
+            //                 orgId: String(org.id),
+            //                 personIds: personsInThisOrg
+            //             });
+            //         }
+            //     });
+            // }
+
+            allVendorOrganizations.forEach(org => {
                 const personsInThisOrg = org.persons
                     .filter(p => currentVendorIds.includes(String(p.id)))
                     .map(p => String(p.id));
@@ -171,7 +212,24 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                 miiFormatPaths: miiFormatDocs,
             });
         }
-    }, [initialData, allowedVendors, form]);
+    }, [initialData, allVendorOrganizations, form]);
+
+    // Reset personIds when orgId changes for any vendor row
+    useEffect(() => {
+        const subscription = form.watch((_value, { name }) => {
+            if (name && name.startsWith('vendorRows.') && name.endsWith('.orgId')) {
+                const indexMatch = name.match(/vendorRows\.(\d+)\.orgId/);
+                if (indexMatch) {
+                    const index = parseInt(indexMatch[1], 10);
+                    const currentPersonIds = form.getValues(`vendorRows.${index}.personIds`);
+                    if (currentPersonIds && currentPersonIds.length > 0) {
+                        form.setValue(`vendorRows.${index}.personIds`, []);
+                    }
+                }
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [form]);
 
     const handleSubmit: SubmitHandler<FormValues> = async (values) => {
         // 1. Flatten Vendor IDs to CSV
@@ -214,7 +272,12 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     };
 
     // Helper to get options for dropdowns
-    const vendorOrgOptions = allowedVendors?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+    // const vendorOrgOptions = allowedVendors?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+    const vendorOrgOptions = useMemo(() => {
+        const options = allVendorOrganizations?.map(v => ({ label: v.name, value: String(v.id) })) || [];
+        console.log('vendorOrgOptions:', options);
+        return options;
+    }, [allVendorOrganizations]);
 
     return (
         <Card>
@@ -257,7 +320,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                         {/* SECTION 1: General Info & Docs */}
                         <div className="space-y-4">
                             <div className="w-full md:w-1/3">
-                                <FieldWrapper control={form.control} name="dueDate" label="RFQ Due Date">
+                                <FieldWrapper control={form.control} name="dueDate" label="Due Date">
                                     {(field) => (
                                         <DateTimeInput
                                             value={field.value ? (field.value instanceof Date ? field.value.toISOString().slice(0, 16) : String(field.value)) : ''}
@@ -371,6 +434,24 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                             </div>
                             <Separator />
 
+                            {/* Error handling for vendor organizations */}
+                            {vendorOrgsError && (
+                                <Alert variant="destructive">
+                                    <AlertDescription>
+                                        Error loading vendor organizations: {vendorOrgsError instanceof Error ? vendorOrgsError.message : 'Unknown error'}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {/* Loading state indicator */}
+                            {isLoadingVendors && (
+                                <Alert>
+                                    <AlertDescription>
+                                        Loading vendor organizations...
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
                             {vendorFields.length === 0 && (
                                 <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
                                     No vendors selected. Click "Add Vendor" to start.
@@ -381,7 +462,8 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 {vendorFields.map((field, index) => {
                                     // Logic to filter Person dropdown based on Org selection for THIS specific row
                                     const currentOrgId = form.watch(`vendorRows.${index}.orgId`);
-                                    const selectedOrg = allowedVendors?.find(v => String(v.id) === currentOrgId);
+                                    // const selectedOrg = allowedVendors?.find(v => String(v.id) === currentOrgId);
+                                    const selectedOrg = allVendorOrganizations?.find(v => String(v.id) === currentOrgId);
                                     const personOptions = selectedOrg?.persons.map(p => ({
                                         label: p.name,
                                         value: String(p.id)
@@ -398,8 +480,6 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                                     label="Organization"
                                                     placeholder="Select Organization"
                                                     options={vendorOrgOptions}
-                                                    // Reset person selection if org changes
-                                                    onChange={() => form.setValue(`vendorRows.${index}.personIds`, [])}
                                                 />
                                             </div>
 
@@ -410,7 +490,6 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                                     label="Contact Persons"
                                                     placeholder={currentOrgId ? "Select people..." : "Select Organization first"}
                                                     options={personOptions}
-                                                    disabled={!currentOrgId}
                                                 />
                                             </div>
 

@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,8 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
 import type { FdrDashboardRow, FdrDashboardTab } from './helpers/fdr.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
-import { FdrActionForm } from './components/FdrActionForm';
+import { tenderNameCol } from '@/components/data-grid/columns';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 const TABS_CONFIG: Array<{ key: FdrDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -83,15 +87,19 @@ const getStatusVariant = (status: string | null): string => {
 
 const FdrListPage = () => {
     const [activeTab, setActiveTab] = useState<FdrDashboardTab>('pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<FdrDashboardRow | null>(null);
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -110,7 +118,7 @@ const FdrListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useFdrDashboardCounts();
@@ -118,44 +126,42 @@ const FdrListPage = () => {
     const fdrData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: FdrDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: FdrDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
-
     const fdrActions: ActionItem<FdrDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<FdrDashboardRow>[]>(
         () => [
-            dateCol<FdrDashboardRow>('fdrCreationDate', {
-                headerName: 'FDR Creation Date',
-                width: 160,
+            {
+                field: 'fdrCreationDate',
+                headerName: 'FDR Date',
+                width: 110,
                 colId: 'fdrCreationDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
             {
                 field: 'fdrNo',
                 headerName: 'FDR No',
-                width: 120,
+                width: 130,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
@@ -164,21 +170,22 @@ const FdrListPage = () => {
             {
                 field: 'beneficiaryName',
                 headerName: 'Beneficiary name',
-                width: 180,
+                maxWidth: 200,
                 colId: 'beneficiaryName',
                 valueGetter: (params) => params.data?.beneficiaryName || '—',
                 sortable: true,
                 filter: true,
             },
-            currencyCol<FdrDashboardRow>('fdrAmount', {
-                field:'fdrAmount',
+            {
+                field: 'fdrAmount',
                 headerName: 'FDR Amount',
                 width: 130,
                 colId: 'fdrAmount',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             tenderNameCol<FdrDashboardRow>('tenderNo', {
-                field:'tenderNo',
+                field: 'tenderNo',
                 headerName: 'Tender Name',
                 width: 200,
                 colId: 'tenderNo',
@@ -202,12 +209,20 @@ const FdrListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            dateCol<FdrDashboardRow>('expiry', {
+            {
+                field: 'expiry',
                 headerName: 'Expiry',
                 width: 120,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
             {
                 field: 'fdrStatus',
                 headerName: 'FDR Status',
@@ -296,18 +311,6 @@ const FdrListPage = () => {
                                 Track and manage Fixed Deposit Receipts for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -315,7 +318,7 @@ const FdrListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as FdrDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -332,6 +335,25 @@ const FdrListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -355,6 +377,9 @@ const FdrListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -374,22 +399,6 @@ const FdrListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <FdrActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        fdrNo: selectedInstrument.fdrNo || undefined,
-                        fdrDate: selectedInstrument.fdrCreationDate || undefined,
-                        amount: selectedInstrument.fdrAmount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

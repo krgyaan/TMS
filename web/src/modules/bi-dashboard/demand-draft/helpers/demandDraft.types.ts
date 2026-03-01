@@ -11,16 +11,18 @@ export type DemandDraftDashboardFilters = {
 
 export interface DemandDraftDashboardRow {
     id: number;
+    requestId: number;
+    purpose: string | null;
     ddCreationDate: Date | null;
     ddNo: string | null;
     beneficiaryName: string | null;
     ddAmount: number | null;
-    tenderName: string | null;
     tenderNo: string | null;
+    tenderName: string | null;
     bidValidity: Date | null;
     tenderStatus: string | null;
-    member: string | null;
-    expiry: Date | null;
+    teamMember: string | null;
+    expiry: string | null;
     ddStatus: string | null;
 }
 

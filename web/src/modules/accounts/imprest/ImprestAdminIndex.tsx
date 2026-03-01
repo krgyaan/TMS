@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DataTable from "@/components/ui/data-table";
-import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText } from "lucide-react";
+import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText, IndianRupee, Plus } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
 import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { GridApi } from "ag-grid-community";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PayImprestDialog } from "./components/PayImprestDialog";
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -29,29 +30,52 @@ const ImprestAdminIndex: React.FC = () => {
     const [searchText, setSearchText] = useState("");
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
 
+    const [payImprestUser, setPayImprestUser] = useState<{
+        userId: number;
+        userName: string;
+    } | null>(null);
+
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
-    const { isAdmin, isSuperUser } = useAuth();
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
     console.log("Fetched employee imprest summary data:", data);
 
+    const canView = canRead("accounts.imprests");
+
+    useEffect(() => {
+        if (!canView) {
+            navigate(paths.shared.imprest);
+        }
+    }, [canView, navigate]);
+
     const imprestActions: ActionItem<EmployeeImprestSummary>[] = [
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
+            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
         },
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestPaymentHistory(row.userId)),
+            onClick: row => navigate(paths.shared.imprestPaymentHistoryByUser(row.userId)),
         },
         {
             label: "Voucher",
             icon: <FileText className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
+            onClick: row => navigate(paths.shared.imprestVoucherByUser(row.userId)),
+        },
+        {
+            label: "Pay Imprest",
+            icon: <IndianRupee className="h-4 w-4" />,
+            onClick: row =>
+                setPayImprestUser({
+                    userId: row.userId,
+                    userName: row.userName,
+                }),
         },
     ];
 
@@ -79,7 +103,7 @@ const ImprestAdminIndex: React.FC = () => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
+                        <a href={paths.shared.imprestUser(userId)} className="underline inline-flex items-center gap-1">
                             {p.value}
                             <ExternalLink className="h-3 w-3" />
                         </a>
@@ -254,6 +278,15 @@ const ImprestAdminIndex: React.FC = () => {
                             }}
                             className="w-64"
                         />
+
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistory)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Payment History
+                        </Button>
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Vouchers
+                        </Button>
                     </div>
                 </CardHeader>
 
@@ -269,6 +302,10 @@ const ImprestAdminIndex: React.FC = () => {
                     />
                 </CardContent>
             </Card>
+
+            {payImprestUser && (
+                <PayImprestDialog open={!!payImprestUser} onOpenChange={() => setPayImprestUser(null)} userId={payImprestUser.userId} userName={payImprestUser.userName} />
+            )}
         </div>
     );
 };

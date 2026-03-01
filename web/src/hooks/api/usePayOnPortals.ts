@@ -23,7 +23,14 @@ export const usePayOnPortalDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<PayOnPortalDashboardRow>>({
         queryKey: payOnPortalsKey.list(queryKeyFilters),
@@ -49,6 +56,19 @@ export const usePayOnPortalDashboardCounts = () => {
             const result = await payOnPortalsService.getCounts();
             return result;
         },
+    });
+
+    return query;
+};
+
+export const usePayOnPortalDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: payOnPortalsKey.detail(id),
+        queryFn: async () => {
+            const result = await payOnPortalsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
     });
 
     return query;

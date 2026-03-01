@@ -16,7 +16,8 @@ class CostingApprovalsService extends BaseApiService {
     }
 
     async getAll(
-        params?: CostingApprovalListParams
+        params?: CostingApprovalListParams,
+        teamId?: number
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const search = new URLSearchParams();
 
@@ -36,6 +37,12 @@ class CostingApprovalsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+        }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
         }
 
         const queryString = search.toString();
@@ -58,8 +65,13 @@ class CostingApprovalsService extends BaseApiService {
         return this.patch<TenderCostingSheet>(`/${id}`, data);
     }
 
-    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
-        return this.get<CostingApprovalDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<CostingApprovalDashboardCounts> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<CostingApprovalDashboardCounts>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 }
 

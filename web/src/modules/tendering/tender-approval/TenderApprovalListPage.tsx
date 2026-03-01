@@ -1,4 +1,4 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -11,7 +11,7 @@ import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/a
 import type { TenderApprovalWithTimer } from './helpers/tenderApproval.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
@@ -19,6 +19,9 @@ import { tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
 type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
@@ -33,11 +36,20 @@ const TenderApprovalListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -52,7 +64,7 @@ const TenderApprovalListPage = () => {
 
     const { data: apiResponse, isLoading: loading, error } = useTenderApprovals(
         activeTab,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: search || undefined },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -85,6 +97,16 @@ const TenderApprovalListPage = () => {
                 navigate(paths.tendering.tenderApprovalView(tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: 'Change Status',
+            onClick: (row: any) => {
+                const tenderId = row.tenderId || row.id;
+                if (tenderId) {
+                    setChangeStatusModal({ open: true, tenderId });
+                }
+            },
+            icon: <RefreshCw className="h-4 w-4" />,
         },
     ];
 
@@ -137,7 +159,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Due Date/Time',
             width: 150,
             colId: 'dueDate',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 if (!params.data?.dueDate) return '—';
                 return formatDateTime(params.data.dueDate);
             },
@@ -149,7 +171,7 @@ const TenderApprovalListPage = () => {
             headerName: 'Tender Value',
             width: 130,
             colId: 'gstValues',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.gstValues;
                 if (value === null || value === undefined) return '—';
                 return formatINR(value);
@@ -162,7 +184,7 @@ const TenderApprovalListPage = () => {
             headerName: 'EMD',
             width: 100,
             colId: 'emd',
-            valueGetter: (params: any) => {
+            cellRenderer: (params: any) => {
                 const value = params.data?.emd;
                 if (value === null || value === undefined) return '—';
                 return formatINR(value);
@@ -218,7 +240,7 @@ const TenderApprovalListPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data.timer;
@@ -288,32 +310,21 @@ const TenderApprovalListPage = () => {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Tender Approvals</CardTitle>
-                        <CardDescription className="mt-2">
-                            Review and approve tender decisions.
-                        </CardDescription>
-                    </div>
-                    <CardAction>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by tender name, number, value, due date, member, item..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10"
-                            />
+        <>
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Tender Approvals</CardTitle>
+                            <CardDescription className="mt-2">
+                                Review and approve tender decisions.
+                            </CardDescription>
                         </div>
-                    </CardAction>
-                </div>
-            </CardHeader>
-            <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
-                    <div className="flex flex-col gap-4 mb-4 px-6">
-                        <TabsList className="m-auto">
+                    </div>
+                </CardHeader>
+                <CardContent className="px-0">
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
+                        <TabsList className="m-auto mb-4">
                             {tabsConfig.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -329,48 +340,85 @@ const TenderApprovalListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
-                    </div>
 
-                    {tabsConfig.map((tab) => (
-                        <TabsContent
-                            key={tab.key}
-                            value={tab.key}
-                            className="px-0 m-0 data-[state=inactive]:hidden"
-                        >
-                            {activeTab === tab.key && (
-                                <>
-                                    {(!approvalData || approvalData.length === 0) ? (
-                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                                            <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
-                                        </div>
-                                    ) : (
-                                        <DataTable
-                                            data={approvalData}
-                                            columnDefs={colDefs as ColDef<any>[]}
-                                            loading={loading}
-                                            manualPagination={true}
-                                            rowCount={totalRows}
-                                            paginationState={pagination}
-                                            onPaginationChange={setPagination}
-                                            gridOptions={{
-                                                defaultColDef: {
-                                                    editable: false,
-                                                    filter: true,
-                                                    sortable: true,
-                                                    resizable: true
-                                                },
-                                                onSortChanged: handleSortChanged,
-                                                overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
-                                            }}
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </TabsContent>
-                    ))}
-                </Tabs>
-            </CardContent>
-        </Card>
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'This Week', value: 'this-week' },
+                                { label: 'This Month', value: 'this-month' },
+                                { label: 'This Year', value: 'this-year' },
+                            ]} value={search} onChange={(value) => setSearch(value)} />
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {tabsConfig.map((tab) => (
+                            <TabsContent
+                                key={tab.key}
+                                value={tab.key}
+                                className="px-0 m-0 data-[state=inactive]:hidden"
+                            >
+                                {activeTab === tab.key && (
+                                    <>
+                                        {(!approvalData || approvalData.length === 0) ? (
+                                            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                                <p className="text-lg font-medium">No {tab.name.toLowerCase()} tenders</p>
+                                            </div>
+                                        ) : (
+                                            <DataTable
+                                                data={approvalData}
+                                                columnDefs={colDefs as ColDef<any>[]}
+                                                loading={loading}
+                                                manualPagination={true}
+                                                rowCount={totalRows}
+                                                paginationState={pagination}
+                                                onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
+                                                gridOptions={{
+                                                    defaultColDef: {
+                                                        editable: false,
+                                                        filter: true,
+                                                        sortable: true,
+                                                        resizable: true
+                                                    },
+                                                    onSortChanged: handleSortChanged,
+                                                    overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No tenders found</span>',
+                                                }}
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                </CardContent>
+            </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
+        </>
     );
 };
 

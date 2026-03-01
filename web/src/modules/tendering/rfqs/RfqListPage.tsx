@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -7,26 +7,40 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { RfqDashboardRow, RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList, List } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
 const Rfqs = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb'>('pending');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -45,7 +59,7 @@ const Rfqs = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useRfqsDashboardCounts();
@@ -55,7 +69,20 @@ const Rfqs = () => {
 
     const deleteMutation = useDeleteRfq();
 
-    const rfqsActions: ActionItem<RfqDashboardRowWithTimer>[] = [
+    const rfqsActions = useMemo<ActionItem<RfqDashboardRowWithTimer>[]>(() => [
+        {
+            label: 'Record Receipt',
+            onClick: (row: RfqDashboardRowWithTimer) => {
+                if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
+            },
+            icon: <ClipboardList className="h-4 w-4" />,
+            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
+        },
+        {
+            label: 'Change Status',
+            onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            icon: <RefreshCw className="h-4 w-4" />,
+        },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
@@ -76,9 +103,8 @@ const Rfqs = () => {
                 }
             },
             icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: RfqDashboardRowWithTimer) => row.rfqId !== null,
         },
-    ];
+    ], [activeTab, navigate, deleteMutation]);
 
     const tabsConfig = useMemo(() => {
         return [
@@ -91,6 +117,11 @@ const Rfqs = () => {
                 key: 'sent' as const,
                 name: 'RFQ Sent',
                 count: counts?.sent ?? 0,
+            },
+            {
+                key: 'responses' as const,
+                name: 'Responses Recorded',
+                count: counts?.responses ?? 0,
             },
             {
                 key: 'rfq-rejected' as const,
@@ -128,15 +159,64 @@ const Rfqs = () => {
             colId: 'dueDate',
         }),
         {
+            field: 'rfqCount',
+            headerName: 'Total RFQs',
+            width: 120,
+            colId: 'rfqCount',
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const count = data?.rfqCount ?? 0;
+                return (
+                    <Badge variant="outline">
+                        {count} sent
+                    </Badge>
+                );
+            },
+            visible: activeTab === 'sent' || activeTab === 'responses',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'responseCount',
+            headerName: 'Resp Recorded',
+            width: 130,
+            colId: 'responseCount',
+            cellRenderer: (params: any) => {
+                const count = params.data?.responseCount ?? 0;
+                return (
+                    <Badge variant={count > 0 ? 'success' : 'secondary'}>
+                        {count} Responses
+                    </Badge>
+                );
+            },
+            visible: activeTab === 'responses',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
             width: 150,
             colId: 'vendorOrganizationNames',
-            valueGetter: (params) => {
+            cellRenderer: (params: any) => {
                 const names = params.data?.vendorOrganizationNames;
-                if (!names) return '—';
-
-                return names;
+                if (!names) return <p>—</p>;
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Badge variant="secondary">
+                                {names.split(',').length} vendors
+                            </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <ul className="list-disc list-inside font-medium">
+                                {names.split(',').map((name: string) => (
+                                    <li key={name}>{name}</li>
+                                ))}
+                            </ul>
+                        </TooltipContent>
+                    </Tooltip>
+                );
             },
             sortable: true,
             filter: true,
@@ -241,23 +321,17 @@ const Rfqs = () => {
                             Review and approve RFQs.
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-8 w-64"
-                            />
-                        </div>
-                    </div>
+                    <CardAction>
+                        <Button variant="outline" onClick={() => navigate(paths.tendering.rfqsResponses)}>
+                            <List className="h-4 w-4" />
+                            View All Responses
+                        </Button>
+                    </CardAction>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb')}>
-                    <TabsList className="m-auto">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb')}>
+                    <TabsList className="m-auto mb-4 flex flex-wrap justify-center h-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -271,6 +345,31 @@ const Rfqs = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -289,7 +388,9 @@ const Rfqs = () => {
                                                     ? 'Tenders requiring RFQs will appear here'
                                                     : tab.key === 'sent'
                                                         ? 'Sent RFQs will be shown here'
-                                                        : tab.key === 'rfq-rejected'
+                                                        : tab.key === 'responses'
+                                                            ? 'RFQs with recorded responses will be shown here'
+                                                            : tab.key === 'rfq-rejected'
                                                             ? 'Rejected RFQs will be shown here'
                                                             : 'Tender DNB RFQs will be shown here'}
                                             </p>
@@ -303,6 +404,9 @@ const Rfqs = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -321,6 +425,15 @@ const Rfqs = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

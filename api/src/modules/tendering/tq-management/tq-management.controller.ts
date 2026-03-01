@@ -1,14 +1,4 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    Query,
-    Logger
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
 import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
 import type {
     CreateTqReceivedDto,
@@ -20,20 +10,23 @@ import type {
 } from './dto/tq-management.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 @Controller('tq-management')
 export class TqManagementController {
     private readonly logger = new Logger(TqManagementController.name);
     constructor(
         private readonly tqManagementService: TqManagementService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tabKey') tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         @Query('tab') tab?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -42,8 +35,13 @@ export class TqManagementController {
     ) {
         // Use tabKey if provided, otherwise fall back to tab for backward compatibility
         const activeTab = tabKey || tab;
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
 
-        const result = await this.tqManagementService.getDashboardData(activeTab, {
+        const result = await this.tqManagementService.getDashboardData(user, parseNumber(teamId), activeTab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -53,19 +51,7 @@ export class TqManagementController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'tq_replied');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'tq_replied');
                 return {
                     ...tender,
                     timer
@@ -80,8 +66,16 @@ export class TqManagementController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.tqManagementService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tqManagementService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('tender/:tenderId')

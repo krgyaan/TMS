@@ -11,6 +11,8 @@ export type PayOnPortalDashboardFilters = {
 
 export interface PayOnPortalDashboardRow {
     id: number;
+    requestId: number;
+    purpose: string | null;
     date: Date | null;
     teamMember: string | null;
     utrNo: string | null;

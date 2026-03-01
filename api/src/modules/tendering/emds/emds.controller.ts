@@ -4,7 +4,8 @@ import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSch
 import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 // Extend Express Request to include user
 interface AuthenticatedRequest extends Request {
@@ -21,39 +22,33 @@ export class EmdsController {
     private readonly logger = new Logger(EmdsController.name);
     constructor(
         private readonly emdsService: EmdsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('/')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query() query: unknown,
-        @Req() req: AuthenticatedRequest,
+        @Query('teamId') teamId?: string,
     ): Promise<DashboardResponse> {
         const parsed = DashboardQuerySchema.parse(query);
-        // Use current user's ID if not provided in query
-        const userId = parsed.userId ?? req.user?.id;
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
         const result = await this.emdsService.getDashboardData(
             parsed.tab as DashboardTab ?? 'pending',
-            userId,
+            user,
+            parseNumber(teamId),
             parsed.page && parsed.limit ? { page: parsed.page, limit: parsed.limit } : undefined,
-            parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined
+            parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined,
+            parsed.search
         );
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'emd_requested');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'emd_request');
                 return {
                     ...tender,
                     timer
@@ -69,10 +64,15 @@ export class EmdsController {
 
     @Get('/dashboard/counts')
     async getDashboardCounts(
-        @Req() req: AuthenticatedRequest,
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
     ): Promise<DashboardCounts> {
-        const userId = req.user?.id;
-        return this.emdsService.getDashboardCounts(userId);
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.emdsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Post('tenders/:tenderId')

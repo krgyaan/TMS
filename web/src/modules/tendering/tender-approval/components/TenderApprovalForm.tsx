@@ -24,7 +24,8 @@ import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/te
 import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
-import { dummyFinancialDocuments, dummyTechnicalDocuments } from '../../info-sheet/helpers/tenderInfoSheet.types';
+import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
+import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
 
 interface TenderApprovalFormProps {
     tenderId: number;
@@ -66,7 +67,36 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
     );
 };
 
-const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+const getOptionLabel = (
+    options: Array<{ value: string; label: string }> | undefined,
+    raw: string | number | null | undefined,
+) => {
+    if (raw === null || raw === undefined) return "—"
+    const rawStr = String(raw).trim()
+    if (!rawStr) return "—"
+
+    if (!options || options.length === 0) {
+        return rawStr
+    }
+
+    const match = options.find((option) => option.value === rawStr)
+    if (match) {
+        return match.label
+    }
+
+    // If it's already a descriptive string, keep it as-is
+    if (isNaN(Number(rawStr))) {
+        return rawStr
+    }
+
+    // Fallback to the raw id string when no label is found
+    return rawStr
+}
+
+const formatDocuments = (
+    documents: string[] | Array<{ id?: number; documentName: string }> = [],
+    options?: Array<{ value: string; label: string }>,
+) => {
     if (!documents.length) {
         return <span className="text-muted-foreground">No documents listed</span>
     }
@@ -75,14 +105,31 @@ const formatDocuments = (documents: string[] | Array<{ id?: number; documentName
         <div className="flex flex-wrap gap-2">
             {documents.map((doc, index) => {
                 // Handle both string arrays and object arrays
-                const docName = typeof doc === 'string' ? doc : doc.documentName;
-                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+                if (typeof doc === "string") {
+                    const label = options ? getOptionLabel(options, doc) : doc
+                    if (!label || label === "—") {
+                        return null
+                    }
+                    return (
+                        <Badge key={doc} variant="outline">
+                            {label}
+                        </Badge>
+                    )
+                }
+
+                const rawName = doc.documentName
+                const docKey = doc.id ?? rawName ?? index
+                const label = options ? getOptionLabel(options, rawName) : rawName
+
+                if (!label || label === "—") {
+                    return null
+                }
 
                 return (
                     <Badge key={docKey} variant="outline">
-                        {docName}
+                        {label}
                     </Badge>
-                );
+                )
             })}
         </div>
     )
@@ -94,6 +141,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const { data: statuses, isLoading: isStatusesLoading } = useStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     const isSubmitting = createApproval.isPending || updateApproval.isPending;
     const isPageLoading = isParentLoading || isVendorOrgsLoading || isStatusesLoading;
@@ -132,6 +181,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     }, [form.formState.errors]);
 
     const tlDecision = form.watch('tlDecision');
+    const rfqRequired = form.watch('rfqRequired');
     const tenderStatus = form.watch('tenderStatus');
     const techDocs = form.watch('approvePqrSelection');
     const finDocs = form.watch('approveFinanceDocSelection');
@@ -146,6 +196,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -157,6 +209,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -170,6 +224,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('remarks', undefined);
         } else if (tlDecision === '0') {
             // Clear all conditional fields
+            form.setValue('rfqRequired', undefined);
+            form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -185,6 +241,19 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         }
     }, [tlDecision, form]);
 
+    // Clear fields when rfqRequired changes
+    useEffect(() => {
+        if (tlDecision === '1') {
+            if (rfqRequired === 'yes') {
+                // Clear quotation files when switching to RFQ required
+                form.setValue('quotationFiles', []);
+            } else if (rfqRequired === 'no') {
+                // Clear vendor selection when switching to quotation files
+                form.setValue('rfqTo', []);
+            }
+        }
+    }, [rfqRequired, tlDecision, form]);
+
     const vendorOrgOptions = useMemo(() =>
         vendorOrganizations?.map(org => ({ value: String(org.id), label: org.name })) ?? [],
         [vendorOrganizations]
@@ -194,6 +263,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         statuses?.filter(s => s.tenderCategory === 'dnb').map(s => ({ value: String(s.id), label: s.name })) ?? [],
         [statuses]
     );
+
+    const rfqRequiredOptions = useMemo(() => [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+    ], []);
 
     const processingFeeModeOptions = useMemo(() =>
         infoSheet?.processingFeeMode?.map(mode => ({ value: mode, label: mode })) ?? [],
@@ -319,15 +393,43 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
                         {tlDecision === '1' && (
                             <div className="space-y-8 animate-in fade-in-50 duration-300">
-                                <div className="space-y-4">
-                                    <h4 className="font-semibold text-base text-primary border-b pb-2">Bidding Details</h4>
-                                    <MultiSelectField
+                                <div className="grid gap-2 md:grid-cols-2 items-start">
+                                    <SelectField
                                         control={form.control}
-                                        name="rfqTo"
-                                        label="Send RFQ to"
-                                        options={vendorOrgOptions}
-                                        placeholder="Select vendors"
+                                        name="rfqRequired"
+                                        label="RFQ Required"
+                                        options={rfqRequiredOptions}
+                                        placeholder="Select if RFQ is required"
                                     />
+                                    {form.formState.errors.rfqRequired && (
+                                        <p className="text-sm text-destructive mt-1">{form.formState.errors.rfqRequired.message}</p>
+                                    )}
+
+                                    {rfqRequired === 'yes' && (
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="rfqTo"
+                                            label="Send RFQ to"
+                                            options={vendorOrgOptions}
+                                            placeholder="Select vendors"
+                                        />
+                                    )}
+
+                                    {rfqRequired === 'no' && (
+                                        <div className="space-y-2">
+                                            <TenderFileUploader
+                                                context="rfq-response-quotation"
+                                                value={form.watch('quotationFiles') || []}
+                                                onChange={(paths) => form.setValue('quotationFiles', paths)}
+                                                label="Upload quotation files"
+                                            />
+                                            {form.formState.errors.quotationFiles && (
+                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.quotationFiles.message}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
                                             <SelectField
@@ -417,7 +519,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <h4 className="font-semibold text-base text-primary border-b pb-2">Document Approval</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <SelectField
@@ -429,7 +530,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet.technicalWorkOrders && infoSheet.technicalWorkOrders?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [])}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [], pqrOptions)}
                                                 </div>
                                             )}
                                             {
@@ -439,7 +540,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                             control={form.control}
                                                             name="alternativeTechnicalDocs"
                                                             label="Alternative Technical Docs"
-                                                            options={dummyTechnicalDocuments}
+                                                            options={pqrOptions}
                                                             placeholder="Select documents"
                                                         />
                                                         {form.formState.errors.alternativeTechnicalDocs && (
@@ -459,7 +560,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet.commercialDocuments && infoSheet.commercialDocuments?.length > 0 && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [])}
+                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [], financeDocumentOptions)}
                                                 </div>
                                             )}
                                             {
@@ -469,7 +570,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                             control={form.control}
                                                             name="alternativeFinancialDocs"
                                                             label="Alternative Financial Docs"
-                                                            options={dummyFinancialDocuments}
+                                                            options={financeDocumentOptions}
                                                             placeholder="Select documents"
                                                         />
                                                         {form.formState.errors.alternativeFinancialDocs && (

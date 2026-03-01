@@ -14,27 +14,15 @@ const BaseActionFormSchema = z.object({
 
 // Cheque Action Form Schema
 export const ChequeActionFormSchema = BaseActionFormSchema.extend({
-    // Accounts Form (CHQ) 1 - Request to Bank
+    // Accounts Form
     cheque_req: z.enum(['Accepted', 'Rejected']).optional(),
     reason_req: z.string().optional(),
-    cheque_format_imran: z.any().optional(), // File
-    prefilled_signed_cheque: z.array(z.any()).optional(), // Files
-
-    // Accounts Form (CHQ) 2 - After Cheque Creation
     cheque_no: z.string().optional(),
-    cheque_date: z.string().optional(),
-    cheque_amount: z.coerce.number().optional(),
-    cheque_type: z.string().optional(),
-    cheque_reason: z.string().optional(),
     due_date: z.string().optional(),
-    courier_request_no: z.string().optional(),
-    remarks: z.string().optional(),
-
-    // Accounts Form (CHQ) 3 - Capture Cheque Details
+    receiving_cheque_handed_over: z.any().optional(), // File
     cheque_images: z.array(z.any()).max(2, 'Maximum 2 cheque images allowed').optional(), // Files (max 2)
-    cheque_charges: z.coerce.number().optional(),
-    stamp_charges: z.coerce.number().optional(),
-    other_charges: z.coerce.number().optional(),
+    positive_pay_confirmation: z.any().optional(), // File
+    remarks: z.string().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
@@ -46,10 +34,6 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     stop_remarks: z.string().optional().nullable(),
     proof_image: z.any().optional(), // File
 
-    // Returned via courier
-    docket_no: z.string().optional(),
-    docket_slip: z.any().optional(), // File
-
     // Stop the cheque from the bank
     stop_reason_text: z.string().optional(),
 
@@ -59,20 +43,10 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     amount: z.coerce.number().optional(),
 
     // Deposited in Bank
-    bt_transfer_date: z.string().optional(),
     reference: z.string().optional(),
 
     // Cancelled/Torn
     cancelled_image_path: z.any().optional(), // File
-
-    // Request Cancellation
-    covering_letter: z.any().optional(), // File
-    cancellation_remarks: z.string().optional(),
-
-    // Cheque Cancellation Confirmation
-    cheque_cancellation_date: z.string().optional(),
-    cheque_cancellation_amount: z.coerce.number().optional(),
-    cheque_cancellation_reference_no: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
@@ -160,15 +134,28 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Action 5: bt_transfer_date, reference are required
+        // Action 1: When Accepted, cheque_no, receiving_cheque_handed_over, cheque_images, positive_pay_confirmation, remarks are required
+        if (data.action === 'accounts-form-1' && data.cheque_req === 'Accepted') {
+            return !!data.cheque_no && !!data.receiving_cheque_handed_over &&
+                data.cheque_images && data.cheque_images.length > 0;
+        }
+        return true;
+    },
+    {
+        message: 'Cheque number, receiving cheque handed over, and cheque images are required when accepted',
+        path: ['cheque_no'],
+    }
+).refine(
+    (data) => {
+        // Action 5: transfer_date, reference are required
         if (data.action === 'deposited-in-bank') {
-            return !!data.bt_transfer_date && !!data.reference;
+            return !!data.transfer_date && !!data.reference;
         }
         return true;
     },
     {
         message: 'Transfer date and reference are required',
-        path: ['bt_transfer_date'],
+        path: ['transfer_date'],
     }
 ).refine(
     (data) => {
@@ -181,17 +168,6 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'Cancelled image is required',
         path: ['cancelled_image_path'],
-    }
-).refine(
-    (data) => {
-        if (data.action === 'accounts-form-3') {
-            return data.cheque_images && data.cheque_images.length <= 2;
-        }
-        return true;
-    },
-    {
-        message: 'Maximum 2 cheque images allowed',
-        path: ['cheque_images'],
     }
 );
 

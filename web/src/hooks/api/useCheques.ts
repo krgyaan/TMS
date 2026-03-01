@@ -23,7 +23,14 @@ export const useChequeDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<ChequeDashboardRow>>({
         queryKey: chequesKey.list(queryKeyFilters),
@@ -49,6 +56,19 @@ export const useChequeDashboardCounts = () => {
             const result = await chequesService.getCounts();
             return result;
         },
+    });
+
+    return query;
+};
+
+export const useChequeDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: chequesKey.detail(id),
+        queryFn: async () => {
+            const result = await chequesService.getById(id);
+            return result;
+        },
+        enabled: !!id,
     });
 
     return query;

@@ -1,5 +1,6 @@
 export interface BankGuaranteeDashboardRow {
     id: number;
+    requestId: number;
     bgDate: Date | null;
     bgNo: string | null;
     beneficiaryName: string | null;
@@ -15,7 +16,6 @@ export interface BankGuaranteeDashboardRow {
     fdrNo: string | null;
     fdrValue: number | null;
     tenderStatus: string | null;
-    expiry: Date | null;
     expiryStatus: string | null;
     bgStatus: string | null;
 }

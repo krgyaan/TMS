@@ -108,7 +108,7 @@ export type UpdateCostingSheetDto = {
     teRemarks: string;
 };
 
-export type TabKey = 'pending' | 'approved' | 'tender-dnb';
+export type CostingApprovalTab = 'pending' | 'approved' | 'tender-dnb';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -150,9 +150,10 @@ export type RejectCostingDto = {
 };
 
 export type CostingApprovalListParams = {
-    tab?: TabKey;
+    tab?: CostingApprovalTab;
     page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 };

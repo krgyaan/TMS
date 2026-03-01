@@ -43,6 +43,11 @@ export class ChequeController {
         return this.chequeService.getDashboardCounts();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.chequeService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

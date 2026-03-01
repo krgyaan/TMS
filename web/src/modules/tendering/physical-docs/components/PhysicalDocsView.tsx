@@ -1,42 +1,33 @@
 import React from 'react';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface PhysicalDocsViewProps {
     physicalDoc: PhysicalDocs | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function PhysicalDocsView({
     physicalDoc,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: PhysicalDocsViewProps) {
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -47,29 +38,16 @@ export function PhysicalDocsView({
     if (!physicalDoc) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-4 w-4" />
                         Physical Documents
                     </CardTitle>
-                    <CardAction className="flex gap-2">
-                        {showEditButton && onEdit && (
-                            <Button variant="default" size="sm" onClick={onEdit}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Create Physical Docs
-                            </Button>
-                        )}
-                        {showBackButton && onBack && (
-                            <Button variant="outline" size="sm" onClick={onBack}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
-                            </Button>
-                        )}
-                    </CardAction>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                        No physical documents information available yet.
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Package className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No physical documents information available yet.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -83,20 +61,6 @@ export function PhysicalDocsView({
                     <Package className="h-5 w-5 text-blue-500" />
                     Physical Documents Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -118,11 +82,29 @@ export function PhysicalDocsView({
                                 Submitted Documents
                             </TableCell>
                             <TableCell className="text-sm">
-                                {physicalDoc.submittedDocs ? (
-                                    <div className="bg-muted/30 p-3 rounded-md">
-                                        {physicalDoc.submittedDocs}
-                                    </div>
-                                ) : (
+                                {physicalDoc.submittedDocs ? (() => {
+                                    let docIds: string[] = [];
+                                    try {
+                                        const parsed = JSON.parse(physicalDoc.submittedDocs);
+                                        if (Array.isArray(parsed)) {
+                                            docIds = parsed.filter(Boolean);
+                                        } else {
+                                            docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
+                                        }
+                                    } catch {
+                                        docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
+                                    }
+
+                                    return docIds.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {docIds.map((docId, idx) => (
+                                                <Badge key={idx} variant="outline">
+                                                    {docId}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    ) : '—';
+                                })() : (
                                     '—'
                                 )}
                             </TableCell>

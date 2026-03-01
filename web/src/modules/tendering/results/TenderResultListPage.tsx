@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,6 +18,9 @@ import type { ResultDashboardRow, ResultDashboardType } from '@/modules/tenderin
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -77,10 +80,19 @@ const TenderResultListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -99,7 +111,7 @@ const TenderResultListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useResultDashboardCounts();
@@ -107,39 +119,31 @@ const TenderResultListPage = () => {
     const resultData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: ResultDashboardRow) => {
-        if (row.id) return navigate(paths.tendering.resultsShow(row.tenderId));
-    }, [navigate]);
-
-    const handleUploadResult = useCallback((row: ResultDashboardRow) => {
-        if (row.id) return navigate(paths.tendering.resultsUpload(row.tenderId));
-        return navigate(paths.tendering.resultsEdit(row.tenderId));
-    }, [navigate]);
-
-    const handleViewRa = useCallback((row: ResultDashboardRow) => {
-        if (row.reverseAuctionId) return navigate(paths.tendering.rasShow(row.reverseAuctionId));
-    }, [navigate]);
-
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
             {
+                label: 'Change Status',
+                icon: <RefreshCw className="h-4 w-4" />,
+                onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            },
+            {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: ResultDashboardRow) => navigate(paths.tendering.resultsShow(row.tenderId)),
             },
             {
                 label: 'Upload Result',
                 icon: <Upload className="h-4 w-4" />,
-                onClick: handleUploadResult,
+                onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.id)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
             },
             {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
-                onClick: handleViewRa,
+                onClick: (row: ResultDashboardRow) => navigate(paths.tendering.rasShow(row.reverseAuctionId!)),
                 visible: (row) => row.raApplicable && !!row.reverseAuctionId,
             },
         ],
-        [handleViewDetails, handleUploadResult, handleViewRa]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<ResultDashboardRow>[]>(
@@ -147,14 +151,14 @@ const TenderResultListPage = () => {
             tenderNameCol<ResultDashboardRow>('tenderNo', {
                 headerName: 'Tender',
                 filter: true,
-                width: 200,
+                width: 250,
                 colId: 'tenderNo',
                 sortable: true,
             }),
             {
                 field: 'teamExecutiveName',
                 headerName: 'Member',
-                width: 100,
+                width: 150,
                 colId: 'teamExecutiveName',
                 valueGetter: (params) => params.data?.teamExecutiveName || '—',
                 sortable: true,
@@ -165,7 +169,7 @@ const TenderResultListPage = () => {
                 headerName: 'Bid Submission',
                 width: 150,
                 colId: 'bidSubmissionDate',
-                valueGetter: (params) =>
+                cellRenderer: (params: any) =>
                     params.data?.bidSubmissionDate
                         ? formatDateTime(params.data.bidSubmissionDate)
                         : '—',
@@ -175,9 +179,9 @@ const TenderResultListPage = () => {
             {
                 field: 'finalPrice',
                 headerName: 'Final Price',
-                width: 110,
+                width: 120,
                 colId: 'finalPrice',
-                valueGetter: (params) => {
+                cellRenderer: (params: any) => {
                     const value = params.data?.finalPrice || params.data?.tenderValue;
                     if (!value) return '—';
                     return formatINR(parseFloat(value));
@@ -197,7 +201,7 @@ const TenderResultListPage = () => {
             {
                 field: 'emdDetails',
                 headerName: 'EMD Details',
-                width: 140,
+                width: 150,
                 colId: 'emdDetails',
                 sortable: true,
                 filter: true,
@@ -270,37 +274,34 @@ const TenderResultListPage = () => {
     const tabsWithData = useMemo(() => {
         return TABS_CONFIG.map((tab) => {
             let count = 0;
+            let totalAmount = 0;
             if (counts) {
                 switch (tab.key) {
                     case 'result-awaited':
                         count = counts.pending ?? 0;
+                        totalAmount = counts.totalAmounts?.pending ?? 0;
                         break;
                     case 'won':
                         count = counts.won ?? 0;
+                        totalAmount = counts.totalAmounts?.won ?? 0;
                         break;
                     case 'lost':
                         count = counts.lost ?? 0;
+                        totalAmount = counts.totalAmounts?.lost ?? 0;
                         break;
                     case 'disqualified':
                         count = counts.disqualified ?? 0;
+                        totalAmount = counts.totalAmounts?.disqualified ?? 0;
                         break;
                 }
             }
             return {
                 ...tab,
                 count,
+                totalAmount,
             };
         });
     }, [counts]);
-
-    // Additional debug logging for derived values
-    useEffect(() => {
-        console.log('=== Derived Values Debug ===');
-        console.log('resultData length:', resultData.length);
-        console.log('resultData:', resultData);
-        console.log('totalRows:', totalRows);
-        console.log('tabsWithData:', tabsWithData);
-    }, [resultData, totalRows, tabsWithData]);
 
     if (isLoading) {
         return (
@@ -352,18 +353,6 @@ const TenderResultListPage = () => {
                                 Track and manage tender results after bid submission.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -388,6 +377,38 @@ const TenderResultListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+                        <div className="flex items-center justify-center">
+                            {tabsWithData.map((tab) => (
+                                <p key={tab.key} className='px-4 text-sm'>{formatINR(tab.totalAmount)}</p>
+                            ))}
+                        </div>
+
+                        {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'This Week', value: 'this-week' },
+                                { label: 'This Month', value: 'this-month' },
+                                { label: 'This Year', value: 'this-year' },
+                            ]}
+                                value={search}
+                                onChange={(value) => setSearch(value)}
+                            />
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -412,6 +433,9 @@ const TenderResultListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -431,6 +455,15 @@ const TenderResultListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </>
     );
 };

@@ -3,7 +3,8 @@ import { TenderApprovalService, type TenderApprovalFilters } from '@/modules/ten
 import { TenderApprovalPayloadSchema, type TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { Logger } from '@nestjs/common';
 
 @Controller('tender-approvals')
@@ -11,19 +12,26 @@ export class TenderApprovalController {
     private readonly logger = new Logger(TenderApprovalController.name);
     constructor(
         private readonly tenderApprovalService: TenderApprovalService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tabKey') tabKey: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        const result = await this.tenderApprovalService.getDashboardData(tabKey, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        const result = await this.tenderApprovalService.getDashboardData(user, parseNumber(teamId), tabKey, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -33,19 +41,7 @@ export class TenderApprovalController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'tender_approval');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'tender_approval');
                 return {
                     ...tender,
                     timer
@@ -60,8 +56,16 @@ export class TenderApprovalController {
     }
 
     @Get('dashboard/counts')
-    async getDashboardCounts() {
-        return this.tenderApprovalService.getCounts();
+    async getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.tenderApprovalService.getCounts(user, parseNumber(teamId));
     }
 
     @Get(':id/approval')

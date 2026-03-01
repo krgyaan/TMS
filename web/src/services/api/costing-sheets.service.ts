@@ -7,7 +7,7 @@ class CostingSheetsService extends BaseApiService {
         super('/costing-sheets');
     }
 
-    async getAll(params?: CostingSheetListParams): Promise<PaginatedResult<CostingSheetDashboardRow>> {
+    async getAll(params?: CostingSheetListParams, teamId?: number): Promise<PaginatedResult<CostingSheetDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {
@@ -26,6 +26,12 @@ class CostingSheetsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+        }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
         }
 
         const queryString = search.toString();
@@ -48,8 +54,13 @@ class CostingSheetsService extends BaseApiService {
         return this.patch<TenderCostingSheet>(`/${id}`, data);
     }
 
-    async getDashboardCounts(): Promise<CostingSheetDashboardCounts> {
-        return this.get<CostingSheetDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<CostingSheetDashboardCounts> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<CostingSheetDashboardCounts>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 
     async checkDriveScopes(): Promise<DriveScopesResponse> {

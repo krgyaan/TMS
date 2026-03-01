@@ -5,6 +5,8 @@ import mysql2 from 'mysql2/promise';
 import { mysqlTable, varchar, bigint, text, decimal, timestamp, datetime } from 'drizzle-orm/mysql-core';
 import { eq, sql } from 'drizzle-orm';
 import { Client } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
     paymentRequests,
     paymentInstruments,
@@ -25,6 +27,27 @@ const config: DatabaseConfig = {
     postgres: process.env.PG_URL || 'postgresql://postgres:gyan@localhost:5432/new_tms',
     mysql: process.env.MYSQL_URL || 'mysql://root:gyan@localhost:3306/mydb',
 };
+
+// Logger Setup
+const LOG_FILE = path.join(process.cwd(), 'migration_errors.json');
+const errorLog: Array<{ table: string; originalId: number; message: string; timestamp: string }> = [];
+
+function logError(table: string, id: number, error: any): void {
+    const errObj = {
+        table,
+        originalId: id,
+        message: error.message || String(error),
+        timestamp: new Date().toISOString(),
+    };
+    console.error(`  ❌ Failed: ${table} ID ${id} - ${errObj.message}`);
+    errorLog.push(errObj);
+    // Write to disk immediately in case of crash
+    try {
+        fs.writeFileSync(LOG_FILE, JSON.stringify(errorLog, null, 2));
+    } catch (writeErr) {
+        console.error('  ⚠ Failed to write error log:', writeErr);
+    }
+}
 
 // ============================================================================
 // MYSQL SCHEMA DEFINITIONS
@@ -250,6 +273,17 @@ async function updateRequestPurpose(ctx: MigrationContext, requestId: number): P
     // Only update once per request
     if (ctx.updatedRequestIds.has(requestId)) return;
 
+    // Validate request exists before updating
+    const request = await ctx.pgDb
+        .select({ id: paymentRequests.id })
+        .from(paymentRequests)
+        .where(eq(paymentRequests.id, requestId))
+        .limit(1);
+
+    if (request.length === 0) {
+        throw new Error(`Payment request ${requestId} not found`);
+    }
+
     await ctx.pgDb
         .update(paymentRequests)
         .set({
@@ -334,11 +368,8 @@ class PopTenderFeesMigrator {
                     instrumentType: 'Portal Payment',
                     amount: Parsers.amount(row.amount),
                     status: status,
-                    currentStage: StatusMapper.getStage(status),
                     action: 1, // Assume action=1 for all tender fees
                     utr: row.utr ?? null,
-                    rejectionReason: row.reason ?? null,
-                    remarks: row.remark ?? null,
                     legacyPortalId: row.id, // Store original ID
                     legacyData: {
                         source_table: 'pop_tender_fees',
@@ -348,6 +379,8 @@ class PopTenderFeesMigrator {
                         utr_msg: row.utr_msg,
                         tender_id: row.tender_id,
                         tender_name: row.tender_name,
+                        reason: row.reason,
+                        remark: row.remark,
                     },
                     createdAt: Parsers.date(row.created_at) ?? new Date(),
                     updatedAt: Parsers.date(row.updated_at) ?? new Date(),
@@ -359,7 +392,6 @@ class PopTenderFeesMigrator {
                 instrumentId: instrument.id,
                 portalName: row.portal_name ?? null,
                 paymentMethod: derivePaymentMethod(row.netbanking_available, row.bank_debit_card),
-                transactionId: row.utr ?? null,
                 transactionDate: Parsers.date(row.due_date_time),
                 isNetbanking: row.netbanking_available ?? null,
                 isDebit: row.bank_debit_card ?? null,
@@ -370,7 +402,7 @@ class PopTenderFeesMigrator {
 
             this.ctx.stats.pop.success++;
         } catch (err) {
-            console.error(`  ✗ Error migrating pop_tender_fees id=${row.id}:`, err);
+            logError('pop_tender_fees', row.id, err);
             this.ctx.stats.pop.errors++;
         }
     }
@@ -443,12 +475,9 @@ class DdTenderFeesMigrator {
                     favouring: row.in_favour_of ?? null,
                     payableAt: row.dd_payable_at ?? null,
                     status: status,
-                    currentStage: StatusMapper.getStage(status),
                     action: 1, // Assume action=1 for all tender fees
                     courierAddress: row.courier_address ?? null,
                     courierDeadline: Parsers.integer(row.dd_needed_in),
-                    rejectionReason: row.reason ?? null,
-                    remarks: row.remark ?? null,
                     legacyDdId: row.id, // Store original ID
                     legacyData: {
                         source_table: 'dd_tender_fees',
@@ -458,6 +487,9 @@ class DdTenderFeesMigrator {
                         delivery_date_time: row.delivery_date_time,
                         tender_id: row.tender_id,
                         tender_name: row.tender_name,
+                        stage: StatusMapper.getStage(status), // Store stage in legacyData instead
+                        reason: row.reason,
+                        remark: row.remark,
                     },
                     createdAt: Parsers.date(row.created_at) ?? new Date(),
                     updatedAt: Parsers.date(row.updated_at) ?? new Date(),
@@ -469,7 +501,6 @@ class DdTenderFeesMigrator {
                 instrumentId: instrument.id,
                 ddNo: row.dd_no ?? null,
                 ddDate: null,
-                bankName: null,
                 reqNo: null,
                 ddNeeds: row.dd_needed_in ?? null,
                 ddPurpose: row.purpose_of_dd ?? null,
@@ -478,7 +509,7 @@ class DdTenderFeesMigrator {
 
             this.ctx.stats.dd.success++;
         } catch (err) {
-            console.error(`  ✗ Error migrating dd_tender_fees id=${row.id}:`, err);
+            logError('dd_tender_fees', row.id, err);
             this.ctx.stats.dd.errors++;
         }
     }
@@ -549,11 +580,8 @@ class BtTenderFeesMigrator {
                     instrumentType: 'Bank Transfer',
                     amount: Parsers.amount(row.amount),
                     status: status,
-                    currentStage: StatusMapper.getStage(status),
                     action: 1, // Assume action=1 for all tender fees
                     utr: row.utr ?? null,
-                    rejectionReason: row.reason ?? null,
-                    remarks: row.remark ?? null,
                     legacyBtId: row.id, // Store original ID
                     legacyData: {
                         source_table: 'bt_tender_fees',
@@ -562,6 +590,9 @@ class BtTenderFeesMigrator {
                         utr_msg: row.utr_msg,
                         tender_id: row.tender_id,
                         tender_name: row.tender_name,
+                        stage: StatusMapper.getStage(status), // Store stage in legacyData instead
+                        reason: row.reason,
+                        remark: row.remark,
                     },
                     createdAt: Parsers.date(row.created_at) ?? new Date(),
                     updatedAt: Parsers.date(row.updated_at) ?? new Date(),
@@ -574,7 +605,6 @@ class BtTenderFeesMigrator {
                 accountName: row.account_name ?? null,
                 accountNumber: row.account_number ?? null,
                 ifsc: row.ifsc ?? null,
-                transactionId: row.utr ?? null,
                 transactionDate: Parsers.date(row.due_date),
                 utrMsg: row.utr_msg ?? null,
                 remarks: row.remark ?? null,
@@ -583,7 +613,7 @@ class BtTenderFeesMigrator {
 
             this.ctx.stats.bt.success++;
         } catch (err) {
-            console.error(`  ✗ Error migrating bt_tender_fees id=${row.id}:`, err);
+            logError('bt_tender_fees', row.id, err);
             this.ctx.stats.bt.errors++;
         }
     }
@@ -927,6 +957,9 @@ class MigrationOrchestrator {
         console.log('');
         console.log('═'.repeat(60));
         console.log('  ✅ Migration completed successfully!');
+        if (errorLog.length > 0) {
+            console.log(`\n  ⚠ ${errorLog.length} errors logged to ${LOG_FILE}`);
+        }
         console.log('═'.repeat(60));
     }
 

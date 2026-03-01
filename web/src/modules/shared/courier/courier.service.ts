@@ -52,6 +52,7 @@ export const courierApi = {
 
     // Create courier
     create: async ({ data, files }: { data: CreateCourierInput; files: File[] }): Promise<Courier> => {
+        console.log("Sending dto from frontend", { data: data });
         const formData = new FormData();
 
         // Append form fields
@@ -65,6 +66,8 @@ export const courierApi = {
         files.forEach(file => {
             formData.append("courierDocs[]", file);
         });
+
+        console.log("Sending data from frontend", { data: formData });
 
         const response = await api.post(ENDPOINT, formData, {
             headers: {

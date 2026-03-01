@@ -1,300 +1,437 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useCostingApprovalById } from '@/hooks/api/useCostingApprovals';
 import { useTender } from '@/hooks/api/useTenders';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
+import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
+import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
+import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
+import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
+import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
+import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
 
 export default function CostingApprovalViewPage() {
-    const { id } = useParams<{ id: string }>();
+    const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
-    const { data: costingSheet, isLoading: costingLoading, error: costingError } = useCostingApprovalById(Number(id));
-    const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(costingSheet?.tenderId));
+
+    if (!tenderIdParam) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Invalid Tender ID.</AlertDescription>
+            </Alert>
+        );
+    }
+
+    const tenderId = Number(tenderIdParam);
+    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
+    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId);
     const { data: vendorOrganizations } = useVendorOrganizations();
 
-    if (costingLoading || tenderLoading) return <Skeleton className="h-[800px]" />;
-
-    if (costingError) {
+    if (tenderError) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Failed to load costing sheet. You may not have permission to access this resource.
+                    Failed to load tender. You may not have permission to access this resource.
                 </AlertDescription>
             </Alert>
         );
     }
 
-    if (!costingSheet || !tenderDetails) return <div>Costing sheet not found</div>;
+    if (tenderLoading || costingSheetLoading) {
+        return <Skeleton className="h-[800px]" />;
+    }
+
+    if (tenderError || (!tenderLoading && !tender)) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Costing sheet or tender not found.</AlertDescription>
+            </Alert>
+        );
+    }
+
+    // Combine tender and approval into TenderWithRelations
+    const tenderWithRelations: TenderWithRelations | null = tender
+        ? {
+            ...tender,
+            approval: approval || null,
+        }
+        : null;
 
     const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
-        costingSheet.oemVendorIds?.includes(vo.id)
+        costingSheet?.oemVendorIds?.includes(vo.id) || false
     ) || [];
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <CardTitle>Costing Sheet Details</CardTitle>
-                            <Badge variant={costingSheet.status === 'Submitted' ? 'default' : costingSheet.status === 'Approved' ? 'secondary' : 'destructive'}>
-                                {costingSheet.status}
-                            </Badge>
-                        </div>
-                        <CardDescription className="mt-2">
-                            View detailed information about this costing sheet
-                        </CardDescription>
-                    </div>
-                    <CardAction>
-                        <Button variant="outline" onClick={() => navigate(-1)}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                    </CardAction>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-8">
-                {/* Tender Information */}
-                <div className="space-y-4">
-                    <h4 className="font-semibold text-base text-primary border-b pb-2">
-                        Tender Information
-                    </h4>
-                    <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                            <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                            <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                            <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                            <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                            <p className="text-base font-semibold">
-                                {tenderDetails.dueDate ? formatDateTime(tenderDetails.dueDate as Date) : '—'}
-                            </p>
-                        </div>
-                        {costingSheet.googleSheetUrl && (
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Google Sheet</p>
-                                <a
-                                    href={costingSheet.googleSheetUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-base font-semibold text-primary hover:underline inline-flex items-center gap-1"
-                                >
-                                    View Sheet <ExternalLink className="h-4 w-4" />
-                                </a>
-                            </div>
-                        )}
-                    </div>
-                </div>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-7 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
+                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
+                    <TabsTrigger value="rfq">RFQ</TabsTrigger>
+                    <TabsTrigger value="emds-tenderfees">EMD</TabsTrigger>
+                    <TabsTrigger value="document-checklist"> Checklist</TabsTrigger>
+                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
+                    <TabsTrigger value="costing-details">Costing</TabsTrigger>
+                </TabsList>
 
-                {/* Side-by-Side Comparison */}
-                <div className="space-y-4">
-                    <h4 className="font-semibold text-base text-primary border-b pb-2">
-                        Costing Details
-                    </h4>
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
+                    {tenderWithRelations ? (
+                        <TenderView
+                            tender={tenderWithRelations}
+                            isLoading={tenderLoading || approvalLoading}
+                        />
+                    ) : (
+                        <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>Tender information not available.</AlertDescription>
+                        </Alert>
+                    )}
+                    <InfoSheetView
+                        infoSheet={infoSheet || null}
+                        isLoading={infoSheetLoading}
+                    />
+                    {tenderWithRelations && (
+                        <TenderApprovalView
+                            tender={tenderWithRelations}
+                            isLoading={tenderLoading || approvalLoading}
+                        />
+                    )}
+                </TabsContent>
 
-                    <div className="grid md:grid-cols-2 gap-6">
-                        {/* TE Submitted Values */}
-                        <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                                <h5 className="font-semibold text-sm text-blue-700 dark:text-blue-300">
-                                    TE Submitted Values
-                                </h5>
-                            </div>
+                {/* Physical Docs */}
+                <TabsContent value="physical-docs">
+                    <PhysicalDocsView
+                        physicalDoc={physicalDoc || null}
+                        isLoading={physicalDocLoading}
+                    />
+                </TabsContent>
 
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
-                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                    {costingSheet.submittedFinalPrice
-                                        ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
-                                        : '—'}
-                                </p>
-                            </div>
+                {/* RFQ */}
+                <TabsContent value="rfq">
+                    <RfqView
+                        rfq={Array.isArray(rfq) && rfq.length > 0 ? rfq[0] : null}
+                        tender={tender || undefined}
+                        isLoading={rfqLoading}
+                    />
+                </TabsContent>
 
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
-                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                    {costingSheet.submittedReceiptPrice
-                                        ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
-                                        : '—'}
-                                </p>
-                            </div>
+                {/* EMD & Tender Fees */}
+                <TabsContent value="emds-tenderfees">
+                    <EmdTenderFeeShow
+                        paymentRequests={paymentRequests || null}
+                        tender={tender || null}
+                        isLoading={paymentRequestsLoading}
+                    />
+                </TabsContent>
 
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
-                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                    {costingSheet.submittedBudgetPrice
-                                        ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
-                                        : '—'}
-                                </p>
-                            </div>
+                {/* Document Checklist */}
+                <TabsContent value="document-checklist">
+                    <DocumentChecklistView
+                        checklist={documentChecklist || null}
+                        isLoading={documentChecklistLoading}
+                    />
+                </TabsContent>
 
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
-                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                    {costingSheet.submittedGrossMargin
-                                        ? `${costingSheet.submittedGrossMargin}%`
-                                        : '—'}
-                                </p>
-                            </div>
+                {/* Bid Submission */}
+                <TabsContent value="bid-submission">
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission || null}
+                        isLoading={bidSubmissionLoading}
+                    />
+                </TabsContent>
 
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {costingSheet.teRemarks || '—'}
-                                </p>
-                            </div>
-
-                            {costingSheet.submittedAt && (
+                {/* Costing Details */}
+                <TabsContent value="costing-details">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Submitted At</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {formatDateTime(costingSheet.submittedAt)}
-                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <CardTitle>Costing Sheet Details</CardTitle>
+                                        <Badge variant={costingSheet?.status === 'Submitted' ? 'default' : costingSheet?.status === 'Approved' ? 'secondary' : 'destructive'}>
+                                            {costingSheet?.status}
+                                        </Badge>
+                                    </div>
+                                    <CardDescription className="mt-2">
+                                        View detailed information about this costing sheet
+                                    </CardDescription>
                                 </div>
-                            )}
-                        </div>
-
-                        {/* TL Approved Values */}
-                        <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                <h5 className="font-semibold text-sm text-green-700 dark:text-green-300">
-                                    TL Approved Values
-                                </h5>
                             </div>
-
-                            {costingSheet.status === 'Approved' ? (
-                                <>
+                        </CardHeader>
+                        <CardContent className="space-y-8">
+                            {/* Tender Information */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-base text-primary border-b pb-2">
+                                    Tender Information
+                                </h4>
+                                <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
                                     <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
-                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                            {costingSheet.finalPrice
-                                                ? formatINR(parseFloat(costingSheet.finalPrice))
-                                                : '—'}
+                                        <p className="text-sm font-medium text-muted-foreground">Tender No</p>
+                                        <p className="text-base font-semibold">{tender?.tenderNo}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Team Member</p>
+                                        <p className="text-base font-semibold">{tender?.teamMemberName || '—'}</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
+                                        <p className="text-base font-semibold">{tender?.tenderName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Due Date</p>
+                                        <p className="text-base font-semibold">
+                                            {tender?.dueDate ? formatDateTime(tender.dueDate as Date) : '—'}
                                         </p>
                                     </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
-                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                            {costingSheet.receiptPrice
-                                                ? formatINR(parseFloat(costingSheet.receiptPrice))
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
-                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                            {costingSheet.budgetPrice
-                                                ? formatINR(parseFloat(costingSheet.budgetPrice))
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
-                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                            {costingSheet.grossMargin
-                                                ? `${costingSheet.grossMargin}%`
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Selected Vendors</p>
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {selectedVendorOrganizations.length > 0 ? (
-                                                selectedVendorOrganizations.map(vendorOrg => (
-                                                    <Badge key={vendorOrg.id} variant="outline">
-                                                        {vendorOrg.name}
-                                                    </Badge>
-                                                ))
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground">—</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">TL Remarks</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {costingSheet.tlRemarks || '—'}
-                                        </p>
-                                    </div>
-
-                                    {costingSheet.approvedAt && (
+                                    {costingSheet?.googleSheetUrl && (
                                         <div>
-                                            <p className="text-xs font-medium text-muted-foreground mb-1">Approved At</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDateTime(costingSheet.approvedAt)}
-                                            </p>
+                                            <p className="text-sm font-medium text-muted-foreground">Google Sheet</p>
+                                            <a
+                                                href={costingSheet?.googleSheetUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-base font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                                            >
+                                                View Sheet <ExternalLink className="h-4 w-4" />
+                                            </a>
                                         </div>
                                     )}
-                                </>
-                            ) : (
-                                <div className="flex items-center justify-center h-full">
-                                    <p className="text-sm text-muted-foreground">
-                                        {costingSheet.status === 'Submitted'
-                                            ? 'Awaiting approval'
-                                            : 'Not approved yet'}
-                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Side-by-Side Comparison */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-base text-primary border-b pb-2">
+                                    Costing Details
+                                </h4>
+
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {/* TE Submitted Values */}
+                                    <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                                            <h5 className="font-semibold text-sm text-blue-700 dark:text-blue-300">
+                                                TE Submitted Values
+                                            </h5>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet?.submittedFinalPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet?.submittedReceiptPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet?.submittedBudgetPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet?.submittedGrossMargin
+                                                    ? `${costingSheet.submittedGrossMargin}%`
+                                                    : '—'}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
+                                            <p className="text-sm text-muted-foreground break-words">
+                                                {costingSheet?.teRemarks || '—'}
+                                            </p>
+                                        </div>
+
+                                        {costingSheet?.submittedAt && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Submitted At</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {formatDateTime(costingSheet?.submittedAt)}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* TL Approved Values */}
+                                    <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                            <h5 className="font-semibold text-sm text-green-700 dark:text-green-300">
+                                                TL Approved Values
+                                            </h5>
+                                        </div>
+
+                                        {costingSheet?.status === 'Approved' ? (
+                                            <>
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
+                                                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                                                        {costingSheet?.finalPrice
+                                                            ? formatINR(parseFloat(costingSheet.finalPrice))
+                                                            : '—'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
+                                                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                                                        {costingSheet?.receiptPrice
+                                                            ? formatINR(parseFloat(costingSheet.receiptPrice))
+                                                            : '—'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
+                                                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                                                        {costingSheet?.budgetPrice
+                                                            ? formatINR(parseFloat(costingSheet.budgetPrice))
+                                                            : '—'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
+                                                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                                                        {costingSheet?.grossMargin
+                                                            ? `${costingSheet.grossMargin}%`
+                                                            : '—'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">Selected Vendors</p>
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        {selectedVendorOrganizations.length > 0 ? (
+                                                            selectedVendorOrganizations.map(vendorOrg => (
+                                                                <Badge key={vendorOrg.id} variant="outline">
+                                                                    {vendorOrg.name}
+                                                                </Badge>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-sm text-muted-foreground">—</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1">TL Remarks</p>
+                                                    <p className="text-sm text-muted-foreground break-words">
+                                                        {costingSheet?.tlRemarks || '—'}
+                                                    </p>
+                                                </div>
+
+                                                {costingSheet?.approvedAt && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground mb-1">Approved At</p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {formatDateTime(costingSheet?.approvedAt)}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full">
+                                                <p className="text-sm text-muted-foreground">
+                                                    {costingSheet?.status === 'Submitted'
+                                                        ? 'Awaiting approval'
+                                                        : 'Not approved yet'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Rejection Reason (if rejected) */}
+                            {costingSheet?.status === 'Rejected/Redo' && costingSheet?.rejectionReason && (
+                                <div className="space-y-4">
+                                    <h4 className="font-semibold text-base text-destructive border-b pb-2">
+                                        Rejection Reason
+                                    </h4>
+                                    <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
+                                        <p className="text-sm text-destructive break-words">{costingSheet?.rejectionReason}</p>
+                                    </div>
                                 </div>
                             )}
-                        </div>
-                    </div>
-                </div>
 
-                {/* Rejection Reason (if rejected) */}
-                {costingSheet.status === 'Rejected/Redo' && costingSheet.rejectionReason && (
-                    <div className="space-y-4">
-                        <h4 className="font-semibold text-base text-destructive border-b pb-2">
-                            Rejection Reason
-                        </h4>
-                        <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
-                            <p className="text-sm text-destructive">{costingSheet.rejectionReason}</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-2 pt-6 border-t">
-                    <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
-                        Back to List
-                    </Button>
-                    {costingSheet.status === 'Submitted' && (
-                        <>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.costingReject(Number(id)))}>
-                                Reject
-                            </Button>
-                            <Button onClick={() => navigate(paths.tendering.costingApprove(Number(id)))}>
-                                Approve
-                            </Button>
-                        </>
-                    )}
-                    {costingSheet.status === 'Approved' && (
-                        <Button onClick={() => navigate(paths.tendering.costingEditApproval(Number(id)))}>
-                            Edit Approval
-                        </Button>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
+                            {/* Action Buttons */}
+                            <div className="flex justify-end gap-2 pt-6 border-t">
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
+                                    Back to List
+                                </Button>
+                                {costingSheet?.status === 'Submitted' && (
+                                    <>
+                                        <Button variant="outline" onClick={() => navigate(paths.tendering.costingReject(costingSheet?.id))}>
+                                            Reject
+                                        </Button>
+                                        <Button onClick={() => navigate(paths.tendering.costingApprove(costingSheet?.id ?? 0))}>
+                                            Approve
+                                        </Button>
+                                    </>
+                                )}
+                                {costingSheet?.status === 'Approved' && (
+                                    <Button onClick={() => navigate(paths.tendering.costingEditApproval(costingSheet?.id ?? 0))}>
+                                        Edit Approval
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 }

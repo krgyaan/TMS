@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, notInArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, notInArray, sql, desc, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
@@ -17,7 +17,8 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -28,6 +29,9 @@ export type TenderListFilters = {
     search?: string;
     teamId?: number;
     assignedTo?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    user?: ValidatedUser;
 };
 
 @Injectable()
@@ -39,7 +43,7 @@ export class TenderInfosService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
@@ -370,10 +374,23 @@ export class TenderInfosService {
             }
         }
 
-        // TODO: Add role-based filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator/Operation Leader: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        if (filters?.user) {
+            const user = filters.user;
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided from frontend
+                // The teamId filter is already applied below if provided
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    conditions.push(eq(tenderInfos.team, user.teamId));
+                }
+            } else {
+                // All other roles: Show only own tenders
+                conditions.push(eq(tenderInfos.teamMember, user.sub));
+            }
+        }
 
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
@@ -391,10 +408,15 @@ export class TenderInfosService {
             );
         }
 
-        if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
-            conditions.push(eq(tenderInfos.team, filters.teamId));
+        // Apply teamId filter only for Super User/Admin (they can switch teams)
+        // For other roles, team filtering is handled by role-based logic above
+        if (filters?.user && (filters.user.roleId === 1 || filters.user.roleId === 2)) {
+            if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
+                conditions.push(eq(tenderInfos.team, filters.teamId));
+            }
         }
 
+        // assignedTo filter (for explicit user filtering, typically not used with role-based filtering)
         if (!filters?.unallocated && filters?.assignedTo !== undefined && filters?.assignedTo !== null) {
             conditions.push(eq(tenderInfos.teamMember, filters.assignedTo));
         }
@@ -418,14 +440,55 @@ export class TenderInfosService {
         const [countResult] = await countQuery.where(whereClause);
         const total = Number(countResult?.count || 0);
 
-        // 3. Get Data (Paginated)
+        // 3. Determine sorting
+        let orderByClause = desc(tenderInfos.createdAt); // Default sort
+
+        if (filters?.sortBy) {
+            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
+                case 'dueDate':
+                    orderByClause = sortFn(tenderInfos.dueDate);
+                    break;
+                case 'gstValues':
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case 'tenderFees':
+                    orderByClause = sortFn(tenderInfos.tenderFees);
+                    break;
+                case 'emd':
+                    orderByClause = sortFn(tenderInfos.emd);
+                    break;
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'statusName':
+                    orderByClause = sortFn(statuses.name);
+                    break;
+                case 'itemName':
+                    orderByClause = sortFn(items.name);
+                    break;
+                case 'organizationName':
+                    orderByClause = sortFn(organizations.name);
+                    break;
+                default:
+                    orderByClause = sortFn(tenderInfos.createdAt);
+            }
+        }
+
+        // 4. Get Data (Paginated) - Sort BEFORE pagination
         const rows = await this.getBaseQueryBuilder()
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(desc(tenderInfos.createdAt));
+            .offset(offset);
 
-        // 4. Map Data
+        // 5. Map Data
         const data = rows.map((row) =>
             this.mapJoinedRow({
                 tenderInfos: row.tenderInfos,
@@ -482,23 +545,27 @@ export class TenderInfosService {
         // Send email notification
         await this.sendTenderCreatedEmail(newTender.id as number, data, createdBy);
 
-        // START TIMER: Add this code to start the workflow and timers
+        // START TIMER: Start the initial tender_info_sheet timer
         try {
-            this.logger.log(`Starting workflow for tender ${newTender.id}`);
-            const workflowResult = await this.workflowService.startWorkflow({
-                workflowCode: 'TENDERING_WF',
+            this.logger.log(`Starting timer for tender ${newTender.id}`);
+            await this.timersService.startTimer({
                 entityType: 'TENDER',
-                entityId: newTender.id.toString(),
+                entityId: newTender.id as number,
+                stage: 'tender_info_sheet',
+                userId: createdBy,
+                timerConfig: {
+                    type: 'FIXED_DURATION',
+                    durationHours: 72
+                },
                 metadata: {
                     createdBy,
                     tenderNo: newTender.tenderNo,
                     dueDate: newTender.dueDate
                 }
             });
-
-            this.logger.log(`Started workflow for tender ${newTender.id} with ${workflowResult.stepsStarted} steps`);
+            this.logger.log(`Started timer for tender ${newTender.id}`);
         } catch (error) {
-            this.logger.error(`Failed to start workflow for tender ${newTender.id}:`, error);
+            this.logger.error(`Failed to start timer for tender ${newTender.id}:`, error);
         }
 
         return newTender;
@@ -698,7 +765,7 @@ export class TenderInfosService {
                     'tender.created',
                     tenderId,
                     coordinatorUserId,
-                    `New Tender Assigned: ${tender.tenderNo}`,
+                    `New Tender allocated - ${tender.tenderName}`,
                     'tender-created',
                     {
                         ...emailData,
@@ -723,7 +790,7 @@ export class TenderInfosService {
                     'tender.created.unallocated',
                     tenderId,
                     coordinatorUserId,
-                    `New Tender Awaiting Allocation: ${tender.tenderNo}`,
+                    `New Tender Identified - Pending Allocation - ${tender.tenderName}`,
                     'tender-created-unallocated',
                     emailData,
                     {
@@ -973,7 +1040,7 @@ export class TenderInfosService {
         return { tenderName: uniqueName };
     }
 
-    async getDashboardCounts(): Promise<{
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{
         'under-preparation': number;
         'did-not-bid': number;
         'tenders-bid': number;
@@ -985,6 +1052,42 @@ export class TenderInfosService {
         // Base condition
         const baseCondition = TenderInfosService.getActiveCondition();
 
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+                // If no teamId filter, show all (no additional condition added)
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    // If no teamId, return empty results (user has no team assigned)
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    // If no user ID, return empty results
+                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                }
+            }
+        } else {
+            // No user provided - return empty results for security
+            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        }
+
+        const baseConditions = roleFilterConditions.length > 0
+            ? and(baseCondition, ...roleFilterConditions)
+            : baseCondition;
+
         // Tab-specific status IDs using StatusCache
         const underPreparationStatusIds = StatusCache.getIds('prep');
         const didNotBidStatusIds = StatusCache.getIds('dnb');
@@ -994,12 +1097,12 @@ export class TenderInfosService {
 
         // Count for each tab
         const counts = await Promise.all([
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, underPreparationStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, didNotBidStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tendersBidStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderWonStatusIds))),
-            this.countTabItems(and(baseCondition, inArray(tenderInfos.status, tenderLostStatusIds))),
-            this.countTabItems(and(baseCondition, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, underPreparationStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, didNotBidStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tendersBidStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderWonStatusIds))),
+            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderLostStatusIds))),
+            this.countTabItems(and(baseConditions, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
         ]);
 
         return {
@@ -1025,4 +1128,3 @@ export class TenderInfosService {
         return result?.count ?? 0;
     }
 }
-

@@ -128,8 +128,8 @@ export const TenderInfoSheetPayloadSchema = z.object({
     technicalWorkOrders: optionalStringArray,
     commercialDocuments: optionalStringArray,
 
-    // Client & Address
-    clients: z.array(ClientSchema).min(1, 'At least one client is required'),
+    // Client & Address (zero or more clients allowed)
+    clients: z.array(ClientSchema),
     courierAddress: optionalString,
 
     // Final Remark

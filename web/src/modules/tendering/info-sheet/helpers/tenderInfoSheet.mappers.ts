@@ -13,6 +13,32 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+// Helper to extract document names from objects or return strings as-is
+const extractDocumentNames = (val: (string | { id?: number; documentName: string } | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
+    if (!val || !Array.isArray(val)) return [];
+    return val
+        .map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                // For document objects, prefer documentName over id
+                if ('documentName' in item && item.documentName != null) {
+                    return String(item.documentName);
+                }
+                // Fallback to id, value, or first string/number property
+                if ('id' in item && item.id != null) return String(item.id);
+                if ('value' in item && item.value != null) return String(item.value);
+                // Fallback: try to find first string/number property
+                for (const [, value] of Object.entries(item)) {
+                    if (typeof value === 'string' || typeof value === 'number') {
+                        return String(value);
+                    }
+                }
+            }
+            return item != null ? String(item) : null;
+        })
+        .filter((item): item is string => item !== null && item !== undefined && item !== 'undefined' && String(item).trim().length > 0);
+};
+
 const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
     return val
@@ -105,7 +131,8 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthValue: 0,
 
     courierAddress: '',
-    clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+    // Allow zero clients by default; user can add as needed
+    clients: [],
 
     teRemark: '',
 });
@@ -197,8 +224,8 @@ export const mapResponseToForm = (
         orderValue3: toNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
-        technicalWorkOrders: toStringArray(data.technicalWorkOrders),
-        commercialDocuments: toStringArray(data.commercialDocuments),
+        technicalWorkOrders: extractDocumentNames(data.technicalWorkOrders),
+        commercialDocuments: extractDocumentNames(data.commercialDocuments),
 
         avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
         avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
@@ -211,6 +238,7 @@ export const mapResponseToForm = (
 
         courierAddress: data.courierAddress ?? '',
 
+        // Map existing clients, otherwise use an empty array (0 or more)
         clients: data.clients && data.clients.length > 0
             ? data.clients.map(client => ({
                 clientName: client.clientName ?? '',
@@ -218,7 +246,7 @@ export const mapResponseToForm = (
                 clientMobile: client.clientMobile ?? '',
                 clientEmail: client.clientEmail ?? '',
             }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+            : [],
 
         teRemark: data.teFinalRemark ?? '',
     };

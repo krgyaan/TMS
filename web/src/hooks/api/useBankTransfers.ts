@@ -23,7 +23,14 @@ export const useBankTransferDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = {
+        tab: filters?.tab,
+        page: filters?.page,
+        limit: filters?.limit,
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<BankTransferDashboardRow>>({
         queryKey: bankTransfersKey.list(queryKeyFilters),
@@ -54,8 +61,22 @@ export const useBankTransferDashboardCounts = () => {
     return query;
 };
 
+export const useBankTransferDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: bankTransfersKey.detail(id),
+        queryFn: async () => {
+            const result = await bankTransfersService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateBankTransferAction = () => {
     const queryClient = useQueryClient();
+    console.log('Action Form called');
 
     return useMutation({
         mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
@@ -63,6 +84,10 @@ export const useUpdateBankTransferAction = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.all });
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.counts() });
+            console.log('useUpdateBankTransferAction onSuccess called');
+        },
+        onError: (error: any) => {
+            console.log('useUpdateBankTransferAction onError called', error);
         },
     });
 };

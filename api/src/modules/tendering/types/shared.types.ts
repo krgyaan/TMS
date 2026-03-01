@@ -150,4 +150,10 @@ export type ResultDashboardCounts = {
     lost: number;
     disqualified: number;
     total: number;
+    totalAmounts: {
+        pending: number;
+        won: number;
+        lost: number;
+        disqualified: number;
+    };
 };

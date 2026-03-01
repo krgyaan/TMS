@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -15,6 +15,9 @@ import {
     EmailStatus,
 } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
+import { normalize } from 'path';
+import { basename } from 'path';
+import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
 
 @Injectable()
 export class EmailService {
@@ -28,6 +31,7 @@ export class EmailService {
         private readonly gmail: GmailClient,
         private readonly recipientResolver: RecipientResolver,
         private readonly config: ConfigService,
+        private readonly tenderFilesService: TenderFilesService,
     ) {
         this.isProd = this.config.get('NODE_ENV') === 'production';
         const rootDir = this.isProd ? 'dist' : 'src';
@@ -58,6 +62,7 @@ export class EmailService {
         });
 
         Handlebars.registerHelper('eq', (a, b) => a === b);
+        Handlebars.registerHelper('ne', (a, b) => a !== b);
         Handlebars.registerHelper('or', (a, b) => a || b);
         Handlebars.registerHelper('and', (a, b) => a && b);
     }
@@ -75,6 +80,55 @@ export class EmailService {
         const templateContent = fs.readFileSync(templatePath, 'utf-8');
         const template = Handlebars.compile(templateContent);
         return template(data);
+    }
+
+    /**
+     * Resolve attachment file paths
+     */
+    private resolveAttachments(input: { files: string[]; baseDir?: string }): Array<{ filename: string; path: string }> {
+        const attachments: Array<{ filename: string; path: string }> = [];
+        const shouldLogDetails = process.env.EMAIL_LOG_ATTACHMENTS === '1';
+
+        const requestedFiles = input.files || [];
+        this.logger.debug(`resolveAttachments: requested files = ${JSON.stringify(requestedFiles)}`);
+
+        for (const file of requestedFiles) {
+            // Normalize and strip any attempted ../ segments
+            const safeRelative = normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
+            const finalRelative = input.baseDir ? `${input.baseDir}/${safeRelative}` : safeRelative;
+
+            // Delegate to TenderFilesService for absolute path resolution
+            const absolutePath = this.tenderFilesService.getAbsolutePath(finalRelative);
+
+            if (!fs.existsSync(absolutePath)) {
+                this.logger.warn(`Attachment not found on disk for RFQ/tender email: ${finalRelative}`);
+                continue;
+            }
+
+            if (shouldLogDetails) {
+                try {
+                    const stats = fs.statSync(absolutePath);
+                    this.logger.debug(
+                        `resolveAttachments: file="${finalRelative}" absolutePath="${absolutePath}" size=${stats.size} bytes`,
+                    );
+                } catch {
+                    this.logger.debug(
+                        `resolveAttachments: file="${finalRelative}" absolutePath="${absolutePath}" (size unknown - stat failed)`,
+                    );
+                }
+            }
+
+            attachments.push({
+                filename: basename(absolutePath),
+                path: absolutePath,
+            });
+        }
+
+        this.logger.debug(
+            `resolveAttachments: resolved ${attachments.length} attachments out of ${requestedFiles.length} requested`,
+        );
+
+        return attachments;
     }
 
     /**
@@ -120,12 +174,34 @@ export class EmailService {
             }
 
             // 5. Render template
-            const htmlBody = this.renderTemplate(options.template, {
+            const templatePayload = {
                 data: {
                     ...options.data,
                     senderName: sender.name,
+                },
+            };
+
+            const htmlBody = this.renderTemplate(options.template, templatePayload);
+
+            // 5.5. Process attachments if provided
+            let resolvedAttachments: Array<{ filename: string; path: string }> | undefined;
+            if (options.attachments && options.attachments.files.length > 0) {
+                const totalRequested = options.attachments.files.length;
+                resolvedAttachments = this.resolveAttachments(options.attachments);
+
+                const resolvedCount = resolvedAttachments.length;
+                this.logger.log(
+                    `EmailService.send: resolved ${resolvedCount} attachment(s) out of ${totalRequested} requested for event ${options.eventType} (ref=${options.referenceType}:${options.referenceId})`,
+                );
+
+                if (resolvedCount === 0 && totalRequested > 0) {
+                    this.logger.warn(
+                        `EmailService.send: all requested attachments failed resolution. Requested files: ${JSON.stringify(
+                            options.attachments.files,
+                        )}`,
+                    );
                 }
-            });
+            }
 
             // 6. Get thread info
             const threadInfo = await this.gmail.getThreadInfo(
@@ -175,6 +251,7 @@ export class EmailService {
                     threadId: threadInfo.threadId || undefined,
                     inReplyTo: threadInfo.inReplyTo || undefined,
                     messageId,
+                    attachments: resolvedAttachments,
                 },
                 referenceType: options.referenceType || '',
                 referenceId: options.referenceId || 0,
@@ -210,6 +287,7 @@ export class EmailService {
 
             // Send via Gmail
             const result = await this.gmail.send(fromUserId, resolved);
+            console.log("result", result);
 
             if (result.success) {
                 // Update log as sent
@@ -223,7 +301,8 @@ export class EmailService {
                     })
                     .where(eq(emailLogs.id, emailLogId));
 
-                // Save thread info
+                // Save thread info - this will also keep DB in sync if we had to fall back
+                // to a new Gmail thread after an invalid/stale threadId.
                 if (isNewThread && result.threadId) {
                     await this.gmail.saveThreadInfo(
                         referenceType,
@@ -240,13 +319,18 @@ export class EmailService {
             } else {
                 throw new Error(result.error);
             }
-        } catch (error) {
-            this.logger.error(`Email ${emailLogId} failed:`, error.message);
+        } catch (error: any) {
+            const errorMessage = error?.message || String(error);
+            const hadThreadId = !!resolved.threadId;
+
+            this.logger.error(
+                `Email ${emailLogId} failed for ref=${referenceType}:${referenceId} (hadThreadId=${hadThreadId}): ${errorMessage}`,
+            );
 
             // Update log as failed
             await this.db
                 .update(emailLogs)
-                .set({ status: 'failed', errorMessage: error.message })
+                .set({ status: 'failed', errorMessage })
                 .where(eq(emailLogs.id, emailLogId));
         }
     }
@@ -294,6 +378,7 @@ export class EmailService {
 
         // Generate label path
         const labelPath = this.generateTenderLabelPath(teamName, tenderName);
+        console.log("labelPath", labelPath);
 
         return this.send({
             referenceType: 'tender',
@@ -310,6 +395,7 @@ export class EmailService {
                 tenderName,
             },
             labelPath,
+            attachments: options.attachments,
         });
     }
 

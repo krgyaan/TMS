@@ -45,6 +45,7 @@ import { TenderApprovalModule } from "@/modules/tendering/tender-approval/tender
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { PhysicalDocsModule } from "@/modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "@/modules/tendering/rfqs/rfq.module";
+import { RfqResponseModule } from "@/modules/tendering/rfq-response/rfq-response.module";
 import { CourierModule } from "@/modules/courier/courier.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
@@ -64,6 +65,8 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { FinancialYearModule } from "@/modules/master/financial-year/financial-year.module";
+import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
 import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
@@ -74,6 +77,17 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 import { TimersModule } from "@/modules/timers/timers.module";
+// import { BusinessPerformanceModule } from "./modules/performance/business/business-performance.module";
+import { WorkOrderModule } from "@/modules/operations/work-order/work-order.module";
+import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
+import { ProjectsModule } from "./modules/operations/projects/projects.module";
+import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { PqrModule } from "@/modules/shared/pqr/pqr.module";
+import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
+import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects-master.module";
+import { AllExceptionsFilter } from "./logger/all-exception.filter";
+import { LoggerModule } from "@/logger/logger.module";
+import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 
 @Module({
     imports: [
@@ -96,6 +110,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
                 ...validateAuthEnv(env),
             }),
         }),
+        LoggerModule,
         DatabaseModule,
         UsersModule,
         RolesModule,
@@ -133,6 +148,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
+        RfqResponseModule,
         RfqsModule,
         CourierModule,
         MailerModule,
@@ -149,6 +165,8 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        FinancialYearModule,
+        FinanceDocTypeModule,
         TenderExecutivePerformanceModule,
         TeamLeaderPerformanceModule,
         OemDashboardModule,
@@ -159,6 +177,15 @@ import { TimersModule } from "@/modules/timers/timers.module";
         BankTransferModule,
         ChequeModule,
         TimersModule,
+        WorkOrderModule,
+        KickOffMeetingModule,
+        ProjectsModule,
+        FollowupSchedulerModule,
+        PqrModule,
+        FinanceDocumentsModule,
+        ProjectsMasterModule,
+        ProjectsMasterrModule,
+        // BusinessPerformanceModule,
     ],
     controllers: [AppController],
     providers: [
@@ -167,6 +194,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
         },
+        AllExceptionsFilter,
     ],
 })
-export class AppModule { }
+export class AppModule {}

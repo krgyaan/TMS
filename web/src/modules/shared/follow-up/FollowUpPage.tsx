@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
@@ -34,6 +34,7 @@ import {
     Upload,
     ImagePlus,
     X,
+    Trash,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import DataTable from "@/components/ui/data-table";
@@ -41,9 +42,10 @@ import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
 import { cn } from "@/lib/utils";
 
-import { useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
+import { useDeleteFollowUp, useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
 import type { FollowUpRow, FollowUpQueryDto, UpdateFollowUpStatusDto } from "@/modules/shared/follow-up/follow-up.types";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ================================
    LABEL MAPS
@@ -51,10 +53,10 @@ import { toast } from "sonner";
 const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "Twice a day",
+    4: "Weekly",
+    5: "Biweekly",
+    6: "Stop",
 };
 
 const STOP_REASON_LABELS: Record<number, string> = {
@@ -152,6 +154,8 @@ const FollowupPage: React.FC = () => {
     const [proofImage, setProofImage] = useState<File | null>(null);
     const [stopRemarks, setStopRemarks] = useState("");
 
+    const { canDelete } = useAuth();
+
     /* ================================
        DATA
     ================================ */
@@ -165,6 +169,7 @@ const FollowupPage: React.FC = () => {
     const followups = data?.data ?? [];
 
     const updateStatusMutation = useUpdateFollowUpStatus();
+    const deleteMutation = useDeleteFollowUp();
 
     /* ================================
        MODALS
@@ -261,6 +266,15 @@ const FollowupPage: React.FC = () => {
             toast.error(error?.message || "Failed to update follow-up status");
         }
     };
+
+    const handleDelete = useCallback(
+        (id: number) => {
+            if (window.confirm(`Are you sure you want to delete this FollowUp ?`)) {
+                deleteMutation.mutate(id);
+            }
+        },
+        [deleteMutation]
+    );
 
     const resetForm = () => {
         setComment("");
@@ -390,6 +404,7 @@ const FollowupPage: React.FC = () => {
                             <IconAction icon={RefreshCw} label="Auto Followup" onClick={() => navigate(paths.shared.followUpEdit(row.id))} />
                             <IconAction icon={FileEdit} label="Update Status" onClick={() => handleOpenUpdateModal(row.id)} />
                             <IconAction icon={Eye} label="View Details" onClick={() => navigate(paths.shared.followUpShow(row.id))} />
+                            {canDelete("shared.followups") && <IconAction icon={Trash} label="Delete" onClick={() => handleDelete(row.id)} />}
                         </div>
                     );
                 },
@@ -781,8 +796,8 @@ const FollowupPage: React.FC = () => {
                                         ? "This will mark the follow-up as successfully achieved."
                                         : "This action will stop all future follow-ups."
                                     : date
-                                    ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
-                                    : "Select a date for the next follow-up."}
+                                      ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
+                                      : "Select a date for the next follow-up."}
                             </p>
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 <Button

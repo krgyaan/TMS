@@ -23,7 +23,14 @@ export const useFdrDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<FdrDashboardRow>>({
         queryKey: fdrsKey.list(queryKeyFilters),
@@ -49,6 +56,19 @@ export const useFdrDashboardCounts = () => {
             const result = await fdrsService.getCounts();
             return result;
         },
+    });
+
+    return query;
+};
+
+export const useFdrDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: fdrsKey.detail(id),
+        queryFn: async () => {
+            const result = await fdrsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
     });
 
     return query;

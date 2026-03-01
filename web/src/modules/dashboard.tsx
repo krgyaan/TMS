@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle, Clock, Users, FileText, GanttChart } from "lucide-react";
+import { Clock, Users, FileText, GanttChart } from "lucide-react";
 
 // Types
 interface TenderInfo {
@@ -168,11 +166,6 @@ const Dashboard = () => {
         return events.filter(event => selectedUser === "all" || event.user === selectedUser);
     }, [dashboardData, teamColors, selectedUser]);
 
-    const handleGoogleConnect = () => {
-        // Implement Google OAuth connection
-        console.log("Connect Google OAuth");
-    };
-
     const getEventBadge = (type: string) => {
         switch (type) {
             case "tender_due":
@@ -188,29 +181,6 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-6 p-8">
-            {/* Google OAuth Alert */}
-            {!dashboardData.google_oauth_connected ? (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="flex items-center justify-between">
-                        <span>Google OAuth Not Connected! Please connect your Google account now</span>
-                        <Button variant="outline" size="sm" onClick={handleGoogleConnect}>
-                            Connect Now
-                        </Button>
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <Alert variant="default">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertDescription className="flex items-center justify-between">
-                        <span>Google OAuth Connected! You are connected. You may reconnect if needed.</span>
-                        <Button variant="outline" size="sm" onClick={handleGoogleConnect}>
-                            Reconnect
-                        </Button>
-                    </AlertDescription>
-                </Alert>
-            )}
-
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Employees - Only for Admin */}
@@ -272,133 +242,147 @@ const Dashboard = () => {
                 </Card>
             </div>
 
-            {/* Calendar Section */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Calendar Overview</CardTitle>
-                    {/* User Filter - Only for Admin */}
-                    {dashboardData.role === "Admin" && (
-                        <div className="flex items-center space-x-4">
-                            <Select value={selectedUser} onValueChange={setSelectedUser}>
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Filter by user" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Users</SelectItem>
-                                    {mockUsers.map(user => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                            {user.name}
-                                        </SelectItem>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {/* Calendar Section */}
+                <Card className="col-span-2">
+                    <CardHeader>
+                        {/* User Filter - Only for Admin */}
+                        {dashboardData.role === "Admin" && (
+                            <div className="flex items-center space-x-4">
+                                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Filter by user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Users</SelectItem>
+                                        {mockUsers.map(user => (
+                                            <SelectItem key={user.id} value={user.id}>
+                                                {user.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Color Legend */}
+                                <div className="flex items-center space-x-2">
+                                    {Object.entries(teamColors).map(([name, color]) => (
+                                        <div key={name} className="flex items-center space-x-1">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color as string }} />
+                                            <span className="text-xs">{name}</span>
+                                        </div>
                                     ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Color Legend */}
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-muted-foreground">Legendary:</span>
-                                {Object.entries(teamColors).map(([name, color]) => (
-                                    <div key={name} className="flex items-center space-x-1">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color as string }} />
-                                        <span className="text-xs">{name}</span>
-                                    </div>
-                                ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    <div className="w-full">
-                        <Tabs defaultValue="month">
-                            <div className="flex justify-center pb-2">
-                                <TabsList>
-                                    <TabsTrigger value="month">Month View</TabsTrigger>
-                                    <TabsTrigger value="week">Week View</TabsTrigger>
-                                    <TabsTrigger value="list">List View</TabsTrigger>
-                                </TabsList>
-                            </div>
-
-                            <TabsContent value="month" className="space-y-4">
-                                <div className="">
-                                    <Calendar
-                                        mode="single"
-                                        selected={selectedDate}
-                                        onSelect={setSelectedDate}
-                                        className="rounded-md border w-full"
-                                        modifiers={{
-                                            hasEvents: calendarEvents.map((event: { date: string }) => new Date(event.date)),
-                                        }}
-                                        modifiersStyles={{
-                                            hasEvents: {
-                                                fontWeight: "bold",
-                                                textDecoration: "underline",
-                                            },
-                                        }}
-                                    />
+                        )}
+                    </CardHeader>
+                    <CardContent>
+                        <div className="w-full">
+                            <Tabs defaultValue="week">
+                                <div className="flex justify-center pb-2">
+                                    <TabsList>
+                                        <TabsTrigger value="month">Month View</TabsTrigger>
+                                        <TabsTrigger value="week">Week View</TabsTrigger>
+                                        <TabsTrigger value="list">List View</TabsTrigger>
+                                    </TabsList>
                                 </div>
 
-                                {/* Events for selected date */}
-                                {selectedDate && (
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">
-                                            Events for {selectedDate.toLocaleDateString()}
-                                        </h4>
+                                <TabsContent value="month" className="space-y-4">
+                                    <div className="">
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedDate}
+                                            onSelect={setSelectedDate}
+                                            className="rounded-md border w-full"
+                                            modifiers={{
+                                                hasEvents: calendarEvents.map((event: { date: string }) => new Date(event.date)),
+                                            }}
+                                            modifiersStyles={{
+                                                hasEvents: {
+                                                    fontWeight: "bold",
+                                                    textDecoration: "underline",
+                                                },
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Events for selected date */}
+                                    {selectedDate && (
+                                        <div className="space-y-2">
+                                            <h4 className="text-sm font-medium">
+                                                Events for {selectedDate.toLocaleDateString()}
+                                            </h4>
+                                            {calendarEvents
+                                                .filter((event: { date: string }) => event.date === selectedDate.toISOString().split("T")[0])
+                                                .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center space-x-3 p-3 border rounded-lg"
+                                                    >
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: event.color as string }}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <div className="font-medium">{event.title}</div>
+                                                        </div>
+                                                        {getEventBadge(event.type)}
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    )}
+                                </TabsContent>
+
+                                <TabsContent value="week">
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        Week view implementation would go here
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="list">
+                                    <div className="space-y-3">
                                         {calendarEvents
-                                            .filter((event: { date: string }) => event.date === selectedDate.toISOString().split("T")[0])
+                                            .sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime())
                                             .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
                                                 <div
                                                     key={index}
-                                                    className="flex items-center space-x-3 p-3 border rounded-lg"
+                                                    className="flex items-center justify-between p-3 border rounded-lg"
                                                 >
-                                                    <div
-                                                        className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color as string }}
-                                                    />
-                                                    <div className="flex-1">
-                                                        <div className="font-medium">{event.title}</div>
+                                                    <div className="flex items-center space-x-3">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: event.color as string }}
+                                                        />
+                                                        <div>
+                                                            <div className="font-medium">{event.title}</div>
+                                                            <div className="text-sm text-muted-foreground">
+                                                                {new Date(event.date).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     {getEventBadge(event.type)}
                                                 </div>
                                             ))}
                                     </div>
-                                )}
-                            </TabsContent>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            <TabsContent value="week">
-                                <div className="text-center py-8 text-muted-foreground">
-                                    Week view implementation would go here
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="list">
-                                <div className="space-y-3">
-                                    {calendarEvents
-                                        .sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                        .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center justify-between p-3 border rounded-lg"
-                                            >
-                                                <div className="flex items-center space-x-3">
-                                                    <div
-                                                        className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color as string }}
-                                                    />
-                                                    <div>
-                                                        <div className="font-medium">{event.title}</div>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            {new Date(event.date).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {getEventBadge(event.type)}
-                                            </div>
-                                        ))}
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                    </div>
-                </CardContent>
-            </Card>
+                {/* Soon Expiring Tenders */}
+                <Card className="col-span-1">
+                    <CardHeader>
+                        <CardTitle>Soon Expiring Timers</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <div className="text-center py-8 text-muted-foreground">
+                                Soon Expiring Timers of any step like Tender, RFQ, TQ, etc. implementation would go here
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };

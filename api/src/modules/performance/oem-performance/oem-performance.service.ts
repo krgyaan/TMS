@@ -7,6 +7,16 @@ import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { OemPerformanceQueryDto } from "./zod/oem-performance.dto";
 import { mapTenderOutcome } from "../team-leader-performance/team-leader-performance.service";
+import type { TenderOutcomeStatus } from "../types/tender.type";
+
+type OemTenderView = {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    value: number;
+    dueDate: Date;
+    status: TenderOutcomeStatus;
+};
 
 @Injectable()
 export class OemPerformanceService {
@@ -44,147 +54,100 @@ export class OemPerformanceService {
     /* =====================================================
        SUMMARY (KPI CARDS)
     ===================================================== */
-
-    async getSummary(dto: OemPerformanceQueryDto) {
+    async getOemOutcomes(dto: OemPerformanceQueryDto) {
         const tenders = await this.getBaseTenders(dto);
 
-        let won = 0,
-            lost = 0,
-            submitted = 0,
-            notAllowed = 0;
+        const tendersWon: OemTenderView[] = [];
+        const tendersLost: OemTenderView[] = [];
+        const tendersSubmitted: OemTenderView[] = [];
+        const tendersNotAllowed: OemTenderView[] = [];
+        const rfqsSent: OemTenderView[] = [];
 
         let valueWon = 0,
             valueLost = 0,
             valueSubmitted = 0;
 
+        const trendBuckets = new Map<string, { won: number; lost: number }>();
+
         for (const t of tenders) {
             const outcome = mapTenderOutcome(Number(t.status));
+            const isNotAllowed = t.oemDenied?.split(",").map(Number).includes(dto.oemId);
 
-            if (outcome === "Won") {
-                won++;
-                valueWon += Number(t.gstValue ?? 0);
-            } else if (outcome === "Lost") {
-                lost++;
-                valueLost += Number(t.gstValue ?? 0);
-            } else if (outcome === "Result Awaited") {
-                submitted++;
-                valueSubmitted += Number(t.gstValue ?? 0);
-            }
-
-            if (t.oemDenied?.split(",").map(Number).includes(dto.oemId)) {
-                notAllowed++;
-            }
-        }
-
-        const total = won + lost + submitted + notAllowed;
-
-        return {
-            totalTendersWithOem: total,
-            tendersWon: won,
-            tendersLost: lost,
-            tendersSubmitted: submitted,
-            tendersNotAllowed: notAllowed,
-            totalValueWon: valueWon,
-            totalValueLost: valueLost,
-            totalValueSubmitted: valueSubmitted,
-            winRate: won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0,
-        };
-    }
-
-    /* =====================================================
-       ALL TENDERS (TABLE)
-    ===================================================== */
-
-    async getTenderList(dto: OemPerformanceQueryDto) {
-        const tenders = await this.getBaseTenders(dto);
-
-        return tenders.map(t => ({
-            id: t.id,
-            tenderNo: t.tenderNo,
-            tenderName: t.tenderName,
-            value: Number(t.gstValue ?? 0),
-            dueDate: t.dueDate,
-            status: mapTenderOutcome(Number(t.status)),
-        }));
-    }
-
-    /* =====================================================
-       NOT ALLOWED TABLE
-    ===================================================== */
-
-    async getNotAllowedTenders(dto: OemPerformanceQueryDto) {
-        const tenders = await this.getBaseTenders(dto);
-
-        return tenders
-            .filter(t => t.oemDenied?.includes(String(dto.oemId)))
-            .map(t => ({
+            const mapped = {
                 id: t.id,
                 tenderNo: t.tenderNo,
                 tenderName: t.tenderName,
-                gstValue: Number(t.gstValue ?? 0),
+                value: Number(t.gstValue ?? 0),
                 dueDate: t.dueDate,
-                reason: "Not allowed by OEM",
-            }));
-    }
+                status: outcome,
+            };
 
-    /* =====================================================
-       RFQs SENT TABLE
-    ===================================================== */
+            // KPI buckets
+            if (outcome === "Won") {
+                tendersWon.push(mapped);
+                valueWon += mapped.value;
+            } else if (outcome === "Lost") {
+                tendersLost.push(mapped);
+                valueLost += mapped.value;
+            } else if (outcome === "Result Awaited") {
+                tendersSubmitted.push(mapped);
+                valueSubmitted += mapped.value;
+            }
 
-    async getRfqsSent(dto: OemPerformanceQueryDto) {
-        const tenders = await this.getBaseTenders(dto);
+            if (isNotAllowed) {
+                tendersNotAllowed.push(mapped);
+            }
 
-        return tenders.map(t => ({
-            id: t.id,
-            tenderNo: t.tenderNo,
-            tenderName: t.tenderName,
-            gstValue: Number(t.gstValue ?? 0),
-            dueDate: t.dueDate,
-        }));
-    }
+            rfqsSent.push(mapped);
 
-    /* =====================================================
-       TRENDS
-    ===================================================== */
-
-    async getTrends(dto: OemPerformanceQueryDto) {
-        const tenders = await this.getBaseTenders(dto);
-
-        const buckets = new Map<string, { won: number; lost: number }>();
-
-        for (const t of tenders) {
+            // Trends
             const label = `${t.dueDate.getFullYear()}-${t.dueDate.getMonth() + 1}`;
-            if (!buckets.has(label)) buckets.set(label, { won: 0, lost: 0 });
-
-            const b = buckets.get(label)!;
-            const outcome = mapTenderOutcome(Number(t.status));
-
-            if (outcome === "Won") b.won++;
-            if (outcome === "Lost") b.lost++;
+            if (!trendBuckets.has(label)) trendBuckets.set(label, { won: 0, lost: 0 });
+            const bucket = trendBuckets.get(label)!;
+            if (outcome === "Won") bucket.won++;
+            if (outcome === "Lost") bucket.lost++;
         }
 
-        return Array.from(buckets.entries()).map(([label, v]) => ({
+        const totalTendersWithOem = tendersWon.length + tendersLost.length + tendersSubmitted.length + tendersNotAllowed.length;
+
+        const winRate = tendersWon.length + tendersLost.length ? Math.round((tendersWon.length / (tendersWon.length + tendersLost.length)) * 100) : 0;
+
+        const trends = Array.from(trendBuckets.entries()).map(([label, v]) => ({
             label,
             winRate: v.won + v.lost ? Math.round((v.won / (v.won + v.lost)) * 100) : 0,
         }));
-    }
 
-    /* =====================================================
-       SCORING
-    ===================================================== */
+        const complianceScore = totalTendersWithOem > 0 ? Math.round(100 - (tendersNotAllowed.length / totalTendersWithOem) * 100) : 100;
 
-    async getScoring(dto: OemPerformanceQueryDto) {
-        const summary = await this.getSummary(dto);
-
-        const winRateScore = Math.min(100, summary.winRate * 1.2);
-        const complianceScore = summary.totalTendersWithOem > 0 ? Math.round(100 - (summary.tendersNotAllowed / summary.totalTendersWithOem) * 100) : 100;
-
-        const total = Math.round(winRateScore * 0.6 + complianceScore * 0.4);
+        const winRateScore = Math.min(100, winRate * 1.2);
+        const totalScore = Math.round(winRateScore * 0.6 + complianceScore * 0.4);
 
         return {
-            winRateScore,
-            complianceScore,
-            total,
+            summary: {
+                totalTendersWithOem,
+                tendersWon: tendersWon.length,
+                tendersLost: tendersLost.length,
+                tendersSubmitted: tendersSubmitted.length,
+                tendersNotAllowed: tendersNotAllowed.length,
+                totalValueWon: valueWon,
+                totalValueLost: valueLost,
+                totalValueSubmitted: valueSubmitted,
+                winRate,
+            },
+            trends,
+            scoring: {
+                winRateScore,
+                complianceScore,
+                total: totalScore,
+            },
+            tendersByKpi: {
+                total: tenders,
+                tendersWon,
+                tendersLost,
+                tendersSubmitted,
+                tendersNotAllowed,
+                rfqsSent,
+            },
         };
     }
 }

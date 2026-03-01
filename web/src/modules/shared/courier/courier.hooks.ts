@@ -1,8 +1,8 @@
-// src/hooks/use-couriers.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { courierApi } from "@/modules/shared/courier/courier.service";
-import type { CreateCourierInput, UpdateCourierInput, UpdateStatusInput, UpdateDispatchInput, CreateDispatchInput, Courier } from "@/modules/shared/courier/courier.types";
+import type { UpdateCourierInput, UpdateStatusInput, CreateDispatchInput, Courier } from "@/modules/shared/courier/courier.types";
+import { useMemo } from "react";
 
 // Query keys
 export const courierKeys = {
@@ -42,6 +42,24 @@ export const useMyCouriers = () => {
         queryKey: courierKeys.myList(),
         queryFn: courierApi.getMyCouriers,
     });
+};
+
+/**
+ * Get Courier (courierNo, courierName) of all for Tendering Modules.
+ */
+
+export const useCourierOptions = () => {
+    const { data: courier = [] } = useAllCouriers();
+    return useMemo(
+        () =>
+            Array.isArray(courier)
+                ? courier.map((c: Courier) => ({
+                    value: String(c.id),
+                    label: `${c.id} - ${c.toOrg}`,
+                }))
+                : [],
+        [courier]
+    );
 };
 
 /**

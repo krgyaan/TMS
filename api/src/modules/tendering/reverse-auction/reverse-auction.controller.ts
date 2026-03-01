@@ -20,8 +20,10 @@ export class ReverseAuctionController {
 
     @Get('dashboard')
     getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tabKey') tabKey?: 'under-evaluation' | 'scheduled' | 'completed',
         @Query('type') type?: RaDashboardType, // Legacy support
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -45,12 +47,20 @@ export class ReverseAuctionController {
             ...(search && { search }),
         };
 
-        return this.reverseAuctionService.getDashboardData(activeTab, filters);
+        return this.reverseAuctionService.getDashboardData(user, parseNumber(teamId), activeTab, filters);
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.reverseAuctionService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.reverseAuctionService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get()
@@ -79,24 +89,22 @@ export class ReverseAuctionController {
         );
     }
 
-    @Patch(':id/schedule')
+    @Post(':tenderId/schedule')
     async scheduleRa(
-        @Param('id', ParseIntPipe) id: number,
+        @Param('tenderId', ParseIntPipe) tenderId: number,
         @Body() dto: ScheduleRaDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        // Fetch RA to get tenderId
-        const ra = await this.reverseAuctionService.findById(id);
-        return this.reverseAuctionService.scheduleRa(id, ra.tenderId, dto, user.sub);
+        return this.reverseAuctionService.scheduleRa(tenderId, dto, user.sub);
     }
 
-    @Patch(':id/upload-result')
+    @Patch(':raId/upload-result')
     uploadResult(
-        @Param('id', ParseIntPipe) id: number,
+        @Param('raId', ParseIntPipe) raId: number,
         @Body() dto: UploadRaResultDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        return this.reverseAuctionService.uploadResult(id, dto, user.sub);
+        return this.reverseAuctionService.uploadResult(raId, dto, user.sub);
     }
 
     @Post('update-started-status')

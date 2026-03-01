@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Inject, Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, UnauthorizedException, BadRequestException, NotFoundException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import authConfig, { type AuthConfig } from "@config/auth.config";
 import { UsersService, type UserWithRelations } from "@/modules/master/users/users.service";
@@ -62,6 +62,19 @@ export class AuthService {
         }
 
         const permissions = await this.permissionService.getUserPermissions(userId, user.role?.id ?? null);
+
+        return { ...user, permissions };
+    }
+
+    async getPermissionsWithId(id: number): Promise<UserWithRelations & { permissions: string[] }> {
+        const user = await this.usersService.findDetailById(id);
+        console.log("User fetched in getPermissionsWithId:", user);
+        
+        if (!user) {
+            throw new NotFoundException("User not found");
+        }
+
+        const permissions = await this.permissionService.getUserPermissionsWithId(id);
 
         return { ...user, permissions };
     }

@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useTqById, useTqItems } from '@/hooks/api/useTqManagement';
 import { useTender } from '@/hooks/api/useTenders';
@@ -73,18 +74,22 @@ export default function TqViewPage() {
     // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
         ? {
-              ...tender,
-              approval: approval || null,
-          }
+            ...tender,
+            approval: approval || null,
+        }
         : null;
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="tq-management" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-9 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
+            <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => navigate(paths.tendering.tqManagement)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                </Button>
+            </div>
+            <Tabs defaultValue="tender-details" className="space-y-4">
+                <TabsList className="grid w-fit grid-cols-7 gap-2">
+                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
                     <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
                     <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
                     <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
@@ -93,14 +98,12 @@ export default function TqViewPage() {
                     <TabsTrigger value="tq-management">TQ Management</TabsTrigger>
                 </TabsList>
 
-                {/* Tender */}
-                <TabsContent value="tender">
+                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
+                <TabsContent value="tender-details" className="space-y-6">
                     {tenderWithRelations ? (
                         <TenderView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
                     ) : (
                         <Alert>
@@ -108,10 +111,6 @@ export default function TqViewPage() {
                             <AlertDescription>Tender information not available.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
                     {infoSheetLoading ? (
                         <InfoSheetView isLoading />
                     ) : infoSheet ? (
@@ -122,22 +121,11 @@ export default function TqViewPage() {
                             <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
                         </Alert>
                     )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
-                    {tenderWithRelations ? (
+                    {tenderWithRelations && (
                         <TenderApprovalView
                             tender={tenderWithRelations}
                             isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
                         />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender approval information not available.</AlertDescription>
-                        </Alert>
                     )}
                 </TabsContent>
 
@@ -166,8 +154,6 @@ export default function TqViewPage() {
                     <DocumentChecklistView
                         checklist={documentChecklist}
                         isLoading={documentChecklistLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -176,8 +162,6 @@ export default function TqViewPage() {
                     <CostingSheetView
                         costingSheet={costingSheet}
                         isLoading={isLoading}
-                        showEditButton={false}
-                        showBackButton={false}
                     />
                 </TabsContent>
 
@@ -186,11 +170,7 @@ export default function TqViewPage() {
                     {bidSubmissionLoading ? (
                         <BidSubmissionView bidSubmission={null} isLoading />
                     ) : bidSubmission ? (
-                        <BidSubmissionView
-                            bidSubmission={bidSubmission}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
+                        <BidSubmissionView bidSubmission={bidSubmission} />
                     ) : (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />
@@ -206,18 +186,6 @@ export default function TqViewPage() {
                         tqItems={tqItems || null}
                         tqTypes={tqTypes || null}
                         isLoading={tqLoading || itemsLoading}
-                        showEditButton={true}
-                        showBackButton={true}
-                        onEdit={() => {
-                            if (tqData.status === 'TQ received') {
-                                navigate(paths.tendering.tqEditReceived(tqId));
-                            } else if (tqData.status === 'TQ replied') {
-                                navigate(paths.tendering.tqEditReplied(tqId));
-                            } else if (tqData.status === 'Disqualified, TQ missed') {
-                                navigate(paths.tendering.tqEditMissed(tqId));
-                            }
-                        }}
-                        onBack={() => navigate(paths.tendering.tqManagement)}
                     />
                 </TabsContent>
             </Tabs>

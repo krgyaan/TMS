@@ -1,27 +1,19 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import {
-    vendorGsts,
-    type VendorGst,
-    type NewVendorGst,
-} from '@db/schemas/vendors/vendor-gsts.schema';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { vendorGsts, type VendorGst, type NewVendorGst } from "@db/schemas/vendors/vendor-gsts.schema";
 
 @Injectable()
 export class VendorGstsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     async findAll(): Promise<VendorGst[]> {
         return this.db.select().from(vendorGsts);
     }
 
     async findById(id: number): Promise<VendorGst> {
-        const result = await this.db
-            .select()
-            .from(vendorGsts)
-            .where(eq(vendorGsts.id, id))
-            .limit(1);
+        const result = await this.db.select().from(vendorGsts).where(eq(vendorGsts.id, id)).limit(1);
 
         if (!result[0]) {
             throw new NotFoundException(`Vendor GST with ID ${id} not found`);
@@ -31,10 +23,7 @@ export class VendorGstsService {
     }
 
     async findByOrganization(orgId: number): Promise<VendorGst[]> {
-        return this.db
-            .select()
-            .from(vendorGsts)
-            .where(eq(vendorGsts.org, orgId));
+        return this.db.select().from(vendorGsts).where(eq(vendorGsts.orgId, orgId));
     }
 
     async create(data: NewVendorGst): Promise<VendorGst> {
@@ -56,10 +45,7 @@ export class VendorGstsService {
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db
-            .delete(vendorGsts)
-            .where(eq(vendorGsts.id, id))
-            .returning();
+        const result = await this.db.delete(vendorGsts).where(eq(vendorGsts.id, id)).returning();
 
         if (!result[0]) {
             throw new NotFoundException(`Vendor GST with ID ${id} not found`);

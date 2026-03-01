@@ -39,25 +39,50 @@
                 </td>
             </tr>
             <tr>
+                <th style="border: 1px solid black; text-align: left;">Processing Fee Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.processing_fee_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
+                <th style="border: 1px solid black; text-align: left;">Processing Fee Amount</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.processing_fee_amount}}</td>
+                <td style="border: 1px solid black; text-align: left;">Rs.</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">Processing Fee Mode</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.processing_fee_modes}}</td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">Tender Fee Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.tender_fee_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
                 <th style="border: 1px solid black; text-align: left;">Tender Fees</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.tender_fees}}</td>
                 <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">Tender Fees in form of</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.tender_fees_in_form_of}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
             </tr>
             <tr>
+                <th style="border: 1px solid black; text-align: left;">Tender Fees in form of</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.tender_fees_in_form_of}}</td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">EMD Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.emd_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
                 <th style="border: 1px solid black; text-align: left;">EMD</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.emd}}</td>
                 <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">EMD Required</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.emd_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">EMD in form of</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.emd_in_form_of}}</td>
             </tr>
             <tr>
                 <th style="border: 1px solid black; text-align: left;">Tender Value (GST Incl.)</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.tender_value}}</td>
                 <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">EMD in form of</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.emd_in_form_of}}</td>
+                <th style="border: 1px solid black; text-align: left;">OEM Experience</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.oem_experience}}</td>
             </tr>
             <tr>
                 <th style="border: 1px solid black; text-align: left;">Bid Validity</th>
@@ -73,8 +98,21 @@
                 <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.maf_required}}</td>
                 <th style="border: 1px solid black; text-align: left;">Delivery Time (supply/total)</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.delivery_time}} Days</td>
+                <th style="border: 1px solid black; text-align: left;">Delivery Time (I&C) Inclusive</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.delivery_time_ic_inclusive}}</td>
+            </tr>
+            <tr>
                 <th style="border: 1px solid black; text-align: left;">Delivery Time (I&C)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.delivery_time_ic}} Days</td>
+                <td style="border: 1px solid black; text-align: left;" colspan="6">
+                    {{#if data.delivery_time_ic_inclusive}}Inclusive in Supply/Total time{{else}}{{data.delivery_time_ic}} Days{{/if}}
+                    </td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">PBG Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.pbg_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
+                <th style="border: 1px solid black; text-align: left;">PBG Form</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.pbg_form}}</td>
             </tr>
             <tr>
                 <th style="border: 1px solid black; text-align: left;">PBG %age</th>
@@ -87,10 +125,27 @@
             <tr>
                 <th style="border: 1px solid black; text-align: left;">PBG Duration</th>
                 <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.pbg_duration}} Months</td>
+                <th style="border: 1px solid black; text-align: left;">LD Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.ld_required}}</td>
+                <th style="border: 1px solid black; text-align: left;"></th>
+                <td style="border: 1px solid black; text-align: left;"></td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">SD Required</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.sd_required}}</td>
+                <td style="border: 1px solid black; text-align: left;"></td>
                 <th style="border: 1px solid black; text-align: left;">LD % (per week)</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.ld_percentage}}%</td>
                 <th style="border: 1px solid black; text-align: left;">Max LD%</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.max_ld}} %</td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid black; text-align: left;">SD Form</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.sd_form}}</td>
+                <th style="border: 1px solid black; text-align: left;">SD %age</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.sd_percentage}}%</td>
+                <th style="border: 1px solid black; text-align: left;">SD Duration</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.sd_duration}} Months</td>
             </tr>
             <tr>
                 <th style="border: 1px solid black; text-align: left;">Physical Docs Submission Required</th>
@@ -106,11 +161,21 @@
                 </td>
             </tr>
             <tr>
+                <th style="border: 1px solid black; text-align: left;">Work Value Type</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.work_value_type}}</td>
+                <td style="border: 1px solid black; text-align: center;" colspan="4">
+                    <b>Financial Criterion</b>
+                </td>
+            </tr>
+            <tr>
                 <th style="border: 1px solid black; text-align: left;">Eligibility Criterion</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.eligibility_criterion}}</td>
                 <td style="border: 1px solid black; text-align: left;"> Age (in yrs)</td>
-                <td style="border: 1px solid black; text-align: center;" colspan="4">
-                    <b>Financial Criterion</b>
+                <td style="border: 1px solid black; text-align: left;" colspan="4">
+                    {{#if data.custom_eligibility_criteria}}
+                        <b>Custom Eligibility Criteria:</b><br/>
+                        <pre style="white-space: pre-wrap; margin: 0;">{{data.custom_eligibility_criteria}}</pre>
+                    {{/if}}
                 </td>
             </tr>
             <tr>
@@ -192,6 +257,18 @@
             {{/if}}
         </thead>
     </table>
+
+    {{#if data.courier_address}}
+        {{#if (ne data.courier_address "Not specified")}}
+            <p><b>Courier Delivery Address:</b></p>
+            <pre style="white-space: pre-wrap; background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">{{data.courier_address}}</pre>
+        {{/if}}
+    {{/if}}
+
+    {{#if data.te_final_remark}}
+        <p><b>TE Final Remark:</b></p>
+        <pre style="white-space: pre-wrap; background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">{{data.te_final_remark}}</pre>
+    {{/if}}
 
     <p>
         Please take your decision using the form link:

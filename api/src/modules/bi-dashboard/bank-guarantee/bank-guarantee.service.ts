@@ -10,6 +10,7 @@ import {
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
@@ -26,33 +27,34 @@ export class BankGuaranteeService {
         private readonly followUpService: FollowUpService,
     ) { }
 
-    async getDashboardData(
-        tab?: string,
-        options?: {
-            page?: number;
-            limit?: number;
-            sortBy?: string;
-            sortOrder?: 'asc' | 'desc';
-            search?: string;
-        },
-    ): Promise<PaginatedResult<BankGuaranteeDashboardRow>> {
-        const page = options?.page || 1;
-        const limit = options?.limit || 50;
-        const offset = (page - 1) * limit;
+    private statusMap() {
+        return {
+            [BG_STATUSES.PENDING]: 'Pending',
+            [BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [BG_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [BG_STATUSES.BG_CREATED]: 'Created',
+            [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
+            [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
+            [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
+            [BG_STATUSES.COURIER_RETURN_RECEIVED]: 'Courier Returned',
+            [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
+            [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
+            [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',
+        };
+    }
 
+    private buildDashboardConditions(tab?: string) {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'BG'),
             eq(paymentInstruments.isActive, true),
         ];
 
-        // Apply tab-specific filters
         if (tab === 'new-requests') {
             conditions.push(
-                or(
-                    isNull(paymentInstruments.action),
-                    eq(paymentInstruments.action, 1)
-                ),
-                eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED)
+                and(
+                    inArray(paymentInstruments.action, [0, 1]),
+                    inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
+                )
             );
         } else if (tab === 'live-yes') {
             conditions.push(
@@ -75,24 +77,56 @@ export class BankGuaranteeService {
             );
         } else if (tab === 'rejected') {
             conditions.push(
-                or(
-                    eq(paymentInstruments.action, 1),
-                    eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED)
+                and(
+                    inArray(paymentInstruments.action, [1, 2]),
+                    eq(paymentInstruments.status, BG_STATUSES.ACCOUNTS_FORM_REJECTED)
                 )
             );
         }
 
-        // Search filter
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${paymentRequests.projectName} ILIKE ${searchStr} OR
-                    ${paymentRequests.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentBgDetails.bgNo} ILIKE ${searchStr} OR
-                    ${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}
-                )`
-            );
+        return conditions;
+    }
+
+    async getDashboardData(
+        tab?: string,
+        options?: {
+            page?: number;
+            limit?: number;
+            sortBy?: string;
+            sortOrder?: 'asc' | 'desc';
+            search?: string;
+        },
+    ): Promise<PaginatedResult<BankGuaranteeDashboardRow>> {
+        const page = options?.page || 1;
+        const limit = options?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const conditions = this.buildDashboardConditions(tab);
+
+        const searchTerm = options?.search?.trim();
+
+        // Search filter - search across all rendered columns
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            const searchConditions: any[] = [
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgNo} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.beneficiaryName} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.bgDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.validityDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.claimExpiryDate}::text ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.fdrNo} ILIKE ${searchStr}`,
+                sql`${instrumentBgDetails.fdrAmt}::text ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+                // Search by BG status display label (table shows "Pending", "Accepted", etc.)
+                sql`(CASE ${paymentInstruments.status} WHEN 'BG_ACCOUNTS_FORM_PENDING' THEN 'Pending' WHEN 'BG_ACCOUNTS_FORM_ACCEPTED' THEN 'Accepted' WHEN 'BG_ACCOUNTS_FORM_REJECTED' THEN 'Rejected' WHEN 'BG_CREATED' THEN 'Created' WHEN 'BG_FDR_DETAILS_CAPTURED' THEN 'FDR Details Captured' WHEN 'BG_FOLLOWUP_INITIATED' THEN 'Followup Initiated' WHEN 'BG_EXTENSION_REQUESTED' THEN 'Extension Requested' WHEN 'BG_RETURN_VIA_COURIER' THEN 'Courier Returned' WHEN 'BG_CANCELLATION_REQUESTED' THEN 'Cancellation Request' WHEN 'BG_BG_CANCELLATION_CONFIRMED' THEN 'Cancelled at Branch' WHEN 'BG_FDR_CANCELLED_CONFIRMED' THEN 'FDR Cancellation Confirmed' ELSE ${paymentInstruments.status}::text END)::text ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -123,19 +157,20 @@ export class BankGuaranteeService {
         const rows = await this.db
             .select({
                 id: paymentInstruments.id,
+                requestId: paymentRequests.id,
                 bgDate: instrumentBgDetails.bgDate,
                 bgNo: instrumentBgDetails.bgNo,
                 beneficiaryName: instrumentBgDetails.beneficiaryName,
-                // Get tender info from payment_requests table
-                tenderName: paymentRequests.projectName,
-                tenderNo: paymentRequests.tenderNo,
-                bidValidity: paymentRequests.dueDate,
-                tenderId: paymentRequests.tenderId,
-                tenderType: paymentRequests.type,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                tenderDueDate: tenderInfos.dueDate,
+                requestDueDate: paymentRequests.dueDate,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                requestType: paymentRequests.type,
                 amount: paymentInstruments.amount,
-                bgExpiryDate: instrumentBgDetails.validityDate,
-                claimExpiryDate: instrumentBgDetails.claimExpiryDate,
-                // Raw charge fields for calculation
+                bgExpiryDate: paymentInstruments.expiryDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
                 stampCharges: instrumentBgDetails.stampCharges,
                 sfmsCharges: instrumentBgDetails.sfmsCharges,
                 stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
@@ -144,7 +179,6 @@ export class BankGuaranteeService {
                 bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
                 fdrNo: instrumentBgDetails.fdrNo,
                 fdrValue: instrumentBgDetails.fdrAmt,
-                // Conditional tender status from tenderInfos if tender_id != 0
                 tenderStatusFromTender: statuses.name,
                 bgStatus: paymentInstruments.status,
             })
@@ -161,13 +195,21 @@ export class BankGuaranteeService {
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join tenderInfos and statuses when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(tenderInfos, and(
+                    eq(tenderInfos.id, paymentRequests.tenderId),
+                    ne(paymentRequests.tenderId, 0)
+                ))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
@@ -180,16 +222,15 @@ export class BankGuaranteeService {
 
             return {
                 id: row.id,
+                requestId: row.requestId,
                 bgDate,
                 bgNo: row.bgNo,
                 beneficiaryName: row.beneficiaryName,
-                tenderName: row.tenderName,
-                tenderNo: row.tenderNo,
-                bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+                tenderName: row.tenderName || row.projectName,
+                tenderNo: row.tenderNo || row.projectNo,
                 amount,
                 bgExpiryDate,
                 bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
-                expiryDate: claimExpiryDate,
                 bgChargesPaid: this.calculateBgChargesPaid(
                     row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
                     row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
@@ -205,104 +246,56 @@ export class BankGuaranteeService {
                 ),
                 fdrNo: row.fdrNo,
                 fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
-                tenderStatus: row.tenderId && row.tenderId !== 0 ? row.tenderStatusFromTender : row.tenderType,
-                expiry: bgExpiryDate,
+                tenderStatus: row.tenderStatusFromTender,
+                bidValidity: row.tenderDueDate || row.requestDueDate,
+                bgStatus: this.statusMap()[row.bgStatus],
                 expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
-                bgStatus: row.bgStatus,
+                expiryDate: claimExpiryDate,
             };
         });
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    private async countByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(
+                instrumentBgDetails,
+                eq(instrumentBgDetails.instrumentId, paymentInstruments.id)
+            )
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<BankGuaranteeDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'BG'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const newRequests = await this.countByConditions(
+            this.buildDashboardConditions('new-requests')
+        );
 
-        // Count new-requests
-        const newRequestsConditions = [
-            ...baseConditions,
-            or(
-                isNull(paymentInstruments.action),
-                eq(paymentInstruments.action, 1)
-            ),
-            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_ACCEPTED),
-        ];
-        const [newRequestsResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...newRequestsConditions));
-        const newRequests = Number(newRequestsResult?.count || 0);
+        const liveYes = await this.countByConditions(
+            this.buildDashboardConditions('live-yes')
+        );
 
-        // Count live-yes
-        const liveYesConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
-        ];
-        const [liveYesResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...liveYesConditions));
-        const liveYes = Number(liveYesResult?.count || 0);
+        const livePnb = await this.countByConditions(
+            this.buildDashboardConditions('live-pnb')
+        );
 
-        // Count live-pnb
-        const livePnbConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'PNB_6011'),
-        ];
-        const [livePnbResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...livePnbConditions));
-        const livePnb = Number(livePnbResult?.count || 0);
+        const liveBgLimit = await this.countByConditions(
+            this.buildDashboardConditions('live-bg-limit')
+        );
 
-        // Count live-bg-limit
-        const liveBgLimitConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
-            eq(instrumentBgDetails.bankName, 'BGLIMIT_0771'),
-        ];
-        const [liveBgLimitResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
-            .where(and(...liveBgLimitConditions));
-        const liveBgLimit = Number(liveBgLimitResult?.count || 0);
+        const cancelled = await this.countByConditions(
+            this.buildDashboardConditions('cancelled')
+        );
 
-        // Count cancelled
-        const cancelledConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [8, 9]),
-        ];
-        const [cancelledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...cancelledConditions));
-        const cancelled = Number(cancelledResult?.count || 0);
+        const rejected = await this.countByConditions(
+            this.buildDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            eq(paymentInstruments.action, 1),
-            eq(paymentInstruments.status, BG_STATUSES.BANK_REQUEST_REJECTED),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
 
         return {
             'new-requests': newRequests,
@@ -374,22 +367,25 @@ export class BankGuaranteeService {
             // Count BGs with bg_no not null
             const bankCount = bgs.filter(bg => bg.bgNo !== null && bg.bgNo !== '').length;
 
-            // Sum of bg_amt where bg_no is not null
+            // 👉 Skip banks with 0 count
+            if (bankCount === 0) {
+                continue;
+            }
+
             const bankAmount = bgs
                 .filter(bg => bg.bgNo !== null && bg.bgNo !== '')
                 .reduce((sum, bg) => sum + (bg.amount ? Number(bg.amount) : 0), 0);
 
-            // FDR amounts by percentage
             const fdrAmount10 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 10)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 10)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const fdrAmount15 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 15)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 15)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const fdrAmount100 = bgs
-                .filter(bg => bg.bgNo !== null && bg.bgNo !== '' && bg.fdrPer && Number(bg.fdrPer) === 100)
+                .filter(bg => bg.bgNo && Number(bg.fdrPer) === 100)
                 .reduce((sum, bg) => sum + (bg.fdrAmt ? Number(bg.fdrAmt) : 0), 0);
 
             const percentage = totalBgCount > 0 ? (bankCount / totalBgCount) * 100 : 0;
@@ -404,8 +400,13 @@ export class BankGuaranteeService {
             };
         }
 
+        // 👉 Filter out banks with 0 count
+        const filteredBankStats = Object.fromEntries(
+            Object.entries(bankStats).filter(([_, stats]) => stats.count > 0)
+        );
+
         return {
-            bankStats,
+            bankStats: filteredBankStats,
             totalBgCount,
             totalBgAmount,
         };
@@ -472,7 +473,7 @@ export class BankGuaranteeService {
         claimExpiryDate: Date | null
     ): string | null {
         if (!bgExpiryDate || !claimExpiryDate) {
-            return 'N/A';
+            return '-';
         }
 
         const now = new Date();
@@ -534,9 +535,9 @@ export class BankGuaranteeService {
      */
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
-            'accounts-form-2': 2,
-            'accounts-form-3': 3,
+            'accounts-form-1': 1, // Request to Bank
+            'accounts-form-2': 2, // After BG Creation
+            'accounts-form-3': 3, // FDR Details Captured
             'initiate-followup': 4,
             'request-extension': 5,
             'returned-courier': 6,
@@ -585,6 +586,16 @@ export class BankGuaranteeService {
             return extractedFiles;
         }
         return [];
+    }
+
+    /**
+     * Get file path from body if it's a string (from TenderFileUploader)
+     */
+    private getFilePathFromBody(fieldname: string, body: any): string | null {
+        if (body[fieldname] && typeof body[fieldname] === 'string') {
+            return body[fieldname];
+        }
+        return null;
     }
 
     /**
@@ -652,20 +663,29 @@ export class BankGuaranteeService {
         } else if (body.action === 'returned-courier') {
             updateData.status = 'RETURNED_VIA_COURIER';
             const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
+            const docketSlipPath = this.getFilePathFromBody('docket_slip', body);
             if (docketSlipFile) {
                 updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+            } else if (docketSlipPath) {
+                updateData.docketSlip = docketSlipPath;
             }
         } else if (body.action === 'request-cancellation') {
             updateData.status = 'CANCELLATION_REQUESTED';
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
                 updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            } else if (coveringLetterPath) {
+                updateData.coveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
             updateData.status = 'BG_CANCELLED';
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
                 updateData.cancelPdf = `bi-dashboard/${cancellConfirmFile.filename}`;
+            } else if (cancellConfirmPath) {
+                updateData.cancelPdf = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             updateData.status = 'FDR_CANCELLED';
@@ -690,15 +710,31 @@ export class BankGuaranteeService {
 
             // Handle bg_format_imran file (single file)
             const bgFormatImranFile = this.getFileForField('bg_format_imran', files, body, fileIndexTracker);
+            const bgFormatImranPath = this.getFilePathFromBody('bg_format_imran', body);
             if (bgFormatImranFile) {
                 bgDetailsUpdate.bgFormatTe = `bi-dashboard/${bgFormatImranFile.filename}`;
+            } else if (bgFormatImranPath) {
+                bgDetailsUpdate.bgFormatTe = bgFormatImranPath;
             }
 
             // Handle prefilled_signed_bg files (multiple files)
             const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
+            const prefilledPath = this.getFilePathFromBody('prefilled_signed_bg', body);
             if (prefilledFiles.length > 0) {
                 const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
+            } else if (prefilledPath) {
+                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
+                try {
+                    const parsed = JSON.parse(prefilledPath);
+                    if (Array.isArray(parsed)) {
+                        bgDetailsUpdate.prefilledSignedBg = JSON.stringify(parsed);
+                    } else {
+                        bgDetailsUpdate.prefilledSignedBg = JSON.stringify([prefilledPath]);
+                    }
+                } catch {
+                    bgDetailsUpdate.prefilledSignedBg = JSON.stringify([prefilledPath]);
+                }
             }
         } else if (body.action === 'accounts-form-2') {
             if (body.bg_no) bgDetailsUpdate.bgNo = body.bg_no;
@@ -720,14 +756,20 @@ export class BankGuaranteeService {
 
             // Handle sfms_conf file
             const sfmsConfFile = this.getFileForField('sfms_conf', files, body, fileIndexTracker);
+            const sfmsConfPath = this.getFilePathFromBody('sfms_conf', body);
             if (sfmsConfFile) {
                 bgDetailsUpdate.sfmsConf = `bi-dashboard/${sfmsConfFile.filename}`;
+            } else if (sfmsConfPath) {
+                bgDetailsUpdate.sfmsConf = sfmsConfPath;
             }
 
             // Handle fdr_copy file
             const fdrCopyFile = this.getFileForField('fdr_copy', files, body, fileIndexTracker);
+            const fdrCopyPath = this.getFilePathFromBody('fdr_copy', body);
             if (fdrCopyFile) {
                 bgDetailsUpdate.fdrCopy = `bi-dashboard/${fdrCopyFile.filename}`;
+            } else if (fdrCopyPath) {
+                bgDetailsUpdate.fdrCopy = fdrCopyPath;
             }
         } else if (body.action === 'request-extension') {
             // Handle modification fields only if modification_required is 'Yes'
@@ -741,8 +783,11 @@ export class BankGuaranteeService {
 
             // Handle extension letter file
             const extLetterFile = this.getFileForField('ext_letter', files, body, fileIndexTracker);
+            const extLetterPath = this.getFilePathFromBody('ext_letter', body);
             if (extLetterFile) {
                 bgDetailsUpdate.extensionLetterPath = `bi-dashboard/${extLetterFile.filename}`;
+            } else if (extLetterPath) {
+                bgDetailsUpdate.extensionLetterPath = extLetterPath;
             }
         } else if (body.action === 'returned-courier') {
             if (body.docket_no) bgDetailsUpdate.courierNo = body.docket_no;
@@ -750,13 +795,19 @@ export class BankGuaranteeService {
         } else if (body.action === 'request-cancellation') {
             if (body.cancel_remark) bgDetailsUpdate.cancelRemark = body.cancel_remark;
             const coveringLetterFile = this.getFileForField('stamp_covering_letter', files, body, fileIndexTracker);
+            const coveringLetterPath = this.getFilePathFromBody('stamp_covering_letter', body);
             if (coveringLetterFile) {
                 bgDetailsUpdate.stampCoveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+            } else if (coveringLetterPath) {
+                bgDetailsUpdate.stampCoveringLetter = coveringLetterPath;
             }
         } else if (body.action === 'bg-cancellation-confirmation') {
             const cancellConfirmFile = this.getFileForField('cancell_confirm', files, body, fileIndexTracker);
+            const cancellConfirmPath = this.getFilePathFromBody('cancell_confirm', body);
             if (cancellConfirmFile) {
                 bgDetailsUpdate.cancellConfirm = `bi-dashboard/${cancellConfirmFile.filename}`;
+            } else if (cancellConfirmPath) {
+                bgDetailsUpdate.cancellConfirm = cancellConfirmPath;
             }
         } else if (body.action === 'fdr-cancellation-confirmation') {
             if (body.bg_fdr_cancel_date) bgDetailsUpdate.bgFdrCancelDate = body.bg_fdr_cancel_date;
@@ -790,97 +841,7 @@ export class BankGuaranteeService {
             }
         }
 
-        // Create follow-up if action is initiate-followup
-        if (body.action === 'initiate-followup') {
-            try {
-                // Get payment request and tender info
-                const [paymentRequest] = await this.db
-                    .select({
-                        requestId: paymentRequests.id,
-                        tenderId: paymentRequests.tenderId,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
-                    .limit(1);
-
-                if (paymentRequest) {
-                    const [tenderInfo] = await this.db
-                        .select({
-                            teamId: tenderInfos.team,
-                            teamMemberId: tenderInfos.teamMember,
-                        })
-                        .from(tenderInfos)
-                        .where(eq(tenderInfos.id, paymentRequest.tenderId))
-                        .limit(1);
-
-                    if (tenderInfo) {
-                        // Get team name
-                        const [team] = await this.db
-                            .select({ name: teams.name })
-                            .from(teams)
-                            .where(eq(teams.id, tenderInfo.teamId))
-                            .limit(1);
-
-                        // Map team name to area format (AC → 'AC Team', Accounts → 'Accounts', others → '{team} Team')
-                        let area = 'DC Team';
-                        if (team?.name === 'AC') {
-                            area = 'AC Team';
-                        } else if (team?.name === 'Accounts') {
-                            area = 'Accounts';
-                        } else if (team?.name) {
-                            area = `${team.name} Team`;
-                        }
-
-                        // Identify proof image from files
-                        let proofImagePath: string | null = null;
-                        const proofImageFile = this.getFileForField('proof_image', files, body, fileIndexTracker);
-                        if (proofImageFile) {
-                            proofImagePath = proofImageFile.filename;
-                        }
-
-                        // Map contacts to ContactPersonDto format and filter out invalid ones
-                        const mappedContacts = contacts
-                            .filter((contact) => contact.name && contact.name.trim().length > 0)
-                            .map((contact) => ({
-                                name: contact.name.trim(),
-                                email: contact.email || null,
-                                phone: contact.phone || null,
-                                org: contact.org || null,
-                            }));
-
-                        if (mappedContacts.length === 0) {
-                            throw new BadRequestException('At least one valid contact with name is required');
-                        }
-
-                        // Create followup DTO
-                        const followUpDto: CreateFollowUpDto = {
-                            area,
-                            partyName: body.organisation_name || '',
-                            amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: 'Bank Guarantee',
-                            assignedToId: tenderInfo.teamMemberId || null,
-                            emdId: paymentRequest.requestId,
-                            contacts: mappedContacts,
-                            frequency: body.frequency ? Number(body.frequency) : 1,
-                            startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
-                            attachments: [],
-                            createdById: user.id,
-                            followUpHistory: [],
-                        };
-
-                        await this.followUpService.create(followUpDto, user.id);
-                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
-                    }
-                }
-            } catch (error) {
-                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
-            }
-        }
+        // Follow-up creation will be handled by a different service class
 
         return {
             success: true,
@@ -888,5 +849,144 @@ export class BankGuaranteeService {
             action: body.action,
             actionNumber,
         };
+    }
+
+    async getById(id: number) {
+        const [result] = await this.db
+            .select({
+                // Payment Instrument fields
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                validityDate: paymentInstruments.validityDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                coveringLetter: paymentInstruments.coveringLetter,
+                extraPdfPaths: paymentInstruments.extraPdfPaths,
+                createdAt: paymentInstruments.createdAt,
+                updatedAt: paymentInstruments.updatedAt,
+
+                // Payment Request fields
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                requestType: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                requestDueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestPurpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                requestStatus: paymentRequests.status,
+                requestRemarks: paymentRequests.remarks,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestUpdatedAt: paymentRequests.updatedAt,
+
+                // BG Details - all fields
+                bgDetailsId: instrumentBgDetails.id,
+                bgNo: instrumentBgDetails.bgNo,
+                bgDate: instrumentBgDetails.bgDate,
+                claimExpiryDateBg: instrumentBgDetails.claimExpiryDate,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                bankName: instrumentBgDetails.bankName,
+                cashMarginPercent: instrumentBgDetails.cashMarginPercent,
+                fdrMarginPercent: instrumentBgDetails.fdrMarginPercent,
+                stampCharges: instrumentBgDetails.stampCharges,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
+                extendedAmount: instrumentBgDetails.extendedAmount,
+                extendedValidityDate: instrumentBgDetails.extendedValidityDate,
+                extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
+                extendedBankName: instrumentBgDetails.extendedBankName,
+                extensionLetterPath: instrumentBgDetails.extensionLetterPath,
+                cancellationLetterPath: instrumentBgDetails.cancellationLetterPath,
+                prefilledSignedBg: instrumentBgDetails.prefilledSignedBg,
+                bgNeeds: instrumentBgDetails.bgNeeds,
+                bgPurpose: instrumentBgDetails.bgPurpose,
+                bgSoftCopy: instrumentBgDetails.bgSoftCopy,
+                bgPo: instrumentBgDetails.bgPo,
+                bgClientUser: instrumentBgDetails.bgClientUser,
+                bgClientCp: instrumentBgDetails.bgClientCp,
+                bgClientFin: instrumentBgDetails.bgClientFin,
+                bgBankAcc: instrumentBgDetails.bgBankAcc,
+                bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                courierNo: instrumentBgDetails.courierNo,
+                stampCharge: instrumentBgDetails.stampCharge,
+                extensionLetter: instrumentBgDetails.extensionLetter,
+                newBgClaim: instrumentBgDetails.newBgClaim,
+                approveBg: instrumentBgDetails.approveBg,
+                bgFormatTe: instrumentBgDetails.bgFormatTe,
+                bgFormatTl: instrumentBgDetails.bgFormatTl,
+                sfmsConf: instrumentBgDetails.sfmsConf,
+                fdrAmt: instrumentBgDetails.fdrAmt,
+                fdrPer: instrumentBgDetails.fdrPer,
+                fdrCopy: instrumentBgDetails.fdrCopy,
+                fdrNo: instrumentBgDetails.fdrNo,
+                fdrValidity: instrumentBgDetails.fdrValidity,
+                fdrRoi: instrumentBgDetails.fdrRoi,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
+                newStampChargeDeducted: instrumentBgDetails.newStampChargeDeducted,
+                stampCoveringLetter: instrumentBgDetails.stampCoveringLetter,
+                cancelRemark: instrumentBgDetails.cancelRemark,
+                cancellConfirm: instrumentBgDetails.cancellConfirm,
+                bgFdrCancelDate: instrumentBgDetails.bgFdrCancelDate,
+                bgFdrCancelAmount: instrumentBgDetails.bgFdrCancelAmount,
+                bgFdrCancelRefNo: instrumentBgDetails.bgFdrCancelRefNo,
+                bg2Remark: instrumentBgDetails.bg2Remark,
+                reasonReq: instrumentBgDetails.reasonReq,
+                bgDetailsCreatedAt: instrumentBgDetails.createdAt,
+                bgDetailsUpdatedAt: instrumentBgDetails.updatedAt,
+
+                // Tender Info fields
+                tenderName: tenderInfos.tenderName,
+                tenderDueDate: tenderInfos.dueDate,
+                tenderStatusId: tenderInfos.status,
+                tenderOrganizationId: tenderInfos.organization,
+                tenderItemId: tenderInfos.item,
+                tenderTeamMember: tenderInfos.teamMember,
+
+                // Status fields
+                tenderStatusName: statuses.name,
+
+                // User fields
+                requestedByName: users.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentRequests.id, id),
+                eq(paymentInstruments.instrumentType, 'BG'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Request with ID ${id} not found`);
+        }
+
+        return result;
     }
 }

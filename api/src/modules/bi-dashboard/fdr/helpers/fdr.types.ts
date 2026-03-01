@@ -1,5 +1,6 @@
 export interface FdrDashboardRow {
     id: number;
+    requestId: number;
     fdrCreationDate: Date | null;
     fdrNo: string | null;
     beneficiaryName: string | null;
@@ -14,12 +15,12 @@ export interface FdrDashboardRow {
 
 export interface FdrDashboardCounts {
     pending: number;
+    rejected: number;
+    returned: number;
+    cancelled: number;
     'pnb-bg-linked': number;
     'ybl-bg-linked': number;
     'security-deposit': number;
     'bond-linked': number;
-    rejected: number;
-    returned: number;
-    cancelled: number;
     total: number;
 }

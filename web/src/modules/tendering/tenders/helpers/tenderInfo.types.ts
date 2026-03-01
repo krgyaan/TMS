@@ -139,6 +139,8 @@ export interface TenderListParams {
     search?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 }
 
 export interface TenderInfoDashboardCounts {

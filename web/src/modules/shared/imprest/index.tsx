@@ -1,6 +1,6 @@
 // ImprestEmployeeDashboard.tsx
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { data, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,23 +8,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle } from "lucide-react";
+import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft, Pencil } from "lucide-react";
 
-import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "./imprest.hooks";
+import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest } from "./imprest.hooks";
 
-import type { ImprestRow } from "./imprest.types";
+import type { ImprestProof, ImprestRow, ProofItem } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import type { GridApi } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser } from "@/hooks/api/useUsers";
+import SelectField from "@/components/form/SelectField";
+import { imprestCategoriesKey, useImprestCategories } from "@/hooks/api/useImprestCategories";
+import { useProjectOptions } from "@/hooks/useSelectOptions";
+import SelectInput from "@/components/SelectInput";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -106,19 +109,32 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
+//pdf helpers
+const isPdf = (file: string) => file.toLowerCase().endsWith(".pdf");
+
+const fileUrl = (file: string) => `/uploads/employeeimprest/${file}`;
+
 const ImprestEmployeeDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user, hasPermission, canUpdate } = useAuth();
+    const { user, hasPermission, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
+    const [isMobile, setIsMobile] = useState(false);
+
+    const projectOptions = useProjectOptions();
+    const { data: imprestCategories = [] } = useImprestCategories();
+
     let userDetails = null;
 
-    const canMutateStatus = canUpdate("shared.imprestss");
+    const canMutateStatus = canUpdate("accounts.imprests");
+    const canDeleteStatus = canDelete("accounts.imprests");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
 
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
+
     console.log(requestedUserId, isOwnPage);
+
     if (requestedUserId) {
         userDetails = useUser(requestedUserId).data;
     }
@@ -139,7 +155,14 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const numericUserId = isOwnPage ? user?.id : requestedUserId;
     console.log(numericUserId);
-    const { data: rows = [], isLoading, error } = useImprestList(numericUserId);
+
+    const { data, isLoading, error } = useImprestList(numericUserId);
+
+    console.log("invoiceProof", data?.invoiceProof);
+
+    const summary = data?.summary;
+    console.log("summary", { summary });
+    const rows = data?.imprests ?? [];
 
     const deleteMutation = useDeleteImprest();
     const uploadProofsMutation = useUploadImprestProofs();
@@ -147,8 +170,12 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const tallyMutation = useTallyImprest();
     const proofMutation = useProofImprest();
 
-    const [lightboxOpen, setLightboxOpen] = useState(false);
-    const [lightboxSlides, setLightboxSlides] = useState<{ src: string }[]>([]);
+    const MOBILE_PAGE_SIZE = 10;
+
+    const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
+    const [proofModalOpen, setProofModalOpen] = useState(false);
+    const [proofs, setProofs] = useState<ProofItem[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
@@ -159,7 +186,19 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
     const [remarkText, setRemarkText] = useState("");
 
+    const [editOpen, setEditOpen] = useState(false);
+    const [editRow, setEditRow] = useState<ImprestRow | null>(null);
+    const updateImprestMutation = useUpdateImprest();
+
     /* -------------------- HANDLERS -------------------- */
+
+    useEffect(() => {
+        const mq = window.matchMedia("(max-width: 768px)");
+        const handler = () => setIsMobile(mq.matches);
+        handler();
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, []);
 
     const handleDelete = useCallback(
         (row: ImprestRow) => {
@@ -205,9 +244,56 @@ const ImprestEmployeeDashboard: React.FC = () => {
         setRemarkOpen(false);
     };
 
-    const openLightboxForRow = (row: ImprestRow) => {
-        setLightboxSlides(row.invoiceProof.map(filename => ({ src: `/uploads/employeeimprest/${filename}` })));
-        setLightboxOpen(true);
+    const openEditModal = (row: ImprestRow) => {
+        setEditRow(row);
+        setEditOpen(true);
+    };
+
+    const submitEditImprest = (e?: React.FormEvent) => {
+        e?.preventDefault();
+
+        if (!editRow) return;
+
+        updateImprestMutation.mutate(
+            {
+                id: editRow.id,
+                data: {
+                    partyName: editRow.partyName?.trim() || null,
+                    projectName: editRow.projectName || null,
+                    categoryId: typeof editRow.categoryId === "number" ? editRow.categoryId : null,
+                    teamId: typeof editRow.teamId === "number" ? editRow.teamId : null,
+                    amount: Number(editRow.amount) || 0,
+                    remark: editRow.remark?.trim() || null,
+                },
+            },
+            {
+                onSuccess: () => {
+                    setEditOpen(false);
+                    setEditRow(null);
+                },
+            }
+        );
+    };
+
+    const openProofModal = (row: ImprestRow) => {
+        if (!Array.isArray(row.invoiceProof)) return;
+
+        const mapped: ProofItem[] = row.invoiceProof
+            .filter(file => typeof file === "string")
+            .map(file => ({
+                type: isPdf(file) ? "pdf" : "image",
+                url: fileUrl(file),
+                name: file,
+            }));
+
+        if (mapped.length === 0) {
+            alert("No proofs available.");
+            return;
+        }
+
+        setProofs(mapped);
+        setCurrentIndex(0);
+        setProofModalOpen(true);
     };
 
     /* -------------------- EXCEL -------------------- */
@@ -236,6 +322,20 @@ const ImprestEmployeeDashboard: React.FC = () => {
         console.log("QuickFilter:", searchText);
     }, [searchText]);
 
+    useEffect(() => {
+        setVisibleCount(MOBILE_PAGE_SIZE);
+    }, [rows]);
+
+    const StatusChip = ({ done, doneText, pendingText, color }: { done: boolean; doneText: string; pendingText: string; color: "green" | "blue" | "purple" }) => {
+        const colorMap = {
+            green: done ? "bg-green-100 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+            blue: done ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+            purple: done ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
+        };
+
+        return <button className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>{done ? doneText : pendingText}</button>;
+    };
+
     /* -------------------- COLUMNS -------------------- */
 
     const columns = useMemo(
@@ -259,11 +359,23 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 minWidth: 140,
             },
             {
+                field: "categoryName",
+                headerName: "Category",
+                flex: 1,
+                minWidth: 140,
+            },
+            {
                 field: "amount",
                 headerName: "Amount",
                 width: 120,
                 valueFormatter: p => formatINR(p.value),
                 cellClass: "font-medium tabular-nums",
+            },
+            {
+                field: "remark",
+                headerName: "Remarks",
+                flex: 1,
+                minWidth: 140,
             },
             {
                 field: "invoiceProof",
@@ -279,7 +391,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openLightboxForRow(row)}>
+                                    <button className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" onClick={() => openProofModal(row)}>
                                         <Eye className="h-3.5 w-3.5" />
                                         {row.invoiceProof.length}
                                     </button>
@@ -341,7 +453,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
+                            {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {canDeleteStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
                     );
                 },
@@ -351,6 +464,50 @@ const ImprestEmployeeDashboard: React.FC = () => {
     );
 
     /* -------------------- RENDER -------------------- */
+
+    const ImprestMobileCard: React.FC<{ row: ImprestRow }> = ({ row }) => {
+        const proofCount = row.invoiceProof.length;
+
+        return (
+            <div className="border rounded-xl p-3 mb-3 bg-background shadow-sm">
+                {/* Top row: Party + Amount */}
+                <div className="flex justify-between items-center">
+                    <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{row.partyName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{row.projectName}</p>
+                    </div>
+                    <p className="font-semibold text-sm tabular-nums">{formatINR(row.amount)}</p>
+                </div>
+
+                {/* Meta row */}
+                <div className="flex justify-between items-center mt-2 text-[11px] text-muted-foreground">
+                    <span>{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
+
+                    {proofCount > 0 && (
+                        <button onClick={() => openProofModal(row)} className="flex items-center gap-1 text-primary">
+                            <Eye className="h-3.5 w-3.5" />
+                            {proofCount} proof{proofCount > 1 && "s"}
+                        </button>
+                    )}
+                </div>
+
+                {/* Status chips */}
+                <div className="flex gap-2 mt-3 flex-wrap">
+                    <StatusChip done={row.approvalStatus === 1} doneText="Approved" pendingText="Approval Pending" color="green" />
+
+                    <StatusChip done={row.tallyStatus === 1} doneText="Tallied" pendingText="Tally Pending" color="blue" />
+
+                    <StatusChip done={row.proofStatus === 1} doneText="Verified" pendingText="Proof Pending" color="purple" />
+                </div>
+
+                {/* Actions row */}
+                <div className="flex justify-end gap-3 mt-3 pt-2 border-t">
+                    <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
+                    <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                </div>
+            </div>
+        );
+    };
 
     if (isLoading) {
         return (
@@ -379,83 +536,248 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="space-y-1">
-                    <CardTitle>{pageTitle}</CardTitle>
-                    <CardDescription>
-                        {rows.length} {rows.length === 1 ? "record" : "records"}
-                    </CardDescription>
-                </div>
+            <CardHeader className="pb-4">
+                <div className="space-y-4">
+                    {/* Top Row: Back + Title */}
+                    <div className={cn("flex items-start gap-2", isMobile ? "flex-col" : "flex-row items-center justify-between")}>
+                        {/* Left Side: Back + Title */}
+                        <div className="flex items-center gap-2">
+                            {!isOwnPage && (
+                                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8">
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                            )}
 
-                <div className="flex items-center gap-2">
-                    <Input
-                        placeholder="Search imprests..."
-                        value={searchText}
-                        onChange={e => {
-                            const value = e.target.value;
-                            setSearchText(value);
-                            gridApi?.setGridOption("quickFilterText", value);
-                        }}
-                        className="w-64"
-                    />
+                            <div>
+                                <CardTitle className="leading-none">{pageTitle}</CardTitle>
+                                <CardDescription className="mt-1">
+                                    {rows.length} {rows.length === 1 ? "record" : "records"}
+                                </CardDescription>
+                            </div>
+                        </div>
 
-                    <Button variant="outline" size="sm" onClick={exportExcel}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                    </Button>
-                    <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Imprest
-                    </Button>
+                        {/* Right Side Controls (Desktop Only) */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    placeholder="Search imprests..."
+                                    value={searchText}
+                                    onChange={e => {
+                                        const value = e.target.value;
+                                        setSearchText(value);
+                                        gridApi?.setGridOption("quickFilterText", value);
+                                    }}
+                                    className="w-64"
+                                />
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Imprest
+                                </Button>
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    View Vouchers
+                                </Button>
+
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId))}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    View Payment History
+                                </Button>
+
+                                <Button variant="outline" size="sm" onClick={exportExcel}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Mobile Controls */}
+                    {isMobile && (
+                        <div className="flex flex-col gap-2">
+                            <Input
+                                placeholder="Search imprests..."
+                                value={searchText}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    setSearchText(value);
+                                    gridApi?.setGridOption("quickFilterText", value);
+                                }}
+                                className="w-full"
+                            />
+
+                            <div className="flex gap-2">
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className="flex-1">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add
+                                </Button>
+
+                                <Button variant="outline" size="sm" onClick={exportExcel} className="flex-1">
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </CardHeader>
 
+            {/* SUMMARY */}
+            {/* ================= FINANCIAL SUMMARY ================= */}
+            {summary && (
+                <div className="mx-3 p-4">
+                    {isMobile ? (
+                        /* ================= MOBILE ================= */
+                        <Card className="border shadow-sm">
+                            <CardContent className="p-5 space-y-3">
+                                {/* Primary Balance */}
+                                <div>
+                                    <p className="text-xs uppercase tracking-widest text-muted-foreground ">Amount Left</p>
+                                    <p className="text-2xl font-semibold tabular-nums mt-1">{formatINR(summary.amountLeft)}</p>
+                                </div>
+
+                                <div className="h-px bg-border" />
+
+                                {/* Financial Breakdown */}
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Spent</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountSpent)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Approved</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountApproved)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Amount Received</span>
+                                        <span className="font-medium tabular-nums">{formatINR(summary.amountReceived)}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        /* ================= DESKTOP ================= */
+                        <Card className="border shadow-sm">
+                            <CardContent className="p-2 pl-5">
+                                <div className="grid grid-cols-4 gap-3 items-center">
+                                    {/* Supporting Metrics */}
+                                    <div className="col-span-3 grid grid-cols-3 gap-6">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Spent</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountSpent)}</p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Approved</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountApproved)}</p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Received</p>
+                                            <p className="text-lg font-medium tabular-nums mt-2">{formatINR(summary.amountReceived)}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Balance (Primary) */}
+                                    <div className="col-span-1 ">
+                                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Amount Left</p>
+                                        <p className="text-xl font-semibold tabular-nums mt-2">{formatINR(summary.amountLeft)}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
+
             <CardContent>
-                <DataTable
-                    data={rows}
-                    columnDefs={columns}
-                    onGridReady={params => {
-                        setGridApi(params.api);
-                        params.api.setQuickFilter(searchText);
-                    }}
-                    gridOptions={{
-                        pagination: true,
-                        paginationPageSize: 20,
-                        rowHeight: 48,
-                        headerHeight: 44,
-                        suppressCellFocus: true,
-                        onGridReady: params => {
+                {isMobile ? (
+                    <div className="mt-2">
+                        {rows.map(row => (
+                            <ImprestMobileCard key={row.id} row={row} />
+                        ))}
+                    </div>
+                ) : (
+                    <DataTable
+                        data={rows}
+                        columnDefs={columns}
+                        onGridReady={params => {
                             setGridApi(params.api);
-                        },
-                    }}
-                />
+                            params.api.setQuickFilter(searchText);
+                        }}
+                        gridOptions={{
+                            pagination: true,
+                            paginationPageSize: 20,
+                            rowHeight: 48,
+                            headerHeight: 44,
+                            suppressCellFocus: true,
+                            onGridReady: params => {
+                                setGridApi(params.api);
+                            },
+                        }}
+                    />
+                )}
             </CardContent>
 
             {/* Upload Proof Dialog */}
             <Dialog open={addProofOpen} onOpenChange={setAddProofOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Upload Proof</DialogTitle>
-                        <DialogDescription>Select one or more files to upload as proof documents.</DialogDescription>
+                        <DialogTitle className="text-xl">Upload Proof Documents</DialogTitle>
+                        <DialogDescription>Drag & drop files here or click to browse. Supported: images and PDF.</DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={submitAddProof} className="space-y-4">
-                        <div className="space-y-2">
-                            <Input type="file" multiple accept="image/*,.pdf" onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))} />
-                            {filesToUpload.length > 0 && (
-                                <p className="text-xs ">
-                                    {filesToUpload.length} {filesToUpload.length === 1 ? "file" : "files"} selected
-                                </p>
-                            )}
-                        </div>
+                    <form onSubmit={submitAddProof} className="space-y-6">
+                        {/* Dropzone */}
+                        <label
+                            htmlFor="proof-upload"
+                            className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:bg-muted/50 transition"
+                        >
+                            <div className="text-muted-foreground">
+                                <p className="font-medium">Click to upload files here</p>
+                                <p className="text-xs mt-1">PNG, JPG, PDF allowed</p>
+                            </div>
 
-                        <div className="flex justify-end gap-2">
+                            <Input
+                                id="proof-upload"
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))}
+                            />
+                        </label>
+
+                        {/* Selected files preview */}
+                        {filesToUpload.length > 0 && (
+                            <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-3 bg-muted/30">
+                                <p className="text-sm font-medium">
+                                    {filesToUpload.length} file{filesToUpload.length > 1 && "s"} selected
+                                </p>
+
+                                <ul className="text-xs space-y-1">
+                                    {filesToUpload.map((file, idx) => (
+                                        <li key={idx} className="flex justify-between items-center bg-background px-2 py-1 rounded border">
+                                            <span className="truncate">{file.name}</span>
+                                            <span className="text-muted-foreground ml-2">{(file.size / 1024).toFixed(1)} KB</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 pt-2">
                             <Button type="button" variant="outline" onClick={() => setAddProofOpen(false)}>
                                 Cancel
                             </Button>
+
                             <Button type="submit" disabled={filesToUpload.length === 0 || uploadProofsMutation.isPending}>
                                 {uploadProofsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                Upload
+                                Upload Files
                             </Button>
                         </div>
                     </form>
@@ -485,8 +807,169 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Lightbox */}
-            {lightboxOpen && <Lightbox open close={() => setLightboxOpen(false)} slides={lightboxSlides} />}
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Imprest</DialogTitle>
+                        <DialogDescription>Update imprest details before approval.</DialogDescription>
+                    </DialogHeader>
+
+                    {editRow && (
+                        <form onSubmit={submitEditImprest} className="space-y-4">
+                            {/* Party Name */}
+                            <Input
+                                value={editRow.partyName ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        partyName: e.target.value,
+                                    })
+                                }
+                                placeholder="Party Name"
+                            />
+
+                            <SelectInput
+                                label="Select Project"
+                                placeholder="-- Select Project --"
+                                value={editRow.projectName ?? ""}
+                                options={projectOptions}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        projectName: val,
+                                    })
+                                }
+                            />
+
+                            <SelectInput
+                                label="Select Category"
+                                placeholder="-- Select Category --"
+                                value={String(editRow.categoryId ?? "")}
+                                options={imprestCategories.map(i => ({
+                                    id: String(i.id),
+                                    name: i.name,
+                                }))}
+                                onChange={val =>
+                                    setEditRow({
+                                        ...editRow,
+                                        categoryId: Number(val),
+                                    })
+                                }
+                            />
+
+                            {/* Amount */}
+                            <Input
+                                type="number"
+                                value={editRow.amount}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        amount: Number(e.target.value),
+                                    })
+                                }
+                                placeholder="Amount"
+                            />
+
+                            {/* Remark */}
+                            <Textarea
+                                value={editRow.remark ?? ""}
+                                onChange={e =>
+                                    setEditRow({
+                                        ...editRow,
+                                        remark: e.target.value,
+                                    })
+                                }
+                                placeholder="Remark"
+                            />
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                                    Cancel
+                                </Button>
+
+                                <Button type="submit">Save Changes</Button>
+                            </div>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={proofModalOpen} onOpenChange={setProofModalOpen}>
+                <DialogContent
+                    className="
+        max-w-none w-screen h-screen
+        p-0
+        overflow-hidden
+        flex flex-col
+        [&>[data-radix-dialog-close]]:hidden
+    "
+                    aria-describedby={undefined}
+                >
+                    {/* Accessibility (required by Radix) */}
+                    <DialogTitle className="sr-only">Proof Viewer</DialogTitle>
+                    <DialogDescription className="sr-only">View uploaded proof documents</DialogDescription>
+
+                    {/* Top Bar */}
+                    <div className="flex items-center justify-between h-14 px-4 border-b bg-background">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{proofs[currentIndex]?.name ?? "Document"}</p>
+                            <p className="text-xs text-muted-foreground">{proofs.length ? `${currentIndex + 1} of ${proofs.length}` : ""}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {proofs[currentIndex]?.url && (
+                                <Button variant="outline" size="sm" onClick={() => window.open(proofs[currentIndex].url, "_blank", "noopener,noreferrer")}>
+                                    Open in new tab
+                                </Button>
+                            )}
+
+                            <Button variant="ghost" size="icon" onClick={() => setProofModalOpen(false)} aria-label="Close">
+                                ✕
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Viewer */}
+                    <div className="flex-1 w-full bg-muted/30">
+                        {proofs[currentIndex] ? (
+                            proofs[currentIndex].type === "image" ? (
+                                <div className="w-full h-full flex items-center justify-center overflow-auto">
+                                    <img src={proofs[currentIndex].url} alt={proofs[currentIndex].name} className="max-w-full max-h-full object-contain bg-white" />
+                                </div>
+                            ) : (
+                                <iframe src={proofs[currentIndex].url} title={proofs[currentIndex].name} className="w-full h-full border-0 bg-white" />
+                            )
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No preview available</div>
+                        )}
+                    </div>
+
+                    {/* Navigation */}
+                    {proofs.length > 1 && (
+                        <div className="pointer-events-none absolute inset-y-14 left-0 right-0 flex items-center justify-between px-4">
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                className="pointer-events-auto shadow"
+                                disabled={currentIndex === 0}
+                                onClick={() => setCurrentIndex(i => i - 1)}
+                            >
+                                ‹
+                            </Button>
+
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                className="pointer-events-auto shadow"
+                                disabled={currentIndex === proofs.length - 1}
+                                onClick={() => setCurrentIndex(i => i + 1)}
+                            >
+                                ›
+                            </Button>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };
