@@ -2349,9 +2349,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(bidDuringCompleted),
                         },
                         completed: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                            count: wonDuringCompleted.length,
+                            value: this.sumValue(wonDuringCompleted),
+                            drilldown: this.mapDrilldown(wonDuringCompleted),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
