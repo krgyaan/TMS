@@ -143,7 +143,7 @@ export class FollowUpService {
                 // 2. Insert relational contacts
                 this.logger.debug("Preparing to insert relational contacts", {
                     count: contacts.length,
-                    followUpId: created.id
+                    followUpId: created.id,
                 });
 
                 if (contacts.length > 0) {
@@ -193,7 +193,7 @@ export class FollowUpService {
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
             if (search) {
-                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`))!);
+                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`), like(followUps.amount, `%${search}%`))!);
             }
 
             const today = new Date().toLocaleDateString("en-CA");
