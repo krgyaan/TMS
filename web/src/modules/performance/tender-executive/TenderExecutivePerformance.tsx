@@ -45,6 +45,7 @@ import { EmdBalanceTable } from "./components/EmdBalanceTable";
 import { EmdPaidTable } from "./components/EmdPaidTable";
 import { EmdReceivedTable } from "./components/EmdReceivedTable";
 import { StageBacklogV2Table } from "./components/StageBacklogV2Table";
+import { EmdBacklogTable } from "./components/EmdBacklogTable";
 
 /* ================================
    HELPERS
@@ -386,13 +387,12 @@ export default function TenderExecutivePerformance() {
                 {sharedQuery && <StageBacklogV2Table {...sharedQuery} />}
 
                 {/* ===== EMD BACKLOG ===== */}
+                {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
 
-                {sharedQuery && <EmdPaidTable {...sharedQuery} />}
+                {/* {sharedQuery && <EmdPaidTable {...sharedQuery} />} */}
                 {/* ===== EMD RECEIVED ===== */}
 
-                {sharedQuery && <EmdReceivedTable {...sharedQuery} />}
-
-                {sharedQuery && <EmdBalanceTable {...sharedQuery} />}
+                {/* {sharedQuery && <EmdBalanceTable {...sharedQuery} />} */}
 
                 {scope.view === "user" && (
                     <>
