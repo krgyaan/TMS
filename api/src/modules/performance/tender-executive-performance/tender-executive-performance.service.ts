@@ -1833,7 +1833,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.created_at BETWEEN '${from}' AND '${to}'
     `);
 
         const assignedDuringPending = await exec(`
@@ -1841,7 +1841,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.created_at BETWEEN '${from}' AND '${to}'
         AND tin.id IS NULL
     `);
 
@@ -1850,6 +1850,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
+        AND ti.created_at < '${to}'
         AND tin.id IS NULL
         AND tl_status = 0
         AND ti.status IN (1,2)
@@ -1903,6 +1904,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
+            AND tin.created_at < '${to}'
             AND ti.tl_status = 0
     `);
 
@@ -1979,19 +1981,29 @@ export class TenderExecutiveService {
     `);
 
         const bidTotal = await exec(`
-            SELECT ti.*
-            FROM tender_infos ti
-            JOIN tender_information tin
-            ON tin.tender_id = ti.id
-            AND ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
-            WHERE ${baseWhere()}
-            AND ti.tl_status = 1
-            AND NOT EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-            );
-    `);
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin
+        ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+      AND (
+            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.created_at < '${to}'
+                AND EXISTS (
+                    SELECT 1
+                    FROM tender_costing_sheets tcs
+                    WHERE tcs.tender_id = ti.id
+                      AND tcs.status = 'Approved'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                )
+            )
+      );
+`);
 
         /* =====================================================
         RESULT AWAITED
@@ -2038,7 +2050,7 @@ export class TenderExecutiveService {
           SELECT 1
           FROM tender_results tr
           WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won', 'Lost', 'Disqualified')
+            AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
             AND tr.created_at BETWEEN '${from}' AND '${to}'
       )
 `);
@@ -2251,7 +2263,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     WHERE ${baseWhere()}
       AND (
-            ti.status IN (39)
+            ti.status IN (39,38, 22)
             OR EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -2291,11 +2303,11 @@ export class TenderExecutiveService {
                             value: this.sumValue(assignedDuringCompleted),
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
-                        // pending: {
-                        //     count: assignedDuringPending.length,
-                        //     value: this.sumValue(assignedDuringPending),
-                        //     drilldown: this.mapDrilldown(assignedDuringPending),
-                        // },
+                        pending: {
+                            count: assignedDuringPending.length,
+                            value: this.sumValue(assignedDuringPending),
+                            drilldown: this.mapDrilldown(assignedDuringPending),
+                        },
                     },
                 },
 
