@@ -2625,7 +2625,7 @@ export class TenderExecutiveService {
         /* =====================================================
        OPENING
        Paid before period & still live
-       (cancelled EXCLUDED)
+       ❌ rejected excluded (status-based)
     ===================================================== */
 
         const opening = await exec(`
@@ -2641,6 +2641,7 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
+          AND pi.status NOT ILIKE '%REJECTED%'
           AND (
               (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
@@ -2650,7 +2651,7 @@ export class TenderExecutiveService {
 
         /* =====================================================
        DURING → COMPLETED
-       Paid in period & returned / settled / cancelled
+       Returned / Settled / Cancelled / Rejected
     ===================================================== */
 
         const duringCompleted = await exec(`
@@ -2668,21 +2669,20 @@ export class TenderExecutiveService {
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND (
-              -- DD / FDR → returned / settled / cancelled
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+                -- Returned / Settled / Cancelled (action-based)
+                (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+             OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
+             OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
 
-              -- Portal / BT → returned / settled / cancelled
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
-
-              -- BG → settled / cancelled
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+                -- Rejected (status-based, universal)
+             OR pi.status ILIKE '%REJECTED%'
           );
     `);
 
         /* =====================================================
        DURING → PENDING
        Paid in period & still live
-       (cancelled EXCLUDED)
+       ❌ rejected excluded (status-based)
     ===================================================== */
 
         const duringPending = await exec(`
@@ -2698,6 +2698,7 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
+          AND pi.status NOT ILIKE '%REJECTED%'
           AND (
               (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
@@ -2708,7 +2709,7 @@ export class TenderExecutiveService {
         /* =====================================================
        CLOSING
        Still live at end of period
-       (cancelled EXCLUDED)
+       ❌ rejected excluded (status-based)
     ===================================================== */
 
         const closing = await exec(`
@@ -2724,6 +2725,7 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at <= '${to}'
+          AND pi.status NOT ILIKE '%REJECTED%'
           AND (
               (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
