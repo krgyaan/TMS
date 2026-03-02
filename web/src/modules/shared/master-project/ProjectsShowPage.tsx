@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Edit } from "lucide-react";
-import { useMasterProject } from "@/hooks/api/useMasterProjects";
 import { paths } from "@/app/routes/paths";
+import { useProjectMaster } from "@/hooks/api/useProjectMaster";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 
 const ProjectsShowPage = () => {
     const navigate = useNavigate();
@@ -25,7 +26,7 @@ const ProjectsShowPage = () => {
         );
     }
 
-    const { data: project, isLoading, error } = useMasterProject(projectId);
+    const { data: project, isLoading, error } = useProjectMaster(projectId);
 
     if (isLoading) {
         return (
@@ -59,9 +60,6 @@ const ProjectsShowPage = () => {
 
     const formatOrDash = (value?: string | null) =>
         value && value.toString().trim().length > 0 ? value : "—";
-
-    const formatDateTime = (value?: string | null) =>
-        value ? new Date(value).toLocaleString() : "—";
 
     return (
         <Card>
@@ -127,7 +125,7 @@ const ProjectsShowPage = () => {
                                     PO Date
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.poDate)}
+                                    {formatDate(project.poDate)}
                                 </td>
                             </tr>
                             <tr className="border-b">
@@ -143,7 +141,7 @@ const ProjectsShowPage = () => {
                                     SAP PO Date
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.sapPoDate)}
+                                    {formatDate(project.sapPoDate)}
                                 </td>
                             </tr>
                             <tr className="border-b">

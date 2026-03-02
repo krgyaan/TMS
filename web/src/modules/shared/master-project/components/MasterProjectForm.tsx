@@ -12,44 +12,32 @@ import { DateInput } from "@/components/form/DateInput";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { ArrowLeft, Save } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { MasterProjectFormSchema } from "../helpers/masterProject.schema";
-import type {
-    MasterProjectFormValues,
-    MasterProjectResponse,
-    MasterProjectListRow,
-} from "../helpers/masterProject.types";
-import {
-    buildDefaultValues,
-    mapResponseToForm,
-    mapFormToCreatePayload,
-    mapFormToUpdatePayload,
-} from "../helpers/masterProject.mappers";
-import {
-    useTeamOptions,
-    useOrganizationOptions,
-    useItemOptions,
-    useLocationOptions,
-} from "@/hooks/useSelectOptions";
-import {
-    useCreateMasterProject,
-    useUpdateMasterProject,
-} from "@/hooks/api/useMasterProjects";
+import { ProjectMasterFormSchema } from "../helpers/projectMaster.schema";
+import type { ProjectMasterFormValues, ProjectMasterResponse, ProjectMasterListRow } from "../helpers/projectMaster.types";
+import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/projectMaster.mappers";
+import { useOrganizationOptions, useItemOptions, useLocationOptions } from "@/hooks/useSelectOptions";
+import { useCreateProjectMaster, useUpdateProjectMaster } from "@/hooks/api/useProjectMaster";
 
 interface MasterProjectFormProps {
     mode: "create" | "edit";
-    existingData?: MasterProjectResponse | MasterProjectListRow;
+    existingData?: ProjectMasterResponse | ProjectMasterListRow;
 }
 
 export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps) {
     const navigate = useNavigate();
 
-    const teamOptions = useTeamOptions([1, 2, 7]);
+    const teamOptions = [
+        { id: "AC", name: "AC", isActive: true },
+        { id: "DC", name: "DC", isActive: true },
+        { id: "BD", name: "BD", isActive: true },
+        { id: "IT", name: "IT", isActive: true },
+    ];
     const organizationOptions = useOrganizationOptions();
     const itemOptions = useItemOptions();
     const locationOptions = useLocationOptions();
 
-    const createMutation = useCreateMasterProject();
-    const updateMutation = useUpdateMasterProject();
+    const createMutation = useCreateProjectMaster();
+    const updateMutation = useUpdateProjectMaster();
 
     const initialValues = useMemo(() => {
         if (mode === "edit" && existingData) {
@@ -58,12 +46,12 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
         return buildDefaultValues();
     }, [mode, existingData]);
 
-    const form = useForm<MasterProjectFormValues>({
-        resolver: zodResolver(MasterProjectFormSchema) as Resolver<MasterProjectFormValues>,
+    const form = useForm<ProjectMasterFormValues>({
+        resolver: zodResolver(ProjectMasterFormSchema) as Resolver<ProjectMasterFormValues>,
         defaultValues: initialValues,
     });
 
-    const watchTeamId = form.watch("teamId");
+    const watchTeamName = form.watch("teamName");
     const watchOrganisationId = form.watch("organisationId");
     const watchItemId = form.watch("itemId");
     const watchLocationId = form.watch("locationId");
@@ -75,11 +63,6 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
     }, [form, initialValues]);
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
-
-    const getSelectedTeamName = (teamId?: number): string => {
-        const option = teamOptions.find(t => Number(t.id) === teamId);
-        return option?.name ?? "";
-    };
 
     const getFinancialYear = (date: Date): string => {
         const year = date.getFullYear();
@@ -93,24 +76,30 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
     };
 
     const parseDmy = (value: string): Date | null => {
+        if (!value) return null;
+
+        if (value.includes("-") && value.split("-")[0].length === 4) {
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
         const [dd, mm, yyyy] = value.split("-");
-        const day = Number(dd);
-        const month = Number(mm);
-        const year = Number(yyyy);
-        if (!day || !month || !year) return null;
-        const d = new Date(year, month - 1, day);
-        return Number.isNaN(d.getTime()) ? null : d;
+        if (!dd || !mm || !yyyy) return null;
+
+        const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+        return Number.isNaN(date.getTime()) ? null : date;
     };
 
     const { projectCodePreview, projectNamePreview } = useMemo(() => {
         try {
-            const teamName =
-                teamOptions.find(t => t.id === String(watchTeamId))?.name ?? "";
+            const teamName = watchTeamName;
+
+            // Use String() for consistent comparison
             const organisationName =
-                organizationOptions.find(o => Number(o.id) === watchOrganisationId)?.name ?? "";
+                organizationOptions.find(o => String(o.id) === String(watchOrganisationId))?.name ?? "";
             const itemName =
-                itemOptions.find(i => Number(i.id) === watchItemId)?.name ?? "";
-            const locationOption = locationOptions.find(l => Number(l.id) === watchLocationId);
+                itemOptions.find(i => String(i.id) === String(watchItemId))?.name ?? "";
+            const locationOption = locationOptions.find(l => String(l.id) === String(watchLocationId));
             const locationCode = locationOption?.name ?? "";
             const locationName = locationOption?.name ?? "";
 
@@ -144,11 +133,10 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
             return { projectCodePreview: "", projectNamePreview: "" };
         }
     }, [
-        teamOptions,
         organizationOptions,
         itemOptions,
         locationOptions,
-        watchTeamId,
+        watchTeamName,
         watchOrganisationId,
         watchItemId,
         watchLocationId,
@@ -156,8 +144,21 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
         watchPoDate,
     ]);
 
-    const handleSubmit: SubmitHandler<MasterProjectFormValues> = async values => {
-        const teamName = getSelectedTeamName(values.teamId);
+    // ✅ FIX: Sync preview values to form
+    useEffect(() => {
+        if (projectCodePreview) {
+            form.setValue("projectCode", projectCodePreview, { shouldValidate: true });
+        }
+    }, [projectCodePreview, form]);
+
+    useEffect(() => {
+        if (projectNamePreview) {
+            form.setValue("projectName", projectNamePreview, { shouldValidate: true });
+        }
+    }, [projectNamePreview, form]);
+
+    const handleSubmit: SubmitHandler<ProjectMasterFormValues> = async values => {
+        const teamName = values.teamName;
         try {
             if (mode === "create") {
                 const payload = mapFormToCreatePayload(values, teamName);
@@ -199,7 +200,7 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                         <div className="grid gap-4 md:grid-cols-3 items-start">
                             <SelectField
                                 control={form.control}
-                                name="teamId"
+                                name="teamName"
                                 label="Team"
                                 options={teamOptions}
                                 placeholder="Select Team"
@@ -304,6 +305,39 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                 )}
                             </FieldWrapper>
 
+                            {/* ✅ FIX: Make these read-only and use form values */}
+                            <FieldWrapper
+                                control={form.control}
+                                name="projectCode"
+                                label="Project Code"
+                                description="Auto-generated from team, PO, organization, item, and location"
+                            >
+                                {field => (
+                                    <Input
+                                        {...field}
+                                        placeholder="Project Code"
+                                        readOnly
+                                        className="bg-muted"
+                                    />
+                                )}
+                            </FieldWrapper>
+
+                            <FieldWrapper
+                                control={form.control}
+                                name="projectName"
+                                label="Project Name"
+                                description="Auto-generated from organization, item, and location"
+                            >
+                                {field => (
+                                    <Input
+                                        {...field}
+                                        placeholder="Project Name"
+                                        readOnly
+                                        className="bg-muted"
+                                    />
+                                )}
+                            </FieldWrapper>
+
                             <FieldWrapper
                                 control={form.control}
                                 name="poDocument"
@@ -334,7 +368,6 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                 )}
                             </FieldWrapper>
 
-
                             <FieldWrapper
                                 control={form.control}
                                 name="completionDocument"
@@ -349,31 +382,6 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                     />
                                 )}
                             </FieldWrapper>
-                        </div>
-
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <div className="flex flex-col space-y-1.5">
-                                <label className="text-sm font-medium text-muted-foreground">
-                                    Project Code (auto-generated)
-                                </label>
-                                <Input
-                                    value={projectCodePreview}
-                                    readOnly
-                                    disabled
-                                    placeholder="Will be generated from team, PO, organization, item, and location"
-                                />
-                            </div>
-                            <div className="flex flex-col space-y-1.5">
-                                <label className="text-sm font-medium text-muted-foreground">
-                                    Project Name (auto-generated)
-                                </label>
-                                <Input
-                                    value={projectNamePreview}
-                                    readOnly
-                                    disabled
-                                    placeholder="Will be generated from organization, item, and location"
-                                />
-                            </div>
                         </div>
 
                         <div className="flex justify-end gap-2 pt-6 border-t">
