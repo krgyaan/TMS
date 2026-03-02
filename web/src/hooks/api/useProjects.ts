@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAllProjectsMaster, fetchProjectMasterById } from "../../services/api/projects-master.service";
+import { fetchAllProjectsMaster, fetchProjectMasterById } from "../../services/api/master-projects.service";
 
 export const projectsMasterKeys = {
     all: ["projects-master"] as const,
