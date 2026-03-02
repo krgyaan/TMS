@@ -19,12 +19,13 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
                         ======================= */}
                         <TableRow>
                             <TableHead rowSpan={2} />
+
                             <TableHead rowSpan={2} className="text-center">
-                                <ColumnHeader title="Opening" description="EMDs paid before the period and pending at start" />
+                                <ColumnHeader title="Opening" description="EMDs paid before the period and not received back" />
                             </TableHead>
 
                             <TableHead colSpan={3} className="text-center">
-                                <ColumnHeader title="During" description="Movement of EMDs during the selected period" />
+                                <ColumnHeader title="During" description="EMD payments and refunds during the selected period" />
                             </TableHead>
 
                             <TableHead rowSpan={2} className="text-center">
@@ -36,9 +37,9 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
                            HEADER ROW 2
                         ======================= */}
                         <TableRow>
-                            <TableHead className="text-center">Total</TableHead>
-                            <TableHead className="text-center">Completed</TableHead>
-                            <TableHead className="text-center">Pending</TableHead>
+                            <TableHead className="text-center">Paid</TableHead>
+                            <TableHead className="text-center">Received (Earlier)</TableHead>
+                            <TableHead className="text-center">Received (Current)</TableHead>
                         </TableRow>
                     </TableHeader>
 
@@ -47,19 +48,19 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
                             <TableCell className="font-semibold">EMD Amount</TableCell>
 
                             {/* OPENING */}
-                            <MetricCell data={data.opening} />
+                            <MetricCell data={data.paidPriorNotReceived} />
 
-                            {/* DURING — TOTAL */}
-                            <MetricCell data={data.during.total} />
+                            {/* DURING — PAID */}
+                            <MetricCell data={data.paidDuring} />
 
-                            {/* DURING — COMPLETED */}
-                            <MetricCell data={data.during.completed} strong />
+                            {/* DURING — RECEIVED (PRIOR PAID) */}
+                            <MetricCell data={data.receivedForPrior} strong />
 
-                            {/* DURING — PENDING */}
-                            <MetricCell data={data.during.pending} />
+                            {/* DURING — RECEIVED (CURRENT PAID) */}
+                            <MetricCell data={data.receivedForDuring} strong />
 
                             {/* CLOSING */}
-                            <MetricCell data={data.closing} strong />
+                            <MetricCell data={data.pendingAtEnd} />
                         </TableRow>
                     </TableBody>
                 </Table>

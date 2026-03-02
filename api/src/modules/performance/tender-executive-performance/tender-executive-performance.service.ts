@@ -1818,6 +1818,7 @@ export class TenderExecutiveService {
         AND ti.created_at < '${from}'
         AND tin.id IS NULL
         AND tl_status = 0
+        AND ti.status IN (1,2)
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1832,7 +1833,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.created_at BETWEEN '${from}' AND '${to}'
     `);
 
         const assignedDuringPending = await exec(`
@@ -1840,7 +1841,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.created_at BETWEEN '${from}' AND '${to}'
         AND tin.id IS NULL
     `);
 
@@ -1849,7 +1850,10 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
+        AND ti.created_at < '${to}'
         AND tin.id IS NULL
+        AND tl_status = 0
+        AND ti.status IN (1,2)
     `);
 
         /* =====================================================
@@ -1900,6 +1904,7 @@ export class TenderExecutiveService {
     FROM tender_infos ti
     JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
+            AND tin.created_at < '${to}'
             AND ti.tl_status = 0
     `);
 
@@ -1909,24 +1914,29 @@ export class TenderExecutiveService {
     ===================================================== */
 
         const bidOpening = await exec(`
-            SELECT ti.*
-            FROM tender_infos ti
-            JOIN tender_information tin
-            ON tin.tender_id = ti.id
-            WHERE ${baseWhere()}
-            AND ti.created_at < '${from}'
-            AND EXISTS (
-                SELECT 1
-                FROM tender_costing_sheets tcs
-                WHERE tcs.tender_id = ti.id
-                    AND tcs.status = 'Approved'
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin
+        ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+      AND (
+            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.created_at < '${from}'
+                AND EXISTS (
+                    SELECT 1
+                    FROM tender_costing_sheets tcs
+                    WHERE tcs.tender_id = ti.id
+                      AND tcs.status = 'Approved'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                )
             )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-            );
-        `);
+      );
+`);
 
         //         const bidDuringTotal = await exec(`
         //     SELECT ti.*
@@ -1940,16 +1950,22 @@ export class TenderExecutiveService {
         //we'll use total tenders approved
 
         const bidDuringCompleted = await exec(`
-    SELECT ti.*
+    SELECT
+        ti.*,
+        COALESCE(tcs.final_price, ti.gst_values) AS effective_value
     FROM tender_infos ti
+    LEFT JOIN tender_costing_sheets tcs
+        ON tcs.tender_id = ti.id
+        AND tcs.status = 'Approved'
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
+      AND EXISTS (
+          SELECT 1
+          FROM bid_submissions bs
+          WHERE bs.tender_id = ti.id
             AND bs.status = 'Bid Submitted'
-        )
-    `);
+            AND bs.created_at BETWEEN '${from}' AND '${to}'
+      )
+`);
 
         const bidDuringPending = await exec(`
     SELECT ti.*
@@ -1965,18 +1981,29 @@ export class TenderExecutiveService {
     `);
 
         const bidTotal = await exec(`
-            SELECT ti.*
-            FROM tender_infos ti
-            JOIN tender_information tin
-            ON tin.tender_id = ti.id
-            WHERE ${baseWhere()}
-            AND ti.tl_status = 1
-            AND NOT EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-            );
-    `);
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin
+        ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+      AND (
+            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.created_at < '${to}'
+                AND EXISTS (
+                    SELECT 1
+                    FROM tender_costing_sheets tcs
+                    WHERE tcs.tender_id = ti.id
+                      AND tcs.status = 'Approved'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                )
+            )
+      );
+`);
 
         /* =====================================================
         RESULT AWAITED
@@ -1987,19 +2014,26 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
-        AND ti.tl_status = 1
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND ti.created_at < '${from}'
+      AND (
+            ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.tl_status = 1
+                AND EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Bid Submitted'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                      AND tr.status IN ('Won','Lost','Disqualified')
+                )
+            )
+      );
+`);
 
         //         const resultAwaitedDuringTotal = await exec(`
         //     SELECT ti.*
@@ -2012,13 +2046,14 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND EXISTS (
+          SELECT 1
+          FROM tender_results tr
+          WHERE tr.tender_id = ti.id
+            AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
+            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      )
+`);
 
         const resultAwaitedDuringPending = await exec(`
     SELECT ti.*
@@ -2041,17 +2076,25 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND (
+            ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.tl_status = 1
+                AND EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Bid Submitted'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                      AND tr.status IN ('Won','Lost','Disqualified')
+                )
+            )
+      );
+`);
 
         /* =====================================================
         MISSED / WON / LOST / DISQUALIFIED (terminal)
@@ -2104,12 +2147,27 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at < '${from}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Won'
-    )
+      AND (
+            /* 1️⃣ Result exists → use result date */
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Won'
+                  AND tr.created_at < '${from}'
+            )
+
+            /* 2️⃣ No result → fallback to status + ti.created_at */
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (25, 26, 27, 28)
+                AND ti.created_at < '${from}'
+            )
+      )
 `);
 
         // DURING → COMPLETED (won only)
@@ -2117,24 +2175,48 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Won'
-    )
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Won'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (25, 26, 27, 28)
+                AND ti.created_at BETWEEN '${from}' AND '${to}'
+            )
+      )
 `);
         // loss OPENING
         const lostOpening = await exec(`
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at < '${from}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Lost'
-    )
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Lost'
+                  AND tr.created_at < '${from}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (18, 21, 22, 24)
+                AND ti.created_at < '${from}'
+            )
+      )
 `);
 
         // DURING → COMPLETED (lost only)
@@ -2142,13 +2224,26 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Lost'
-    )
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Lost'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (18, 21, 22, 24)
+                AND ti.created_at BETWEEN '${from}' AND '${to}'
+            )
+      )
 `);
+
         // loss OPENING
         const disqualifiedOpening = await exec(`
     SELECT ti.*
@@ -2167,14 +2262,17 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Disqualified'
-    )
+      AND (
+            ti.status IN (39,38, 22)
+            OR EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Disqualified'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
+      )
 `);
-
         /* =====================================================
         FINAL RESPONSE
     ===================================================== */
@@ -2266,38 +2364,38 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(bidDuringCompleted),
                         },
                         pending: {
-                            count: bidDuringPending.length,
-                            value: this.sumValue(bidDuringPending),
-                            drilldown: this.mapDrilldown(bidDuringPending),
-                        },
-                    },
-                },
-
-                missed: {
-                    opening: {
-                        count: missedOpening.length,
-                        value: this.sumValue(missedOpening),
-                        drilldown: this.mapDrilldown(missedOpening),
-                    },
-                    total: {
-                        count: missedOpening.length + missedDuringCompleted.length,
-                        value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
-                        drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
-                    },
-                    during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
-                        completed: {
                             count: missedDuringCompleted.length,
                             value: this.sumValue(missedDuringCompleted),
                             drilldown: this.mapDrilldown(missedDuringCompleted),
                         },
-                        pending: { count: 0, value: 0, drilldown: [] },
                     },
                 },
+
+                // missed: {
+                //     opening: {
+                //         count: missedOpening.length,
+                //         value: this.sumValue(missedOpening),
+                //         drilldown: this.mapDrilldown(missedOpening),
+                //     },
+                //     total: {
+                //         count: missedOpening.length + missedDuringCompleted.length,
+                //         value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
+                //         drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
+                //     },
+                //     during: {
+                //         total: {
+                //             count: bidDuringCompleted.length,
+                //             value: this.sumValue(bidDuringCompleted),
+                //             drilldown: this.mapDrilldown(bidDuringCompleted),
+                //         },
+                //         completed: {
+                //             count: missedDuringCompleted.length,
+                //             value: this.sumValue(missedDuringCompleted),
+                //             drilldown: this.mapDrilldown(missedDuringCompleted),
+                //         },
+                //         pending: { count: 0, value: 0, drilldown: [] },
+                //     },
+                // },
 
                 resultAwaited: {
                     opening: {
@@ -2322,9 +2420,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
                         },
                         pending: {
-                            count: resultAwaitedDuringPending.length,
-                            value: this.sumValue(resultAwaitedDuringPending),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringPending),
+                            count: disqualifiedDuringCompleted.length,
+                            value: this.sumValue(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
                         },
                     },
                 },
@@ -2341,11 +2439,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown([...wonOpening, ...wonDuringCompleted]),
                     },
                     during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
+                        // total: {
+                        //     count: bidDuringCompleted.length,
+                        //     value: this.sumValue(bidDuringCompleted),
+                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
+                        // },
                         completed: {
                             count: wonDuringCompleted.length,
                             value: this.sumValue(wonDuringCompleted),
@@ -2367,11 +2465,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown([...lostOpening, ...lostDuringCompleted]),
                     },
                     during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
+                        // total: {
+                        //     count: bidDuringCompleted.length,
+                        //     value: this.sumValue(bidDuringCompleted),
+                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
+                        // },
                         completed: {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
@@ -2381,31 +2479,31 @@ export class TenderExecutiveService {
                     },
                 },
 
-                disqualified: {
-                    opening: {
-                        count: disqualifiedOpening.length,
-                        value: this.sumValue(disqualifiedOpening),
-                        drilldown: this.mapDrilldown(disqualifiedOpening),
-                    },
-                    total: {
-                        count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
-                        value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                        drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                    },
-                    during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
-                        completed: {
-                            count: disqualifiedDuringCompleted.length,
-                            value: this.sumValue(disqualifiedDuringCompleted),
-                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
-                        },
-                        pending: { count: 0, value: 0, drilldown: [] },
-                    },
-                },
+                // disqualified: {
+                //     opening: {
+                //         count: disqualifiedOpening.length,
+                //         value: this.sumValue(disqualifiedOpening),
+                //         drilldown: this.mapDrilldown(disqualifiedOpening),
+                //     },
+                //     total: {
+                //         count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
+                //         value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                //         drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                //     },
+                //     during: {
+                //         total: {
+                //             count: bidDuringCompleted.length,
+                //             value: this.sumValue(bidDuringCompleted),
+                //             drilldown: this.mapDrilldown(bidDuringCompleted),
+                //         },
+                //         completed: {
+                //             count: disqualifiedDuringCompleted.length,
+                //             value: this.sumValue(disqualifiedDuringCompleted),
+                //             drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                //         },
+                //         pending: { count: 0, value: 0, drilldown: [] },
+                //     },
+                // },
             },
         };
     }
@@ -2415,14 +2513,13 @@ export class TenderExecutiveService {
             tenderId: t.id,
             tenderNo: t.tender_no ?? t.tenderNo,
             tenderName: t.tender_name ?? t.tenderName,
-            value: Number(t.gst_values ?? 0),
+            value: Number(t.effective_value ?? t.gst_values ?? 0),
         }));
     }
 
     private sumValue(rows: any[]) {
-        return rows.reduce((sum, r) => sum + Number(r.gst_values ?? 0), 0);
+        return rows.reduce((sum, r) => sum + Number(r.effective_value ?? r.gst_values ?? 0), 0);
     }
-
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
@@ -2604,8 +2701,7 @@ export class TenderExecutiveService {
         const to = `${query.toDate}T23:59:59.999Z`;
 
         /* ============================
-       BASE WHERE (same philosophy
-       as getStageBacklogV2)
+       BASE WHERE
     ============================ */
 
         const baseWhere = () => {
@@ -2624,8 +2720,8 @@ export class TenderExecutiveService {
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
         /* =====================================================
-       OPENING
-       Paid before period & still live
+       A. OPENING
+       Paid before period & still pending
     ===================================================== */
 
         const opening = await exec(`
@@ -2641,19 +2737,19 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
     `);
 
         /* =====================================================
-       DURING → COMPLETED
-       Paid & returned/settled in period
+       B. PAID DURING PERIOD (ALL)
     ===================================================== */
 
-        const duringCompleted = await exec(`
+        const paidDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
@@ -2666,20 +2762,39 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
-          AND pi.updated_at BETWEEN '${from}' AND '${to}'
+          AND pi.status NOT ILIKE '%rejected%';
+    `);
+
+        /* =====================================================
+       C. RECEIVED FOR PRIOR PAID
+    ===================================================== */
+
+        const receivedForPrior = await exec(`
+        SELECT
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
+        FROM payment_requests pr
+        JOIN payment_instruments pi ON pi.request_id = pr.id
+        JOIN tender_infos ti ON ti.id = pr.tender_id
+        WHERE ${baseWhere()}
+          AND pr.created_at < '${from}'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
               (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
           );
     `);
 
         /* =====================================================
-       DURING → PENDING
-       Paid in period & still live
+       D. RECEIVED FOR DURING PAID
     ===================================================== */
 
-        const duringPending = await exec(`
+        const receivedForDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
@@ -2692,16 +2807,17 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
           );
     `);
 
         /* =====================================================
-       CLOSING
-       Still live at end of period
+       E. CLOSING
+       Pending at end of period
     ===================================================== */
 
         const closing = await exec(`
@@ -2717,163 +2833,51 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at <= '${to}'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
     `);
 
         /* =====================================================
-       FINAL RESPONSE (UI-READY)
+       FINAL RESPONSE (dashboard-ready)
     ===================================================== */
 
         return {
             from: new Date(from),
             to: new Date(to),
 
-            opening: {
+            paidPriorNotReceived: {
                 count: opening.length,
                 value: sumValue(opening),
                 drilldown: opening,
             },
 
-            during: {
-                completed: {
-                    count: duringCompleted.length,
-                    value: sumValue(duringCompleted),
-                    drilldown: duringCompleted,
-                },
-                pending: {
-                    count: duringPending.length,
-                    value: sumValue(duringPending),
-                    drilldown: duringPending,
-                },
-                total: {
-                    count: duringCompleted.length + duringPending.length,
-                    value: sumValue(duringCompleted) + sumValue(duringPending),
-                    drilldown: [...duringCompleted, ...duringPending],
-                },
+            paidDuring: {
+                count: paidDuring.length,
+                value: sumValue(paidDuring),
+                drilldown: paidDuring,
             },
 
-            closing: {
+            receivedForPrior: {
+                count: receivedForPrior.length,
+                value: sumValue(receivedForPrior),
+                drilldown: receivedForPrior,
+            },
+
+            receivedForDuring: {
+                count: receivedForDuring.length,
+                value: sumValue(receivedForDuring),
+                drilldown: receivedForDuring,
+            },
+
+            pendingAtEnd: {
                 count: closing.length,
                 value: sumValue(closing),
                 drilldown: closing,
             },
         };
     }
-    // async getEmdCashFlow(query: EmdBalanceQueryDto) {
-    //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
-    //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
-
-    //     const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
-
-    //     const emptyBucket = () => ({
-    //         count: 0,
-    //         value: 0,
-    //         drilldown: [] as any[],
-    //     });
-
-    //     const result = {
-    //         opening: emptyBucket(),
-    //         during: {
-    //             pending: emptyBucket(),
-    //             completed: emptyBucket(),
-    //             total: emptyBucket(), // derived later
-    //         },
-    //         closing: emptyBucket(), // derived later
-    //     };
-
-    //     if (!tenderIds.length) {
-    //         return result;
-    //     }
-
-    //     const rows = await this.db
-    //         .select({
-    //             tenderId: paymentRequests.tenderId,
-    //             amount: paymentRequests.amountRequired,
-    //             paidAt: paymentRequests.createdAt,
-
-    //             instrumentType: paymentInstruments.instrumentType,
-    //             action: paymentInstruments.action,
-    //             receivedAt: paymentInstruments.updatedAt,
-
-    //             tenderNo: tenderInfos.tenderNo,
-    //             tenderName: tenderInfos.tenderName,
-    //         })
-    //         .from(paymentRequests)
-    //         .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
-    //         .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-    //         .where(
-    //             and(
-    //                 inArray(paymentRequests.tenderId, tenderIds),
-    //                 eq(paymentRequests.purpose, "EMD"),
-    //                 inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG", "Cheque"]),
-    //                 lte(paymentRequests.createdAt, to)
-    //             )
-    //         );
-
-    //     for (const r of rows) {
-    //         if (!r.paidAt) continue;
-
-    //         const paidAt = r.paidAt;
-    //         const receivedAt = r.receivedAt ?? null;
-
-    //         const financialState = resolveEmdFinancialState(r.instrumentType, r.action);
-
-    //         const isReceived = financialState === "RETURNED" || financialState === "SETTLED";
-
-    //         const meta = {
-    //             tenderId: r.tenderId,
-    //             tenderNo: r.tenderNo,
-    //             tenderName: r.tenderName,
-    //             instrumentType: r.instrumentType,
-    //             amount: Number(r.amount),
-    //             paidAt,
-    //             receivedAt,
-    //         };
-
-    //         // =========================
-    //         // OPENING
-    //         // =========================
-    //         if (paidAt < from && (!isReceived || (receivedAt && receivedAt >= from))) {
-    //             result.opening.count++;
-    //             result.opening.value += meta.amount;
-    //             result.opening.drilldown.push(meta);
-    //         }
-
-    //         // =========================
-    //         // DURING.PENDING
-    //         // =========================
-    //         if (paidAt >= from && paidAt <= to && (!isReceived || (receivedAt && receivedAt > to))) {
-    //             result.during.pending.count++;
-    //             result.during.pending.value += meta.amount;
-    //             result.during.pending.drilldown.push(meta);
-    //         }
-
-    //         // =========================
-    //         // DURING.COMPLETED
-    //         // =========================
-    //         if (paidAt >= from && paidAt <= to && isReceived && receivedAt && receivedAt >= from && receivedAt <= to) {
-    //             result.during.completed.count++;
-    //             result.during.completed.value += meta.amount;
-    //             result.during.completed.drilldown.push(meta);
-    //         }
-    //     }
-
-    //     // =========================
-    //     // DERIVED TOTALS
-    //     // =========================
-
-    //     result.during.total.count = result.during.pending.count + result.during.completed.count;
-
-    //     result.during.total.value = result.during.pending.value + result.during.completed.value;
-
-    //     result.closing.count = result.opening.count + result.during.pending.count;
-
-    //     result.closing.value = result.opening.value + result.during.pending.value;
-
-    //     return result;
-    // }
 }
