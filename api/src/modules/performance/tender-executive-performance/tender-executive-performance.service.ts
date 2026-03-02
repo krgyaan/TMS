@@ -1851,6 +1851,8 @@ export class TenderExecutiveService {
     LEFT JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
         AND tin.id IS NULL
+        AND tl_status = 0
+        AND ti.status IN (1,2)
     `);
 
         /* =====================================================
