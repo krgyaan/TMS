@@ -17,6 +17,9 @@ export type RequestExtensionFilters = {
 export type RequestExtensionResponse = {
     id: number;
     tenderId: number;
+    tenderName: string;
+    tenderNo: string;
+    tenderDue: string;
     days: number;
     reason: string;
     clients: string;
@@ -55,6 +58,9 @@ export class RequestExtensionsService {
         return {
             id: row.id,
             tenderId: row.tenderId,
+            tenderName: row.tenderName,
+            tenderNo: row.tenderNo,
+            tenderDue: row.tenderDue,
             days: row.days,
             reason: row.reason,
             clients: row.clients,
