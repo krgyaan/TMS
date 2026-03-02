@@ -12,7 +12,6 @@ import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import type { PqrListRow } from '@/modules/shared/pqr/helpers/pqr.types';
 import { useRequestExtensions } from '@/hooks/api/useRequestExtension';
 import type { RequestExtensionListRow } from './helpers/requestExtension.types';
 
@@ -52,7 +51,7 @@ const RequestExtensionListPage = () => {
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
 
-    const pqrActions: ActionItem<PqrListRow>[] = useMemo(
+    const requestExtensionActions: ActionItem<RequestExtensionListRow>[] = useMemo(
         () => [
             {
                 label: 'View',
@@ -61,7 +60,7 @@ const RequestExtensionListPage = () => {
             },
             {
                 label: 'Edit',
-                onClick: (row) => navigate(paths.tendering.requestExtensionEdit(row.id)),
+                onClick: (row) => navigate(paths.tendering.requestExtensionEdit(row.tenderId, row.id)),
                 icon: <Edit className="h-4 w-4" />,
             },
         ],
@@ -75,7 +74,8 @@ const RequestExtensionListPage = () => {
                 colId: 'tenderName',
                 headerName: 'Tender Name',
                 flex: 1,
-                maxWidth: 120,
+                width: 100,
+                maxWidth: 160,
                 valueGetter: (params) => params.data?.tenderName ?? '—',
                 sortable: true,
                 filter: true,
@@ -85,7 +85,8 @@ const RequestExtensionListPage = () => {
                 colId: 'tenderNo',
                 headerName: 'Tender No.',
                 flex: 1.5,
-                minWidth: 120,
+                width: 100,
+                maxWidth: 160,
                 valueGetter: (params) => params.data?.tenderNo ?? '—',
                 sortable: true,
                 filter: true,
@@ -95,7 +96,8 @@ const RequestExtensionListPage = () => {
                 colId: 'days',
                 headerName: 'Days of Extension',
                 flex: 1,
-                minWidth: 100,
+                width: 90,
+                maxWidth: 120,
                 valueGetter: (params) => params.data?.days ?? '—',
                 sortable: true,
                 filter: true,
@@ -105,7 +107,7 @@ const RequestExtensionListPage = () => {
                 colId: 'reason',
                 headerName: 'Reason for Extension',
                 flex: 1,
-                minWidth: 200,
+                width: 250,
                 valueGetter: (params) => params.data?.reason ?? '—',
                 sortable: true,
                 filter: true,
@@ -115,8 +117,9 @@ const RequestExtensionListPage = () => {
                 colId: 'createdAt',
                 headerName: 'Requested On',
                 flex: 1,
-                minWidth: 100,
-                cellRenderer: (params: { data?: PqrListRow }) =>
+                width: 100,
+                maxWidth: 150,
+                cellRenderer: (params: { data?: RequestExtensionListRow }) =>
                     params.data?.createdAt ? formatDateTime(params.data.createdAt) : '—',
                 sortable: true,
                 filter: true,
@@ -124,13 +127,13 @@ const RequestExtensionListPage = () => {
             {
                 headerName: 'Actions',
                 filter: false,
-                cellRenderer: createActionColumnRenderer(pqrActions),
+                cellRenderer: createActionColumnRenderer(requestExtensionActions),
                 sortable: false,
                 pinned: 'right',
                 width: 80,
             },
         ],
-        [pqrActions]
+        [requestExtensionActions]
     );
 
     if (loading) {
@@ -227,7 +230,7 @@ const RequestExtensionListPage = () => {
                             },
                             onSortChanged: handleSortChanged,
                             overlayNoRowsTemplate:
-                                '<span style="padding: 10px; text-align: center;">No PQR entries found</span>',
+                                '<span style="padding: 10px; text-align: center;">No Request Extension entries found</span>',
                         }}
                     />
                 )}

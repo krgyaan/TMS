@@ -5,7 +5,7 @@ export interface Client {
   org: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
 }
 
 // Form Values Type

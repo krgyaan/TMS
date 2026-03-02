@@ -49,7 +49,7 @@ export function RequestExtensionForm({ mode, tenderId, existingData }: RequestEx
         }
 
         // Create mode: will be populated when tender data loads
-        return buildDefaultValues();
+        return buildDefaultValues(tenderId);
     }, [mode, existingData]);
 
     const form = useForm<RequestExtensionFormValues>({
@@ -69,17 +69,17 @@ export function RequestExtensionForm({ mode, tenderId, existingData }: RequestEx
     }, [form, initialValues]);
 
     // For create mode: populate clients from tender when tender data loads
-    useEffect(() => {
-        if (mode === 'create' && tender) {
-            form.setValue('tenderId', tender.id);
+    // useEffect(() => {
+    //     if (mode === 'create' && tender) {
+    //         form.setValue('tenderId', tender.id);
 
-            // Map tender clients to form clients
-            if (tender.clients && tender.clients.length > 0) {
-                const mappedClients = mapTenderClientsToFormClients(tender.clients);
-                form.setValue('clients', mappedClients);
-            }
-        }
-    }, [mode, tender, form]);
+    //         // Map tender clients to form clients
+    //         if (tender.clients && tender.clients.length > 0) {
+    //             const mappedClients = mapTenderClientsToFormClients(tender.clients);
+    //             form.setValue('clients', mappedClients);
+    //         }
+    //     }
+    // }, [mode, tender, form]);
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -160,7 +160,7 @@ export function RequestExtensionForm({ mode, tenderId, existingData }: RequestEx
                 </div>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(handleSubmit, (errors) => console.log(errors))} className="space-y-8">
                         {/* Extension Details */}
                         <div className="grid gap-4 md:grid-cols-6 items-start">
                             <FieldWrapper
@@ -300,10 +300,16 @@ export function RequestExtensionForm({ mode, tenderId, existingData }: RequestEx
                         {/* Form Actions */}
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button
-                                type="button"
+                                type="submit"
                                 variant="outline"
                                 onClick={() => navigate(-1)}
                                 disabled={isSubmitting}
+                                onSubmit={form.handleSubmit(
+                                    handleSubmit,
+                                    (errors) => {
+                                        console.log('❌ Validation errors:', errors);
+                                    }
+                                )}
                             >
                                 Cancel
                             </Button>
