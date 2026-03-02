@@ -2323,11 +2323,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown(approvedTotal),
                     },
                     during: {
-                        // total: {
-                        //     count: approvedDuringTotal.length,
-                        //     value: this.sumValue(approvedDuringTotal),
-                        //     drilldown: this.mapDrilldown(approvedDuringTotal),
-                        // },
+                        total: {
+                            count: approvedDuringTotal.length,
+                            value: this.sumValue(approvedDuringTotal),
+                            drilldown: this.mapDrilldown(approvedDuringTotal),
+                        },
                         completed: {
                             count: approvedDuringCompleted.length,
                             value: this.sumValue(approvedDuringCompleted),
