@@ -11,9 +11,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { usePqrs } from '@/hooks/api/usePqrs';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { PqrListRow } from '@/modules/shared/pqr/helpers/pqr.types';
+import { useRequestExtensions } from '@/hooks/api/useRequestExtension';
+import type { RequestExtensionListRow } from './helpers/requestExtension.types';
 
 const RequestExtensionListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -39,7 +40,7 @@ const RequestExtensionListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    const { data: apiResponse, isLoading: loading, error } = usePqrs(
+    const { data: apiResponse, isLoading: loading, error } = useRequestExtensions(
         {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
@@ -67,7 +68,7 @@ const RequestExtensionListPage = () => {
         [navigate]
     );
 
-    const colDefs = useMemo<ColDef<PqrListRow>[]>(
+    const colDefs = useMemo<ColDef<RequestExtensionListRow>[]>(
         () => [
             {
                 field: 'tenderName',
