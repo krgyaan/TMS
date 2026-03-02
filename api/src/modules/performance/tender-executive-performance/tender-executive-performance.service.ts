@@ -181,6 +181,29 @@ function resolveEmdFinancialState(instrumentType: string, action: number | null)
             return "LOCKED";
     }
 }
+
+function isFinanciallyPaid(instrumentType: string, action: number | null): boolean {
+    // 🚫 created / pending is NEVER paid
+    if (action === 0) return false;
+
+    switch (instrumentType) {
+        case "DD":
+        case "FDR":
+        case "Cheque":
+        case "Portal Payment":
+        case "Bank Transfer":
+            // money locked only after acceptance
+            return [1, 2].includes(action ?? -1);
+
+        case "BG":
+            // BG counts as paid only when live
+            return [2, 3, 4, 5, 6, 7].includes(action ?? -1);
+
+        default:
+            return false;
+    }
+}
+
 const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED", "REJECTED"];
 
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
@@ -2617,9 +2640,9 @@ export class TenderExecutiveService {
             during: {
                 pending: emptyBucket(),
                 completed: emptyBucket(),
-                total: emptyBucket(), // derived later
+                total: emptyBucket(), // derived
             },
-            closing: emptyBucket(), // derived later
+            closing: emptyBucket(), // derived
         };
 
         if (!tenderIds.length) {
@@ -2660,6 +2683,11 @@ export class TenderExecutiveService {
             const financialState = resolveEmdFinancialState(r.instrumentType, r.action);
 
             const isReceived = financialState === "RETURNED" || financialState === "SETTLED";
+
+            const isPaid = isFinanciallyPaid(r.instrumentType, r.action);
+
+            // 🚫 HARD STOP: never count unpaid EMDs
+            if (!isPaid) continue;
 
             const meta = {
                 tenderId: r.tenderId,
