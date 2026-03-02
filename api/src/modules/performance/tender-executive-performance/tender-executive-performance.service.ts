@@ -2087,7 +2087,7 @@ export class TenderExecutiveService {
 
         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
 
-        const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
+        const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.value ?? 0), 0);
 
         /* =====================================================
        A. OPENING
@@ -2134,8 +2134,8 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
-          AND pi.status NOT ILIKE '%rejected%';
-          AND pi.status NOT ILIKE '%pending%';
+          AND pi.status NOT ILIKE '%rejected%'
+          AND pi.status NOT ILIKE '%pending%'
     `);
 
         /* =====================================================
