@@ -9,26 +9,19 @@ export interface ProjectMasterResponse {
     organisationId: number | null;
     itemId: number;
     locationId: number | null;
-
     poNo: string | null;
     projectCode: string | null;
     projectName: string | null;
-
-    poDocument: string | null;
+    poUpload: string[] | null;
     poDate: string | null;
-
-    performanceProof: string | null;
+    performanceProof: string[] | null;
     performanceDate: string | null;
-
-    completionProof: string | null;
+    completionProof: string[] | null;
     completionDate: string | null;
-
     sapPoDate: string | null;
     sapPoNo: string | null;
-
     tenderId: number | null;
     enquiryId: number | null;
-
     createdAt?: string | null;
     updatedAt?: string | null;
 }
@@ -44,23 +37,17 @@ export interface CreateProjectMasterDto {
     organisationId?: number | null;
     itemId: number;
     locationId?: number | null;
-
     poNo?: string | null;
-    poUpload?: string | null;
+    poUpload?: string[] | null;
     poDate?: string | null;
-
     projectCode?: string | null;
     projectName?: string | null;
-
-    performanceProof?: string | null;
+    performanceProof?: string[] | null;
     performanceDate?: string | null;
-
-    completionProof?: string | null;
+    completionProof?: string[] | null;
     completionDate?: string | null;
-
     sapPoDate?: string | null;
     sapPoNo?: string | null;
-
     tenderId?: number | null;
     enquiryId?: number | null;
 }

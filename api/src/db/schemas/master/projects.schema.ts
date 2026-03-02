@@ -1,3 +1,4 @@
+import { jsonb } from "drizzle-orm/pg-core";
 import { pgTable, bigserial, bigint, varchar, timestamp, date, integer, index } from "drizzle-orm/pg-core";
 
 export const projects = pgTable("projects", {
@@ -9,18 +10,18 @@ export const projects = pgTable("projects", {
     poNo: varchar("po_no", { length: 255 }),
     projectCode: varchar("project_code", { length: 255 }),
     projectName: varchar("project_name", { length: 255 }),
-    poUpload: varchar("po_upload", { length: 255 }),
+    poUpload: jsonb("po_upload").$type<string[]>(),
     poDate: date("po_date"),
-    performanceProof: varchar("performance_proof", { length: 2000 }),
+    performanceProof: jsonb("performance_proof").$type<string[]>(),
     performanceDate: date("performance_date"),
-    completionProof: varchar("completion_proof", { length: 2000 }),
+    completionProof: jsonb("completion_proof").$type<string[]>(),
     completionDate: date("completion_date"),
-    createdAt: timestamp("created_at", { withTimezone: true }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }),
     sapPoDate: date("sap_po_date"),
     sapPoNo: varchar("sap_po_no", { length: 255 }),
     tenderId: integer("tender_id"),
     enquiryId: bigint("enquiry_id", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
   (table) => ([
     index("idx_projects_org_id").on(table.organisationId),
