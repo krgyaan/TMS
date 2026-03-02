@@ -2216,11 +2216,11 @@ export class TenderExecutiveService {
                             value: this.sumValue(assignedDuringCompleted),
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
-                        pending: {
-                            count: assignedDuringPending.length,
-                            value: this.sumValue(assignedDuringPending),
-                            drilldown: this.mapDrilldown(assignedDuringPending),
-                        },
+                        // pending: {
+                        //     count: assignedDuringPending.length,
+                        //     value: this.sumValue(assignedDuringPending),
+                        //     drilldown: this.mapDrilldown(assignedDuringPending),
+                        // },
                     },
                 },
 
@@ -2236,11 +2236,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown(approvedTotal),
                     },
                     during: {
-                        total: {
-                            count: approvedDuringTotal.length,
-                            value: this.sumValue(approvedDuringTotal),
-                            drilldown: this.mapDrilldown(approvedDuringTotal),
-                        },
+                        // total: {
+                        //     count: approvedDuringTotal.length,
+                        //     value: this.sumValue(approvedDuringTotal),
+                        //     drilldown: this.mapDrilldown(approvedDuringTotal),
+                        // },
                         completed: {
                             count: approvedDuringCompleted.length,
                             value: this.sumValue(approvedDuringCompleted),
@@ -2277,38 +2277,38 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(bidDuringCompleted),
                         },
                         pending: {
-                            count: bidDuringPending.length,
-                            value: this.sumValue(bidDuringPending),
-                            drilldown: this.mapDrilldown(bidDuringPending),
-                        },
-                    },
-                },
-
-                missed: {
-                    opening: {
-                        count: missedOpening.length,
-                        value: this.sumValue(missedOpening),
-                        drilldown: this.mapDrilldown(missedOpening),
-                    },
-                    total: {
-                        count: missedOpening.length + missedDuringCompleted.length,
-                        value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
-                        drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
-                    },
-                    during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
-                        completed: {
                             count: missedDuringCompleted.length,
                             value: this.sumValue(missedDuringCompleted),
                             drilldown: this.mapDrilldown(missedDuringCompleted),
                         },
-                        pending: { count: 0, value: 0, drilldown: [] },
                     },
                 },
+
+                // missed: {
+                //     opening: {
+                //         count: missedOpening.length,
+                //         value: this.sumValue(missedOpening),
+                //         drilldown: this.mapDrilldown(missedOpening),
+                //     },
+                //     total: {
+                //         count: missedOpening.length + missedDuringCompleted.length,
+                //         value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
+                //         drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
+                //     },
+                //     during: {
+                //         total: {
+                //             count: bidDuringCompleted.length,
+                //             value: this.sumValue(bidDuringCompleted),
+                //             drilldown: this.mapDrilldown(bidDuringCompleted),
+                //         },
+                //         completed: {
+                //             count: missedDuringCompleted.length,
+                //             value: this.sumValue(missedDuringCompleted),
+                //             drilldown: this.mapDrilldown(missedDuringCompleted),
+                //         },
+                //         pending: { count: 0, value: 0, drilldown: [] },
+                //     },
+                // },
 
                 resultAwaited: {
                     opening: {
@@ -2333,9 +2333,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
                         },
                         pending: {
-                            count: resultAwaitedDuringPending.length,
-                            value: this.sumValue(resultAwaitedDuringPending),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringPending),
+                            count: disqualifiedDuringCompleted.length,
+                            value: this.sumValue(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
                         },
                     },
                 },
@@ -2352,11 +2352,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown([...wonOpening, ...wonDuringCompleted]),
                     },
                     during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
+                        // total: {
+                        //     count: bidDuringCompleted.length,
+                        //     value: this.sumValue(bidDuringCompleted),
+                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
+                        // },
                         completed: {
                             count: wonDuringCompleted.length,
                             value: this.sumValue(wonDuringCompleted),
@@ -2378,11 +2378,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown([...lostOpening, ...lostDuringCompleted]),
                     },
                     during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
+                        // total: {
+                        //     count: bidDuringCompleted.length,
+                        //     value: this.sumValue(bidDuringCompleted),
+                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
+                        // },
                         completed: {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
@@ -2392,31 +2392,31 @@ export class TenderExecutiveService {
                     },
                 },
 
-                disqualified: {
-                    opening: {
-                        count: disqualifiedOpening.length,
-                        value: this.sumValue(disqualifiedOpening),
-                        drilldown: this.mapDrilldown(disqualifiedOpening),
-                    },
-                    total: {
-                        count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
-                        value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                        drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                    },
-                    during: {
-                        total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
-                        },
-                        completed: {
-                            count: disqualifiedDuringCompleted.length,
-                            value: this.sumValue(disqualifiedDuringCompleted),
-                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
-                        },
-                        pending: { count: 0, value: 0, drilldown: [] },
-                    },
-                },
+                // disqualified: {
+                //     opening: {
+                //         count: disqualifiedOpening.length,
+                //         value: this.sumValue(disqualifiedOpening),
+                //         drilldown: this.mapDrilldown(disqualifiedOpening),
+                //     },
+                //     total: {
+                //         count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
+                //         value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                //         drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
+                //     },
+                //     during: {
+                //         total: {
+                //             count: bidDuringCompleted.length,
+                //             value: this.sumValue(bidDuringCompleted),
+                //             drilldown: this.mapDrilldown(bidDuringCompleted),
+                //         },
+                //         completed: {
+                //             count: disqualifiedDuringCompleted.length,
+                //             value: this.sumValue(disqualifiedDuringCompleted),
+                //             drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                //         },
+                //         pending: { count: 0, value: 0, drilldown: [] },
+                //     },
+                // },
             },
         };
     }
