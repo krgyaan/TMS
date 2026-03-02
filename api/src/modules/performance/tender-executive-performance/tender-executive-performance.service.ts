@@ -1818,6 +1818,7 @@ export class TenderExecutiveService {
         AND ti.created_at < '${from}'
         AND tin.id IS NULL
         AND tl_status = 0
+        AND ti.status IN (1,2)
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1940,8 +1941,13 @@ export class TenderExecutiveService {
         //we'll use total tenders approved
 
         const bidDuringCompleted = await exec(`
-    SELECT ti.*
+    SELECT
+        ti.*,
+        COALESCE(tcs.final_price, ti.gst_values) AS effective_value
     FROM tender_infos ti
+    LEFT JOIN tender_costing_sheets tcs
+        ON tcs.tender_id = ti.id
+        AND tcs.status = 'Approved'
     WHERE ${baseWhere()}
       AND EXISTS (
           SELECT 1
@@ -2420,14 +2426,13 @@ export class TenderExecutiveService {
             tenderId: t.id,
             tenderNo: t.tender_no ?? t.tenderNo,
             tenderName: t.tender_name ?? t.tenderName,
-            value: Number(t.gst_values ?? 0),
+            value: Number(t.effective_value ?? t.gst_values ?? 0),
         }));
     }
 
     private sumValue(rows: any[]) {
-        return rows.reduce((sum, r) => sum + Number(r.gst_values ?? 0), 0);
+        return rows.reduce((sum, r) => sum + Number(r.effective_value ?? r.gst_values ?? 0), 0);
     }
-
     // =======================================================
     // EMD BALANCE SHEET VIEW
     // =======================================================
