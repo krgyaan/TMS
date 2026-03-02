@@ -85,6 +85,10 @@ export const paths = {
         resultsUpload: (tenderId: number) => `/tendering/results/upload/${tenderId}`,
         resultsShow: (tenderId: number) => `/tendering/results/${tenderId}`,
         resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
+        requestExtension: "/tendering/request-extension",
+        requestExtensionCreate: (tenderId: number) => `/tendering/request-extension/create/${tenderId}`,
+        requestExtensionEdit: (id: number) => `/tendering/request-extension/edit/${id}`,
+        requestExtensionView: (id: number) => `/tendering/request-extension/view/${id}`,
     },
 
     // ==================== OPERATIONS ====================
