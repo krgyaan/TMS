@@ -86,8 +86,8 @@ export const paths = {
         resultsShow: (tenderId: number) => `/tendering/results/${tenderId}`,
         resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
         requestExtension: "/tendering/request-extension",
-        requestExtensionCreate: (tenderId: number) => `/tendering/request-extension/create/${tenderId}`,
-        requestExtensionEdit: (id: number) => `/tendering/request-extension/edit/${id}`,
+        requestExtensionCreate: (tenderId: number) => `/tendering/request-extension/${tenderId}/create`,
+        requestExtensionEdit: (tenderId: number, id: number) => `/tendering/request-extension/${tenderId}/edit/${id}`,
         requestExtensionView: (id: number) => `/tendering/request-extension/view/${id}`,
     },
 
