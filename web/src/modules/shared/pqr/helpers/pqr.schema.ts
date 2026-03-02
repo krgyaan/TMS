@@ -8,9 +8,9 @@ export const PqrFormSchema = z.object({
     poDate: z.string().min(1, { message: "PO date is required" }),
     uploadPo: z.array(z.string()).default([]),
     uploadSapGemPo: z.array(z.string()).default([]),
-    sapGemPoDate: z.string().min(1, { message: "SAP/GEM PO date is required" }),
+    sapGemPoDate: z.string().optional(),
     uploadCompletion: z.array(z.string()).default([]),
-    completionDate: z.string().min(1, { message: "Completion date is required" }),
+    completionDate: z.string().optional(),
     performanceCertificate: z.array(z.string()).default([]),
     remarks: z.string().optional(),
 });

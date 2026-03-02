@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { usePqr } from "@/hooks/api/usePqrs";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 
 const PqrShowPage = () => {
     const navigate = useNavigate();
@@ -58,12 +59,6 @@ const PqrShowPage = () => {
 
     const formatOrDash = (value?: string | null) =>
         value && value.trim().length > 0 ? value : "—";
-
-    const formatDate = (value?: string | null) =>
-        value && value.trim().length > 0 ? value : "—";
-
-    const formatDateTime = (value?: string | null) =>
-        value ? new Date(value).toLocaleString() : "—";
 
     const poFiles = pqr.uploadPo ? Array.isArray(pqr.uploadPo) ? pqr.uploadPo : [pqr.uploadPo] : [];
     const sapGemPoFiles = pqr.uploadSapGemPo ? Array.isArray(pqr.uploadSapGemPo) ? pqr.uploadSapGemPo : [pqr.uploadSapGemPo] : [];
