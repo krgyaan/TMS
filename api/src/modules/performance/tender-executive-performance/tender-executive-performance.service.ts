@@ -2604,8 +2604,7 @@ export class TenderExecutiveService {
         const to = `${query.toDate}T23:59:59.999Z`;
 
         /* ============================
-       BASE WHERE (same philosophy
-       as getStageBacklogV2)
+       BASE WHERE
     ============================ */
 
         const baseWhere = () => {
@@ -2626,6 +2625,7 @@ export class TenderExecutiveService {
         /* =====================================================
        OPENING
        Paid before period & still live
+       (cancelled EXCLUDED)
     ===================================================== */
 
         const opening = await exec(`
@@ -2650,7 +2650,7 @@ export class TenderExecutiveService {
 
         /* =====================================================
        DURING → COMPLETED
-       Paid & returned/settled in period
+       Paid in period & returned / settled / cancelled
     ===================================================== */
 
         const duringCompleted = await exec(`
@@ -2668,8 +2668,13 @@ export class TenderExecutiveService {
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+              -- DD / FDR → returned / settled / cancelled
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+
+              -- Portal / BT → returned / settled / cancelled
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
+
+              -- BG → settled / cancelled
            OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
           );
     `);
@@ -2677,6 +2682,7 @@ export class TenderExecutiveService {
         /* =====================================================
        DURING → PENDING
        Paid in period & still live
+       (cancelled EXCLUDED)
     ===================================================== */
 
         const duringPending = await exec(`
@@ -2702,6 +2708,7 @@ export class TenderExecutiveService {
         /* =====================================================
        CLOSING
        Still live at end of period
+       (cancelled EXCLUDED)
     ===================================================== */
 
         const closing = await exec(`
@@ -2725,7 +2732,7 @@ export class TenderExecutiveService {
     `);
 
         /* =====================================================
-       FINAL RESPONSE (UI-READY)
+       FINAL RESPONSE
     ===================================================== */
 
         return {
@@ -2763,117 +2770,4 @@ export class TenderExecutiveService {
             },
         };
     }
-    // async getEmdCashFlow(query: EmdBalanceQueryDto) {
-    //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
-    //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
-
-    //     const tenderIds = await this.resolveTenderIdsForView(query.view, query.userId, query.teamId);
-
-    //     const emptyBucket = () => ({
-    //         count: 0,
-    //         value: 0,
-    //         drilldown: [] as any[],
-    //     });
-
-    //     const result = {
-    //         opening: emptyBucket(),
-    //         during: {
-    //             pending: emptyBucket(),
-    //             completed: emptyBucket(),
-    //             total: emptyBucket(), // derived later
-    //         },
-    //         closing: emptyBucket(), // derived later
-    //     };
-
-    //     if (!tenderIds.length) {
-    //         return result;
-    //     }
-
-    //     const rows = await this.db
-    //         .select({
-    //             tenderId: paymentRequests.tenderId,
-    //             amount: paymentRequests.amountRequired,
-    //             paidAt: paymentRequests.createdAt,
-
-    //             instrumentType: paymentInstruments.instrumentType,
-    //             action: paymentInstruments.action,
-    //             receivedAt: paymentInstruments.updatedAt,
-
-    //             tenderNo: tenderInfos.tenderNo,
-    //             tenderName: tenderInfos.tenderName,
-    //         })
-    //         .from(paymentRequests)
-    //         .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
-    //         .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-    //         .where(
-    //             and(
-    //                 inArray(paymentRequests.tenderId, tenderIds),
-    //                 eq(paymentRequests.purpose, "EMD"),
-    //                 inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Bank Transfer", "Portal Payment", "BG", "Cheque"]),
-    //                 lte(paymentRequests.createdAt, to)
-    //             )
-    //         );
-
-    //     for (const r of rows) {
-    //         if (!r.paidAt) continue;
-
-    //         const paidAt = r.paidAt;
-    //         const receivedAt = r.receivedAt ?? null;
-
-    //         const financialState = resolveEmdFinancialState(r.instrumentType, r.action);
-
-    //         const isReceived = financialState === "RETURNED" || financialState === "SETTLED";
-
-    //         const meta = {
-    //             tenderId: r.tenderId,
-    //             tenderNo: r.tenderNo,
-    //             tenderName: r.tenderName,
-    //             instrumentType: r.instrumentType,
-    //             amount: Number(r.amount),
-    //             paidAt,
-    //             receivedAt,
-    //         };
-
-    //         // =========================
-    //         // OPENING
-    //         // =========================
-    //         if (paidAt < from && (!isReceived || (receivedAt && receivedAt >= from))) {
-    //             result.opening.count++;
-    //             result.opening.value += meta.amount;
-    //             result.opening.drilldown.push(meta);
-    //         }
-
-    //         // =========================
-    //         // DURING.PENDING
-    //         // =========================
-    //         if (paidAt >= from && paidAt <= to && (!isReceived || (receivedAt && receivedAt > to))) {
-    //             result.during.pending.count++;
-    //             result.during.pending.value += meta.amount;
-    //             result.during.pending.drilldown.push(meta);
-    //         }
-
-    //         // =========================
-    //         // DURING.COMPLETED
-    //         // =========================
-    //         if (paidAt >= from && paidAt <= to && isReceived && receivedAt && receivedAt >= from && receivedAt <= to) {
-    //             result.during.completed.count++;
-    //             result.during.completed.value += meta.amount;
-    //             result.during.completed.drilldown.push(meta);
-    //         }
-    //     }
-
-    //     // =========================
-    //     // DERIVED TOTALS
-    //     // =========================
-
-    //     result.during.total.count = result.during.pending.count + result.during.completed.count;
-
-    //     result.during.total.value = result.during.pending.value + result.during.completed.value;
-
-    //     result.closing.count = result.opening.count + result.during.pending.count;
-
-    //     result.closing.value = result.opening.value + result.during.pending.value;
-
-    //     return result;
-    // }
 }
