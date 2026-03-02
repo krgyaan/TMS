@@ -72,7 +72,7 @@ export const useCreateRequestExtension = () => {
     });
 };
 
-export const useUpdatePqr = () => {
+export const useUpdateRequestExtension = () => {
     const queryClient = useQueryClient();
 
     return useMutation({

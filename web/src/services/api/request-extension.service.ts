@@ -4,7 +4,7 @@ import type { PaginatedResult } from '@/types/api.types';
 
 class RequestExtensionService extends BaseApiService {
     constructor() {
-        super('/request-extension');
+        super('/request-extensions');
     }
 
     async getAll(params?: RequestExtensionListParams): Promise<PaginatedResult<RequestExtensionListRow>> {
