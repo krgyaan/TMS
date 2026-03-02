@@ -153,11 +153,11 @@ export class ProjectsMasterService {
                     poNo: projects.poNo,
                     projectCode: projects.projectCode,
                     projectName: projects.projectName,
-                    poDocument: projects.poDocument,
+                    poDocument: projects.poUpload,
                     poDate: projects.poDate,
-                    performanceCertificate: projects.performanceCertificate,
+                    performanceCertificate: projects.performanceProof,
                     performanceDate: projects.performanceDate,
-                    completionDocument: projects.completionDocument,
+                    completionDocument: projects.completionProof,
                     completionDate: projects.completionDate,
                     createdAt: projects.createdAt,
                     updatedAt: projects.updatedAt,
@@ -183,7 +183,7 @@ export class ProjectsMasterService {
                 .where(where),
         ]);
 
-        const data: ProjectListRow[] = (rows as ProjectListRow[]).map(row => ({
+        const data: ProjectListRow[] = rows.map(row => ({
             id: row.id,
             teamName: row.teamName,
             organisationId: row.organisationId,
@@ -192,11 +192,11 @@ export class ProjectsMasterService {
             poNo: row.poNo,
             projectCode: row.projectCode,
             projectName: row.projectName,
-            poDocument: row.poDocument,
+            poUpload: row.organizationName,
             poDate: row.poDate,
-            performanceCertificate: row.performanceCertificate,
+            performanceProof: row.itemName,
             performanceDate: row.performanceDate,
-            completionDocument: row.completionDocument,
+            completionProof: row.locationName,
             completionDate: row.completionDate,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
@@ -234,14 +234,6 @@ export class ProjectsMasterService {
     }
 
     async create(input: CreateProjectDto): Promise<ProjectRow> {
-        const { projectCode, projectName } =
-            await this.generateProjectCodeAndName({
-                teamName: input.teamName,
-                organisationId: input.organisationId ?? undefined,
-                itemId: input.itemId,
-                locationId: input.locationId ?? undefined,
-            });
-
         const now = new Date();
 
         const rows = await this.db
@@ -252,13 +244,13 @@ export class ProjectsMasterService {
                 itemId: input.itemId,
                 locationId: input.locationId ?? null,
                 poNo: input.poNo ?? null,
-                projectCode,
-                projectName,
-                poDocument: input.poDocument ?? null,
+                projectCode: input.projectCode,
+                projectName: input.projectName,
+                poDocument: input.poUpload ?? null,
                 poDate: input.poDate ? new Date(input.poDate) : null,
-                performanceCertificate: input.performanceCertificate ?? null,
+                performanceCertificate: input.performanceProof ?? null,
                 performanceDate: input.performanceDate ? new Date(input.performanceDate) : null,
-                completionDocument: input.completionDocument ?? null,
+                completionDocument: input.completionProof ?? null,
                 completionDate: input.completionDate ? new Date(input.completionDate) : null,
                 sapPoDate: input.sapPoDate ? new Date(input.sapPoDate) : null,
                 sapPoNo: input.sapPoNo ?? null,
@@ -275,28 +267,6 @@ export class ProjectsMasterService {
     async update(id: number, input: UpdateProjectDto): Promise<ProjectRow> {
         const existing = await this.findById(id);
 
-        let projectCode = existing.projectCode;
-        let projectName = existing.projectName;
-
-        const needsRegenerate =
-            input.itemId ||
-            input.organisationId !== undefined ||
-            input.locationId !== undefined;
-
-        if (needsRegenerate) {
-            const { projectCode: newCode, projectName: newName } =
-                await this.generateProjectCodeAndName({
-                    teamName: input.teamName ?? existing.teamName,
-                    organisationId:
-                        input.organisationId ?? existing.organisationId ?? undefined,
-                    itemId: input.itemId ?? existing.itemId,
-                    locationId:
-                        input.locationId ?? existing.locationId ?? undefined,
-                });
-            projectCode = newCode;
-            projectName = newName;
-        }
-
         const rows = await this.db
             .update(projects)
             .set({
@@ -311,15 +281,14 @@ export class ProjectsMasterService {
                         ? input.locationId
                         : existing.locationId,
                 poNo: input.poNo ?? existing.poNo,
-                projectCode,
-                projectName,
-                poDocument: input.poDocument ?? existing.poDocument,
+                projectCode: input.projectCode ?? existing.projectCode,
+                projectName: input.projectName ?? existing.projectName,
+                poUpload: input.poUpload ?? existing.poUpload,
                 poDate: input.poDate ?? existing.poDate,
-                performanceCertificate:
-                    input.performanceCertificate ?? existing.performanceCertificate,
+                performanceProof:
+                    input.performanceProof ?? existing.performanceProof,
                 performanceDate: input.performanceDate ?? existing.performanceDate,
-                completionDocument:
-                    input.completionDocument ?? existing.completionDocument,
+                completionProof: input.completionProof ?? existing.completionProof,
                 completionDate: input.completionDate ?? existing.completionDate,
                 sapPoDate: input.sapPoDate ?? existing.sapPoDate,
                 sapPoNo: input.sapPoNo ?? existing.sapPoNo,

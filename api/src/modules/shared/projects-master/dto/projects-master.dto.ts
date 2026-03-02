@@ -6,14 +6,17 @@ export const ProjectBaseSchema = z.object({
     itemId: z.number().int(),
     locationId: z.number().int().nullable().optional(),
 
+    projectCode: z.string().max(255).nullable().optional(),
+    projectName: z.string().max(255).nullable().optional(),
+
     poNo: z.string().max(255).nullable().optional(),
-    poDocument: z.string().max(255).nullable().optional(),
+    poUpload: z.string().max(255).nullable().optional(),
     poDate: z.string().nullable().optional(),
 
-    performanceCertificate: z.string().max(2000).nullable().optional(),
+    performanceProof: z.string().max(2000).nullable().optional(),
     performanceDate: z.string().nullable().optional(),
 
-    completionDocument: z.string().max(2000).nullable().optional(),
+    completionProof: z.string().max(2000).nullable().optional(),
     completionDate: z.string().nullable().optional(),
 
     sapPoDate: z.string().nullable().optional(),
