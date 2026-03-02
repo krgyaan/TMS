@@ -9,7 +9,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -156,7 +156,16 @@ const TenderListPage = () => {
                 }
             },
             icon: <Trash className="h-4 w-4" />,
+            visible: (row: TenderInfoWithNames) => {
+                // For now, show delete button for all users
+                return row.teamMember == 7 || row.teamMember == 8;
+            },
         },
+        {
+            label: "Request Extension",
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
+            icon: <Clock className="h-4 w-4" />,
+        }
     ];
 
     const [colDefs] = useState<ColDef<TenderWithTimer>[]>([
