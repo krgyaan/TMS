@@ -10,20 +10,6 @@ import { useFinanceDocument } from "@/hooks/api/useFinanceDocuments";
 import { useFinancialYears } from "@/hooks/api/useFinancialYear";
 import { useFinanceDocTypes } from "@/hooks/api/useFinanceDocType";
 
-const parsePgTextArray = (value?: string | null): string[] => {
-    if (!value) return [];
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-        return [trimmed];
-    }
-    const inner = trimmed.slice(1, -1);
-    if (!inner) return [];
-    return inner
-        .split(",")
-        .map((part) => part.trim().replace(/^"(.*)"$/, "$1"))
-        .filter((part) => part.length > 0);
-};
-
 const FinanceDocumentShowPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
@@ -96,7 +82,10 @@ const FinanceDocumentShowPage = () => {
     const financialYearLabel =
         financialYearMap[financeDocument.financialYear] ?? "—";
 
-    const documentFiles = parsePgTextArray(financeDocument.uploadFile);
+    const documentFiles = financeDocument.uploadFile ? Array.isArray(financeDocument.uploadFile)
+        ? financeDocument.uploadFile
+        : [financeDocument.uploadFile]
+        : [];
 
     const formatDateTime = (value?: string | null) =>
         value ? new Date(value).toLocaleString() : "—";
@@ -114,16 +103,6 @@ const FinanceDocumentShowPage = () => {
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                navigate(
-                                    `/document-dashboard/finance-document/${financeDocumentId}/edit`
-                                )
-                            }
-                        >
-                            <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     </div>
                 </div>
@@ -163,7 +142,7 @@ const FinanceDocumentShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {documentFiles.length > 0 ? (
                                         documentFiles.map((fileName, index) => {
-                                            const url = `/uploads/finance-document/${fileName}`;
+                                            const url = `/api/v1/tender-files/serve/${fileName}`;
                                             return (
                                                 <div key={`${fileName}-${index}`}>
                                                     <a
@@ -174,7 +153,7 @@ const FinanceDocumentShowPage = () => {
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         {documentFiles.length > 1
-                                                            ? `View Document ${index + 1}`
+                                                            ? `View Document - ${index + 1}`
                                                             : "View Document"}
                                                     </a>
                                                 </div>

@@ -4,10 +4,10 @@ import { PqrFormSchema } from './pqr.schema';
 // Form Values Type
 export type PqrFormValues = z.infer<typeof PqrFormSchema>;
 
-// Response from API (list and detail - API returns teamName/value as string from DB)
 export interface PqrResponse {
     id: number;
-    teamName: number;
+    teamId: number;
+    teamName: string;
     projectName: string;
     value: number;
     item: string;
@@ -17,15 +17,15 @@ export interface PqrResponse {
     uploadSapGemPo: string | null;
     completionDate: string;
     uploadCompletion: string | null;
-    uploadPerformanceCertificate: string | null;
+    performanceCertificate: string | null;
     remarks: string | undefined;
     createdAt?: string;
     updatedAt?: string;
 }
 
-// List row from API (teamName and value returned as string by backend)
 export interface PqrListRow {
     id: number;
+    teamId: number;
     teamName: string;
     projectName: string | null;
     value: string;
@@ -36,7 +36,7 @@ export interface PqrListRow {
     uploadSapGemPo: string | null;
     completionDate: string | null;
     uploadCompletion: string | null;
-    uploadPerformanceCertificate: string | null;
+    performanceCertificate: string | null;
     remarks: string | null;
     createdAt?: string | null;
     updatedAt?: string | null;
@@ -44,30 +44,34 @@ export interface PqrListRow {
 
 // Create DTO
 export interface CreatePqrDto {
-    teamName: number;
+    teamId: number;
     projectName: string;
     value: number;
     item: string;
     poDate: string;
     uploadPo?: string;
+    sapGemPoDate: string | null;
     uploadSapGemPo?: string;
+    completionDate: string | null;
     uploadCompletion?: string;
-    uploadPerformanceCertificate?: string;
+    performanceCertificate?: string;
     remarks?: string;
 }
 
 // Update DTO
 export interface UpdatePqrDto {
     id: number;
-    teamName?: number;
+    teamId?: number;
     projectName?: string;
     value?: number;
     item?: string;
     poDate?: string;
     uploadPo?: string;
+    sapGemPoDate: string | null;
     uploadSapGemPo?: string;
     uploadCompletion?: string;
-    uploadPerformanceCertificate?: string;
+    completionDate: string | null;
+    performanceCertificate?: string;
     remarks?: string;
 }
 

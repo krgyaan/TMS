@@ -6,21 +6,6 @@ import type {
     UpdateFinanceDocumentDto,
 } from './financeDocument.types';
 
-const parsePgTextArray = (value?: string | null): string[] => {
-    if (!value) return [];
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-        return [trimmed];
-    }
-    const inner = trimmed.slice(1, -1);
-    if (!inner) return [];
-    return inner
-        .split(",")
-        .map((part) => part.trim().replace(/^"(.*)"$/, "$1"))
-        .filter((part) => part.length > 0);
-};
-
 // Build default values (for create mode)
 export const buildDefaultValues = (): FinanceDocumentFormValues => {
     return {
@@ -35,25 +20,36 @@ const toNumber = (v: string | number | null | undefined): number =>
     typeof v === 'number' ? v : v != null ? Number(v) : 0;
 
 // Map API response to form values (for edit mode). Accepts both response and list row (API returns list row shape).
-export const mapResponseToForm = (
-    existingData: FinanceDocumentResponse | FinanceDocumentListRow | null
-): FinanceDocumentFormValues => {
-    if (!existingData) {
-        return buildDefaultValues();
+export function mapResponseToForm(
+    response: FinanceDocumentResponse | FinanceDocumentListRow
+): FinanceDocumentFormValues {
+    // Handle uploadFile which might come as different property names
+    let uploadFile: string[] = [];
+
+    if ('uploadFile' in response && response.uploadFile) {
+        uploadFile = Array.isArray(response.uploadFile)
+            ? response.uploadFile
+            : [response.uploadFile];
+    } else if ('documentPath' in response && response.documentPath) {
+        // Backend might return as documentPath
+        const docPath = (response as any).documentPath;
+        uploadFile = Array.isArray(docPath) ? docPath : [docPath];
     }
 
-    const doc = existingData as FinanceDocumentListRow & { documentType?: number; financialYear?: number };
-    const uploadFiles = parsePgTextArray(doc.uploadFile as string | null);
-    return {
-        documentName: doc.documentName ?? '',
-        documentType: toNumber(doc.documentType),
-        financialYear: toNumber(doc.financialYear),
-        uploadFile: uploadFiles,
-    };
-};
+    // Normalize paths
+    uploadFile = uploadFile
+        .filter(p => p && typeof p === 'string')
+        .map(p => p.replace(/\\/g, '/'));
 
-// First path from TenderFileUploader array (API accepts single path per field)
-const firstPath = (paths: string[]): string | undefined => paths?.[0];
+    const result = {
+        documentName: response.documentName ?? '',
+        documentType: response.documentType != null ? toNumber(response.documentType) : 0,
+        financialYear: response.financialYear != null ? toNumber(response.financialYear) : 0,
+        uploadFile,
+    };
+
+    return result;
+}
 
 // Map form values to Create DTO
 export const mapFormToCreatePayload = (values: FinanceDocumentFormValues): CreateFinanceDocumentDto => {
@@ -61,7 +57,7 @@ export const mapFormToCreatePayload = (values: FinanceDocumentFormValues): Creat
         documentName: values.documentName,
         documentType: values.documentType,
         financialYear: values.financialYear,
-        uploadFile: firstPath(values.uploadFile),
+        uploadFile: values.uploadFile?.length ? values.uploadFile : undefined,
     };
 };
 
@@ -75,6 +71,6 @@ export const mapFormToUpdatePayload = (
         documentName: values.documentName,
         documentType: values.documentType,
         financialYear: values.financialYear,
-        uploadFile: firstPath(values.uploadFile),
+        uploadFile: values.uploadFile?.length ? values.uploadFile : undefined,
     };
 };

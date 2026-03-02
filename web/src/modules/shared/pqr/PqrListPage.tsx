@@ -71,19 +71,11 @@ const PqrListPage = () => {
     const colDefs = useMemo<ColDef<PqrListRow>[]>(
         () => [
             {
-                field: 'id',
-                colId: 'id',
-                headerName: 'ID',
-                width: 80,
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'teamName',
                 colId: 'teamName',
-                headerName: 'Team Name',
+                headerName: 'Team',
                 flex: 1,
-                minWidth: 120,
+                maxWidth: 90,
                 valueGetter: (params) => params.data?.teamName ?? '—',
                 sortable: true,
                 filter: true,
@@ -232,7 +224,8 @@ const PqrListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <div className="flex items-center gap-4 px-6 pb-4">
+                <div className="flex justify-between items-center gap-4 px-6 pb-4">
+                    <div></div>
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input

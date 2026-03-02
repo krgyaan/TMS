@@ -91,14 +91,6 @@ const FinanceDocumentListPage = () => {
     const colDefs = useMemo<ColDef<FinanceDocumentListRow>[]>(
         () => [
             {
-                field: 'id',
-                colId: 'id',
-                headerName: 'ID',
-                width: 80,
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'documentName',
                 colId: 'documentName',
                 headerName: 'Document Name',
@@ -135,30 +127,6 @@ const FinanceDocumentListPage = () => {
                 },
                 sortable: true,
                 filter: true,
-            },
-            {
-                field: 'uploadFile',
-                colId: 'uploadFile',
-                headerName: 'Document',
-                flex: 1,
-                minWidth: 120,
-                cellRenderer: (params: { data?: FinanceDocumentListRow }) => {
-                    const url = params.data?.uploadFile;
-                    if (!url) return '—';
-                    return (
-                        <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            Document
-                        </a>
-                    );
-                },
-                sortable: false,
-                filter: false,
             },
             {
                 headerName: 'Actions',

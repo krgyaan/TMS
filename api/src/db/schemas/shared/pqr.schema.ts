@@ -1,9 +1,10 @@
-import { pgTable, bigserial, varchar, date, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, varchar, date, timestamp, bigint } from "drizzle-orm/pg-core";
+import { teams } from "../master";
 
 export const pqrDocuments = pgTable("pqr_documents", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
 
-    teamName: varchar("team_name", { length: 255 }),
+    teamId: bigint("team_id", { mode: "number" }).references(() => teams.id),
     projectName: varchar("project_name", { length: 255 }),
     value: varchar("value", { length: 255 }),
     item: varchar("item", { length: 255 }),
@@ -23,3 +24,5 @@ export const pqrDocuments = pgTable("pqr_documents", {
     createdAt: timestamp("created_at", { withTimezone: false }),
     updatedAt: timestamp("updated_at", { withTimezone: false }),
 });
+
+export type Pqr = typeof pqrDocuments.$inferSelect;

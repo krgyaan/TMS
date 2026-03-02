@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { optionalTextField, textField } from '@/utils/zod-schema-generator';
 
 export const CreatePqrSchema = z.object({
-    teamName: z.coerce.number().int().positive('Team Name is required'),
+    teamId: z.coerce.number().int().positive('Team Name is required'),
     projectName: textField(255).min(1, 'Project Name is required'),
     value: z.coerce.number().nonnegative('Value is required'),
     item: textField(255).min(1, 'Item is required'),
