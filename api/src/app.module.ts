@@ -88,6 +88,7 @@ import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 
 @Module({
     imports: [
@@ -186,6 +187,7 @@ import { ProjectsMasterModule } from "./modules/master/projects-master/projects-
         ProjectsMasterModule,
         ProjectsMasterrModule,
         // BusinessPerformanceModule,
+        RequestExtensionsModule
     ],
     controllers: [AppController],
     providers: [
