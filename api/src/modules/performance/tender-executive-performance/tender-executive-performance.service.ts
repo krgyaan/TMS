@@ -1912,24 +1912,29 @@ export class TenderExecutiveService {
     ===================================================== */
 
         const bidOpening = await exec(`
-            SELECT ti.*
-            FROM tender_infos ti
-            JOIN tender_information tin
-            ON tin.tender_id = ti.id
-            WHERE ${baseWhere()}
-            AND ti.created_at < '${from}'
-            AND EXISTS (
-                SELECT 1
-                FROM tender_costing_sheets tcs
-                WHERE tcs.tender_id = ti.id
-                    AND tcs.status = 'Approved'
+    SELECT ti.*
+    FROM tender_infos ti
+    JOIN tender_information tin
+        ON tin.tender_id = ti.id
+    WHERE ${baseWhere()}
+      AND (
+            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.created_at < '${from}'
+                AND EXISTS (
+                    SELECT 1
+                    FROM tender_costing_sheets tcs
+                    WHERE tcs.tender_id = ti.id
+                      AND tcs.status = 'Approved'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                )
             )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-            );
-        `);
+      );
+`);
 
         //         const bidDuringTotal = await exec(`
         //     SELECT ti.*
@@ -1978,6 +1983,7 @@ export class TenderExecutiveService {
             FROM tender_infos ti
             JOIN tender_information tin
             ON tin.tender_id = ti.id
+            AND ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
             WHERE ${baseWhere()}
             AND ti.tl_status = 1
             AND NOT EXISTS (
@@ -1996,19 +2002,26 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
-        AND ti.tl_status = 1
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND ti.created_at < '${from}'
+      AND (
+            ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.tl_status = 1
+                AND EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Bid Submitted'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                      AND tr.status IN ('Won','Lost','Disqualified')
+                )
+            )
+      );
+`);
 
         //         const resultAwaitedDuringTotal = await exec(`
         //     SELECT ti.*
@@ -2051,17 +2064,25 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND (
+            ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
+            AND (
+                ti.tl_status = 1
+                AND EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Bid Submitted'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                      AND tr.status IN ('Won','Lost','Disqualified')
+                )
+            )
+      );
+`);
 
         /* =====================================================
         MISSED / WON / LOST / DISQUALIFIED (terminal)
@@ -2114,12 +2135,27 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at < '${from}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Won'
-    )
+      AND (
+            /* 1️⃣ Result exists → use result date */
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Won'
+                  AND tr.created_at < '${from}'
+            )
+
+            /* 2️⃣ No result → fallback to status + ti.created_at */
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (25, 26, 27, 28)
+                AND ti.created_at < '${from}'
+            )
+      )
 `);
 
         // DURING → COMPLETED (won only)
@@ -2127,12 +2163,23 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-      AND EXISTS (
-          SELECT 1
-          FROM tender_results tr
-          WHERE tr.tender_id = ti.id
-            AND tr.status = 'Won'
-            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Won'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (25, 26, 27, 28)
+                AND ti.created_at BETWEEN '${from}' AND '${to}'
+            )
       )
 `);
         // loss OPENING
@@ -2140,12 +2187,24 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at < '${from}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Lost'
-    )
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Lost'
+                  AND tr.created_at < '${from}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (18, 21, 22, 24)
+                AND ti.created_at < '${from}'
+            )
+      )
 `);
 
         // DURING → COMPLETED (lost only)
@@ -2153,12 +2212,23 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-      AND EXISTS (
-          SELECT 1
-          FROM tender_results tr
-          WHERE tr.tender_id = ti.id
-            AND tr.status = 'Lost'
-            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Lost'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
+            OR (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM tender_results tr
+                    WHERE tr.tender_id = ti.id
+                )
+                AND ti.status IN (18, 21, 22, 24)
+                AND ti.created_at BETWEEN '${from}' AND '${to}'
+            )
       )
 `);
 
@@ -2180,12 +2250,15 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-      AND EXISTS (
-          SELECT 1
-          FROM tender_results tr
-          WHERE tr.tender_id = ti.id
-            AND tr.status = 'Disqualified'
-            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      AND (
+            ti.status IN (39)
+            OR EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.status = 'Disqualified'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+            )
       )
 `);
         /* =====================================================
