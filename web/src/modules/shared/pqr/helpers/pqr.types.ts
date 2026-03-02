@@ -12,12 +12,12 @@ export interface PqrResponse {
     value: number;
     item: string;
     poDate: string;
-    uploadPo: string | null;
-    sapGemPoDate: string;
-    uploadSapGemPo: string | null;
-    completionDate: string;
-    uploadCompletion: string | null;
-    performanceCertificate: string | null;
+    uploadPo: string[] | null;
+    sapGemPoDate: string | null;
+    uploadSapGemPo: string[] | null;
+    completionDate: string | null;
+    uploadCompletion: string[] | null;
+    performanceCertificate: string[] | null;
     remarks: string | undefined;
     createdAt?: string;
     updatedAt?: string;
@@ -31,12 +31,12 @@ export interface PqrListRow {
     value: string;
     item: string | null;
     poDate: string | null;
-    uploadPo: string | null;
+    uploadPo: string[] | null;
     sapGemPoDate: string | null;
-    uploadSapGemPo: string | null;
+    uploadSapGemPo: string[] | null;
     completionDate: string | null;
-    uploadCompletion: string | null;
-    performanceCertificate: string | null;
+    uploadCompletion: string[] | null;
+    performanceCertificate: string[] | null;
     remarks: string | null;
     createdAt?: string | null;
     updatedAt?: string | null;
@@ -49,12 +49,12 @@ export interface CreatePqrDto {
     value: number;
     item: string;
     poDate: string;
-    uploadPo?: string;
+    uploadPo?: string[];
     sapGemPoDate: string | null;
-    uploadSapGemPo?: string;
+    uploadSapGemPo?: string[];
     completionDate: string | null;
-    uploadCompletion?: string;
-    performanceCertificate?: string;
+    uploadCompletion?: string[];
+    performanceCertificate?: string[];
     remarks?: string;
 }
 
@@ -66,12 +66,12 @@ export interface UpdatePqrDto {
     value?: number;
     item?: string;
     poDate?: string;
-    uploadPo?: string;
+    uploadPo?: string[];
     sapGemPoDate: string | null;
-    uploadSapGemPo?: string;
-    uploadCompletion?: string;
+    uploadSapGemPo?: string[];
+    uploadCompletion?: string[];
     completionDate: string | null;
-    performanceCertificate?: string;
+    performanceCertificate?: string[];
     remarks?: string;
 }
 

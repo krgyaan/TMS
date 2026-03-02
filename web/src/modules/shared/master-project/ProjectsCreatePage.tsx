@@ -1,4 +1,4 @@
-import MasterProjectForm from "./components/MasterProjectForm";
+import MasterProjectForm from "./components/ProjectMasterForm";
 
 const ProjectsCreatePage = () => {
     return (

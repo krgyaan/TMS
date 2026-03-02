@@ -1,19 +1,28 @@
 import { z } from "zod";
 
+// Helper to handle empty arrays
+const optionalFileArray = z
+    .array(z.string())
+    .nullish()
+    .transform((val) => (val && val.length > 0 ? val : undefined));
+
 export const ProjectBaseSchema = z.object({
     teamName: z.string().max(255, "Team name is too long"),
     organisationId: z.number().int().nullable().optional(),
     itemId: z.number().int(),
     locationId: z.number().int().nullable().optional(),
 
+    projectCode: z.string().max(255).nullable().optional(),
+    projectName: z.string().max(255).nullable().optional(),
+
     poNo: z.string().max(255).nullable().optional(),
-    poDocument: z.string().max(255).nullable().optional(),
+    poUpload: optionalFileArray,
     poDate: z.string().nullable().optional(),
 
-    performanceCertificate: z.string().max(2000).nullable().optional(),
+    performanceProof: optionalFileArray,
     performanceDate: z.string().nullable().optional(),
 
-    completionDocument: z.string().max(2000).nullable().optional(),
+    completionProof: optionalFileArray,
     completionDate: z.string().nullable().optional(),
 
     sapPoDate: z.string().nullable().optional(),

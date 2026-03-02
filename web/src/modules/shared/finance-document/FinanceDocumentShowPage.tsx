@@ -5,10 +5,11 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Edit } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useFinanceDocument } from "@/hooks/api/useFinanceDocuments";
 import { useFinancialYears } from "@/hooks/api/useFinancialYear";
 import { useFinanceDocTypes } from "@/hooks/api/useFinanceDocType";
+import { formatDateTime } from "@/hooks/useFormatedDate";
 
 const FinanceDocumentShowPage = () => {
     const navigate = useNavigate();
@@ -86,9 +87,6 @@ const FinanceDocumentShowPage = () => {
         ? financeDocument.uploadFile
         : [financeDocument.uploadFile]
         : [];
-
-    const formatDateTime = (value?: string | null) =>
-        value ? new Date(value).toLocaleString() : "—";
 
     return (
         <Card>

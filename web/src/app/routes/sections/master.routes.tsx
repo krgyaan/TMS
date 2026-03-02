@@ -91,9 +91,9 @@ const Master_LoanParty_Create = lazy(() => import("@/modules/master/loan-party/c
 const Master_LoanParty_Edit = lazy(() => import("@/modules/master/loan-party/edit"));
 
 // Projects
-const Master_Project = lazy(() => import("@/modules/shared/master-project"));
-const Master_Project_Create = lazy(() => import("@/modules/shared/master-project/create"));
-const Master_Project_Edit = lazy(() => import("@/modules/shared/master-project/edit"));
+// const Master_Project = lazy(() => import("@/modules/shared/master-project"));
+// const Master_Project_Create = lazy(() => import("@/modules/shared/master-project/create"));
+// const Master_Project_Edit = lazy(() => import("@/modules/shared/master-project/edit"));
 
 // States
 const Master_State = lazy(() => import("@/modules/master/state"));
@@ -578,7 +578,7 @@ export default function MasterRoutes() {
             </Route>
 
             {/* Projects */}
-            <Route path="projects">
+            {/* <Route path="projects">
                 <Route
                     index
                     element={
@@ -603,7 +603,7 @@ export default function MasterRoutes() {
                         </RouteWrapper>
                     }
                 />
-            </Route>
+            </Route> */}
 
             {/* States */}
             <Route path="states">

@@ -1,22 +1,24 @@
 import type {
-    MasterProjectFormValues,
-    MasterProjectResponse,
-    MasterProjectListRow,
-    CreateMasterProjectDto,
-    UpdateMasterProjectDto,
-} from "./masterProject.types";
+    ProjectMasterFormValues,
+    ProjectMasterResponse,
+    ProjectMasterListRow,
+    CreateProjectMasterDto,
+    UpdateProjectMasterDto,
+} from "./projectMaster.types";
 
-export const buildDefaultValues = (): MasterProjectFormValues => ({
-    teamId: undefined as any,
+export const buildDefaultValues = (): ProjectMasterFormValues => ({
+    teamName: undefined as any,
     organisationId: undefined as any,
     itemId: undefined as any,
     locationId: undefined as any,
+    projectCode: "",
+    projectName: "",
     poNo: "",
     poDate: "",
-    poDocument: [],
-    performanceCertificate: [],
+    poUpload: [],
+    performanceProof: [],
     performanceDate: "",
-    completionDocument: [],
+    completionProof: [],
     completionDate: "",
     sapPoDate: "",
     sapPoNo: "",
@@ -26,28 +28,28 @@ export const buildDefaultValues = (): MasterProjectFormValues => ({
 
 const toStringOrEmpty = (v: string | null | undefined): string => (v ?? "") as string;
 
-const firstPath = (paths: string[]): string | null => (paths && paths.length > 0 ? paths[0] : null);
-
 export const mapResponseToForm = (
-    existing: MasterProjectResponse | MasterProjectListRow | null,
-): MasterProjectFormValues => {
+    existing: ProjectMasterResponse | ProjectMasterListRow | null,
+): ProjectMasterFormValues => {
     if (!existing) {
         return buildDefaultValues();
     }
 
-    const row = existing as MasterProjectListRow & { teamId?: number | null };
+    const row = existing as ProjectMasterListRow & { teamId?: number | null };
 
     return {
-        teamId: (row as any).teamId ?? 0,
+        teamName: (row as any).teamName ?? "",
         organisationId: row.organisationId ?? 0,
         itemId: row.itemId,
         locationId: row.locationId ?? 0,
         poNo: toStringOrEmpty(row.poNo),
         poDate: toStringOrEmpty(row.poDate),
-        poDocument: row.poDocument ? [row.poDocument] : [],
-        performanceCertificate: row.performanceCertificate ? [row.performanceCertificate] : [],
+        projectCode: row.projectCode ? row.projectCode : "",
+        projectName: row.projectName ? row.projectName : "",
+        poUpload: row.poUpload ?? [],
+        performanceProof: row.performanceProof ?? [],
         performanceDate: toStringOrEmpty(row.performanceDate),
-        completionDocument: row.completionDocument ? [row.completionDocument] : [],
+        completionProof: row.completionProof ?? [],
         completionDate: toStringOrEmpty(row.completionDate),
         sapPoDate: toStringOrEmpty(row.sapPoDate),
         sapPoNo: toStringOrEmpty(row.sapPoNo),
@@ -57,19 +59,21 @@ export const mapResponseToForm = (
 };
 
 export const mapFormToCreatePayload = (
-    values: MasterProjectFormValues,
+    values: ProjectMasterFormValues,
     teamName: string,
-): CreateMasterProjectDto => ({
+): CreateProjectMasterDto => ({
     teamName,
     organisationId: values.organisationId ?? null,
     itemId: values.itemId,
     locationId: values.locationId ?? null,
+    projectCode: values.projectCode || null,
+    projectName: values.projectName || null,
     poNo: values.poNo || null,
-    poDocument: firstPath(values.poDocument),
+    poUpload: values.poUpload || null,
     poDate: values.poDate || null,
-    performanceCertificate: firstPath(values.performanceCertificate),
+    performanceProof: values.performanceProof || null,
     performanceDate: values.performanceDate || null,
-    completionDocument: firstPath(values.completionDocument),
+    completionProof: values.completionProof || null,
     completionDate: values.completionDate || null,
     sapPoDate: values.sapPoDate || null,
     sapPoNo: values.sapPoNo || null,
@@ -79,20 +83,22 @@ export const mapFormToCreatePayload = (
 
 export const mapFormToUpdatePayload = (
     id: number,
-    values: MasterProjectFormValues,
+    values: ProjectMasterFormValues,
     teamName: string,
-): UpdateMasterProjectDto => ({
+): UpdateProjectMasterDto => ({
     id,
     teamName,
     organisationId: values.organisationId ?? null,
     itemId: values.itemId,
     locationId: values.locationId ?? null,
     poNo: values.poNo || null,
-    poDocument: firstPath(values.poDocument),
+    poUpload: values.poUpload || null,
     poDate: values.poDate || null,
-    performanceCertificate: firstPath(values.performanceCertificate),
+    projectCode: values.projectCode || null,
+    projectName: values.projectName || null,
+    performanceProof: values.performanceProof || null,
     performanceDate: values.performanceDate || null,
-    completionDocument: firstPath(values.completionDocument),
+    completionProof: values.completionProof || null,
     completionDate: values.completionDate || null,
     sapPoDate: values.sapPoDate || null,
     sapPoNo: values.sapPoNo || null,

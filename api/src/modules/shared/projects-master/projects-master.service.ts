@@ -88,6 +88,29 @@ export class ProjectsMasterService {
         return { projectCode, projectName };
     }
 
+    private normalizeFilePaths(value: string[] | string | null | undefined): string[] | null {
+        if (!value) return null;
+
+        let paths: string[] = [];
+
+        if (Array.isArray(value)) {
+            paths = value;
+        } else if (typeof value === 'string') {
+            paths = [value];
+        }
+
+        // Normalize each path
+        const normalized = paths
+            .filter(p => p && typeof p === 'string' && p.trim() !== '')
+            .map(p =>
+                p.trim()
+                    .replace(/\\/g, '/')      // Replace backslashes
+                    .replace(/\/+/g, '/')     // Remove duplicate slashes
+            );
+
+        return normalized.length > 0 ? normalized : null;
+    }
+
     async findAll(filters: ListProjectsFilters) {
         const page = filters.page && filters.page > 0 ? filters.page : 1;
         const limit = filters.limit && filters.limit > 0 ? filters.limit : 50;
@@ -153,11 +176,11 @@ export class ProjectsMasterService {
                     poNo: projects.poNo,
                     projectCode: projects.projectCode,
                     projectName: projects.projectName,
-                    poDocument: projects.poDocument,
+                    poUpload: projects.poUpload,
                     poDate: projects.poDate,
-                    performanceCertificate: projects.performanceCertificate,
+                    performanceProof: projects.performanceProof,
                     performanceDate: projects.performanceDate,
-                    completionDocument: projects.completionDocument,
+                    completionProof: projects.completionProof,
                     completionDate: projects.completionDate,
                     createdAt: projects.createdAt,
                     updatedAt: projects.updatedAt,
@@ -183,7 +206,7 @@ export class ProjectsMasterService {
                 .where(where),
         ]);
 
-        const data: ProjectListRow[] = (rows as ProjectListRow[]).map(row => ({
+        const data: ProjectListRow[] = rows.map(row => ({
             id: row.id,
             teamName: row.teamName,
             organisationId: row.organisationId,
@@ -192,11 +215,11 @@ export class ProjectsMasterService {
             poNo: row.poNo,
             projectCode: row.projectCode,
             projectName: row.projectName,
-            poDocument: row.poDocument,
+            poUpload: row.poUpload,
             poDate: row.poDate,
-            performanceCertificate: row.performanceCertificate,
+            performanceProof: row.performanceProof,
             performanceDate: row.performanceDate,
-            completionDocument: row.completionDocument,
+            completionProof: row.completionProof,
             completionDate: row.completionDate,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
@@ -234,14 +257,6 @@ export class ProjectsMasterService {
     }
 
     async create(input: CreateProjectDto): Promise<ProjectRow> {
-        const { projectCode, projectName } =
-            await this.generateProjectCodeAndName({
-                teamName: input.teamName,
-                organisationId: input.organisationId ?? undefined,
-                itemId: input.itemId,
-                locationId: input.locationId ?? undefined,
-            });
-
         const now = new Date();
 
         const rows = await this.db
@@ -252,13 +267,13 @@ export class ProjectsMasterService {
                 itemId: input.itemId,
                 locationId: input.locationId ?? null,
                 poNo: input.poNo ?? null,
-                projectCode,
-                projectName,
-                poDocument: input.poDocument ?? null,
+                projectCode: input.projectCode,
+                projectName: input.projectName,
+                poUpload: this.normalizeFilePaths(input.poUpload) ?? null,
                 poDate: input.poDate ? new Date(input.poDate) : null,
-                performanceCertificate: input.performanceCertificate ?? null,
+                performanceProof: this.normalizeFilePaths(input.performanceProof) ?? null,
                 performanceDate: input.performanceDate ? new Date(input.performanceDate) : null,
-                completionDocument: input.completionDocument ?? null,
+                completionProof: this.normalizeFilePaths(input.completionProof) ?? null,
                 completionDate: input.completionDate ? new Date(input.completionDate) : null,
                 sapPoDate: input.sapPoDate ? new Date(input.sapPoDate) : null,
                 sapPoNo: input.sapPoNo ?? null,
@@ -275,62 +290,26 @@ export class ProjectsMasterService {
     async update(id: number, input: UpdateProjectDto): Promise<ProjectRow> {
         const existing = await this.findById(id);
 
-        let projectCode = existing.projectCode;
-        let projectName = existing.projectName;
-
-        const needsRegenerate =
-            input.itemId ||
-            input.organisationId !== undefined ||
-            input.locationId !== undefined;
-
-        if (needsRegenerate) {
-            const { projectCode: newCode, projectName: newName } =
-                await this.generateProjectCodeAndName({
-                    teamName: input.teamName ?? existing.teamName,
-                    organisationId:
-                        input.organisationId ?? existing.organisationId ?? undefined,
-                    itemId: input.itemId ?? existing.itemId,
-                    locationId:
-                        input.locationId ?? existing.locationId ?? undefined,
-                });
-            projectCode = newCode;
-            projectName = newName;
-        }
-
         const rows = await this.db
             .update(projects)
             .set({
                 teamName: input.teamName ?? existing.teamName,
-                organisationId:
-                    input.organisationId !== undefined
-                        ? input.organisationId
-                        : existing.organisationId,
+                organisationId: input.organisationId !== undefined ? input.organisationId : existing.organisationId,
                 itemId: input.itemId ?? existing.itemId,
-                locationId:
-                    input.locationId !== undefined
-                        ? input.locationId
-                        : existing.locationId,
+                locationId: input.locationId !== undefined ? input.locationId : existing.locationId,
                 poNo: input.poNo ?? existing.poNo,
-                projectCode,
-                projectName,
-                poDocument: input.poDocument ?? existing.poDocument,
+                projectCode: input.projectCode ?? existing.projectCode,
+                projectName: input.projectName ?? existing.projectName,
+                poUpload: this.normalizeFilePaths(input.poUpload ?? existing.poUpload),
                 poDate: input.poDate ?? existing.poDate,
-                performanceCertificate:
-                    input.performanceCertificate ?? existing.performanceCertificate,
+                performanceProof: this.normalizeFilePaths(input.performanceProof ?? existing.performanceProof),
                 performanceDate: input.performanceDate ?? existing.performanceDate,
-                completionDocument:
-                    input.completionDocument ?? existing.completionDocument,
+                completionProof: this.normalizeFilePaths(input.completionProof ?? existing.completionProof),
                 completionDate: input.completionDate ?? existing.completionDate,
                 sapPoDate: input.sapPoDate ?? existing.sapPoDate,
                 sapPoNo: input.sapPoNo ?? existing.sapPoNo,
-                tenderId:
-                    input.tenderId !== undefined
-                        ? input.tenderId
-                        : existing.tenderId,
-                enquiryId:
-                    input.enquiryId !== undefined
-                        ? input.enquiryId
-                        : existing.enquiryId,
+                tenderId: input.tenderId !== undefined ? input.tenderId : existing.tenderId,
+                enquiryId: input.enquiryId !== undefined ? input.enquiryId : existing.enquiryId,
                 updatedAt: new Date(),
             })
             .where(eq(projects.id, id))

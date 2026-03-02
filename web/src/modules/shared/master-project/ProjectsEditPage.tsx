@@ -3,14 +3,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMasterProject } from "@/hooks/api/useMasterProjects";
-import MasterProjectForm from "./components/MasterProjectForm";
+import { useProjectMaster } from "@/hooks/api/useProjectMaster";
+import MasterProjectForm from "./components/ProjectMasterForm";
 
 const ProjectsEditPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const projectId = id ? parseInt(id, 10) : null;
-    const { data: existingData, isLoading, error } = useMasterProject(projectId);
+    const { data: existingData, isLoading, error } = useProjectMaster(projectId);
 
     if (projectId == null || (id && isNaN(projectId))) {
         return (

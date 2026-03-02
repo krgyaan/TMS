@@ -1,27 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { masterProjectsService } from "@/services/api";
 import type {
-    MasterProjectListRow,
-    MasterProjectListParams,
-    CreateMasterProjectDto,
-    UpdateMasterProjectDto,
-} from "@/modules/shared/master-project/helpers/masterProject.types";
+    ProjectMasterListRow,
+    ProjectMasterListParams,
+    CreateProjectMasterDto,
+    UpdateProjectMasterDto,
+} from "@/modules/shared/master-project/helpers/projectMaster.types";
 import type { PaginatedResult } from "@/types/api.types";
 import { toast } from "sonner";
 import { handleQueryError } from "@/lib/react-query";
+import { projectMasterService } from "@/services/api/projects-master.service";
 
-export const masterProjectsKey = {
-    all: ["master-projects"] as const,
-    lists: () => [...masterProjectsKey.all, "list"] as const,
-    list: (filters?: Record<string, unknown>) => [...masterProjectsKey.lists(), { filters }] as const,
-    detail: (id: number) => [...masterProjectsKey.all, "detail", id] as const,
+export const projectMasterKey = {
+    all: ["project-master"] as const,
+    lists: () => [...projectMasterKey.all, "list"] as const,
+    list: (filters?: Record<string, unknown>) => [...projectMasterKey.lists(), { filters }] as const,
+    detail: (id: number) => [...projectMasterKey.all, "detail", id] as const,
 };
 
-export const useMasterProjects = (
+export const useProjectMasters = (
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: "asc" | "desc" },
 ) => {
-    const params: MasterProjectListParams = {
+    const params: ProjectMasterListParams = {
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
@@ -29,15 +29,15 @@ export const useMasterProjects = (
         ...(pagination.search && { search: pagination.search }),
     };
 
-    return useQuery<PaginatedResult<MasterProjectListRow>>({
-        queryKey: masterProjectsKey.list({
+    return useQuery<PaginatedResult<ProjectMasterListRow>>({
+        queryKey: projectMasterKey.list({
             page: pagination.page,
             limit: pagination.limit,
             search: pagination.search ?? undefined,
             sortBy: sort?.sortBy,
             sortOrder: sort?.sortOrder,
         }),
-        queryFn: () => masterProjectsService.getAll(params),
+        queryFn: () => projectMasterService.getAll(params),
         placeholderData: previousData => {
             if (
                 previousData &&
@@ -52,21 +52,21 @@ export const useMasterProjects = (
     });
 };
 
-export const useMasterProject = (id: number | null) => {
-    return useQuery<MasterProjectListRow>({
-        queryKey: masterProjectsKey.detail(id ?? 0),
-        queryFn: () => masterProjectsService.getById(id!),
+export const useProjectMaster = (id: number | null) => {
+    return useQuery<ProjectMasterListRow>({
+        queryKey: projectMasterKey.detail(id ?? 0),
+        queryFn: () => projectMasterService.getById(id!),
         enabled: !!id,
     });
 };
 
-export const useCreateMasterProject = () => {
+export const useCreateProjectMaster = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateMasterProjectDto) => masterProjectsService.create(data),
+        mutationFn: (data: CreateProjectMasterDto) => projectMasterService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: masterProjectsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: projectMasterKey.lists() });
             toast.success("Project created successfully");
         },
         onError: error => {
@@ -75,15 +75,15 @@ export const useCreateMasterProject = () => {
     });
 };
 
-export const useUpdateMasterProject = () => {
+export const useUpdateProjectMaster = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Omit<UpdateMasterProjectDto, "id"> }) =>
-            masterProjectsService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: Omit<UpdateProjectMasterDto, "id"> }) =>
+            projectMasterService.update(id, data),
         onSuccess: data => {
-            queryClient.invalidateQueries({ queryKey: masterProjectsKey.lists() });
-            queryClient.invalidateQueries({ queryKey: masterProjectsKey.detail(data.id) });
+            queryClient.invalidateQueries({ queryKey: projectMasterKey.lists() });
+            queryClient.invalidateQueries({ queryKey: projectMasterKey.detail(data.id) });
             toast.success("Project updated successfully");
         },
         onError: error => {
@@ -92,13 +92,13 @@ export const useUpdateMasterProject = () => {
     });
 };
 
-export const useDeleteMasterProject = () => {
+export const useDeleteProjectMaster = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: number) => masterProjectsService.remove(id),
+        mutationFn: (id: number) => projectMasterService.remove(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: masterProjectsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: projectMasterKey.lists() });
             toast.success("Project deleted successfully");
         },
         onError: error => {

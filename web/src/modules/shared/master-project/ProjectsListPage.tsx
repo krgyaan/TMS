@@ -14,8 +14,8 @@ import { Input } from "@/components/ui/input";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { paths } from "@/app/routes/paths";
-import { useMasterProjects } from "@/hooks/api/useMasterProjects";
-import type { MasterProjectListRow } from "./helpers/masterProject.types";
+import { useProjectMasters } from "@/hooks/api/useProjectMaster";
+import type { ProjectMasterListRow } from "./helpers/projectMaster.types";
 
 const ProjectsListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -41,7 +41,7 @@ const ProjectsListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    const { data: apiResponse, isLoading, error } = useMasterProjects(
+    const { data: apiResponse, isLoading, error } = useProjectMasters(
         {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
@@ -53,7 +53,7 @@ const ProjectsListPage = () => {
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
 
-    const actions: ActionItem<MasterProjectListRow>[] = useMemo(
+    const actions: ActionItem<ProjectMasterListRow>[] = useMemo(
         () => [
             {
                 label: "View",
@@ -69,7 +69,7 @@ const ProjectsListPage = () => {
         [navigate],
     );
 
-    const colDefs = useMemo<ColDef<MasterProjectListRow>[]>(
+    const colDefs = useMemo<ColDef<ProjectMasterListRow>[]>(
         () => [
             {
                 field: "teamName",
@@ -117,7 +117,7 @@ const ProjectsListPage = () => {
                 headerName: "PO Date",
                 flex: 1,
                 minWidth: 130,
-                cellRenderer: (params: { data?: MasterProjectListRow }) =>
+                cellRenderer: (params: { data?: ProjectMasterListRow }) =>
                     params.data?.poDate ? formatDate(params.data.poDate) : "—",
                 sortable: true,
                 filter: true,
@@ -128,38 +128,8 @@ const ProjectsListPage = () => {
                 headerName: "SAP PO Date",
                 flex: 1,
                 minWidth: 130,
-                cellRenderer: (params: { data?: MasterProjectListRow }) =>
+                cellRenderer: (params: { data?: ProjectMasterListRow }) =>
                     params.data?.sapPoDate ? formatDate(params.data.sapPoDate) : "—",
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: "organizationName",
-                colId: "organizationName",
-                headerName: "Organization",
-                flex: 1,
-                minWidth: 140,
-                valueGetter: params => params.data?.organizationName ?? "—",
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: "itemName",
-                colId: "itemName",
-                headerName: "Item",
-                flex: 1,
-                minWidth: 100,
-                valueGetter: params => params.data?.itemName ?? "—",
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: "locationName",
-                colId: "locationName",
-                headerName: "Location",
-                flex: 1,
-                minWidth: 100,
-                valueGetter: params => params.data?.locationName ?? "—",
                 sortable: true,
                 filter: true,
             },
