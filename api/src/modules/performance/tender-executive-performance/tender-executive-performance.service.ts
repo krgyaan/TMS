@@ -1240,16 +1240,16 @@ export class TenderExecutiveService {
         AND ti.tl_status = 0
     `);
 
-        const approvedDuringTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM tender_information te
-        WHERE ti.id = te.tender_id
-        )
-    `);
+        //     const approvedDuringTotal = await exec(`
+        // SELECT ti.*
+        // FROM tender_infos ti
+        // WHERE ${baseWhere()}
+        //     AND ti.created_at BETWEEN '${from}' AND '${to}'
+        //     AND EXISTS (
+        //     SELECT 1 FROM tender_information te
+        //     WHERE ti.id = te.tender_id
+        //     )
+        // `);
 
         const approvedDuringCompleted = await exec(`
     SELECT ti.*
@@ -1257,7 +1257,7 @@ export class TenderExecutiveService {
     JOIN tender_information tin ON tin.tender_id = ti.id
     WHERE ${baseWhere()}
         AND tin.created_at BETWEEN '${from}' AND '${to}'
-        AND ti.tl_status IN (1, 2)
+        AND ti.tl_status = 1
     `);
 
         const approvedDuringPending = await exec(`
