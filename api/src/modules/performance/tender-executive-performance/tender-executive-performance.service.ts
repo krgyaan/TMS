@@ -2603,6 +2603,11 @@ export class TenderExecutiveService {
         const from = `${query.fromDate}T00:00:00.000Z`;
         const to = `${query.toDate}T23:59:59.999Z`;
 
+        /* ============================
+       BASE WHERE (same philosophy
+       as getStageBacklogV2)
+    ============================ */
+
         const baseWhere = () => {
             let w = `pr.purpose = 'EMD'`;
             if (query.view === "user" && query.userId) {
@@ -2625,20 +2630,19 @@ export class TenderExecutiveService {
 
         const opening = await exec(`
         SELECT
-            pr.tender_id,
-            pr.amount_required AS amount,
-            pr.created_at      AS paid_at,
-            pi.instrument_type,
-            pi.action,
-            ti.tender_no,
-            ti.tender_name
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
           AND (
-              (pi.instrument_type IN ('DD','FDR','Cheque') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
@@ -2646,19 +2650,17 @@ export class TenderExecutiveService {
 
         /* =====================================================
        DURING → COMPLETED
-       Paid in period & returned/settled in period
+       Paid & returned/settled in period
     ===================================================== */
 
         const duringCompleted = await exec(`
         SELECT
-            pr.tender_id,
-            pr.amount_required AS amount,
-            pr.created_at      AS paid_at,
-            pi.updated_at      AS received_at,
-            pi.instrument_type,
-            pi.action,
-            ti.tender_no,
-            ti.tender_name
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
@@ -2666,7 +2668,7 @@ export class TenderExecutiveService {
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND (
-              (pi.instrument_type IN ('DD','FDR','Cheque') AND pi.action IN (3,4,5))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
            OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
           );
@@ -2679,20 +2681,19 @@ export class TenderExecutiveService {
 
         const duringPending = await exec(`
         SELECT
-            pr.tender_id,
-            pr.amount_required AS amount,
-            pr.created_at      AS paid_at,
-            pi.instrument_type,
-            pi.action,
-            ti.tender_no,
-            ti.tender_name
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND (
-              (pi.instrument_type IN ('DD','FDR','Cheque') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
@@ -2705,27 +2706,26 @@ export class TenderExecutiveService {
 
         const closing = await exec(`
         SELECT
-            pr.tender_id,
-            pr.amount_required AS amount,
-            pr.created_at      AS paid_at,
-            pi.instrument_type,
-            pi.action,
-            ti.tender_no,
-            ti.tender_name
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at <= '${to}'
           AND (
-              (pi.instrument_type IN ('DD','FDR','Cheque') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
     `);
 
         /* =====================================================
-       FINAL RESPONSE
+       FINAL RESPONSE (UI-READY)
     ===================================================== */
 
         return {
@@ -2763,7 +2763,6 @@ export class TenderExecutiveService {
             },
         };
     }
-
     // async getEmdCashFlow(query: EmdBalanceQueryDto) {
     //     const from = new Date(`${query.fromDate}T00:00:00.000Z`);
     //     const to = new Date(`${query.toDate}T23:59:59.999Z`);
