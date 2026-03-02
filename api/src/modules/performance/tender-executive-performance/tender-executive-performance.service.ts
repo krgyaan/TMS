@@ -2013,13 +2013,14 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-            AND tr.status IN ('Won','Lost','Disqualified')
-        )
-    `);
+      AND EXISTS (
+          SELECT 1
+          FROM tender_results tr
+          WHERE tr.tender_id = ti.id
+            AND tr.status IN ('Won', 'Lost', 'Disqualified')
+            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      )
+`);
 
         const resultAwaitedDuringPending = await exec(`
     SELECT ti.*
@@ -2118,12 +2119,13 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Won'
-    )
+      AND EXISTS (
+          SELECT 1
+          FROM tender_results tr
+          WHERE tr.tender_id = ti.id
+            AND tr.status = 'Won'
+            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      )
 `);
         // loss OPENING
         const lostOpening = await exec(`
@@ -2143,13 +2145,15 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Lost'
-    )
+      AND EXISTS (
+          SELECT 1
+          FROM tender_results tr
+          WHERE tr.tender_id = ti.id
+            AND tr.status = 'Lost'
+            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      )
 `);
+
         // loss OPENING
         const disqualifiedOpening = await exec(`
     SELECT ti.*
@@ -2168,14 +2172,14 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Disqualified'
-    )
+      AND EXISTS (
+          SELECT 1
+          FROM tender_results tr
+          WHERE tr.tender_id = ti.id
+            AND tr.status = 'Disqualified'
+            AND tr.created_at BETWEEN '${from}' AND '${to}'
+      )
 `);
-
         /* =====================================================
         FINAL RESPONSE
     ===================================================== */
