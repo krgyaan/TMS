@@ -158,13 +158,13 @@ const RequestExtensionListPage = () => {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>PQR</CardTitle>
+                    <CardTitle>Request Extension</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Failed to load PQR list. Please try again later.
+                            Failed to load Request Extension list. Please try again later.
                         </AlertDescription>
                     </Alert>
                 </CardContent>

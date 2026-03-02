@@ -1,5 +1,6 @@
+import type { TenderClient } from '@/types/api.types';
 import type { RequestExtensionFormValues } from './requestExtension.schema';
-import type { CreateRequestExtensionDto, RequestExtensionListRow, RequestExtensionResponse, UpdateRequestExtensionDto } from './requestExtension.types';
+import type { Client, CreateRequestExtensionDto, RequestExtensionListRow, RequestExtensionResponse, UpdateRequestExtensionDto } from './requestExtension.types';
 // Build default values (for create mode)
 export const buildDefaultValues = (): RequestExtensionFormValues => {
     return {
@@ -10,41 +11,36 @@ export const buildDefaultValues = (): RequestExtensionFormValues => {
     };
 };
 
-export const mapResponseToForm = (
-    existingData: RequestExtensionResponse | RequestExtensionListRow | null
-): RequestExtensionFormValues => {
-    if (!existingData) {
-        return buildDefaultValues();
-    }
-    return {
-        tenderId: existingData.tenderId,
-        days: existingData.days,
-        reason: existingData.reason,
-        clients: existingData.clients ?? [],
-    };
+// Map tender clients to form clients (for create mode)
+export const mapTenderClientsToFormClients = (tenderClients: TenderClient[]): Client[] => {
+  return tenderClients.map((tc) => ({
+    org: '',
+    name: tc.clientName,
+    email: tc.clientEmail ?? '',
+    phone: tc.clientMobile ?? '',
+  }));
 };
-
 
 // Map form values to Create DTO
-export const mapFormToCreatePayload = (values: RequestExtensionFormValues): CreateRequestExtensionDto => {
-    return {
-        tenderId: values.tenderId,
-        days: values.days,
-        reason: values.reason,
-        clients: values.clients,
-    };
-};
+export const mapResponseToForm = (
+  response: RequestExtensionResponse | RequestExtensionListRow
+): RequestExtensionFormValues => ({
+  tenderId: response.tenderId,
+  days: response.days,
+  reason: response.reason,
+  clients: response.clients || [], // Extract from JSON
+});
 
-// Map form values to Update DTO
-export const mapFormToUpdatePayload = (
-    id: number,
-    values: RequestExtensionFormValues
-): UpdateRequestExtensionDto => {
-    return {
-        id,
-        tenderId: values.tenderId,
-        days: values.days,
-        reason: values.reason,
-        clients: values.clients,
-    };
-};
+export const mapFormToCreatePayload = (values: RequestExtensionFormValues) => ({
+  tenderId: values.tenderId,
+  days: values.days,
+  reason: values.reason,
+  clients: values.clients,
+});
+
+export const mapFormToUpdatePayload = (id: number, values: RequestExtensionFormValues) => ({
+  id,
+  days: values.days,
+  reason: values.reason,
+  clients: values.clients,
+});

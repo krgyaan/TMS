@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { RequestExtensionFormSchema } from './requestExtension.schema';
 
+export interface Client {
+  org: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
 // Form Values Type
 export type RequestExtensionFormValues = z.infer<typeof RequestExtensionFormSchema>;
 
@@ -9,7 +16,7 @@ export interface RequestExtensionResponse {
     tenderId: number;
     days: number;
     reason: string;
-    clients: number[];
+    clients: Client[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -22,7 +29,7 @@ export interface RequestExtensionListRow {
     tenderDue: string;
     days: number;
     reason: string;
-    clients: number[];
+    clients: Client[];
     createdAt?: string | null;
     updatedAt?: string | null;
 }
@@ -32,7 +39,7 @@ export interface CreateRequestExtensionDto {
     tenderId: number;
     days: number;
     reason: string;
-    clients: number[];
+    clients: Client[];
 }
 
 // Update DTO
@@ -41,7 +48,7 @@ export interface UpdateRequestExtensionDto {
     tenderId?: number;
     days?: number;
     reason?: string;
-    clients?: number[];
+    clients?: Client[];
 }
 
 // List params
