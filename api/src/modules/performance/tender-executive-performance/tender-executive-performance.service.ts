@@ -2623,9 +2623,8 @@ export class TenderExecutiveService {
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
         /* =====================================================
-       OPENING
-       Paid before period & still live
-       ❌ rejected excluded (keyword-based)
+       A. OPENING
+       Paid before period & still pending
     ===================================================== */
 
         const opening = await exec(`
@@ -2650,11 +2649,56 @@ export class TenderExecutiveService {
     `);
 
         /* =====================================================
-       DURING → COMPLETED
-       Returned / Settled / Cancelled / Rejected
+       B. PAID DURING PERIOD (ALL)
     ===================================================== */
 
-        const duringCompleted = await exec(`
+        const paidDuring = await exec(`
+        SELECT
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
+        FROM payment_requests pr
+        JOIN payment_instruments pi ON pi.request_id = pr.id
+        JOIN tender_infos ti ON ti.id = pr.tender_id
+        WHERE ${baseWhere()}
+          AND pr.created_at BETWEEN '${from}' AND '${to}'
+          AND pi.status NOT ILIKE '%rejected%';
+    `);
+
+        /* =====================================================
+       C. RECEIVED FOR PRIOR PAID
+    ===================================================== */
+
+        const receivedForPrior = await exec(`
+        SELECT
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pr.amount_required  AS "amount",
+            pi.instrument_type  AS "instrumentType",
+            ti.tender_no        AS "tenderNo",
+            ti.tender_name      AS "tenderName"
+        FROM payment_requests pr
+        JOIN payment_instruments pi ON pi.request_id = pr.id
+        JOIN tender_infos ti ON ti.id = pr.tender_id
+        WHERE ${baseWhere()}
+          AND pr.created_at < '${from}'
+          AND pi.updated_at BETWEEN '${from}' AND '${to}'
+          AND pi.status NOT ILIKE '%rejected%'
+          AND (
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+          );
+    `);
+
+        /* =====================================================
+       D. RECEIVED FOR DURING PAID
+    ===================================================== */
+
+        const receivedForDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
@@ -2668,48 +2712,17 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.updated_at BETWEEN '${from}' AND '${to}'
-          AND (
-                -- Returned / Settled / Cancelled (action-based)
-                (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-             OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
-             OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-
-                -- Rejected (status keyword-based)
-             OR pi.status ILIKE '%rejected%'
-          );
-    `);
-
-        /* =====================================================
-       DURING → PENDING
-       Paid in period & still live
-       ❌ rejected excluded
-    ===================================================== */
-
-        const duringPending = await exec(`
-        SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "amount",
-            pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-          AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
           );
     `);
 
         /* =====================================================
-       CLOSING
-       Still live at end of period
-       ❌ rejected excluded
+       E. CLOSING
+       Pending at end of period
     ===================================================== */
 
         const closing = await exec(`
@@ -2734,38 +2747,38 @@ export class TenderExecutiveService {
     `);
 
         /* =====================================================
-       FINAL RESPONSE
+       FINAL RESPONSE (dashboard-ready)
     ===================================================== */
 
         return {
             from: new Date(from),
             to: new Date(to),
 
-            opening: {
+            paidPriorNotReceived: {
                 count: opening.length,
                 value: sumValue(opening),
                 drilldown: opening,
             },
 
-            during: {
-                completed: {
-                    count: duringCompleted.length,
-                    value: sumValue(duringCompleted),
-                    drilldown: duringCompleted,
-                },
-                pending: {
-                    count: duringPending.length,
-                    value: sumValue(duringPending),
-                    drilldown: duringPending,
-                },
-                total: {
-                    count: duringCompleted.length + duringPending.length,
-                    value: sumValue(duringCompleted) + sumValue(duringPending),
-                    drilldown: [...duringCompleted, ...duringPending],
-                },
+            paidDuring: {
+                count: paidDuring.length,
+                value: sumValue(paidDuring),
+                drilldown: paidDuring,
             },
 
-            closing: {
+            receivedForPrior: {
+                count: receivedForPrior.length,
+                value: sumValue(receivedForPrior),
+                drilldown: receivedForPrior,
+            },
+
+            receivedForDuring: {
+                count: receivedForDuring.length,
+                value: sumValue(receivedForDuring),
+                drilldown: receivedForDuring,
+            },
+
+            pendingAtEnd: {
                 count: closing.length,
                 value: sumValue(closing),
                 drilldown: closing,
