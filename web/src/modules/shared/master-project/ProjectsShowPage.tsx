@@ -4,8 +4,7 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Edit } from "lucide-react";
-import { paths } from "@/app/routes/paths";
+import { ArrowLeft } from "lucide-react";
 import { useProjectMaster } from "@/hooks/api/useProjectMaster";
 import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 
@@ -13,6 +12,7 @@ const ProjectsShowPage = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const projectId = id ? parseInt(id, 10) : null;
+    const { data: project, isLoading, error } = useProjectMaster(projectId);
 
     if (!projectId) {
         return (
@@ -26,7 +26,6 @@ const ProjectsShowPage = () => {
         );
     }
 
-    const { data: project, isLoading, error } = useProjectMaster(projectId);
 
     if (isLoading) {
         return (
@@ -61,6 +60,10 @@ const ProjectsShowPage = () => {
     const formatOrDash = (value?: string | null) =>
         value && value.toString().trim().length > 0 ? value : "—";
 
+    const poUploads = project.poUpload ?? [];
+    const performanceProof = project.performanceProof ?? [];
+    const completionProof = project.completionProof ?? [];
+
     return (
         <Card>
             <CardHeader>
@@ -74,12 +77,6 @@ const ProjectsShowPage = () => {
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate(paths.documentDashboard.projectsEdit(projectId))}
-                        >
-                            <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     </div>
                 </div>
@@ -122,6 +119,35 @@ const ProjectsShowPage = () => {
                             </tr>
                             <tr className="border-b">
                                 <th className="w-1/3 py-3 pr-4 text-left font-medium text-muted-foreground">
+                                    PO Document
+                                </th>
+                                <td className="py-3 text-foreground">
+                                    {poUploads.length > 0 ? (
+                                        poUploads.map((file, index) => {
+                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            return (
+                                                <div key={`${file}-${index}`}>
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {poUploads.length > 1
+                                                            ? `View PO Document ${index + 1}`
+                                                            : "View PO Document"}
+                                                    </a>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        "—"
+                                    )}
+                                </td>
+                            </tr>
+                            <tr className="border-b">
+                                <th className="w-1/3 py-3 pr-4 text-left font-medium text-muted-foreground">
                                     PO Date
                                 </th>
                                 <td className="py-3 text-foreground">
@@ -149,7 +175,28 @@ const ProjectsShowPage = () => {
                                     Performance Certificate
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.performanceCertificate)}
+                                    {performanceProof.length > 0 ? (
+                                        performanceProof.map((file, index) => {
+                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            return (
+                                                <div key={`${file}-${index}`}>
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {performanceProof.length > 1
+                                                            ? `View Performance Certificate ${index + 1}`
+                                                            : "View Performance Certificate"}
+                                                    </a>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        "—"
+                                    )}
                                 </td>
                             </tr>
                             <tr className="border-b">
@@ -157,7 +204,7 @@ const ProjectsShowPage = () => {
                                     Performance Date
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.performanceDate)}
+                                    {formatDate(project.performanceDate)}
                                 </td>
                             </tr>
                             <tr className="border-b">
@@ -165,7 +212,28 @@ const ProjectsShowPage = () => {
                                     Completion Document
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.completionDocument)}
+                                    {completionProof.length > 0 ? (
+                                        completionProof.map((file, index) => {
+                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            return (
+                                                <div key={`${file}-${index}`}>
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {completionProof.length > 1
+                                                            ? `View Completion Certificate ${index + 1}`
+                                                            : "View Completion Certificate"}
+                                                    </a>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        "—"
+                                    )}
                                 </td>
                             </tr>
                             <tr className="border-b">
@@ -173,7 +241,7 @@ const ProjectsShowPage = () => {
                                     Completion Date
                                 </th>
                                 <td className="py-3 text-foreground">
-                                    {formatOrDash(project.completionDate)}
+                                    {formatDate(project.completionDate)}
                                 </td>
                             </tr>
                             <tr className="border-b">

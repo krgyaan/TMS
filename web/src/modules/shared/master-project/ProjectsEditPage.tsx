@@ -4,7 +4,7 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectMaster } from "@/hooks/api/useProjectMaster";
-import MasterProjectForm from "./components/MasterProjectForm";
+import MasterProjectForm from "./components/ProjectMasterForm";
 
 const ProjectsEditPage = () => {
     const navigate = useNavigate();
