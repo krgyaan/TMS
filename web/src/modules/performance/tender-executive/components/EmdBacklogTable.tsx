@@ -4,9 +4,12 @@ import { useEmdCashFlow } from "../tender-executive.hooks";
 import { ColumnHeader } from "./emd-helpers";
 import { MetricCell } from "./MetricCell";
 
+/* ================================
+   EMD TRACKING TABLE
+================================ */
+
 export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
     const { data } = useEmdCashFlow(props);
-
     if (!data) return null;
 
     return (
@@ -14,52 +17,48 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
             <CardContent className="p-0">
                 <Table className="w-full table-fixed">
                     <TableHeader className="bg-muted/30">
-                        {/* =======================
-                           HEADER ROW 1
-                        ======================= */}
                         <TableRow>
-                            <TableHead rowSpan={2} />
+                            <TableHead />
 
-                            <TableHead rowSpan={2} className="text-center">
-                                <ColumnHeader title="Opening" description="EMDs paid before the period and not received back" />
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Opening" description="EMD paid before the start of the period but not received back" />
                             </TableHead>
 
-                            <TableHead colSpan={3} className="text-center">
-                                <ColumnHeader title="During" description="EMD payments and refunds during the selected period" />
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Paid During Period" description="EMD paid during the selected period" />
                             </TableHead>
 
-                            <TableHead rowSpan={2} className="text-center">
-                                <ColumnHeader title="Closing" description="EMDs pending at the end of the period" />
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Received (Prior Paid)" description="EMD received during the period for payments made before the period" />
                             </TableHead>
-                        </TableRow>
 
-                        {/* =======================
-                           HEADER ROW 2
-                        ======================= */}
-                        <TableRow>
-                            <TableHead className="text-center">Paid</TableHead>
-                            <TableHead className="text-center">Received (Earlier)</TableHead>
-                            <TableHead className="text-center">Received (Current)</TableHead>
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Received (Current Paid)" description="EMD received during the period for payments made during the period" />
+                            </TableHead>
+
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Closing" description="EMD pending at the end of the period" />
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
 
                     <TableBody>
                         <TableRow className="hover:bg-muted/20">
-                            <TableCell className="font-semibold">EMD Amount</TableCell>
+                            <TableCell className="font-semibold">EMD Tracking</TableCell>
 
-                            {/* OPENING */}
+                            {/* Opening */}
                             <MetricCell data={data.paidPriorNotReceived} />
 
-                            {/* DURING — PAID */}
+                            {/* Paid During */}
                             <MetricCell data={data.paidDuring} />
 
-                            {/* DURING — RECEIVED (PRIOR PAID) */}
+                            {/* Received for Prior Paid */}
                             <MetricCell data={data.receivedForPrior} strong />
 
-                            {/* DURING — RECEIVED (CURRENT PAID) */}
+                            {/* Received for Current Paid */}
                             <MetricCell data={data.receivedForDuring} strong />
 
-                            {/* CLOSING */}
+                            {/* Closing */}
                             <MetricCell data={data.pendingAtEnd} />
                         </TableRow>
                     </TableBody>

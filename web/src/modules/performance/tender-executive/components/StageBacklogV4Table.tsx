@@ -184,11 +184,11 @@ function ResultTable({ stage }: { stage: any }) {
                         <TableRow className="hover:bg-muted/20">
                             <TableCell className="font-semibold">Tender Results</TableCell>
 
-                            <MetricCell bucket={stage.opening} />
-                            <MetricCell bucket={stage.during.total} />
-                            <MetricCell bucket={stage.during.completed} />
-                            <MetricCell bucket={stage.during.pending} />
-                            <MetricCell bucket={stage.total} />
+                            <MetricCell data={stage.opening} />
+                            <MetricCell data={stage.during.total} />
+                            <MetricCell data={stage.during.completed} />
+                            <MetricCell data={stage.during.pending} />
+                            <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
                 </Table>

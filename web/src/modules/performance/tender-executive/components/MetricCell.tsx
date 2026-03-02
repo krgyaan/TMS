@@ -41,7 +41,7 @@ export function MetricCell({ data, strong = false }: { data: any; strong?: boole
                                     <div className="font-medium truncate">{e.tenderNo ?? `Tender #${e.tenderId}`}</div>
                                     {e.tenderName && <div className="text-muted-foreground truncate">{e.tenderName}</div>}
                                     <div>
-                                        {e.instrumentType} · {formatCurrency(e.amount)}
+                                        {e.instrumentType} · {formatCurrency(e.value)}
                                     </div>
                                 </div>
 
