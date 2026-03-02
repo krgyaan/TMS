@@ -2136,6 +2136,7 @@ export class TenderExecutiveService {
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND pi.status NOT ILIKE '%pending%'
+          AND pi.instrument_type NOT IN ('Cheque')
     `);
 
         /* =====================================================
