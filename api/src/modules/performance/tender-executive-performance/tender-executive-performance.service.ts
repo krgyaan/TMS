@@ -2625,7 +2625,7 @@ export class TenderExecutiveService {
         /* =====================================================
        OPENING
        Paid before period & still live
-       ❌ rejected EXCLUDED
+       ❌ rejected excluded (keyword-based)
     ===================================================== */
 
         const opening = await exec(`
@@ -2641,9 +2641,9 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
-          AND pi.status <> 'ACCOUNTS_FORM_REJECTED'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
@@ -2669,20 +2669,20 @@ export class TenderExecutiveService {
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND (
-                -- Returned / Settled / Cancelled (action based)
+                -- Returned / Settled / Cancelled (action-based)
                 (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
              OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
              OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
 
-                -- Rejected (status based)
-             OR pi.status = 'ACCOUNTS_FORM_REJECTED'
+                -- Rejected (status keyword-based)
+             OR pi.status ILIKE '%rejected%'
           );
     `);
 
         /* =====================================================
        DURING → PENDING
        Paid in period & still live
-       ❌ rejected EXCLUDED
+       ❌ rejected excluded
     ===================================================== */
 
         const duringPending = await exec(`
@@ -2698,9 +2698,9 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
-          AND pi.status <> 'ACCOUNTS_FORM_REJECTED'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
@@ -2709,7 +2709,7 @@ export class TenderExecutiveService {
         /* =====================================================
        CLOSING
        Still live at end of period
-       ❌ rejected EXCLUDED
+       ❌ rejected excluded
     ===================================================== */
 
         const closing = await exec(`
@@ -2725,9 +2725,9 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at <= '${to}'
-          AND pi.status <> 'ACCOUNTS_FORM_REJECTED'
+          AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
            OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
           );
