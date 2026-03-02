@@ -2108,10 +2108,12 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
           AND pi.status NOT ILIKE '%rejected%'
+          AND pi.status NOT ILIKE '%pending%'
+          AND pi.status ILIKE '%accepted%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
           );
     `);
 
@@ -2133,6 +2135,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%';
+          AND pi.status NOT ILIKE '%pending%';
     `);
 
         /* =====================================================
@@ -2153,10 +2156,11 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
           AND pi.status NOT ILIKE '%rejected%'
+          AND pi.status NOT ILIKE '%pending%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
           );
     `);
 
@@ -2178,10 +2182,11 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
+          AND pi.status NOT ILIKE '%pending%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
           );
     `);
 
@@ -2202,12 +2207,14 @@ export class TenderExecutiveService {
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at <= '${to}'
+          AND pr.created_at < '${to}'
           AND pi.status NOT ILIKE '%rejected%'
+          AND pi.status NOT ILIKE '%pending%'
+          AND pi.status ILIKE '%accepted%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (2))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
            OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (2,3,4,5,6,7))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
           );
     `);
 
