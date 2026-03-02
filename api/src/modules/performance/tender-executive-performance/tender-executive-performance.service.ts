@@ -1943,13 +1943,14 @@ export class TenderExecutiveService {
     SELECT ti.*
     FROM tender_infos ti
     WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
+      AND EXISTS (
+          SELECT 1
+          FROM bid_submissions bs
+          WHERE bs.tender_id = ti.id
             AND bs.status = 'Bid Submitted'
-        )
-    `);
+            AND bs.created_at BETWEEN '${from}' AND '${to}'
+      )
+`);
 
         const bidDuringPending = await exec(`
     SELECT ti.*
@@ -2685,12 +2686,11 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at < '${from}'
-          AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
           );
     `);
 
@@ -2711,12 +2711,11 @@ export class TenderExecutiveService {
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
           AND pr.created_at BETWEEN '${from}' AND '${to}'
-          AND pi.updated_at BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4,6,7))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5))
+           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+           OR (pi.instrument_type = 'BG' AND pi.action IN (6,8,9))
           );
     `);
 
