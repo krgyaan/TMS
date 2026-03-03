@@ -12,7 +12,7 @@ export const submitQueryKey = {
     detail: (id: number) => [...submitQueryKey.all, 'detail', id] as const,
 };
 
-export const useSubmitQuerys = (
+export const useSubmitQueries = (
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
