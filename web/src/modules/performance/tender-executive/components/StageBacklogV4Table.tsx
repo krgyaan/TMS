@@ -39,6 +39,9 @@ function AssignmentTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
                             </TableHead>
                             <TableHead className="text-center">
+                                <ColumnHeader title="Pending During" description="Tender Info pending at the end of the period" />
+                            </TableHead>
+                            <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
                             </TableHead>
                         </TableRow>
@@ -51,6 +54,7 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
+                            <MetricCell data={stage.during.pending} />
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
@@ -82,6 +86,9 @@ function ApprovalTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Approved" description="Tenders approved during the period" />
                             </TableHead>
                             <TableHead className="text-center">
+                                <ColumnHeader title="Rejected" description="Tenders rejected during the period" />
+                            </TableHead>
+                            <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender approval pending at the end of the period" />
                             </TableHead>
                         </TableRow>
@@ -94,6 +101,7 @@ function ApprovalTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
+                            <MetricCell data={stage.during.rejected} />
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
