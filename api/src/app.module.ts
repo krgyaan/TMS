@@ -89,6 +89,7 @@ import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
+import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 
 @Module({
     imports: [
@@ -187,7 +188,8 @@ import { RequestExtensionsModule } from "./modules/tendering/request_extensions/
         ProjectsMasterModule,
         ProjectsMasterrModule,
         // BusinessPerformanceModule,
-        RequestExtensionsModule
+        RequestExtensionsModule,
+        SubmitQueriesModule
     ],
     controllers: [AppController],
     providers: [
