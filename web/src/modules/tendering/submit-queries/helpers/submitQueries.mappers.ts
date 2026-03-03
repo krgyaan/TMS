@@ -1,76 +1,96 @@
-import type { TenderClient } from "@/types/api.types";
-import type { Client, SubmitQueryListRow, SubmitQueryResponse } from "./submitQueries.types";
-import type { SubmitQueriesFormValues } from "./submitQueries.schema";
+import type { SubmitQueryFormValues, QueryItemValues, ClientContactValues } from './submitQueries.schema';
+import type {
+    SubmitQueryResponse,
+    SubmitQueryListRow,
+    CreateSubmitQueryPayload,
+    UpdateSubmitQueryPayload
+} from './submitQueries.types';
 
-// Build default values (for create mode)
-export const buildDefaultValues = (tenderId?: number): SubmitQueriesFormValues => {
-    return {
-        tenderId: tenderId || 0,
-        clients: [],
-        queries: [],
-    };
+// Default empty query item
+export const defaultQueryItem: QueryItemValues = {
+    pageNo: '',
+    clauseNo: '',
+    queryType: 'technical',
+    currentStatement: '',
+    requestedStatement: '',
 };
 
-// Map tender clients to form clients (for create mode)
-export const mapTenderClientsToFormClients = (tenderClients: TenderClient[]): Client[] => {
-  return tenderClients.map((tc) => ({
+// Default empty client contact
+export const defaultClientContact: ClientContactValues = {
     org: '',
-    name: tc.clientName,
-    email: tc.clientEmail ?? '',
-    phone: tc.clientMobile ?? '',
-  }));
+    name: '',
+    email: '',
+    phone: '',
+    ccEmails: [],
 };
 
-// Map form values to Create DTO
-export const mapResponseToForm = (
-  response: SubmitQueryResponse | SubmitQueryListRow
-): SubmitQueriesFormValues => ({
-  tenderId: response.tenderId,
-  queries: response.queries.map((query) => ({
-    pageNo: query.pageNo,
-    clauseNo: query.clauseNo,
-    queryType: query.queryType,
-    currentStatement: query.currentStatement,
-    requestedStatement: query.requestedStatement,
-  })),
-  clients: response.clients.map((client) => ({
-    org: client.org,
-    name: client.name,
-    email: client.email,
-    phone: client.phone || '', // Ensure phone is always a string
-  })),
-});
+// Build default values for new form
+export function buildDefaultValues(tenderId?: number): SubmitQueryFormValues {
+    return {
+        tenderId: tenderId ?? 0,
+        queries: [{ ...defaultQueryItem }],
+        clientContacts: [{ ...defaultClientContact }],
+    };
+}
 
-export const mapFormToCreatePayload = (values: SubmitQueriesFormValues) => ({
-  tenderId: values.tenderId,
-  queries: values.queries.map((query) => ({
-    pageNo: query.pageNo,
-    clauseNo: query.clauseNo,
-    queryType: query.queryType,
-    currentStatement: query.currentStatement,
-    requestedStatement: query.requestedStatement,
-  })),
-  clients: values.clients.map((client) => ({
-    org: client.org,
-    name: client.name,
-    email: client.email,
-    phone: client.phone || '', // Ensure phone is always a string
-  })),
-});
+// Map API response to form values
+export function mapResponseToForm(data: SubmitQueryResponse | SubmitQueryListRow): SubmitQueryFormValues {
+    return {
+        tenderId: data.tenderId,
+        queries: data.queries.map(q => ({
+            pageNo: q.pageNo,
+            clauseNo: q.clauseNo,
+            queryType: q.queryType,
+            currentStatement: q.currentStatement,
+            requestedStatement: q.requestedStatement,
+        })),
+        clientContacts: data.clientContacts.map(c => ({
+            org: c.org,
+            name: c.name,
+            email: c.email,
+            phone: c.phone,
+            ccEmails: c.ccEmails ?? [],
+        })),
+    };
+}
 
-export const mapFormToUpdatePayload = (id: number, values: SubmitQueriesFormValues) => ({
-  id,
-  queries: values.queries.map((query) => ({
-    pageNo: query.pageNo,
-    clauseNo: query.clauseNo,
-    queryType: query.queryType,
-    currentStatement: query.currentStatement,
-    requestedStatement: query.requestedStatement,
-  })),
-  clients: values.clients.map((client) => ({
-    org: client.org,
-    name: client.name,
-    email: client.email,
-    phone: client.phone || '', // Ensure phone is always a string
-  })),
-});
+// Map form values to create payload
+export function mapFormToCreatePayload(values: SubmitQueryFormValues): CreateSubmitQueryPayload {
+    return {
+        tenderId: values.tenderId,
+        queries: values.queries.map(q => ({
+            pageNo: q.pageNo,
+            clauseNo: q.clauseNo,
+            queryType: q.queryType,
+            currentStatement: q.currentStatement,
+            requestedStatement: q.requestedStatement,
+        })),
+        clientContacts: values.clientContacts.map(c => ({
+            org: c.org,
+            name: c.name,
+            email: c.email,
+            phone: c.phone ?? '',
+            ccEmails: c.ccEmails?.filter(email => email.trim() !== '') ?? [],
+        })),
+    };
+}
+
+// Map form values to update payload
+export function mapFormToUpdatePayload(id: number, values: SubmitQueryFormValues): UpdateSubmitQueryPayload {
+    return mapFormToCreatePayload(values);
+}
+
+// Map tender clients to form client contacts (for pre-populating)
+export function mapTenderClientsToFormClients(tenderClients: any[]): ClientContactValues[] {
+    if (!tenderClients || tenderClients.length === 0) {
+        return [{ ...defaultClientContact }];
+    }
+
+    return tenderClients.map(client => ({
+        org: client.org || client.organization || '',
+        name: client.name || client.contactName || '',
+        email: client.email || '',
+        phone: client.phone || '',
+        ccEmails: [],
+    }));
+}

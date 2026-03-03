@@ -1,30 +1,42 @@
 import { z } from 'zod';
 
-// Schema for client contacts
-const ClientContactSchema = z.object({
-  org: z.string().min(1),
-  name: z.string().min(1),
-  email: z.email(),
-  phone: z.string(),
+// Query type enum
+export const QueryTypeEnum = z.enum(['technical', 'commercial', 'bec', 'price_bid']);
+export type QueryType = z.infer<typeof QueryTypeEnum>;
+
+// Query list item schema
+export const QueryItemSchema = z.object({
+    pageNo: z.string().min(1, 'Page number is required'),
+    clauseNo: z.string().min(1, 'Clause number is required'),
+    queryType: QueryTypeEnum,
+    currentStatement: z.string().min(1, 'Current statement is required'),
+    requestedStatement: z.string().min(1, 'Requested statement is required'),
 });
 
-
-// Schema for query list items
-const QueryListItemSchema = z.object({
-  pageNo: z.string().min(1),
-  clauseNo: z.string().min(1),
-  queryType: z.enum(['technical', 'commercial', 'bec', 'price_bid']),
-  currentStatement: z.string().min(1),
-  requestedStatement: z.string().min(1),
+// Client contact schema
+export const ClientContactSchema = z.object({
+    org: z.string().min(1, 'Organization is required'),
+    name: z.string().min(1, 'Contact name is required'),
+    email: z.email('Invalid email address'),
+    phone: z.string().optional(),
+    ccEmails: z.array(z.email('Invalid CC email')).optional().default([]),
 });
 
 // Main form schema
-export const SubmitQueriesFormSchema = z.object({
-  tenderId: z.number().int().positive({ message: "Tender ID is required" }),
-  clients: z.array(ClientContactSchema).min(1, { message: "At least one client contact is required" }),
-  queries: z.array(QueryListItemSchema).min(1, { message: "At least one query is required" }),
+export const SubmitQueryFormSchema = z.object({
+    tenderId: z.number().int().positive(),
+    queries: z.array(QueryItemSchema).min(1, 'At least one query is required'),
+    clientContacts: z.array(ClientContactSchema).min(1, 'At least one client contact is required'),
 });
 
-export type SubmitQueriesFormValues = z.infer<typeof SubmitQueriesFormSchema>;
-export type ClientContact = z.infer<typeof ClientContactSchema>;
-export type QueryListItem = z.infer<typeof QueryListItemSchema>;
+export type SubmitQueryFormValues = z.infer<typeof SubmitQueryFormSchema>;
+export type QueryItemValues = z.infer<typeof QueryItemSchema>;
+export type ClientContactValues = z.infer<typeof ClientContactSchema>;
+
+// Query type options for select dropdown
+export const queryTypeOptions = [
+    { value: 'technical', label: 'Technical' },
+    { value: 'commercial', label: 'Commercial' },
+    { value: 'bec', label: 'BEC' },
+    { value: 'price_bid', label: 'Price Bid Format' },
+] as const;
