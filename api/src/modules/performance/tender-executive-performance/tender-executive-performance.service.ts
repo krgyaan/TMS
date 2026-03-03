@@ -1188,7 +1188,7 @@ export class TenderExecutiveService {
         AND ti.created_at < '${from}'
         AND tin.id IS NULL
         AND tl_status = 0
-        AND ti.status IN (1,2)
+        AND ti.status IN (1)
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1223,7 +1223,7 @@ export class TenderExecutiveService {
         AND ti.created_at < '${to}'
         AND tin.id IS NULL
         AND tl_status = 0
-        AND ti.status IN (1,2)
+        AND ti.status IN (1)
     `);
 
         /* =====================================================
