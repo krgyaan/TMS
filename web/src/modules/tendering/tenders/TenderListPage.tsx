@@ -165,6 +165,11 @@ const TenderListPage = () => {
             label: "Request Extension",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
+        },
+        {
+            label: "Submit Queries",
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.submitQueryCreate(row.id)),
+            icon: <Clock className="h-4 w-4" />,
         }
     ];
 

@@ -59,3 +59,11 @@ export interface SubmitQueryListResponse {
         totalPages: number;
     };
 }
+
+export interface SubmitQueryListParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}

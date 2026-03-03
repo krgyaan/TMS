@@ -71,6 +71,10 @@ const Tendering_Result_Upload = lazy(() => import('@/modules/tendering/results/T
 const RequestExtensionListPage = lazy(() => import('@/modules/tendering/request-extension/RequestExtensionListPage'));
 const RequestExtensionCreatePage = lazy(() => import('@/modules/tendering/request-extension/RequestExtensionCreatePage'));
 const RequestExtensionEditPage = lazy(() => import('@/modules/tendering/request-extension/RequestExtensionEditPage'));
+const SubmitQueryListPage = lazy(() => import('@/modules/tendering/submit-queries/SubmitQueryListPage'));
+const SubmitQueryCreatePage = lazy(() => import('@/modules/tendering/submit-queries/SubmitQueryCreatePage'));
+const SubmitQueryEditPage = lazy(() => import('@/modules/tendering/submit-queries/SubmitQueryEditPage'));
+const SubmitQueryShowPage = lazy(() => import('@/modules/tendering/submit-queries/SubmitQueryShowPage'));
 
 export default function TenderingRoutes() {
     return (
@@ -144,6 +148,10 @@ export default function TenderingRoutes() {
             <Route path="request-extension" element={<RouteWrapper><RequestExtensionListPage /></RouteWrapper>} />
             <Route path="request-extension/:tenderId/create" element={<RouteWrapper><RequestExtensionCreatePage /></RouteWrapper>} />
             <Route path="request-extension/:tenderId/edit/:id" element={<RouteWrapper><RequestExtensionEditPage /></RouteWrapper>} />
+            <Route path="submit-query" element={<RouteWrapper><SubmitQueryListPage /></RouteWrapper>} />
+            <Route path="submit-query/:tenderId/create" element={<RouteWrapper><SubmitQueryCreatePage /></RouteWrapper>} />
+            <Route path="submit-query/:tenderId/edit/:id" element={<RouteWrapper><SubmitQueryEditPage /></RouteWrapper>} />
+            <Route path="submit-query/:tenderId/view/:id" element={<RouteWrapper><SubmitQueryShowPage /></RouteWrapper>} />
         </Routes>
     );
 }

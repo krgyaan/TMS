@@ -1,105 +1,129 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 import { handleQueryError } from '@/lib/react-query';
-import type { CreateSubmitQueryDto, SubmitQueryListParams, SubmitQueryListRow, UpdateSubmitQueryDto } from '@/modules/tendering/submit-queries/helpers/submitQueries.types';
 import { submitQueryService } from '@/services/api/submit-query.service';
+import type { PaginatedResult } from '@/types/api.types';
+import type { CreateSubmitQueryPayload, SubmitQueryListParams, SubmitQueryListRow, SubmitQueryResponse, UpdateSubmitQueryPayload } from '@/modules/tendering/submit-queries/helpers/submitQueries.types';
 
-export const submitQueryKey = {
-    all: ['submit-query'] as const,
-    lists: () => [...submitQueryKey.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) => [...submitQueryKey.lists(), { filters }] as const,
-    detail: (id: number) => [...submitQueryKey.all, 'detail', id] as const,
+export const submitQueryKeys = {
+    all: ['submit-queries'] as const,
+    lists: () => [...submitQueryKeys.all, 'list'] as const,
+    list: (params?: SubmitQueryListParams) => [...submitQueryKeys.lists(), params] as const,
+    details: () => [...submitQueryKeys.all, 'detail'] as const,
+    detail: (id: number) => [...submitQueryKeys.details(), id] as const,
 };
 
-export const useSubmitQueries = (
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
-    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
-) => {
-    const params: SubmitQueryListParams = {
-        page: pagination.page,
-        limit: pagination.limit,
-        ...(sort?.sortBy && { sortBy: sort.sortBy }),
-        ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
-        ...(pagination.search && { search: pagination.search }),
+export interface UseSubmitQueriesParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
+// ============================================================================
+// Query Hooks
+// ============================================================================
+
+/**
+ * Fetch paginated list of submit queries
+ */
+export function useSubmitQueries(params: UseSubmitQueriesParams = {}) {
+    const { page = 1, limit = 50, search, sortBy, sortOrder } = params;
+
+    const queryParams: SubmitQueryListParams = {
+        page,
+        limit,
+        ...(search && { search }),
+        ...(sortBy && { sortBy }),
+        ...(sortOrder && { sortOrder }),
     };
 
     return useQuery<PaginatedResult<SubmitQueryListRow>>({
-        queryKey: submitQueryKey.list({
-            page: pagination.page,
-            limit: pagination.limit,
-            search: pagination.search ?? undefined,
-            sortBy: sort?.sortBy,
-            sortOrder: sort?.sortOrder,
-        }),
-        queryFn: () => submitQueryService.getAll(params),
-        placeholderData: (previousData) => {
-            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
-                return previousData;
-            }
-            return undefined;
-        },
+        queryKey: submitQueryKeys.list(queryParams),
+        queryFn: () => submitQueryService.getAll(queryParams),
+        placeholderData: (prev) => prev,
     });
-};
+}
 
-export const useSubmitQuerysAll = () => {
+/**
+ * Fetch all submit queries (no pagination)
+ */
+export function useSubmitQueriesAll() {
     return useQuery<PaginatedResult<SubmitQueryListRow>>({
-        queryKey: submitQueryKey.list({ all: true }),
-        queryFn: () => submitQueryService.getAll(),
+        queryKey: submitQueryKeys.list(),
+        queryFn: () => submitQueryService.getAll({ limit: 1000 }),
     });
-};
+}
 
-export const useSubmitQuery = (id: number | null) => {
-    return useQuery<SubmitQueryListRow>({
-        queryKey: submitQueryKey.detail(id ?? 0),
+/**
+ * Fetch single submit query by ID
+ */
+export function useSubmitQuery(id: number | null | undefined) {
+    return useQuery<SubmitQueryResponse>({
+        queryKey: submitQueryKeys.detail(id ?? 0),
         queryFn: () => submitQueryService.getById(id!),
-        enabled: !!id,
+        enabled: !!id && id > 0,
     });
-};
+}
 
-export const useCreateSubmitQuery = () => {
+// ============================================================================
+// Mutation Hooks
+// ============================================================================
+
+/**
+ * Create a new submit query
+ */
+export function useCreateSubmitQuery() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateSubmitQueryDto) => submitQueryService.create(data),
+        mutationFn: (data: CreateSubmitQueryPayload) => submitQueryService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: submitQueryKey.lists() });
-            toast.success('Submit Query created successfully');
+            queryClient.invalidateQueries({ queryKey: submitQueryKeys.lists() });
+            toast.success('Submit query created successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
         },
     });
-};
+}
 
-export const useUpdateSubmitQuery = () => {
+/**
+ * Update an existing submit query
+ */
+export function useUpdateSubmitQuery() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Omit<UpdateSubmitQueryDto, 'id'> }) =>
+        mutationFn: ({ id, data }: { id: number; data: UpdateSubmitQueryPayload }) =>
             submitQueryService.update(id, data),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: submitQueryKey.lists() });
-            queryClient.invalidateQueries({ queryKey: submitQueryKey.detail(data.id) });
-            toast.success('Submit Query updated successfully');
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: submitQueryKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: submitQueryKeys.detail(variables.id) });
+            toast.success('Submit query updated successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
         },
     });
-};
+}
 
-export const useDeleteSubmitQuery = () => {
+/**
+ * Delete a submit query
+ */
+export function useDeleteSubmitQuery() {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: (id: number) => submitQueryService.remove(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: submitQueryKey.lists() });
-            toast.success('Submit Query deleted successfully');
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: submitQueryKeys.lists() });
+            queryClient.removeQueries({ queryKey: submitQueryKeys.detail(id) });
+            toast.success('Submit query deleted successfully');
         },
         onError: (error) => {
             toast.error(handleQueryError(error));
         },
     });
-};
+}

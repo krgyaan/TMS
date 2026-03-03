@@ -223,7 +223,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`queries.${index}.pageNo`}
-                                                            hideLabel
+                                                            label=""
                                                         >
                                                             {(fieldProps) => (
                                                                 <Input
@@ -238,7 +238,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`queries.${index}.clauseNo`}
-                                                            hideLabel
+                                                            label=""
                                                         >
                                                             {(fieldProps) => (
                                                                 <Input
@@ -253,7 +253,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`queries.${index}.queryType`}
-                                                            hideLabel
+                                                            label=""
                                                         >
                                                             {(fieldProps) => (
                                                                 <Select
@@ -278,7 +278,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`queries.${index}.currentStatement`}
-                                                            hideLabel
+                                                            label=""
                                                         >
                                                             {(fieldProps) => (
                                                                 <Textarea
@@ -294,7 +294,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`queries.${index}.requestedStatement`}
-                                                            hideLabel
+                                                            label=""
                                                         >
                                                             {(fieldProps) => (
                                                                 <Textarea
@@ -455,7 +455,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                                         <FieldWrapper
                                                             control={form.control}
                                                             name={`clientContacts.${index}.ccEmails.${emailIndex}`}
-                                                            hideLabel
+                                                            label="CC Email"
                                                             className="flex-1"
                                                         >
                                                             {(fieldProps) => (
