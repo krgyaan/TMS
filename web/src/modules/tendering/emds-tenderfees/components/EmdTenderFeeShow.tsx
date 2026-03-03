@@ -10,7 +10,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 interface PaymentRequest {
     id: number;
     tenderId: number;
-    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string | number;
     dueDate: string | Date | null;
     status: string;
@@ -28,6 +28,7 @@ interface PaymentRequest {
         courierDeadline?: number | null;
         status: string;
         details?: any;
+        action?: string;
     }>;
 }
 
@@ -44,20 +45,17 @@ const formatValue = (value?: string | number | null) => {
 
 const getStatusBadgeVariant = (status: string) => {
     const statusLower = status.toLowerCase();
-    if (statusLower === 'pending') return 'secondary';
-    if (statusLower === 'approved' || statusLower === 'received') return 'default';
-    if (statusLower === 'rejected' || statusLower === 'cancelled') return 'destructive';
-    return 'outline';
+    if (statusLower === "pending") return "secondary";
+    if (statusLower === "approved" || statusLower === "received") return "default";
+    if (statusLower === "rejected" || statusLower === "cancelled") return "destructive";
+    return "outline";
 };
 
 const hasValue = (value?: string | Date | number | null) => {
     return value !== null && value !== undefined && value !== "";
 };
 
-export const EmdTenderFeeShow = ({
-    paymentRequests,
-    isLoading,
-}: EmdTenderFeeShowProps) => {
+export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeShowProps) => {
     if (isLoading) {
         return (
             <Card>
@@ -94,11 +92,11 @@ export const EmdTenderFeeShow = ({
         );
     }
 
-    const emdRequest = paymentRequests.find(r => r.purpose === 'EMD');
-    const tenderFeeRequest = paymentRequests.find(r => r.purpose === 'Tender Fee');
-    const processingFeeRequest = paymentRequests.find(r => r.purpose === 'Processing Fee');
+    const emdRequest = paymentRequests.find(r => r.purpose === "EMD");
+    const tenderFeeRequest = paymentRequests.find(r => r.purpose === "Tender Fee");
+    const processingFeeRequest = paymentRequests.find(r => r.purpose === "Processing Fee");
 
-    const renderInstrumentRows = (instruments: PaymentRequest['instruments'], purposeLabel: string) => {
+    const renderInstrumentRows = (instruments: PaymentRequest["instruments"], purposeLabel: string) => {
         if (!instruments || instruments.length === 0) return null;
 
         return (
@@ -112,38 +110,25 @@ export const EmdTenderFeeShow = ({
                     <>
                         {/* Instrument Header Row */}
                         <TableRow key={`${instrument.id || idx}-header`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Instrument Type
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {instrument.instrumentType}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Status
-                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Instrument Type</TableCell>
+                            <TableCell className="text-sm font-semibold">{instrument.instrumentType}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                             <TableCell>
-                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
-                                    {instrument.status}
-                                </Badge>
+                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>{instrument.status}</Badge>
+                                <span>{instrument.action}</span>
                             </TableCell>
                         </TableRow>
 
                         {/* Instrument Amount & Favouring Row */}
                         <TableRow key={`${instrument.id || idx}-amount`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Amount
-                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Amount</TableCell>
                             <TableCell className="text-sm font-semibold" colSpan={hasValue(instrument.favouring) ? 1 : 3}>
                                 {formatINR(instrument.amount)}
                             </TableCell>
                             {hasValue(instrument.favouring) && (
                                 <>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Favouring
-                                    </TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                        {formatValue(instrument.favouring)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Favouring</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(instrument.favouring)}</TableCell>
                                 </>
                             )}
                         </TableRow>
@@ -153,18 +138,14 @@ export const EmdTenderFeeShow = ({
                             <TableRow key={`${instrument.id || idx}-payable`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
                                 {hasValue(instrument.payableAt) ? (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Payable At
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Payable At</TableCell>
                                         <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={hasValue(instrument.issueDate) ? 1 : 3}>
                                             {formatValue(instrument.payableAt)}
                                         </TableCell>
                                     </>
                                 ) : (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Issue Date
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Issue Date</TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
                                             {formatDateTime(instrument.issueDate)}
                                         </TableCell>
@@ -172,12 +153,8 @@ export const EmdTenderFeeShow = ({
                                 )}
                                 {hasValue(instrument.payableAt) && hasValue(instrument.issueDate) && (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Issue Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatDateTime(instrument.issueDate)}
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Issue Date</TableCell>
+                                        <TableCell className="text-sm">{formatDateTime(instrument.issueDate)}</TableCell>
                                     </>
                                 )}
                             </TableRow>
@@ -188,18 +165,14 @@ export const EmdTenderFeeShow = ({
                             <TableRow key={`${instrument.id || idx}-expiry`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
                                 {hasValue(instrument.expiryDate) ? (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Expiry Date
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Expiry Date</TableCell>
                                         <TableCell className="text-sm" colSpan={hasValue(instrument.claimExpiryDate) ? 1 : 3}>
                                             {formatDateTime(instrument.expiryDate)}
                                         </TableCell>
                                     </>
                                 ) : (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Claim Expiry Date
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Claim Expiry Date</TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
                                             {formatDateTime(instrument.claimExpiryDate)}
                                         </TableCell>
@@ -207,12 +180,8 @@ export const EmdTenderFeeShow = ({
                                 )}
                                 {hasValue(instrument.expiryDate) && hasValue(instrument.claimExpiryDate) && (
                                     <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Claim Expiry Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatDateTime(instrument.claimExpiryDate)}
-                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Claim Expiry Date</TableCell>
+                                        <TableCell className="text-sm">{formatDateTime(instrument.claimExpiryDate)}</TableCell>
                                     </>
                                 )}
                             </TableRow>
@@ -221,18 +190,10 @@ export const EmdTenderFeeShow = ({
                         {/* Instrument Courier Details Row */}
                         {(instrument.courierAddress || instrument.courierDeadline) && (
                             <TableRow key={`${instrument.id || idx}-courier`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Address
-                                </TableCell>
-                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                    {formatValue(instrument.courierAddress)}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Deadline
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {instrument.courierDeadline ? `${instrument.courierDeadline} days` : "—"}
-                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">Courier Address</TableCell>
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(instrument.courierAddress)}</TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">Courier Deadline</TableCell>
+                                <TableCell className="text-sm">{instrument.courierDeadline ? `${instrument.courierDeadline} days` : "—"}</TableCell>
                             </TableRow>
                         )}
 
@@ -247,18 +208,14 @@ export const EmdTenderFeeShow = ({
                                         const [key2, value2] = entries[i + 1] || [null, null];
                                         rows.push(
                                             <TableRow key={`${instrument.id || idx}-details-${i}`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">
-                                                    {key1.replace(/([A-Z])/g, ' $1').trim()}
-                                                </TableCell>
+                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">{key1.replace(/([A-Z])/g, " $1").trim()}</TableCell>
                                                 <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                                    {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1)))
-                                                        ? formatDateTime(value1)
-                                                        : String(value1)}
+                                                    {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1))) ? formatDateTime(value1) : String(value1)}
                                                 </TableCell>
                                                 {key2 ? (
                                                     <>
                                                         <TableCell className="text-sm font-medium text-muted-foreground capitalize">
-                                                            {key2.replace(/([A-Z])/g, ' $1').trim()}
+                                                            {key2.replace(/([A-Z])/g, " $1").trim()}
                                                         </TableCell>
                                                         <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                             {value2 instanceof Date || (typeof value2 === "string" && !isNaN(Date.parse(value2)))
@@ -309,34 +266,18 @@ export const EmdTenderFeeShow = ({
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                                     <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>
-                                            {emdRequest.status}
-                                        </Badge>
+                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>{emdRequest.status}</Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(emdRequest.amountRequired)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(emdRequest.amountRequired)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(emdRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                        {formatValue(emdRequest.remarks)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
+                                    <TableCell className="text-sm">{formatDateTime(emdRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(emdRequest.remarks)}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(emdRequest.instruments, "EMD")}
                             </>
@@ -351,34 +292,18 @@ export const EmdTenderFeeShow = ({
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                                     <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>
-                                            {tenderFeeRequest.status}
-                                        </Badge>
+                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>{tenderFeeRequest.status}</Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(tenderFeeRequest.amountRequired)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(tenderFeeRequest.amountRequired)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(tenderFeeRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                        {formatValue(tenderFeeRequest.remarks)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
+                                    <TableCell className="text-sm">{formatDateTime(tenderFeeRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(tenderFeeRequest.remarks)}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(tenderFeeRequest.instruments, "Tender Fee")}
                             </>
@@ -393,34 +318,18 @@ export const EmdTenderFeeShow = ({
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                                     <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>
-                                            {processingFeeRequest.status}
-                                        </Badge>
+                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>{processingFeeRequest.status}</Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(processingFeeRequest.amountRequired)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(processingFeeRequest.amountRequired)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(processingFeeRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                        {formatValue(processingFeeRequest.remarks)}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
+                                    <TableCell className="text-sm">{formatDateTime(processingFeeRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(processingFeeRequest.remarks)}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(processingFeeRequest.instruments, "Processing Fee")}
                             </>
@@ -434,8 +343,8 @@ export const EmdTenderFeeShow = ({
                             <TableCell colSpan={2} className="font-bold text-sm">
                                 {formatINR(
                                     (Number(emdRequest?.amountRequired) || 0) +
-                                    (Number(tenderFeeRequest?.amountRequired) || 0) +
-                                    (Number(processingFeeRequest?.amountRequired) || 0)
+                                        (Number(tenderFeeRequest?.amountRequired) || 0) +
+                                        (Number(processingFeeRequest?.amountRequired) || 0)
                                 )}
                             </TableCell>
                         </TableRow>
