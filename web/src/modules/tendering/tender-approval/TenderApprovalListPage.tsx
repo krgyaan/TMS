@@ -17,7 +17,6 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
 import { currencyCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
