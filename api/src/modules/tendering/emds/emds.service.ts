@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException, } from '@nestjs/common';
-import { eq, and, inArray, or, gt, asc, desc, isNull, sql, isNotNull, not } from 'drizzle-orm';
+import { eq, and, inArray, or, gt, asc, desc, isNull, sql, isNotNull, not, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, type PaymentRequest, type PaymentInstrument, } from '@db/schemas/tendering/emds.schema';
@@ -326,6 +326,25 @@ export class EmdsService {
         return roleFilterConditions;
     }
 
+    private getDefaultSortByTab(tab: DashboardTab): SQL<unknown> {
+        switch (tab) {
+            case 'pending':
+            case 'tender-dnb':
+                // Soonest due date first for pending items
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+
+            case 'sent':
+            case 'approved':
+            case 'rejected':
+            case 'returned':
+                // Latest due date first for processed items
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
+
     private getTabSqlCondition(tab: DashboardTab) {
         // Status matching logic
         const isRejected = sql`${paymentInstruments.status} LIKE ${'%' + REJECTED_STATUS_PATTERN}`;
@@ -411,17 +430,36 @@ export class EmdsService {
         }
 
         // Sorting Logic
-        let orderClause: any = asc(tenderInfos.dueDate);
+        let orderClause: SQL<unknown>;
+
         if (sort?.sortBy) {
+            // User-specified sorting takes priority
             const direction = sort.sortOrder === 'desc' ? desc : asc;
             switch (sort.sortBy) {
-                case 'tenderNo': orderClause = direction(tenderInfos.tenderNo); break;
-                case 'tenderName': orderClause = direction(tenderInfos.tenderName); break;
-                case 'dueDate': orderClause = direction(tenderInfos.dueDate); break;
-                case 'amountRequired': orderClause = direction(paymentRequests.amountRequired); break;
-                case 'purpose': orderClause = direction(paymentRequests.purpose); break;
-                default: orderClause = asc(tenderInfos.dueDate);
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'amountRequired':
+                    orderClause = direction(paymentRequests.amountRequired);
+                    break;
+                case 'purpose':
+                    orderClause = direction(paymentRequests.purpose);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                default:
+                    orderClause = this.getDefaultSortByTab(tab);
             }
+        } else {
+            // Default sorting based on tab
+            orderClause = this.getDefaultSortByTab(tab);
         }
 
         const whereClause = and(
@@ -579,8 +617,10 @@ export class EmdsService {
         }
 
         // Build order clause
-        let orderClause: any = asc(tenderInfos.dueDate);
+        let orderClause: SQL<unknown>;
+
         if (sort?.sortBy) {
+            // User-specified sorting takes priority
             const direction = sort.sortOrder === 'desc' ? desc : asc;
             switch (sort.sortBy) {
                 case 'tenderNo':
@@ -599,8 +639,11 @@ export class EmdsService {
                     orderClause = direction(tenderInfos.emd);
                     break;
                 default:
-                    orderClause = asc(tenderInfos.dueDate);
+                    orderClause = this.getDefaultSortByTab('pending');
             }
+        } else {
+            // Default sorting: soonest due date first
+            orderClause = this.getDefaultSortByTab('pending');
         }
 
         // Get total count
@@ -718,7 +761,8 @@ export class EmdsService {
         }
 
         // Build order clause (same as getPendingTenders)
-        let orderClause: any = asc(tenderInfos.dueDate);
+        let orderClause: SQL<unknown>;
+
         if (sort?.sortBy) {
             const direction = sort.sortOrder === 'desc' ? desc : asc;
             switch (sort.sortBy) {
@@ -738,8 +782,11 @@ export class EmdsService {
                     orderClause = direction(tenderInfos.emd);
                     break;
                 default:
-                    orderClause = asc(tenderInfos.dueDate);
+                    orderClause = this.getDefaultSortByTab('tender-dnb');
             }
+        } else {
+            // Default sorting: soonest due date first
+            orderClause = this.getDefaultSortByTab('tender-dnb');
         }
 
         // Get total count
