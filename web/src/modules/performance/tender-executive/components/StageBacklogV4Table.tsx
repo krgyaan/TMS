@@ -38,6 +38,9 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <TableHead className="text-center">
                                 <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
                             </TableHead>
+                            {/* <TableHead className="text-center">
+                                <ColumnHeader title="Pending During" description="Tender Info pending at the end of the period" />
+                            </TableHead> */}
                             <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
                             </TableHead>
@@ -51,6 +54,7 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
+                            {/* <MetricCell data={stage.during.pending} /> */}
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
@@ -82,6 +86,9 @@ function ApprovalTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Approved" description="Tenders approved during the period" />
                             </TableHead>
                             <TableHead className="text-center">
+                                <ColumnHeader title="Rejected" description="Tenders rejected during the period" />
+                            </TableHead>
+                            <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender approval pending at the end of the period" />
                             </TableHead>
                         </TableRow>
@@ -94,6 +101,7 @@ function ApprovalTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
+                            <MetricCell data={stage.during.rejected} />
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
@@ -122,10 +130,10 @@ function BidTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Approved During" description="Tenders approved during the period" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Bid Submitted" description="Tenders bid during the period" />
+                                <ColumnHeader title="Bid Submitted" description="Tenders bid during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Missed" description="Tenders missed during the period" />
+                                <ColumnHeader title="Missed" description="Tenders missed during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Approved but bidding pending at the end of the period" />
@@ -163,19 +171,19 @@ function ResultTable({ stage }: { stage: any }) {
                         <TableRow>
                             <TableHead />
                             <TableHead className="text-center">
-                                <ColumnHeader title="Awaited at Start" description="Tender Result awaited at the start of the period" />
+                                <ColumnHeader title="Awaited at Start" description="Tender Result awaited at the start of the period  (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Bid During" description="Tenders Bid during the period" />
+                                <ColumnHeader title="Bid During" description="Tenders Bid during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Result Received" description="Tender Results received during the period" />
+                                <ColumnHeader title="Result Received" description="Tender Results received during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Disqualified" description="Tenders disqualified during the period" />
+                                <ColumnHeader title="Disqualified" description="Tenders disqualified during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Awaited at End" description="Tender Result awaited at the end of the period" />
+                                <ColumnHeader title="Awaited at End" description="Tender Result awaited at the end of the period (Final Price)" />
                             </TableHead>
                         </TableRow>
                     </TableHeader>
@@ -210,10 +218,10 @@ function WonTable({ stage }: { stage: any }) {
                         <TableRow>
                             <TableHead />
                             <TableHead className="text-center">
-                                <ColumnHeader title="Won Before Period" description="Tenders won before the start of the period" />
+                                <ColumnHeader title="Won Before Period" description="Tenders won before the start of the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Won During Period" description="Tenders won for tenders bid during the period" />
+                                <ColumnHeader title="Won During Period" description="Tenders won for tenders bid during the period (Final Price)" />
                             </TableHead>
                         </TableRow>
                     </TableHeader>
@@ -244,11 +252,11 @@ function LostTable({ stage }: { stage: any }) {
                             <TableHead />
 
                             <TableHead className="text-center">
-                                <ColumnHeader title="Lost Before Period" description="Tenders Lost for tender bids before the start of the period" />
+                                <ColumnHeader title="Lost Before Period" description="Tenders Lost for tender bids before the start of the period (Final Price)" />
                             </TableHead>
 
                             <TableHead className="text-center">
-                                <ColumnHeader title="Lost During Period" description="Tenders Lost for tenders bid during the period" />
+                                <ColumnHeader title="Lost During Period" description="Tenders Lost for tenders bid during the period (Final Price)" />
                             </TableHead>
                         </TableRow>
                     </TableHeader>

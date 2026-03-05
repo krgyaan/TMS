@@ -1173,478 +1173,332 @@ export class TenderExecutiveService {
 
         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
 
-        const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.gst_values ?? 0), 0);
+        /**
+         * 🔥 BASE SELECT WITH VALUE SWITCH
+         * Switch to final_price only AFTER Bid Submitted
+         */
+        const baseSelect = `
+        SELECT
+            ti.*,
+            CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Bid Submitted'
+                )
+                THEN COALESCE(tcs.final_price, ti.gst_values)
+                ELSE ti.gst_values
+            END AS effective_value
+        FROM tender_infos ti
+        LEFT JOIN LATERAL (
+            SELECT final_price
+            FROM tender_costing_sheets
+            WHERE tender_id = ti.id
+              AND status = 'Approved'
+            ORDER BY approved_at DESC NULLS LAST
+            LIMIT 1
+        ) tcs ON true
+    `;
 
         /* =====================================================
-        ASSIGNED
-        Completed: tender_information exists
+       ASSIGNED
     ===================================================== */
 
         const assignedOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
-        AND tin.id IS NULL
-        AND tl_status = 0
-        AND ti.status IN (1,2)
+        ${baseSelect}
+        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.created_at < '${from}'
+          AND tin.id IS NULL
+          AND tl_status = 0
+          AND ti.status IN (1)
     `);
 
         const assignedDuringTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
     `);
 
         const assignedDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND tin.created_at BETWEEN '${from}' AND '${to}'
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at BETWEEN '${from}' AND '${to}'
     `);
 
         const assignedDuringPending = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND tin.id IS NULL
+        ${baseSelect}
+        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND tin.id IS NULL
     `);
 
         const assignedTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    LEFT JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND ti.created_at < '${to}'
-        AND tin.id IS NULL
-        AND tl_status = 0
-        AND ti.status IN (1,2)
+        ${baseSelect}
+        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.created_at < '${to}'
+          AND tin.id IS NULL
+          AND tl_status = 0
+          AND ti.status IN (1)
     `);
 
         /* =====================================================
-        APPROVED
-        Completed: bid submitted
+       APPROVED
     ===================================================== */
 
         const approvedOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND tin.created_at < '${from}'
-        AND ti.tl_status = 0
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at < '${from}'
+          AND ti.tl_status = 0
     `);
 
-        //     const approvedDuringTotal = await exec(`
-        // SELECT ti.*
-        // FROM tender_infos ti
-        // WHERE ${baseWhere()}
-        //     AND ti.created_at BETWEEN '${from}' AND '${to}'
-        //     AND EXISTS (
-        //     SELECT 1 FROM tender_information te
-        //     WHERE ti.id = te.tender_id
-        //     )
-        // `);
-
         const approvedDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND tin.created_at BETWEEN '${from}' AND '${to}'
-        AND ti.tl_status = 1
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_status = 1
     `);
 
         const approvedDuringPending = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-        AND tin.created_at <  '${to}'
-        AND ti.tl_status = 0
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at < '${to}'
+          AND ti.tl_status = 0
+    `);
+
+        const approvedDuringRejected = await exec(`
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_status = 2
     `);
 
         const approvedTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-            AND tin.created_at < '${to}'
-            AND ti.tl_status = 0
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND tin.created_at < '${to}'
+          AND ti.tl_status = 0
     `);
 
         /* =====================================================
-        BID
-        Completed: bid submitted
+       BID
     ===================================================== */
-
-        // --ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
 
         const bidOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin
-        ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-      AND (
-            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
-            AND (
-                ti.created_at < '${from}'
-                AND EXISTS (
-                    SELECT 1
-                    FROM tender_costing_sheets tcs
-                    WHERE tcs.tender_id = ti.id
-                      AND tcs.status = 'Approved'
-                )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM bid_submissions bs
-                    WHERE bs.tender_id = ti.id
-                )
-            )
-      );
-`);
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.tl_status = 1
+          AND tin.created_at < '${from}'
+          AND NOT EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.created_at < '${from}'
+          )
+    `);
 
-        //         const bidDuringTotal = await exec(`
-        //     SELECT ti.*
-        //     FROM tender_infos ti
-        //     LEFT JOIN tender_costing_sheet tcos ON tcos.tender_id = ti.id
-        //     WHERE ${baseWhere()}
-        //       AND ti.created_at BETWEEN '${from}' AND '${to}'
-        //       AND tcos.id IS NULL
-        //   `);
-
-        //we'll use total tenders approved
+        const bidDuringTotal = await exec(`
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.tl_status = 1
+          AND tin.created_at BETWEEN '${from}' AND '${to}'
+    `);
 
         const bidDuringCompleted = await exec(`
-    SELECT
-        ti.*,
-        COALESCE(tcs.final_price, ti.gst_values) AS effective_value
-    FROM tender_infos ti
-    LEFT JOIN tender_costing_sheets tcs
-        ON tcs.tender_id = ti.id
-        AND tcs.status = 'Approved'
-    WHERE ${baseWhere()}
-      AND EXISTS (
-          SELECT 1
-          FROM bid_submissions bs
-          WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-            AND bs.created_at BETWEEN '${from}' AND '${to}'
-      )
-`);
-
-        const bidDuringPending = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND NOT EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND ti.tl_status = 1
-    `);
-
-        const bidTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    JOIN tender_information tin
-        ON tin.tender_id = ti.id
-    WHERE ${baseWhere()}
-      AND (
-            ti.status NOT IN (17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
-            AND (
-                ti.created_at < '${to}'
-                AND EXISTS (
-                    SELECT 1
-                    FROM tender_costing_sheets tcs
-                    WHERE tcs.tender_id = ti.id
-                      AND tcs.status = 'Approved'
-                )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM bid_submissions bs
-                    WHERE bs.tender_id = ti.id
-                )
-            )
-      );
-`);
-
-        /* =====================================================
-        RESULT AWAITED
-        Completed: result declared
-    ===================================================== */
-
-        const resultAwaitedOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
-      AND ti.tl_status = 1
-      AND EXISTS (
-            SELECT 1
-            FROM bid_submissions bs
-            WHERE bs.tender_id = ti.id
-              AND bs.status = 'Bid Submitted'
-              AND bs.created_at < '${from}'   -- ✅ from date applied here
-        )
-      AND NOT EXISTS (
-            SELECT 1
-            FROM tender_results tr
-            WHERE tr.tender_id = ti.id
-              AND tr.status IN ('Won','Lost','Disqualified')
-        );
-`);
-
-        //         const resultAwaitedDuringTotal = await exec(`
-        //     SELECT ti.*
-        //     FROM tender_infos ti
-        //     WHERE ${baseWhere()}
-        //       AND ti.created_at BETWEEN '${from}' AND '${to}'
-        //   `);
-
-        const resultAwaitedDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND EXISTS (
-          SELECT 1
-          FROM tender_results tr
-          WHERE tr.tender_id = ti.id
-            AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
-            AND tr.created_at BETWEEN '${from}' AND '${to}'
-      )
-`);
-
-        const resultAwaitedDuringPending = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-        AND ti.tl_status = 1
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Bid Submitted'
-        )
-        AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        )
-    `);
-
-        const resultAwaitedTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND ti.status NOT IN (18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 38, 39)
-      AND ti.tl_status = 1
-      AND EXISTS (
-            SELECT 1
-            FROM bid_submissions bs
-            WHERE bs.tender_id = ti.id
-              AND bs.status = 'Bid Submitted'
-              AND bs.created_at < '${to}'  -- ✅ date applied here
-        )
-      AND NOT EXISTS (
-            SELECT 1
-            FROM tender_results tr
-            WHERE tr.tender_id = ti.id
-              AND tr.status IN ('Won','Lost','Disqualified')
-        );
-`);
-
-        /* =====================================================
-        MISSED / WON / LOST / DISQUALIFIED (terminal)
-    ===================================================== */
-
-        const missedOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
-        AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-            AND bs.status = 'Tender Missed'
-        )
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+          )
     `);
 
         const missedDuringCompleted = await exec(`
-            SELECT ti.*
-            FROM tender_infos ti
-            WHERE ${baseWhere()}
-            AND EXISTS (
-                    SELECT 1 
-                    FROM bid_submissions bs
-                    WHERE bs.tender_id = ti.id
-                    AND bs.status = 'Tender Missed'
-                    AND bs.created_at BETWEEN '${from}' AND '${to}'  -- ✅ filter moved here
-                )
-        `);
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Tender Missed'
+                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+          )
+    `);
 
-        // DURING → TOTAL (pending results, shared logic)
-        const terminalDuringTotal = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-    AND ti.created_at BETWEEN '${from}' AND '${to}'
-    AND EXISTS (
-        SELECT 1 FROM bid_submissions bs
-        WHERE bs.tender_id = ti.id
-        AND bs.status = 'Bid Submitted'
-    )
-    AND NOT EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status IN ('Won','Lost','Disqualified')
-    )
-`);
+        const bidTotal = await exec(`
+        ${baseSelect}
+        JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+          AND ti.tl_status = 1
+          AND tin.created_at <= '${to}'
+          AND NOT EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.created_at <= '${to}'
+          )
+    `);
 
-        // OPENING
-        const wonOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND (
-            /* 1️⃣ Result exists → use result date */
-            EXISTS (
+        /* =====================================================
+       RESULT AWAITED
+    ===================================================== */
+
+        const resultAwaitedOpening = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at < '${from}'
+          )
+          AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status = 'Won'
                   AND tr.created_at < '${from}'
-            )
+          )
+    `);
 
-            /* 2️⃣ No result → fallback to status + ti.created_at */
-            OR (
-                NOT EXISTS (
-                    SELECT 1
-                    FROM tender_results tr
-                    WHERE tr.tender_id = ti.id
-                )
-                AND ti.status IN (25, 26, 27, 28)
-                AND ti.created_at < '${from}'
-            )
-      )
-`);
+        const resultAwaitedDuringTotal = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+          )
+    `);
 
-        // DURING → COMPLETED (won only)
         const wonDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND (
-            EXISTS (
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status = 'Won'
+                  AND tr.status ILIKE 'won'
                   AND tr.created_at BETWEEN '${from}' AND '${to}'
-            )
-            OR (
-                NOT EXISTS (
-                    SELECT 1
-                    FROM tender_results tr
-                    WHERE tr.tender_id = ti.id
-                )
-                AND ti.status IN (25, 26, 27, 28)
-                AND ti.created_at BETWEEN '${from}' AND '${to}'
-            )
-      )
-`);
-        // loss OPENING
-        const lostOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND (
-            EXISTS (
-                SELECT 1
-                FROM tender_results tr
-                WHERE tr.tender_id = ti.id
-                  AND tr.status = 'Lost'
-                  AND tr.created_at < '${from}'
-            )
-            OR (
-                NOT EXISTS (
-                    SELECT 1
-                    FROM tender_results tr
-                    WHERE tr.tender_id = ti.id
-                )
-                AND ti.status IN (18, 21, 22, 24)
-                AND ti.created_at < '${from}'
-            )
-      )
-`);
+          )
+    `);
 
-        // DURING → COMPLETED (lost only)
         const lostDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND (
-            EXISTS (
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status = 'Lost'
+                  AND tr.status ILIKE 'lost'
                   AND tr.created_at BETWEEN '${from}' AND '${to}'
-            )
-            OR (
-                NOT EXISTS (
-                    SELECT 1
-                    FROM tender_results tr
-                    WHERE tr.tender_id = ti.id
-                )
-                AND ti.status IN (18, 21, 22, 24)
-                AND ti.created_at BETWEEN '${from}' AND '${to}'
-            )
-      )
-`);
+          )
+    `);
 
-        // loss OPENING
-        const disqualifiedOpening = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-    AND ti.created_at < '${from}'
-    AND EXISTS (
-        SELECT 1 FROM tender_results tr
-        WHERE tr.tender_id = ti.id
-        AND tr.status = 'Disqualified'
-    )
-`);
-
-        // DURING → COMPLETED (disqualified only)
         const disqualifiedDuringCompleted = await exec(`
-    SELECT ti.*
-    FROM tender_infos ti
-    WHERE ${baseWhere()}
-      AND (
-            (
-                ti.status IN (39, 38, 22)
-                AND ti.created_at BETWEEN '${from}' AND '${to}'  -- ✅ apply here
-            )
-            OR EXISTS (
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status = 'Disqualified'
+                  AND tr.status ILIKE 'disqualified'
                   AND tr.created_at BETWEEN '${from}' AND '${to}'
-            )
-      )
-`);
+          )
+    `);
+
+        const resultAwaitedDuringPending = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+          )
+          AND NOT EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+          )
+    `);
+
+        const resultAwaitedClosing = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at <= '${to}'
+          )
+          AND NOT EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND tr.created_at <= '${to}'
+          )
+    `);
+
+        const wonOpening = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND LOWER(TRIM(tr.status)) = 'won'
+                  AND tr.created_at < '${from}'
+          )
+    `);
+
+        const lostOpening = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                  AND LOWER(TRIM(tr.status)) = 'lost'
+                  AND tr.created_at < '${from}'
+          )
+    `);
+
         /* =====================================================
         FINAL RESPONSE
     ===================================================== */
+
+        const wonTotalSet = new Map();
+        [...wonOpening, ...wonDuringCompleted].forEach(t => {
+            wonTotalSet.set(t.id, t);
+        });
+        const wonTotal = Array.from(wonTotalSet.values());
+
+        const lostTotalSet = new Map();
+        [...lostOpening, ...lostDuringCompleted].forEach(t => {
+            lostTotalSet.set(t.id, t);
+        });
+        const lostTotal = Array.from(lostTotalSet.values());
 
         return {
             from: new Date(from),
@@ -1702,10 +1556,10 @@ export class TenderExecutiveService {
                             value: this.sumValue(approvedDuringCompleted),
                             drilldown: this.mapDrilldown(approvedDuringCompleted),
                         },
-                        pending: {
-                            count: approvedDuringPending.length,
-                            value: this.sumValue(approvedDuringPending),
-                            drilldown: this.mapDrilldown(approvedDuringPending),
+                        rejected: {
+                            count: approvedDuringRejected.length,
+                            value: this.sumValue(approvedDuringRejected),
+                            drilldown: this.mapDrilldown(approvedDuringRejected),
                         },
                     },
                 },
@@ -1772,26 +1626,33 @@ export class TenderExecutiveService {
                         value: this.sumValue(resultAwaitedOpening),
                         drilldown: this.mapDrilldown(resultAwaitedOpening),
                     },
+
                     total: {
-                        count: resultAwaitedTotal.length,
-                        value: this.sumValue(resultAwaitedTotal),
-                        drilldown: this.mapDrilldown(resultAwaitedTotal),
+                        count: resultAwaitedClosing.length, // 🔥 closing pending
+                        value: this.sumValue(resultAwaitedClosing),
+                        drilldown: this.mapDrilldown(resultAwaitedClosing),
                     },
+
                     during: {
                         total: {
-                            count: bidDuringCompleted.length,
-                            value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                            // 🔥 bids that entered result stage during period
+                            count: resultAwaitedDuringTotal.length,
+                            value: this.sumValue(resultAwaitedDuringTotal),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringTotal),
                         },
+
                         completed: {
-                            count: resultAwaitedDuringCompleted.length,
-                            value: this.sumValue(resultAwaitedDuringCompleted),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
+                            // 🔥 result received during period
+                            count: wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length,
+                            value: this.sumValue([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
+                            drilldown: this.mapDrilldown([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
                         },
+
                         pending: {
-                            count: disqualifiedDuringCompleted.length,
-                            value: this.sumValue(disqualifiedDuringCompleted),
-                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                            // 🔥 pending during = entered - completed
+                            count: resultAwaitedDuringTotal.length - (wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length),
+                            value: 0,
+                            drilldown: [],
                         },
                     },
                 },
@@ -1803,16 +1664,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown(wonOpening),
                     },
                     total: {
-                        count: wonOpening.length + wonDuringCompleted.length,
-                        value: this.sumValue([...wonOpening, ...wonDuringCompleted]),
-                        drilldown: this.mapDrilldown([...wonOpening, ...wonDuringCompleted]),
+                        count: wonTotal.length,
+                        value: this.sumValue(wonTotal),
+                        drilldown: this.mapDrilldown(wonTotal),
                     },
                     during: {
-                        // total: {
-                        //     count: bidDuringCompleted.length,
-                        //     value: this.sumValue(bidDuringCompleted),
-                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
-                        // },
                         completed: {
                             count: wonDuringCompleted.length,
                             value: this.sumValue(wonDuringCompleted),
@@ -1829,16 +1685,11 @@ export class TenderExecutiveService {
                         drilldown: this.mapDrilldown(lostOpening),
                     },
                     total: {
-                        count: lostOpening.length + lostDuringCompleted.length,
-                        value: this.sumValue([...lostOpening, ...lostDuringCompleted]),
-                        drilldown: this.mapDrilldown([...lostOpening, ...lostDuringCompleted]),
+                        count: lostTotal.length,
+                        value: this.sumValue(lostTotal),
+                        drilldown: this.mapDrilldown(lostTotal),
                     },
                     during: {
-                        // total: {
-                        //     count: bidDuringCompleted.length,
-                        //     value: this.sumValue(bidDuringCompleted),
-                        //     drilldown: this.mapDrilldown(bidDuringCompleted),
-                        // },
                         completed: {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
@@ -1847,32 +1698,6 @@ export class TenderExecutiveService {
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
                 },
-
-                // disqualified: {
-                //     opening: {
-                //         count: disqualifiedOpening.length,
-                //         value: this.sumValue(disqualifiedOpening),
-                //         drilldown: this.mapDrilldown(disqualifiedOpening),
-                //     },
-                //     total: {
-                //         count: disqualifiedOpening.length + disqualifiedDuringCompleted.length,
-                //         value: this.sumValue([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                //         drilldown: this.mapDrilldown([...disqualifiedOpening, ...disqualifiedDuringCompleted]),
-                //     },
-                //     during: {
-                //         total: {
-                //             count: bidDuringCompleted.length,
-                //             value: this.sumValue(bidDuringCompleted),
-                //             drilldown: this.mapDrilldown(bidDuringCompleted),
-                //         },
-                //         completed: {
-                //             count: disqualifiedDuringCompleted.length,
-                //             value: this.sumValue(disqualifiedDuringCompleted),
-                //             drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
-                //         },
-                //         pending: { count: 0, value: 0, drilldown: [] },
-                //     },
-                // },
             },
         };
     }
