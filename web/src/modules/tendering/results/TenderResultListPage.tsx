@@ -11,11 +11,10 @@ import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { useResultDashboard, useResultDashboardCounts } from '@/hooks/api/useTenderResults';
 import type { ResultDashboardRow, ResultDashboardType } from '@/modules/tendering/results/helpers/tenderResult.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -148,11 +147,12 @@ const TenderResultListPage = () => {
 
     const colDefs = useMemo<ColDef<ResultDashboardRow>[]>(
         () => [
-            tenderNameCol<ResultDashboardRow>('tenderNo', {
+            tenderNameCol<ResultDashboardRow>('tenderName', {
+                field: 'tenderName',
+                colId: 'tenderName',
                 headerName: 'Tender',
                 filter: true,
                 width: 250,
-                colId: 'tenderNo',
                 sortable: true,
             }),
             {
@@ -164,31 +164,22 @@ const TenderResultListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            {
+            dateCol<ResultDashboardRow>('bidSubmissionDate', { includeTime: true }, {
                 field: 'bidSubmissionDate',
+                colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
                 width: 150,
-                colId: 'bidSubmissionDate',
-                cellRenderer: (params: any) =>
-                    params.data?.bidSubmissionDate
-                        ? formatDateTime(params.data.bidSubmissionDate)
-                        : '—',
                 sortable: true,
                 filter: true,
-            },
-            {
-                field: 'finalPrice',
-                headerName: 'Final Price',
+            }),
+            currencyCol<ResultDashboardRow>('finalPrice', {
+                field: "finalPrice",
+                colId: "finalPrice",
+                headerName: "Final Price",
+                filter: true,
+                sortable: true,
                 width: 120,
-                colId: 'finalPrice',
-                cellRenderer: (params: any) => {
-                    const value = params.data?.finalPrice || params.data?.tenderValue;
-                    if (!value) return '—';
-                    return formatINR(parseFloat(value));
-                },
-                sortable: true,
-                filter: true,
-            },
+            }),
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
@@ -205,6 +196,11 @@ const TenderResultListPage = () => {
                 colId: 'emdDetails',
                 sortable: true,
                 filter: true,
+                comparator: (valueA: number | null, valueB: number | null): number => {
+                    const numA = valueA ?? 0;
+                    const numB = valueB ?? 0;
+                    return numA - numB;
+                },
                 cellRenderer: (params: any) => {
                     const emd = params.data?.emdDetails;
                     if (!emd) return '—';
