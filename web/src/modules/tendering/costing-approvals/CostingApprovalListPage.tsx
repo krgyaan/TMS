@@ -12,11 +12,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
 import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer, CostingApprovalTab } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
@@ -124,7 +122,9 @@ const CostingApprovalListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingApprovalDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<CostingApprovalDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<CostingApprovalDashboardRowWithTimer>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender',
             filter: true,
             flex: 2,
@@ -140,30 +140,24 @@ const CostingApprovalListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<CostingApprovalDashboardRowWithTimer>('dueDate', { includeTime: true }, {
+            headerName: 'Due Date',
             field: 'dueDate',
             colId: 'dueDate',
-            headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
-            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'emdAmount',
-            colId: 'emdAmount',
-            headerName: 'EMD',
+        }),
+        currencyCol<CostingApprovalDashboardRowWithTimer>('emdAmount', {
+            field: "emdAmount",
+            colId: "emdAmount",
+            headerName: "EMD",
+            filter: true,
+            sortable: true,
             flex: 1,
             minWidth: 100,
-            cellRenderer: (params: any) => {
-                const value = params.data?.emdAmount;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
+        }),
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -173,20 +167,16 @@ const CostingApprovalListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'submittedFinalPrice',
-            colId: 'submittedFinalPrice',
-            headerName: 'TE Final Price',
+        currencyCol<CostingApprovalDashboardRowWithTimer>('submittedFinalPrice', {
+            field: "submittedFinalPrice",
+            colId: "submittedFinalPrice",
+            headerName: "TE Final Price",
             flex: 1,
             minWidth: 130,
-            cellRenderer: (params: any) => {
-                const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
             sortable: true,
             filter: true,
-        },
+
+        }),
         {
             field: 'costingStatus',
             colId: 'costingStatus',
