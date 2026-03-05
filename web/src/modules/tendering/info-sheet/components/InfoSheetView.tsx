@@ -19,6 +19,10 @@ const formatValue = (value?: string | number | null) => {
     return value
 }
 
+function toTitleCase(str: string | number) {
+    return str.toString().toLowerCase().split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
 const formatYesNo = (value?: string | null) => {
     if (!value) return "—"
     return value === "YES" ? "Yes" : value === "NO" ? "No" : value
@@ -341,13 +345,13 @@ export const InfoSheetView = ({
                                         Commercial Evaluation Type
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {formatValue(infoSheet.commercialEvaluation)}
+                                        {toTitleCase(formatValue(infoSheet.commercialEvaluation?.replaceAll('_', ' ')))}
                                     </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         MAF Required
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {formatValue(infoSheet.mafRequired)}
+                                        {toTitleCase(formatValue(infoSheet.mafRequired?.replaceAll('_', ' ')))}
                                     </TableCell>
                                 </TableRow>
                             </>
@@ -494,7 +498,7 @@ export const InfoSheetView = ({
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Company Age (Years)
+                                Eligibility Criterion (Years)
                             </TableCell>
                             <TableCell className="text-sm">
                                 {formatValue(infoSheet.techEligibilityAge)}
@@ -510,11 +514,6 @@ export const InfoSheetView = ({
                         {/* Work Orders */}
                         {(infoSheet.workValueType) && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Eligibility Criteria
-                                    </TableCell>
-                                </TableRow>
                                 {infoSheet.workValueType === 'WORKS_VALUES' && (
                                     <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -573,7 +572,7 @@ export const InfoSheetView = ({
                                             Avg Annual Turnover Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.avgAnnualTurnoverType)}
+                                            {toTitleCase(formatValue(infoSheet.avgAnnualTurnoverType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Avg Annual Turnover Value
@@ -589,7 +588,7 @@ export const InfoSheetView = ({
                                             Working Capital Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.workingCapitalType)}
+                                            {toTitleCase(formatValue(infoSheet.workingCapitalType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Working Capital Value
@@ -605,7 +604,7 @@ export const InfoSheetView = ({
                                             Solvency Certificate Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.solvencyCertificateType)}
+                                            {toTitleCase(formatValue(infoSheet.solvencyCertificateType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Solvency Certificate Value
@@ -621,7 +620,7 @@ export const InfoSheetView = ({
                                             Net Worth Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.netWorthType)}
+                                            {toTitleCase(formatValue(infoSheet.netWorthType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Net Worth Value
