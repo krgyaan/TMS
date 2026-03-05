@@ -4,7 +4,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 
 // Helper function to map document IDs to names
@@ -161,7 +160,7 @@ export function TenderApprovalView({
                                     Tender Approval Status
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {approval.tlStatus}
+                                    {approval.tlStatus == 1 ? 'Approved' : approval.tlStatus == 2 ? 'Rejected' : approval.tlStatus == 3 ? 'Incomplete' : 'Pending'}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -189,11 +188,11 @@ export function TenderApprovalView({
                                         RFQ To (Vendor Organizations)
                                     </TableCell>
                                     <TableCell className="text-sm" colSpan={3}>
-                                        {approval.rfqTo && approval.rfqTo.length > 0 ? (
+                                        {approval.rfqTo?.length ? (
                                             <div className="flex flex-wrap gap-2">
-                                                {approval.rfqTo.map((vendorId) => (
-                                                    <Badge key={vendorId} variant="outline">
-                                                        Vendor ID: {vendorId}
+                                                {approval.rfqTo.map((vendor) => (
+                                                    <Badge key={vendor.name} variant="outline">
+                                                        {vendor.name}
                                                     </Badge>
                                                 ))}
                                             </div>
@@ -349,27 +348,6 @@ export function TenderApprovalView({
                                 ))}
                             </>
                         )}
-
-                        {/* Timestamps */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Timeline
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Created At
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatDateTime(approval.createdAt)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Last Updated
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatDateTime(approval.updatedAt)}
-                            </TableCell>
-                        </TableRow>
                     </TableBody>
                 </Table>
             </CardContent>

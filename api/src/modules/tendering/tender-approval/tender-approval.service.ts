@@ -24,7 +24,6 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
-import { bidSubmissions, organizations, tenderResults } from '@/db/schemas';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -69,9 +68,6 @@ export class TenderApprovalService {
         private readonly tenderInfoSheetsService: TenderInfoSheetsService,
     ) { }
 
-    /**
-     * Build role-based filter conditions for tender queries
-     */
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
 
@@ -105,28 +101,29 @@ export class TenderApprovalService {
         return roleFilterConditions;
     }
 
-    private getDefaultSortByCategory(category?: string): SQL<unknown> {
-        switch (category) {
-            case 'did-not-bid':
+    private getDefaultSortByTab(tab: string): SQL<unknown> {
+        switch (tab) {
+            case "pending":
+                // Soonest due date first, NULLs last
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+
+            case "accepted":
+                // Latest due date first (most recently due accepted tenders)
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
-            case 'tenders-bid':
-                return sql`${bidSubmissions.submissionDatetime} DESC NULLS LAST`;
+            case "rejected":
+                // Latest due date first (most recently due rejected tenders)
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
-            case 'tender-won':
-                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
-
-            case 'tender-lost':
-                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+            case "tender-dnb":
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
             default:
                 return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
         }
     }
 
-    /**
-     * Get dashboard data by tab
-     */
     async getDashboardData(
         user?: ValidatedUser,
         teamId?: number,
@@ -185,55 +182,43 @@ export class TenderApprovalService {
         const allConditions = [...baseConditions, ...tabConditions];
         const whereClause = and(...allConditions);
 
-        // Build orderBy clause
+        // Build orderBy clause based on tab
         let orderByClause: SQL<unknown>;
 
         if (filters?.sortBy) {
-            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
-
+            // User-specified sorting takes priority
+            const sortFn = filters.sortOrder === "desc" ? desc : asc;
             switch (filters.sortBy) {
-                case 'dueDate':
-                    orderByClause = sortFn(tenderInfos.dueDate);
-                    break;
-                case 'gstValues':
-                    orderByClause = sortFn(tenderInfos.gstValues);
-                    break;
-                case 'tenderFees':
-                    orderByClause = sortFn(tenderInfos.tenderFees);
-                    break;
-                case 'emd':
-                    orderByClause = sortFn(tenderInfos.emd);
-                    break;
-                case 'tenderNo':
+                case "tenderNo":
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
-                case 'tenderName':
+                case "tenderName":
                     orderByClause = sortFn(tenderInfos.tenderName);
                     break;
-                case 'teamMemberName':
+                case "teamMemberName":
                     orderByClause = sortFn(users.name);
                     break;
-                case 'statusName':
-                    orderByClause = sortFn(statuses.name);
+                case "dueDate":
+                    orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'itemName':
+                case "gstValues":
+                    orderByClause = sortFn(tenderInfos.gstValues);
+                    break;
+                case "itemName":
                     orderByClause = sortFn(items.name);
                     break;
-                case 'organizationName':
-                    orderByClause = sortFn(organizations.name);
+                case "statusName":
+                    orderByClause = sortFn(statuses.name);
                     break;
-                case 'resultDate':
-                    orderByClause = sortFn(tenderResults.resultUploadedAt);
-                    break;
-                case 'submissionDate':
-                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                case "tlStatus":
+                    orderByClause = sortFn(tenderInfos.tlStatus);
                     break;
                 default:
-                    orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
+                    orderByClause = this.getDefaultSortByTab(activeTab);
             }
         } else {
-            // Default sorting based on category
-            orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
+            // Default sorting based on tab
+            orderByClause = this.getDefaultSortByTab(activeTab);
         }
 
         // Build query
@@ -367,12 +352,21 @@ export class TenderApprovalService {
 
         const data = result[0];
 
-        const rfqToArray = data.rfqTo
-            ? data.rfqTo
+        let vendorOrganizationNames: { name: string }[] = [];
+
+        if (data.rfqTo) {
+            const vendorOrganizationIds = (data.rfqTo ?? "")
                 .split(",")
-                .map(Number)
-                .filter(n => !isNaN(n))
-            : [];
+                .map(id => parseInt(id.trim(), 10))
+                .filter(id => Number.isInteger(id) && id > 0);
+
+            if (vendorOrganizationIds.length > 0) {
+                vendorOrganizationNames = await this.db
+                    .select({ name: vendorOrganizations.name })
+                    .from(vendorOrganizations)
+                    .where(inArray(vendorOrganizations.id, vendorOrganizationIds));
+            }
+        }
 
         // Parse quotationFiles from JSON string if present
         let quotationFilesArray: string[] = [];
@@ -398,7 +392,7 @@ export class TenderApprovalService {
 
         return {
             ...data,
-            rfqTo: rfqToArray,
+            rfqTo: vendorOrganizationNames,
             quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
         };

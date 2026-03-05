@@ -40,7 +40,7 @@ export interface TenderApproval {
     tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no" | null;
     quotationFiles?: string[] | null;
-    rfqTo: number[] | null;
+    rfqTo: string[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
