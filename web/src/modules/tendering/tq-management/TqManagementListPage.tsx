@@ -12,9 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import QualificationDialog from './components/QualificationDialog';
 import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
@@ -33,9 +32,9 @@ const TqManagementListPage = () => {
     const [tqQualifiedDialogOpen, setTqQualifiedDialogOpen] = useState(false);
     const [pendingTenderId, setPendingTenderId] = useState<number | null>(null);
     const [pendingTqId, setPendingTqId] = useState<number | null>(null);
-    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({ 
-        open: false, 
-        tenderId: null 
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
     });
     const navigate = useNavigate();
 
@@ -241,11 +240,12 @@ const TqManagementListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<TqManagementDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<TqManagementDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<TqManagementDashboardRowWithTimer>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender',
             filter: true,
             width: 200,
-            colId: 'tenderNo',
             sortable: true,
         }),
         {
@@ -257,15 +257,14 @@ const TqManagementListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<TqManagementDashboardRowWithTimer>('bidSubmissionDate', { includeTime: true }, {
             field: 'bidSubmissionDate',
+            colId: 'bidSubmissionDate',
             headerName: 'Bid Submission',
             width: 150,
-            colId: 'bidSubmissionDate',
-            cellRenderer: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
-        },
+        }),
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -275,15 +274,14 @@ const TqManagementListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<TqManagementDashboardRowWithTimer>('tqSubmissionDeadline', { includeTime: true }, {
             field: 'tqSubmissionDeadline',
+            colId: 'tqSubmissionDeadline',
             headerName: 'TQ Deadline',
             width: 150,
-            colId: 'tqSubmissionDeadline',
-            cellRenderer: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
-        },
+        }),
         {
             field: 'tqStatus',
             headerName: 'TQ Status',
@@ -340,12 +338,12 @@ const TqManagementListPage = () => {
             },
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(tqManagementActions),
             sortable: false,
             pinned: 'right',
-            width: 80,
+            width: 57,
         },
     ], [tqManagementActions]);
 
