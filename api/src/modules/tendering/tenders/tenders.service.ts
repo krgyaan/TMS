@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, notInArray, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, notInArray, sql, desc, asc, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos, type TenderInfo, type NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
@@ -110,6 +110,25 @@ export class TenderInfosService {
             resultDate: row.resultDate ? new Date(row.resultDate) : null,
         };
     };
+
+    private getDefaultSortByCategory(category?: string): SQL<unknown> {
+        switch (category) {
+            case 'did-not-bid':
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case 'tenders-bid':
+                return sql`${bidSubmissions.submissionDatetime} DESC NULLS LAST`;
+
+            case 'tender-won':
+                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+
+            case 'tender-lost':
+                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
 
     async exists(id: number): Promise<boolean> {
         const [result] = await this.db
@@ -450,10 +469,11 @@ export class TenderInfosService {
         const total = Number(countResult?.count || 0);
 
         // 3. Determine sorting
-        let orderByClause = desc(tenderInfos.dueDate); // Default sort
+        let orderByClause: SQL<unknown>;
 
         if (filters?.sortBy) {
             const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+
             switch (filters.sortBy) {
                 case 'dueDate':
                     orderByClause = sortFn(tenderInfos.dueDate);
@@ -485,9 +505,18 @@ export class TenderInfosService {
                 case 'organizationName':
                     orderByClause = sortFn(organizations.name);
                     break;
+                case 'resultDate':
+                    orderByClause = sortFn(tenderResults.resultUploadedAt);
+                    break;
+                case 'submissionDate':
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
+                    break;
                 default:
-                    orderByClause = sortFn(tenderInfos.dueDate);
+                    orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
             }
+        } else {
+            // Default sorting based on category
+            orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
         }
 
         // 4. Get Data (Paginated) - Sort BEFORE pagination
