@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
-import { tenderNameCol } from "@/components/data-grid/columns";
+import { currencyCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
@@ -174,7 +174,7 @@ const TenderListPage = () => {
     ];
 
     const [colDefs] = useState<ColDef<TenderWithTimer>[]>([
-        tenderNameCol<TenderInfoWithNames>('tenderNo', {
+        tenderNameCol<TenderInfoWithNames>('tenderName', {
             headerName: 'Tender Details',
             filter: true,
             width: 250,
@@ -188,33 +188,30 @@ const TenderListPage = () => {
                 return <span title={data?.teamMemberUsername}>{value ? value : <b className="text-gray-400">Unassigned</b>}</span>;
             },
         },
-        {
+        currencyCol<TenderInfoWithNames>('gstValues', {
             field: "gstValues",
             colId: "gstValues",
-            headerName: "Tender Value",
+            headerName: 'Tender Value',
             filter: true,
             sortable: true,
             width: 130,
-            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
-        },
-        {
+        }),
+        currencyCol<TenderInfoWithNames>('tenderFees', {
             field: "tenderFees",
             colId: "tenderFees",
-            headerName: "Tender Fee",
+            headerName: 'Tender Fee',
             filter: true,
             sortable: true,
             width: 120,
-            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
-        },
-        {
+        }),
+        currencyCol<TenderInfoWithNames>('emd', {
             field: "emd",
             colId: "emd",
             headerName: "EMD",
             filter: true,
             sortable: true,
             width: 100,
-            cellRenderer: (p: { value: number | null | undefined }) => formatINR(p.value ?? 0),
-        },
+        }),
         {
             field: "dueDate",
             colId: "dueDate",
