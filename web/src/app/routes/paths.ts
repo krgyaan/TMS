@@ -88,11 +88,11 @@ export const paths = {
         requestExtension: "/tendering/request-extension",
         requestExtensionCreate: (tenderId: number) => `/tendering/request-extension/${tenderId}/create`,
         requestExtensionEdit: (tenderId: number, id: number) => `/tendering/request-extension/${tenderId}/edit/${id}`,
-        requestExtensionView: (id: number) => `/tendering/request-extension/view/${id}`,
+        requestExtensionView: (tenderId: number, id: number) => `/tendering/request-extension/${tenderId}/view/${id}`,
         submitQuery: "/tendering/submit-queries",
-        submitQueryCreate: (tenderId: number) => `/tendering/submit-query/${tenderId}/create`,
-        submitQueryEdit: (tenderId: number, id: number) => `/tendering/submit-query/${tenderId}/edit/${id}`,
-        submitQueryView: (tenderId: number, id: number) => `/tendering/submit-query/${tenderId}/view/${id}`,
+        submitQueryCreate: (tenderId: number) => `/tendering/submit-queries/${tenderId}/create`,
+        submitQueryEdit: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/edit/${id}`,
+        submitQueryView: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/view/${id}`,
     },
 
     // ==================== OPERATIONS ====================

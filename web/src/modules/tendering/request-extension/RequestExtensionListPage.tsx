@@ -55,7 +55,7 @@ const RequestExtensionListPage = () => {
         () => [
             {
                 label: 'View',
-                onClick: (row) => navigate(paths.tendering.requestExtensionView(row.id)),
+                onClick: (row) => navigate(paths.tendering.requestExtensionView(row.tenderId, row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
