@@ -1,21 +1,14 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import {
-    physicalDocs,
-    physicalDocsPersons,
-    type NewPhysicalDocs,
+import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs,
 } from '@db/schemas/tendering/physical-docs.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
-import type {
-    CreatePhysicalDocDto,
-    UpdatePhysicalDocDto,
-} from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { items } from '@db/schemas/master/items.schema';
@@ -123,6 +116,25 @@ export class PhysicalDocsService {
         return roleFilterConditions;
     }
 
+    private getDefaultSortByTab(tab: string): SQL<unknown> {
+        switch (tab) {
+            case 'pending':
+                // Soonest due date first, NULLs last
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+
+            case 'sent':
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case 'tender-dnb':
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
+
     /**
      * Get dashboard data by tab - Refactored to use config
      */
@@ -142,7 +154,6 @@ export class PhysicalDocsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             inArray(tenderInformation.physicalDocsRequired, ['Yes', 'YES']),
         ];
 
@@ -169,7 +180,7 @@ export class PhysicalDocsService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Add search conditions - search across all rendered columns
+        // Add search conditions
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
             const searchConditions: any[] = [
@@ -189,22 +200,12 @@ export class PhysicalDocsService {
         const whereClause = and(...conditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : activeTab === 'sent' ? 'desc' : 'desc');
-        let orderByClause: any = asc(tenderInfos.dueDate);
+        let orderByClause: SQL<unknown>;
 
-        // Set default sort based on tab if no sortBy specified
-        if (!sortBy) {
-            if (activeTab === 'pending') {
-                orderByClause = asc(tenderInfos.dueDate);
-            } else if (activeTab === 'sent') {
-                orderByClause = desc(physicalDocs.createdAt);
-            } else if (activeTab === 'tender-dnb') {
-                orderByClause = desc(tenderInfos.updatedAt);
-            }
-        } else {
-            const sortFn = sortOrder === 'desc' ? desc : asc;
-            switch (sortBy) {
+        if (filters?.sortBy) {
+            // User-specified sorting takes priority
+            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
                 case 'tenderNo':
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
@@ -217,18 +218,21 @@ export class PhysicalDocsService {
                 case 'dueDate':
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'dispatchDate':
-                    orderByClause = sortFn(physicalDocs.createdAt);
+                case 'physicalDocsDeadline':
+                    orderByClause = sortFn(tenderInformation.physicalDocsDeadline);
                     break;
-                case 'statusChangeDate':
-                    orderByClause = sortFn(tenderInfos.updatedAt);
+                case 'courierDate':
+                    orderByClause = sortFn(physicalDocs.createdAt);
                     break;
                 case 'statusName':
                     orderByClause = sortFn(statuses.name);
                     break;
                 default:
-                    orderByClause = sortFn(tenderInfos.dueDate);
+                    orderByClause = this.getDefaultSortByTab(activeTab);
             }
+        } else {
+            // Default sorting based on tab
+            orderByClause = this.getDefaultSortByTab(activeTab);
         }
 
         // Get total count
