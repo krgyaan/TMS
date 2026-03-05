@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray, SQL } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -126,9 +126,38 @@ export class RfqsService {
         return roleFilterConditions;
     }
 
-    /**
-     * Get RFQ Dashboard data - Refactored to use dashboard config
-     */
+    private getDefaultSortByRfqTab(tab: string): SQL<unknown> {
+        switch (tab) {
+            case "pending":
+                // Soonest due date first, NULLs last
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+
+            case "sent":
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case "responses":
+                // Latest response received first
+                return sql`(
+                    SELECT MAX(${rfqResponses.receiptDatetime})
+                    FROM ${rfqResponses}
+                    JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id}
+                    WHERE ${rfqs.tenderId} = ${tenderInfos.id}
+                ) DESC NULLS LAST`;
+
+            case "rfq-rejected":
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case "tender-dnb":
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
+
     async getRfqData(
         user?: ValidatedUser,
         teamId?: number,
@@ -201,22 +230,12 @@ export class RfqsService {
         const whereClause = and(...conditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || (activeTab === "pending" ? "asc" : "desc");
-        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+        let orderByClause: SQL<unknown>;
 
-        // Set default sort based on tab if no sortBy specified
-        if (!sortBy) {
-            if (activeTab === "pending") {
-                orderByClause = asc(tenderInfos.dueDate);
-            } else if (activeTab === "sent") {
-                orderByClause = desc(tenderInfos.dueDate);
-            } else if (activeTab === "rfq-rejected" || activeTab === "tender-dnb") {
-                orderByClause = desc(tenderInfos.updatedAt);
-            }
-        } else {
-            const sortFn = sortOrder === "desc" ? desc : asc;
-            switch (sortBy) {
+        if (filters?.sortBy) {
+            // User-specified sorting takes priority
+            const sortFn = filters.sortOrder === "desc" ? desc : asc;
+            switch (filters.sortBy) {
                 case "tenderNo":
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
@@ -229,12 +248,24 @@ export class RfqsService {
                 case "dueDate":
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case "statusChangeDate":
-                    orderByClause = sortFn(tenderInfos.updatedAt);
+                case "responseDate":
+                    // Sort by latest response date
+                    orderByClause = sql`(
+                        SELECT MAX(${rfqResponses.createdAt})
+                        FROM ${rfqResponses}
+                        JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id}
+                        WHERE ${rfqs.tenderId} = ${tenderInfos.id}
+                    ) ${filters.sortOrder === "desc" ? sql`DESC NULLS LAST` : sql`ASC NULLS LAST`}`;
+                    break;
+                case "statusName":
+                    orderByClause = sortFn(statuses.name);
                     break;
                 default:
-                    orderByClause = sortFn(tenderInfos.dueDate);
+                    orderByClause = this.getDefaultSortByRfqTab(activeTab);
             }
+        } else {
+            // Default sorting based on tab
+            orderByClause = this.getDefaultSortByRfqTab(activeTab);
         }
 
         // Get total count
