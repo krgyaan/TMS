@@ -12,10 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmissionDashboardRow } from '@/hooks/api/useBidSubmissions';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import type { BidSubmissionDashboardRowWithTimer } from './helpers/bidSubmission.types';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -152,7 +150,9 @@ const BidSubmissionListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<BidSubmissionDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<BidSubmissionDashboardRow>('tenderNo', {
+        tenderNameCol<BidSubmissionDashboardRow>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender',
             filter: true,
             width: 200,
@@ -166,41 +166,30 @@ const BidSubmissionListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<BidSubmissionDashboardRow>('dueDate', { includeTime: true }, {
             field: 'dueDate',
             colId: 'dueDate',
             headerName: 'Due Date & Time',
             width: 160,
-            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'emdAmount',
-            colId: 'emdAmount',
-            headerName: 'EMD',
+        }),
+        currencyCol<BidSubmissionDashboardRow>('emdAmount', {
+            field: "emdAmount",
+            colId: "emdAmount",
+            headerName: "EMD",
+            filter: true,
+            sortable: true,
             width: 120,
-            cellRenderer: (params: any) => {
-                const value = params.data?.emdAmount;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
+        }),
+        currencyCol<BidSubmissionDashboardRow>('finalCosting', {
+            field: "finalCosting",
+            colId: "finalCosting",
+            headerName: "Final Costing",
             filter: true,
-        },
-        {
-            field: 'finalCosting',
-            colId: 'finalCosting',
-            headerName: 'Final Costing',
+            sortable: true,
             width: 130,
-            cellRenderer: (params: any) => {
-                const value = params.data?.finalCosting;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
+        }),
         {
             field: 'statusName',
             colId: 'statusName',
@@ -254,12 +243,12 @@ const BidSubmissionListPage = () => {
             },
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(bidSubmissionActions),
             sortable: false,
             pinned: 'right',
-            width: 80,
+            width: 57,
         },
     ], [bidSubmissionActions]);
 
