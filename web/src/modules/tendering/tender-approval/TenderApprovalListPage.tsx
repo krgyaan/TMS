@@ -15,7 +15,7 @@ import { AlertCircle, CheckCircle, Eye, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { toast } from 'sonner';
-import { tenderNameCol } from '@/components/data-grid';
+import { currencyCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
@@ -138,11 +138,11 @@ const TenderApprovalListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<TenderApprovalWithTimer>[]>(() => [
-        tenderNameCol<TenderApprovalWithTimer>('tenderNo', {
+        tenderNameCol<TenderApprovalWithTimer>('tenderName', {
             headerName: 'Tender Details',
             filter: true,
             width: 250,
-            colId: 'tenderNo',
+            colId: 'tenderName',
             sortable: true,
         }),
         {
@@ -156,7 +156,7 @@ const TenderApprovalListPage = () => {
         },
         {
             field: 'dueDate',
-            headerName: 'Due Date/Time',
+            headerName: 'Due Date Time',
             width: 150,
             colId: 'dueDate',
             cellRenderer: (params: any) => {
@@ -166,32 +166,22 @@ const TenderApprovalListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'gstValues',
+        currencyCol<TenderApprovalWithTimer>('gstValues', {
+            field: "gstValues",
+            colId: "gstValues",
             headerName: 'Tender Value',
+            filter: true,
+            sortable: true,
             width: 130,
-            colId: 'gstValues',
-            cellRenderer: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
+        }),
+        currencyCol<TenderApprovalWithTimer>('emd', {
+            field: "emd",
+            colId: "emd",
+            headerName: "EMD",
             filter: true,
-        },
-        {
-            field: 'emd',
-            headerName: 'EMD',
+            sortable: true,
             width: 100,
-            colId: 'emd',
-            cellRenderer: (params: any) => {
-                const value = params.data?.emd;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
+        }),
         {
             field: 'statusName',
             headerName: 'Status',

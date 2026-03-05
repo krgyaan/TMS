@@ -13,7 +13,6 @@ import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw, Clock } from "lu
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { currencyCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
@@ -175,6 +174,8 @@ const TenderListPage = () => {
 
     const [colDefs] = useState<ColDef<TenderWithTimer>[]>([
         tenderNameCol<TenderInfoWithNames>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender Details',
             filter: true,
             width: 250,
