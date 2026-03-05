@@ -6,6 +6,7 @@ export interface FrontendTimerData {
     remainingSeconds: number;
     status: FrontendTimerStatus;
     stepName: string;
+    deadline?: Date | null;
 }
 
 export function transformTimerForFrontend(timer: TimerWithComputed | null, defaultStage?: string): FrontendTimerData {
@@ -50,6 +51,7 @@ export function transformTimerForFrontend(timer: TimerWithComputed | null, defau
     return {
         remainingSeconds,
         status,
-        stepName: timer.stage
+        stepName: timer.stage,
+        deadline: timer.deadlineAt || null,
     };
 }

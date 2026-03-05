@@ -262,6 +262,7 @@ const TenderListPage = () => {
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data.timer;
+                console.log("Rendering timer for tender", data.tenderName, "with timer", timer);
 
                 if (!timer) {
                     return <TenderTimerDisplay
@@ -273,6 +274,7 @@ const TenderListPage = () => {
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
                         status={timer.status}
+                        deadline={timer.deadline}
                     />
                 );
             },

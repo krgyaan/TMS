@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCircle } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface TenderTimerDisplayProps {
     remainingSeconds: number;
     status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE';
-    deadline?: string;
+    deadline?: Date | null; // Required for accurate overdue calculation
 }
 
 export const TenderTimerDisplay = ({
@@ -13,20 +13,16 @@ export const TenderTimerDisplay = ({
     status,
     deadline
 }: TenderTimerDisplayProps) => {
-    // Treat OVERDUE as still running
     const isActiveTimer = status === 'RUNNING' || status === 'OVERDUE';
-    const [timeLeft, setTimeLeft] = useState(remainingSeconds);
-    const startTimeRef = useRef<number>(Date.now());
-    const initialTimeRef = useRef<number>(remainingSeconds);
+    const [displaySeconds, setDisplaySeconds] = useState(0);
+    const [isOverdue, setIsOverdue] = useState(false);
 
     // Format time as HH:MM:SS
     const formatTime = (seconds: number) => {
         const absSeconds = Math.abs(Math.floor(seconds));
-
         const hours = Math.floor(absSeconds / 3600);
         const minutes = Math.floor((absSeconds % 3600) / 60);
         const secs = absSeconds % 60;
-
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     };
 
@@ -37,75 +33,86 @@ export const TenderTimerDisplay = ({
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     };
 
-    // Calculate time from deadline if available
-    useEffect(() => {
-        if (deadline && isActiveTimer) {
-            const deadlineTime = new Date(deadline).getTime();
-            const now = Date.now();
-            const calculatedRemaining = Math.floor((deadlineTime - now) / 1000);
-            setTimeLeft(calculatedRemaining);
-            initialTimeRef.current = calculatedRemaining;
-            startTimeRef.current = now;
-        } else {
-            setTimeLeft(remainingSeconds);
-            initialTimeRef.current = remainingSeconds;
-            startTimeRef.current = Date.now();
+    // Calculate time based on deadline
+    const calculateTime = () => {
+        if (!deadline) {
+            return {
+                seconds: remainingSeconds,
+                overdue: remainingSeconds < 0
+            };
         }
-    }, [remainingSeconds, deadline, isActiveTimer]);
 
-    // Countdown/Countup effect
+        const now = Date.now();
+        const deadlineTime = new Date(deadline).getTime();
+        const diff = deadlineTime - now;
+        const seconds = Math.floor(diff / 1000);
+
+        return {
+            seconds: Math.abs(seconds),
+            overdue: diff < 0
+        };
+    };
+
+    // Initial calculation and interval setup
     useEffect(() => {
-        if (!isActiveTimer) return;
+        if (!isActiveTimer) {
+            // For non-active timers, just use remainingSeconds
+            setDisplaySeconds(Math.abs(remainingSeconds));
+            setIsOverdue(remainingSeconds < 0);
+            return;
+        }
 
+        // Calculate immediately
+        const { seconds, overdue } = calculateTime();
+        setDisplaySeconds(seconds);
+        setIsOverdue(overdue);
+
+        // Update every second
         const intervalId = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-            const newTimeLeft = initialTimeRef.current - elapsed;
-            setTimeLeft(newTimeLeft);
+            const { seconds, overdue } = calculateTime();
+            setDisplaySeconds(seconds);
+            setIsOverdue(overdue);
         }, 1000);
 
         return () => clearInterval(intervalId);
-    }, [isActiveTimer]);
-
-    const isOverdue = timeLeft < 0;
-    // Convert negative time to positive for stopwatch display
-    const overdueSeconds = Math.abs(timeLeft);
+    }, [deadline, remainingSeconds, isActiveTimer]);
 
     const getDisplay = () => {
         if (isActiveTimer) {
             if (isOverdue) {
-                // OVERDUE: Show as stopwatch counting UP in red
+                // OVERDUE: Stopwatch counting UP from deadline
+                // Shows how long past the deadline (now - deadline_at)
                 return (
                     <Badge
-                        variant="outline"
-                        className="font-mono border-destructive text-destructive"
+                        variant="secondary"
+                        className="text-destructive font-mono"
                     >
-                        {formatTime(overdueSeconds)}
+                        {formatTime(displaySeconds)}
                     </Badge>
                 );
             }
 
-            // Normal countdown
+            // Normal countdown: time remaining until deadline
             return (
                 <Badge variant="outline" className="text-emerald-400 font-mono">
-                    {formatTime(timeLeft)}
+                    {formatTime(displaySeconds)}
                 </Badge>
             );
         }
 
         switch (status) {
             case 'COMPLETED':
-                const completedOverdue = remainingSeconds < 0;
                 return (
-                    <Badge variant={completedOverdue ? "destructive" : "success"}>
+                    <Badge variant={isOverdue ? "destructive" : "success"}>
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        {completedOverdue ? '+' : ''}{formatShortTime(remainingSeconds)}
+                        {isOverdue ? '+' : ''}{formatShortTime(displaySeconds)}
                     </Badge>
                 );
             case 'PAUSED':
                 return (
                     <Badge variant="secondary">
                         <Clock className="w-3 h-3 mr-1" />
-                        {formatShortTime(timeLeft)}
+                        {formatShortTime(displaySeconds)}
                     </Badge>
                 );
             default:
