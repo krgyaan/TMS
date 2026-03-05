@@ -10,11 +10,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, Calendar, Upload, FileX2, Clock, CheckCircle2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { useReverseAuctionDashboard, useReverseAuctionDashboardCounts } from '@/hooks/api/useReverseAuctions';
 import type { RaDashboardRow, RaDashboardTab } from '@/modules/tendering/ras/helpers/reverseAuction.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -188,7 +186,9 @@ const ReverseAuctionListPage = () => {
 
     const colDefs = useMemo<ColDef<RaDashboardRow>[]>(
         () => [
-            tenderNameCol<RaDashboardRow>('tenderNo', {
+            tenderNameCol<RaDashboardRow>('tenderName', {
+                field: 'tenderName',
+                colId: 'tenderName',
                 headerName: 'Tender',
                 filter: true,
                 width: 200,
@@ -201,19 +201,14 @@ const ReverseAuctionListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            {
+            currencyCol<RaDashboardRow>('tenderValue', {
                 field: 'tenderValue',
                 colId: 'tenderValue',
                 headerName: 'Tender Value',
                 width: 130,
-                cellRenderer: (params: any) => {
-                    const value = params.data?.tenderValue;
-                    if (!value) return '—';
-                    return formatINR(parseFloat(value));
-                },
                 sortable: true,
                 filter: true,
-            },
+            }),
             {
                 field: 'tenderStatus',
                 colId: 'tenderStatus',
@@ -223,38 +218,30 @@ const ReverseAuctionListPage = () => {
                 sortable: true,
                 filter: true,
             },
-            {
+            dateCol<RaDashboardRow>('bidSubmissionDate', { includeTime: true }, {
                 field: 'bidSubmissionDate',
                 colId: 'bidSubmissionDate',
                 headerName: 'Bid Submission',
                 width: 150,
-                cellRenderer: (params: any) =>
-                    params.data?.bidSubmissionDate
-                        ? formatDateTime(params.data.bidSubmissionDate)
-                        : '—',
                 sortable: true,
                 filter: true,
-            },
-            {
+            }),
+            dateCol<RaDashboardRow>('raStartTime', { includeTime: true }, {
                 field: 'raStartTime',
                 colId: 'raStartTime',
                 headerName: 'RA Start Time',
                 width: 150,
-                cellRenderer: (params: any) =>
-                    params.data?.raStartTime ? formatDateTime(params.data.raStartTime) : '—',
                 sortable: true,
                 filter: true,
-            },
-            {
+            }),
+            dateCol<RaDashboardRow>('raEndTime', { includeTime: true }, {
                 field: 'raEndTime',
                 colId: 'raEndTime',
                 headerName: 'RA End Time',
                 width: 150,
-                cellRenderer: (params: any) =>
-                    params.data?.raEndTime ? formatDateTime(params.data.raEndTime) : '—',
                 sortable: true,
                 filter: true,
-            },
+            }),
             {
                 field: 'raStatus',
                 colId: 'raStatus',
@@ -269,12 +256,12 @@ const ReverseAuctionListPage = () => {
                 },
             },
             {
-                headerName: 'Actions',
+                headerName: '',
                 filter: false,
                 cellRenderer: createActionColumnRenderer(raActions),
                 sortable: false,
                 pinned: 'right',
-                width: 80,
+                width: 57,
             },
         ],
         [raActions, activeTab]
