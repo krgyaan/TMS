@@ -19,6 +19,7 @@ import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { bidSubmissions, tenderResults } from '@/db/schemas';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -89,6 +90,8 @@ export class TenderInfosService {
         organizations: { name: string | null; acronym: string | null } | null;
         locations: { name: string | null; state: string | null } | null;
         websites: { name: string | null; url: string | null } | null;
+        bidSubmissionsDate?: Date | null;
+        resultDate?: Date | null;
     }): TenderInfoWithNames => {
         const t = row.tenderInfos;
         return {
@@ -103,6 +106,8 @@ export class TenderInfosService {
             locationState: row.locations?.state ?? null,
             websiteName: row.websites?.name ?? null,
             websiteLink: row.websites?.url ?? null,
+            bidSubmissionDate: row.bidSubmissionsDate ? new Date(row.bidSubmissionsDate) : null,
+            resultDate: row.resultDate ? new Date(row.resultDate) : null,
         };
     };
 
@@ -336,6 +341,8 @@ export class TenderInfosService {
                 name: websites.name,
                 url: websites.url,
             },
+            bidSubmissionDate: bidSubmissions.submissionDatetime,
+            resultDate: tenderResults.resultUploadedAt,
         };
     }
 
@@ -348,6 +355,8 @@ export class TenderInfosService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
             .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .leftJoin(websites, eq(websites.id, tenderInfos.website));
     }
 
@@ -441,7 +450,7 @@ export class TenderInfosService {
         const total = Number(countResult?.count || 0);
 
         // 3. Determine sorting
-        let orderByClause = desc(tenderInfos.createdAt); // Default sort
+        let orderByClause = desc(tenderInfos.dueDate); // Default sort
 
         if (filters?.sortBy) {
             const sortFn = filters.sortOrder === 'desc' ? desc : asc;
@@ -477,7 +486,7 @@ export class TenderInfosService {
                     orderByClause = sortFn(organizations.name);
                     break;
                 default:
-                    orderByClause = sortFn(tenderInfos.createdAt);
+                    orderByClause = sortFn(tenderInfos.dueDate);
             }
         }
 
@@ -498,6 +507,8 @@ export class TenderInfosService {
                 organizations: row.organizations,
                 locations: row.locations,
                 websites: row.websites,
+                bidSubmissionsDate: row.bidSubmissionDate,
+                resultDate: row.resultDate,
             })
         );
 

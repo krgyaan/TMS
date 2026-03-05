@@ -3,7 +3,7 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc, sql, or, inArray, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, or, inArray, isNull, SQL } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -24,6 +24,7 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { bidSubmissions, organizations, tenderResults } from '@/db/schemas';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -104,6 +105,25 @@ export class TenderApprovalService {
         return roleFilterConditions;
     }
 
+    private getDefaultSortByCategory(category?: string): SQL<unknown> {
+        switch (category) {
+            case 'did-not-bid':
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case 'tenders-bid':
+                return sql`${bidSubmissions.submissionDatetime} DESC NULLS LAST`;
+
+            case 'tender-won':
+                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+
+            case 'tender-lost':
+                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
+
     /**
      * Get dashboard data by tab
      */
@@ -166,50 +186,54 @@ export class TenderApprovalService {
         const whereClause = and(...allConditions);
 
         // Build orderBy clause
-        const sortBy =
-            filters?.sortBy || (activeTab === "pending" ? "dueDate" : activeTab === "accepted" ? "approvalDate" : activeTab === "rejected" ? "rejectionDate" : "statusChangeDate");
-        const sortOrder = filters?.sortOrder || (activeTab === "pending" ? "asc" : "desc");
-        let orderByClause: any = asc(tenderInfos.dueDate); // Default
+        let orderByClause: SQL<unknown>;
 
-        if (sortBy) {
-            const sortFn = sortOrder === "desc" ? desc : asc;
-            switch (sortBy) {
-                case "tenderNo":
-                    orderByClause = sortFn(tenderInfos.tenderNo);
-                    break;
-                case "tenderName":
-                    orderByClause = sortFn(tenderInfos.tenderName);
-                    break;
-                case "teamMemberName":
-                    orderByClause = sortFn(users.name);
-                    break;
-                case "dueDate":
+        if (filters?.sortBy) {
+            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+
+            switch (filters.sortBy) {
+                case 'dueDate':
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case "approvalDate":
-                    orderByClause = sortFn(tenderInfos.updatedAt);
-                    break;
-                case "rejectionDate":
-                    orderByClause = sortFn(tenderInfos.updatedAt);
-                    break;
-                case "statusChangeDate":
-                    orderByClause = sortFn(tenderInfos.updatedAt);
-                    break;
-                case "gstValues":
+                case 'gstValues':
                     orderByClause = sortFn(tenderInfos.gstValues);
                     break;
-                case "itemName":
-                    orderByClause = sortFn(items.name);
+                case 'tenderFees':
+                    orderByClause = sortFn(tenderInfos.tenderFees);
                     break;
-                case "statusName":
+                case 'emd':
+                    orderByClause = sortFn(tenderInfos.emd);
+                    break;
+                case 'tenderNo':
+                    orderByClause = sortFn(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderByClause = sortFn(tenderInfos.tenderName);
+                    break;
+                case 'teamMemberName':
+                    orderByClause = sortFn(users.name);
+                    break;
+                case 'statusName':
                     orderByClause = sortFn(statuses.name);
                     break;
-                case "tlStatus":
-                    orderByClause = sortFn(tenderInfos.tlStatus);
+                case 'itemName':
+                    orderByClause = sortFn(items.name);
+                    break;
+                case 'organizationName':
+                    orderByClause = sortFn(organizations.name);
+                    break;
+                case 'resultDate':
+                    orderByClause = sortFn(tenderResults.resultUploadedAt);
+                    break;
+                case 'submissionDate':
+                    orderByClause = sortFn(bidSubmissions.submissionDatetime);
                     break;
                 default:
-                    orderByClause = sortFn(tenderInfos.dueDate);
+                    orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
             }
+        } else {
+            // Default sorting based on category
+            orderByClause = this.getDefaultSortByCategory(filters?.sortBy);
         }
 
         // Build query

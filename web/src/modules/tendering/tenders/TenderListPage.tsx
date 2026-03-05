@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/hooks/useFormatedDate";
-import { currencyCol, tenderNameCol } from "@/components/data-grid/columns";
+import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
@@ -172,7 +172,7 @@ const TenderListPage = () => {
         }
     ];
 
-    const [colDefs] = useState<ColDef<TenderWithTimer>[]>([
+    const colDefs = useMemo<ColDef<TenderWithTimer>[]>(() => [
         tenderNameCol<TenderInfoWithNames>('tenderName', {
             field: 'tenderName',
             colId: 'tenderName',
@@ -224,6 +224,24 @@ const TenderListPage = () => {
                 return params.value ? formatDateTime(params.value) : "-";
             },
         },
+        dateCol<TenderInfoWithNames>('resultDate', { includeTime: true }, {
+            field: "resultDate",
+            colId: "resultDate",
+            headerName: "Result Date",
+            filter: true,
+            sortable: true,
+            width: 150,
+            hide: (activeTab !== 'tender-won' && activeTab !== 'tender-lost'),
+        }),
+        dateCol<TenderInfoWithNames>('bidSubmissionDate', { includeTime: true }, {
+            field: "bidSubmissionDate",
+            colId: "bidSubmissionDate",
+            headerName: "Bid Submission Date",
+            filter: true,
+            sortable: true,
+            width: 150,
+            hide: (activeTab == 'tender-lost' || activeTab == 'tender-won' || activeTab == 'unallocated' || activeTab == 'did-not-bid' || activeTab == 'under-preparation'),
+        }),
         {
             field: "statusName",
             headerName: "Status",
@@ -267,7 +285,7 @@ const TenderListPage = () => {
             pinned: "right",
             width: 57,
         },
-    ]);
+    ], [activeTab]);
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">

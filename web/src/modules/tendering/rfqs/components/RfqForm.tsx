@@ -27,6 +27,7 @@ import { useCreateRfq, useUpdateRfq } from '@/hooks/api/useRfqs';
 import { useVendorOrganizationsWithRelations } from '@/hooks/api/useVendorOrganizations';
 import type { Rfq, RfqDashboardRow } from '../helpers/rfq.types';
 import { Input } from '@/components/ui/input';
+import { formatDateTime } from '@/hooks/useFormatedDate';
 
 const RfqFormSchema = z.object({
     dueDate: z.date({ message: "Due date is required" }),
@@ -323,7 +324,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 <FieldWrapper control={form.control} name="dueDate" label="Due Date">
                                     {(field) => (
                                         <DateTimeInput
-                                            value={field.value ? (field.value instanceof Date ? field.value.toISOString().slice(0, 16) : String(field.value)) : ''}
+                                            value={field.value ? (formatDateTime(field.value)) : ''}
                                             onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
                                             placeholder="Select date and time"
                                         />
