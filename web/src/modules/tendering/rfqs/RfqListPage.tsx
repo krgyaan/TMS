@@ -153,7 +153,7 @@ const Rfqs = () => {
             sortable: true,
             filter: true,
         },
-        dateCol<RfqDashboardRowWithTimer>('dueDate', {
+        dateCol<RfqDashboardRowWithTimer>('dueDate', { includeTime: true }, {
             headerName: 'Due Date',
             width: 150,
             colId: 'dueDate',
@@ -391,8 +391,8 @@ const Rfqs = () => {
                                                         : tab.key === 'responses'
                                                             ? 'RFQs with recorded responses will be shown here'
                                                             : tab.key === 'rfq-rejected'
-                                                            ? 'Rejected RFQs will be shown here'
-                                                            : 'Tender DNB RFQs will be shown here'}
+                                                                ? 'Rejected RFQs will be shown here'
+                                                                : 'Tender DNB RFQs will be shown here'}
                                             </p>
                                         </div>
                                     ) : (

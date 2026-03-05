@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send } from "lucide-react";
@@ -16,8 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
-import { tenderNameCol } from "@/components/data-grid";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { currencyCol, tenderNameCol } from "@/components/data-grid";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
@@ -172,79 +170,38 @@ const EmdsAndTenderFeesPage = () => {
 
             return [
                 tenderDetailsCol,
-                {
-                    field: 'gstValues',
-                    colId: 'gstValues',
+                currencyCol<any>('gstValues', {
+                    field: "gstValues",
+                    colId: "gstValues",
                     headerName: 'Tender Value',
+                    filter: true,
+                    sortable: true,
                     width: 130,
-                    cellRenderer: (params: any) => (
-                        <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>
-                    ),
+                }),
+                currencyCol<any>('emd', {
+                    field: "emd",
+                    colId: "emd",
+                    headerName: "EMD",
+                    filter: true,
                     sortable: true,
-                },
-                {
-                    field: 'emd',
-                    colId: 'emd',
-                    headerName: 'EMD',
                     width: 100,
-                    cellRenderer: (params: any) => {
-                        const amount = Number(params.value) || 0;
-                        if (amount <= 0) return <span className="text-gray-400">—</span>;
-                        return (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="font-medium">{formatINR(amount)}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{params.data?.emdMode}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    },
+                }),
+                currencyCol<any>('tenderFee', {
+                    field: "tenderFee",
+                    colId: "tenderFee",
+                    headerName: "Tender Fee",
+                    filter: true,
                     sortable: true,
-                },
-                {
-                    field: 'tenderFee',
-                    colId: 'tenderFee',
-                    headerName: 'Tender Fee',
-                    width: 120,
-                    cellRenderer: (params: any) => {
-                        const amount = Number(params.value) || 0;
-                        if (amount <= 0) return <span className="text-gray-400">—</span>;
-                        return (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="font-medium">{formatINR(amount)}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{params.data?.tenderFeeMode}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    },
+                    width: 100,
+                }),
+                currencyCol<any>('processingFee', {
+                    field: "processingFee",
+                    colId: "processingFee",
+                    headerName: "Processing Fee",
+                    filter: true,
                     sortable: true,
-                },
-                {
-                    field: 'processingFee',
-                    colId: 'processingFee',
-                    headerName: 'Processing Fee',
-                    width: 140,
-                    cellRenderer: (params: any) => {
-                        const amount = Number(params.value) || 0;
-                        if (amount <= 0) return <span className="text-gray-400">—</span>;
-                        return (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="font-medium">{formatINR(amount)}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{params.data?.processingFeeMode}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    },
-                    sortable: true,
-                },
+                    width: 100,
+                }),
                 teamMemberCol,
                 {
                     field: 'dueDate',
@@ -331,19 +288,14 @@ const EmdsAndTenderFeesPage = () => {
                     </Badge>
                 ),
             },
-            {
-                field: 'amountRequired',
-                colId: 'amountRequired',
-                headerName: 'Amount',
-                width: 100,
-                cellRenderer: (params: any) =>
-                    params.value ? (
-                        <span className="font-medium">{formatINR(params.value)}</span>
-                    ) : (
-                        <span className="text-gray-400">—</span>
-                    ),
+            currencyCol<any>('amountRequired', {
+                field: "amountRequired",
+                colId: "amountRequired",
+                headerName: "Amount Required",
+                filter: true,
                 sortable: true,
-            },
+                width: 100,
+            }),
             {
                 field: 'requestType',
                 headerName: 'Request Type',
