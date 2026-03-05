@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
-import { tenderNameCol } from "@/components/data-grid/columns";
+import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
 import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -239,8 +239,10 @@ const CostingSheets = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingSheetDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<CostingSheetDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<CostingSheetDashboardRowWithTimer>('tenderName', {
             headerName: 'Tender Details',
+            field: 'tenderName',
+            colId: 'tenderName',
             filter: true,
             width: 200,
         }),
@@ -253,28 +255,22 @@ const CostingSheets = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<CostingSheetDashboardRowWithTimer>('dueDate', { includeTime: true }, {
+            headerName: 'Due Date',
             field: 'dueDate',
             colId: 'dueDate',
-            headerName: 'Due Date',
             width: 140,
-            cellRenderer: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'emdAmount',
-            colId: 'emdAmount',
-            headerName: 'EMD',
+        }),
+        currencyCol<CostingSheetDashboardRowWithTimer>('emdAmount', {
+            field: "emdAmount",
+            colId: "emdAmount",
+            headerName: "EMD",
+            filter: true,
+            sortable: true,
             width: 100,
-            cellRenderer: (params: any) => {
-                const value = params.data?.emdAmount;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
+        }),
         {
             field: 'statusName',
             colId: 'statusName',
@@ -301,19 +297,14 @@ const CostingSheets = () => {
                 return <Badge variant={status === 'Submitted' ? 'success' : status === 'Rejected/Redo' ? 'destructive' : 'secondary'}>{status}</Badge>;
             },
         },
-        {
-            field: 'submittedFinalPrice',
-            colId: 'submittedFinalPrice',
-            headerName: 'Final Price',
-            width: 130,
-            cellRenderer: (params: any) => {
-                const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
+        currencyCol<CostingSheetDashboardRowWithTimer>('submittedFinalPrice', {
+            field: "submittedFinalPrice",
+            colId: "submittedFinalPrice",
+            headerName: "Final Price",
             filter: true,
-        },
+            sortable: true,
+            width: 130,
+        }),
         {
             field: 'googleSheetUrl',
             headerName: 'Sheet',

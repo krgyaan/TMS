@@ -137,11 +137,12 @@ const Rfqs = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<RfqDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<RfqDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<RfqDashboardRowWithTimer>('tenderName', {
             headerName: 'Tender Details',
+            colId: 'tenderName',
+            field: 'tenderName',
             filter: true,
             width: 250,
-            colId: 'tenderNo',
             sortable: true,
         }),
         {

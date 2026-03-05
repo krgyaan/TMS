@@ -105,7 +105,9 @@ const PhysicalDocsListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<PhysicalDocsDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<PhysicalDocsDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<PhysicalDocsDashboardRowWithTimer>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender Details',
             filter: true,
             width: 250,

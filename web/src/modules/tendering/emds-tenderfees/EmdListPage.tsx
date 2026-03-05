@@ -103,7 +103,9 @@ const EmdsAndTenderFeesPage = () => {
         const isPendingTab = activeTab === 'pending' || activeTab === 'tender-dnb';
 
         // ─── Shared columns ───
-        const tenderDetailsCol = tenderNameCol<any>('tenderNo', {
+        const tenderDetailsCol = tenderNameCol<any>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender Details',
             filter: true,
             width: isPendingTab ? 200 : 250,

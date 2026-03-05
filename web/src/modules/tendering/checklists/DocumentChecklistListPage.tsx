@@ -109,7 +109,9 @@ const Checklists = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderNo', {
+        tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender Details',
             filter: true,
             width: 250,
