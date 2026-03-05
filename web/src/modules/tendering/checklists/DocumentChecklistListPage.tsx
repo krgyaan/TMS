@@ -12,11 +12,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
 import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
 import type { TenderDocumentChecklistDashboardRow, TenderDocumentChecklistDashboardRowWithTimer } from './helpers/documentChecklist.types';
-import { tenderNameCol } from '@/components/data-grid';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
@@ -125,21 +123,11 @@ const Checklists = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'dueDate',
-            colId: 'dueDate',
+        dateCol<TenderDocumentChecklistDashboardRow>('dueDate', { includeTime: true }, {
             headerName: 'Due Date',
             width: 150,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
-            sortable: true,
-            filter: true,
-            comparator: (dateA, dateB) => {
-                if (!dateA && !dateB) return 0;
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return new Date(dateA).getTime() - new Date(dateB).getTime();
-            },
-        },
+            colId: 'dueDate',
+        }),
         {
             field: 'itemName',
             colId: 'itemName',
@@ -149,19 +137,14 @@ const Checklists = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'gstValues',
-            colId: 'gstValues',
+        currencyCol<TenderDocumentChecklistDashboardRow>('gstValues', {
+            field: "gstValues",
+            colId: "gstValues",
             headerName: 'Tender Value',
-            width: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
             filter: true,
-        },
+            sortable: true,
+            width: 130,
+        }),
         {
             field: 'statusName',
             colId: 'statusName',
