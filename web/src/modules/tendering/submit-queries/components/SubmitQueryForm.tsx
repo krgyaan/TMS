@@ -101,14 +101,14 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
 
     // Handle CC Emails for a specific contact
     const handleAddCcEmail = (contactIndex: number) => {
-        const currentCcEmails = form.getValues(`clientContacts.${contactIndex}.ccEmails`) || [];
-        form.setValue(`clientContacts.${contactIndex}.ccEmails`, [...currentCcEmails, '']);
+        const currentCcEmails = form.getValues(`clientContacts.${contactIndex}.cc_emails`) || [];
+        form.setValue(`clientContacts.${contactIndex}.cc_emails`, [...currentCcEmails, '']);
     };
 
     const handleRemoveCcEmail = (contactIndex: number, emailIndex: number) => {
-        const currentCcEmails = form.getValues(`clientContacts.${contactIndex}.ccEmails`) || [];
+        const currentCcEmails = form.getValues(`clientContacts.${contactIndex}.cc_emails`) || [];
         const updatedCcEmails = currentCcEmails.filter((_, idx) => idx !== emailIndex);
-        form.setValue(`clientContacts.${contactIndex}.ccEmails`, updatedCcEmails);
+        form.setValue(`clientContacts.${contactIndex}.cc_emails`, updatedCcEmails);
     };
 
     if (tenderError) {
@@ -379,7 +379,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clientContacts.${index}.org`}
+                                                name={`clientContacts.${index}.client_org`}
                                                 label="Organization"
                                             >
                                                 {(fieldProps) => (
@@ -392,7 +392,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
 
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clientContacts.${index}.name`}
+                                                name={`clientContacts.${index}.client_name`}
                                                 label="Contact Person"
                                             >
                                                 {(fieldProps) => (
@@ -405,7 +405,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
 
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clientContacts.${index}.email`}
+                                                name={`clientContacts.${index}.client_email`}
                                                 label="Email"
                                             >
                                                 {(fieldProps) => (
@@ -419,7 +419,7 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
 
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clientContacts.${index}.phone`}
+                                                name={`clientContacts.${index}.client_phone`}
                                                 label="Phone"
                                             >
                                                 {(fieldProps) => (
@@ -450,11 +450,11 @@ export function SubmitQueryForm({ mode, tenderId, existingData }: SubmitQueryFor
                                             </div>
 
                                             <div className="grid gap-2 grid-cols-6">
-                                                {(form.watch(`clientContacts.${index}.ccEmails`) || []).map((_, emailIndex) => (
+                                                {(form.watch(`clientContacts.${index}.cc_emails`) || []).map((_, emailIndex) => (
                                                     <div key={emailIndex} className="flex items-center gap-2">
                                                         <FieldWrapper
                                                             control={form.control}
-                                                            name={`clientContacts.${index}.ccEmails.${emailIndex}`}
+                                                            name={`clientContacts.${index}.cc_emails.${emailIndex}`}
                                                             label=""
                                                             className="flex-1"
                                                         >

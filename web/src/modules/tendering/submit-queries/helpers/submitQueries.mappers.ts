@@ -17,11 +17,11 @@ export const defaultQueryItem: QueryItemValues = {
 
 // Default empty client contact
 export const defaultClientContact: ClientContactValues = {
-    org: '',
-    name: '',
-    email: '',
-    phone: '',
-    ccEmails: [],
+    client_org: '',
+    client_name: '',
+    client_email: '',
+    client_phone: '',
+    cc_emails: [],
 };
 
 // Build default values for new form
@@ -45,11 +45,11 @@ export function mapResponseToForm(data: SubmitQueryResponse | SubmitQueryListRow
             requestedStatement: q.requestedStatement,
         })),
         clientContacts: data.clientContacts.map(c => ({
-            org: c.org,
-            name: c.name,
-            email: c.email,
-            phone: c.phone,
-            ccEmails: c.ccEmails ?? [],
+            client_org: c.client_org,
+            client_name: c.client_name,
+            client_email: c.client_email,
+            client_phone: c.client_phone,
+            cc_emails: c.cc_emails ?? [],
         })),
     };
 }
@@ -66,11 +66,11 @@ export function mapFormToCreatePayload(values: SubmitQueryFormValues): CreateSub
             requestedStatement: q.requestedStatement,
         })),
         clientContacts: values.clientContacts.map(c => ({
-            org: c.org,
-            name: c.name,
-            email: c.email,
-            phone: c.phone ?? '',
-            ccEmails: c.ccEmails?.filter(email => email.trim() !== '') ?? [],
+            client_org: c.client_org,
+            client_name: c.client_name,
+            client_email: c.client_email,
+            client_phone: c.client_phone ?? '',
+            cc_emails: c.cc_emails?.filter(email => email.trim() !== '') ?? [],
         })),
     };
 }
@@ -87,10 +87,10 @@ export function mapTenderClientsToFormClients(tenderClients: any[]): ClientConta
     }
 
     return tenderClients.map(client => ({
-        org: client.org || client.organization || '',
-        name: client.name || client.contactName || '',
-        email: client.email || '',
-        phone: client.phone || '',
-        ccEmails: [],
+        client_org: client.org || client.organization || '',
+        client_name: client.name || client.contactName || '',
+        client_email: client.email || '',
+        client_phone: client.phone || '',
+        cc_emails: [],
     }));
 }

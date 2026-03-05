@@ -27,8 +27,9 @@ export type SubmitQueryResponse = {
 
 @Injectable()
 export class SubmitQueriesService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
+    // Map create DTO to database insert values
     private mapCreateToDb(data: CreateSubmitQueriesDto) {
         const now = new Date();
         return {
@@ -39,22 +40,30 @@ export class SubmitQueriesService {
         };
     }
 
+    // Map update DTO to database update values
     private mapUpdateToDb(data: UpdateSubmitQueriesDto) {
         const out: Record<string, unknown> = { updatedAt: new Date() };
 
-        if (data.tenderId !== undefined) out.tenderId = data.tenderId;
-        if (data.clientContacts !== undefined) out.clientContacts = data.clientContacts;
+        if (data.tenderId !== undefined) {
+            out.tenderId = data.tenderId;
+        }
+        if (data.clientContacts !== undefined) {
+            out.clientContacts = data.clientContacts;
+        }
 
         return out as Partial<typeof submitQueries.$inferInsert>;
     }
 
+    // Map database row to response format
     private mapRowToResponse(row: any, queries: any[] = []): SubmitQueryResponse {
+        const clientContacts = (row.clientContacts as ClientContact[]) || [];
+
         return {
             id: row.id,
             tenderId: row.tenderId,
             tenderName: row.tenderName,
             tenderNo: row.tenderNo,
-            clientContacts: row.clientContacts as ClientContact[] || [],
+            clientContacts: clientContacts,
             queries: queries.map(q => ({
                 pageNo: q.pageNo,
                 clauseNo: q.clauseNo,
@@ -72,7 +81,6 @@ export class SubmitQueriesService {
         const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
         const offset = (page - 1) * limit;
         const sortOrder = filters?.sortOrder ?? 'desc';
-        const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
 
         const orderFn = sortOrder === 'desc' ? desc : asc;
@@ -94,9 +102,7 @@ export class SubmitQueriesService {
             .innerJoin(tenderInfos, eq(submitQueries.tenderId, tenderInfos.id));
 
         const [countResult, rows] = await Promise.all([
-            baseQuery
-                .where(whereClause)
-                .then(([r]) => Number(r?.count ?? 0)),
+            baseQuery.where(whereClause).then(([r]) => Number(r?.count ?? 0)),
             this.db
                 .select({
                     id: submitQueries.id,
@@ -115,8 +121,6 @@ export class SubmitQueriesService {
                 .offset(offset),
         ]);
 
-        const total = countResult;
-
         // Fetch queries for each submit_queries record
         const data = await Promise.all(
             rows.map(async (row) => {
@@ -126,22 +130,22 @@ export class SubmitQueriesService {
                     .where(eq(submitQueriesLists.submitQueriesId, BigInt(row.id)));
 
                 return this.mapRowToResponse(row, queries);
-            })
+            }),
         );
 
         return {
             data,
             meta: {
-                total,
+                total: countResult,
                 page,
                 limit,
-                totalPages: Math.ceil(total / limit) || 1,
+                totalPages: Math.ceil(countResult / limit) || 1,
             },
         };
     }
 
-    async findById(id: number) {
-        const [row] = await this.db
+    async findById(id: number, db: DbInstance = this.db) {
+        const [row] = await db
             .select({
                 id: submitQueries.id,
                 tenderId: submitQueries.tenderId,
@@ -160,8 +164,7 @@ export class SubmitQueriesService {
             throw new NotFoundException(`Submit Query with ID ${id} not found`);
         }
 
-        // Fetch associated queries
-        const queries = await this.db
+        const queries = await db
             .select()
             .from(submitQueriesLists)
             .where(eq(submitQueriesLists.submitQueriesId, BigInt(id)));
@@ -175,14 +178,14 @@ export class SubmitQueriesService {
             const insertValues = this.mapCreateToDb(data);
             const [inserted] = await tx
                 .insert(submitQueries)
-                .values(insertValues as never)
+                .values(insertValues)
                 .returning({ id: submitQueries.id });
 
             // Insert query list items
             if (data.queries && data.queries.length > 0) {
                 const now = new Date();
-                const queryListValues = data.queries.map(q => ({
-                    submitQueriesId: inserted.id,
+                const queryListValues = data.queries.map((q) => ({
+                    submitQueriesId: BigInt(inserted.id),
                     pageNo: q.pageNo,
                     clauseNo: q.clauseNo,
                     queryType: q.queryType,
@@ -192,17 +195,27 @@ export class SubmitQueriesService {
                     updatedAt: now,
                 }));
 
-                await tx
-                    .insert(submitQueriesLists)
-                    .values(queryListValues as never);
+                await tx.insert(submitQueriesLists).values(queryListValues);
             }
 
-            return this.findById(inserted.id);
+            // Use transaction context for findById
+            return this.findById(inserted.id, tx as unknown as DbInstance);
         });
     }
 
     async update(id: number, data: UpdateSubmitQueriesDto) {
         return await this.db.transaction(async (tx) => {
+            // Check if record exists
+            const [existing] = await tx
+                .select({ id: submitQueries.id })
+                .from(submitQueries)
+                .where(eq(submitQueries.id, id))
+                .limit(1);
+
+            if (!existing) {
+                throw new NotFoundException(`Submit Query with ID ${id} not found`);
+            }
+
             // Update main record
             const updateValues = this.mapUpdateToDb(data);
             await tx
@@ -220,8 +233,8 @@ export class SubmitQueriesService {
                 // Insert new queries
                 if (data.queries.length > 0) {
                     const now = new Date();
-                    const queryListValues = data.queries.map(q => ({
-                        submitQueriesId: id,
+                    const queryListValues = data.queries.map((q) => ({
+                        submitQueriesId: BigInt(id),
                         pageNo: q.pageNo,
                         clauseNo: q.clauseNo,
                         queryType: q.queryType,
@@ -231,13 +244,12 @@ export class SubmitQueriesService {
                         updatedAt: now,
                     }));
 
-                    await tx
-                        .insert(submitQueriesLists)
-                        .values(queryListValues as never);
+                    await tx.insert(submitQueriesLists).values(queryListValues);
                 }
             }
 
-            return this.findById(id);
+            // Use transaction context for findById
+            return this.findById(id, tx as unknown as DbInstance);
         });
     }
 
@@ -245,12 +257,10 @@ export class SubmitQueriesService {
         const [row] = await this.db
             .delete(submitQueries)
             .where(eq(submitQueries.id, id))
-            .returning();
+            .returning({ id: submitQueries.id });
 
         if (!row) {
             throw new NotFoundException(`Submit Query with ID ${id} not found`);
         }
-
-        // Queries will be auto-deleted due to cascade
     }
 }

@@ -31,11 +31,11 @@ export interface QueryItem {
 }
 
 export interface ClientContact {
-    org: string;
-    name: string;
-    email: string;
-    phone: string;
-    ccEmails?: string[];
+    client_org: string;
+    client_name: string;
+    client_email: string;
+    client_phone: string;
+    cc_emails?: string[];
 }
 
 export interface CreateSubmitQueryPayload {

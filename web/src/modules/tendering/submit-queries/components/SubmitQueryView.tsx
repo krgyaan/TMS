@@ -188,7 +188,7 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
                                                 <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
                                                 <div>
                                                     <p className="text-xs text-muted-foreground">Organization</p>
-                                                    <p className="font-medium">{contact.org}</p>
+                                                    <p className="font-medium">{contact.client_org}</p>
                                                 </div>
                                             </div>
 
@@ -197,7 +197,7 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
                                                 <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
                                                 <div>
                                                     <p className="text-xs text-muted-foreground">Contact Person</p>
-                                                    <p className="font-medium">{contact.name}</p>
+                                                    <p className="font-medium">{contact.client_name}</p>
                                                 </div>
                                             </div>
 
@@ -207,10 +207,10 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
                                                 <div>
                                                     <p className="text-xs text-muted-foreground">Email</p>
                                                     <a
-                                                        href={`mailto:${contact.email}`}
+                                                        href={`mailto:${contact.client_email}`}
                                                         className="font-medium text-primary hover:underline"
                                                     >
-                                                        {contact.email}
+                                                        {contact.client_email}
                                                     </a>
                                                 </div>
                                             </div>
@@ -221,20 +221,20 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
                                                 <div>
                                                     <p className="text-xs text-muted-foreground">Phone</p>
                                                     <a
-                                                        href={`tel:${contact.phone}`}
+                                                        href={`tel:${contact.client_phone}`}
                                                         className="font-medium text-primary hover:underline"
                                                     >
-                                                        {contact.phone}
+                                                        {contact.client_phone}
                                                     </a>
                                                 </div>
                                             </div>
 
                                             {/* CC Emails */}
-                                            {contact.ccEmails && contact.ccEmails.length > 0 && (
+                                            {contact.cc_emails && contact.cc_emails.length > 0 && (
                                                 <div className="pt-2 border-t">
                                                     <p className="text-xs text-muted-foreground mb-2">CC Emails</p>
                                                     <div className="flex flex-wrap gap-1">
-                                                        {contact.ccEmails.map((ccEmail, emailIndex) => (
+                                                        {contact.cc_emails.map((ccEmail, emailIndex) => (
                                                             <Badge
                                                                 key={emailIndex}
                                                                 variant="secondary"

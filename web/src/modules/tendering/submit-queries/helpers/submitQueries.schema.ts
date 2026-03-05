@@ -15,11 +15,11 @@ export const QueryItemSchema = z.object({
 
 // Client contact schema
 export const ClientContactSchema = z.object({
-    org: z.string().min(1, 'Organization is required'),
-    name: z.string().min(1, 'Contact name is required'),
-    email: z.email('Invalid email address'),
-    phone: z.string().optional(),
-    ccEmails: z.array(z.email('Invalid CC email')).optional().default([]),
+    client_org: z.string().min(1, 'Organization is required'),
+    client_name: z.string().min(1, 'Contact name is required'),
+    client_email: z.email('Invalid email address'),
+    client_phone: z.string().optional(),
+    cc_emails: z.array(z.email('Invalid CC email')).optional().default([]),
 });
 
 // Main form schema

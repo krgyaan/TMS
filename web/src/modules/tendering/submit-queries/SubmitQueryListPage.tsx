@@ -12,7 +12,7 @@ import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import type { SubmitQueryListRow } from './helpers/submitQueries.types';
+import type { ClientContact, SubmitQueryListRow } from './helpers/submitQueries.types';
 import { useSubmitQueries } from '@/hooks/api/useSubmitQuery';
 import { Badge } from '@/components/ui/badge';
 
@@ -96,7 +96,7 @@ const SubmitQueryListPage = () => {
                 colId: 'queries',
                 headerName: 'Query Types',
                 flex: 1,
-                cellRenderer: (params: { data?: any }) => (
+                cellRenderer: (params: { data?: SubmitQueryListRow }) => (
                     params.data?.queries ? (
                         <div className="flex flex-wrap gap-1">
                             {params.data.queries.map((query: any, index: number) => (
@@ -115,10 +115,10 @@ const SubmitQueryListPage = () => {
                 colId: 'clientContacts',
                 headerName: 'Sent To',
                 flex: 1,
-                cellRenderer: (params: { data?: any }) => {
+                cellRenderer: (params: { data?: SubmitQueryListRow }) => {
                     if (!params.data) return '—';
                     let emails: string[] = [];
-                    params.data.clientContacts.forEach((contact: any) => {
+                    params.data.clientContacts.forEach((contact: ClientContact) => {
                         if (contact.client_email) {
                             emails.push(contact.client_email.trim());
                         }
