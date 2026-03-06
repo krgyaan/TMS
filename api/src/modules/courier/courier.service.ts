@@ -462,10 +462,11 @@ export class CourierService {
 
             // ===== Mail side effect (non-blocking) =====
             if (statusData.status === COURIER_STATUS.DELIVERED && googleConnection) {
+                const statusLabel = COURIER_STATUS_LABELS[statusData.status] || "-";
                 try {
                     await this.mailerService.sendMail(
                         CourierMailTemplates.COURIER_STATUS_UPDATE,
-                        { ...updated, fromName: user.name },
+                        { ...updated, fromName: user.name, statusLabel },
                         {
                             to: [toEmailsList],
                             cc: ccMail,
