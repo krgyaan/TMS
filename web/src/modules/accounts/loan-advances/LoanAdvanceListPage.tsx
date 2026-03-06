@@ -8,13 +8,14 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Eye, Edit, FileX2, Search, Plus, Clock1 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { Button } from '@/components/ui/button';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { Badge } from '@/components/ui/badge';
 import { useLoanAdvances } from '@/hooks/api/useLoanAdvance';
+import { Badge } from '@/components/ui/badge';
 import type { LoanAdvanceListRow } from './helpers/loanAdvance.types';
+import { currencyCol, dateCol } from '@/components/data-grid';
 
 const LoanAdvanceListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -40,27 +41,29 @@ const LoanAdvanceListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    const { data: apiResponse, isLoading: loading, error } = useLoanAdvances(
-        {
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            search: debouncedSearch || undefined,
-        },
-    );
+    const { data: apiResponse, isLoading: loading, error } = useLoanAdvances({
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        search: debouncedSearch || undefined,
+    });
 
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
-
-    const submitQueryActions: ActionItem<LoanAdvanceListRow>[] = useMemo(
+    const loanAdvanceActions: ActionItem<LoanAdvanceListRow>[] = useMemo(
         () => [
             {
+                label: 'Due EMI',
+                onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
+                icon: <Clock1 className='h-4 w-4' />
+            },
+            {
                 label: 'View',
-                onClick: (row) => navigate(paths.tendering.submitQueryView(row.id)),
+                onClick: (row) => navigate(paths.accounts.loanAdvancesView(row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Edit',
-                onClick: (row) => navigate(paths.tendering.submitQueryEdit(row.id)),
+                onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
                 icon: <Edit className="h-4 w-4" />,
             },
         ],
@@ -70,96 +73,108 @@ const LoanAdvanceListPage = () => {
     const colDefs = useMemo<ColDef<LoanAdvanceListRow>[]>(
         () => [
             {
-                field: 'tenderName',
-                colId: 'tenderName',
-                headerName: 'Tender Name',
-                flex: 1,
-                width: 100,
-                maxWidth: 160,
-                valueGetter: (params) => params.data?.tenderName ?? '—',
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'tenderNo',
-                colId: 'tenderNo',
-                headerName: 'Tender No.',
+                field: 'bankName',
+                colId: 'bankName',
+                headerName: 'Bank Name',
                 flex: 1.5,
-                width: 100,
-                maxWidth: 160,
-                valueGetter: (params) => params.data?.tenderNo ?? '—',
+                minWidth: 150,
+                valueGetter: (params) => params.data?.bankName ?? '—',
                 sortable: true,
                 filter: true,
             },
             {
-                field: 'queries',
-                colId: 'queries',
-                headerName: 'Query Types',
+                field: 'loanAccNo',
+                colId: 'loanAccNo',
+                headerName: 'Loan Account No.',
                 flex: 1,
-                cellRenderer: (params: { data?: SubmitQueryListRow }) => (
-                    params.data?.queries ? (
-                        <div className="flex flex-wrap gap-1">
-                            {params.data.queries.map((query: any, index: number) => (
-                                <Badge key={index} variant="outline" className="h-5 px-1">
-                                    {query.queryType}
-                                </Badge>
-                            ))}
-                        </div>
+                minWidth: 130,
+                valueGetter: (params) => params.data?.loanAccNo ?? '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'typeOfLoan',
+                colId: 'typeOfLoan',
+                headerName: 'Loan Type',
+                flex: 1,
+                minWidth: 100,
+                cellRenderer: (params: { data?: LoanAdvanceListRow }) => (
+                    params.data?.typeOfLoan ? (
+                        <Badge variant="secondary" className="h-5 px-2">
+                            {params.data.typeOfLoan}
+                        </Badge>
                     ) : '—'
                 ),
-                sortable: false,
-                filter: false,
+                sortable: true,
+                filter: true,
+            },
+            currencyCol<LoanAdvanceListRow>('loanAmount', {
+                field: 'loanAmount',
+                colId: 'loanAmount',
+                headerName: 'Loan Amount',
+                flex: 1,
+                minWidth: 130,
+                sortable: true,
+                filter: true,
+            }),
+            currencyCol<LoanAdvanceListRow>('principleOutstanding', {
+                field: 'principleOutstanding',
+                colId: 'principleOutstanding',
+                headerName: 'Outstanding',
+                flex: 1,
+                minWidth: 120,
+                sortable: true,
+                filter: true,
+            }),
+            dateCol<LoanAdvanceListRow>('emiPaymentDate', {includeTime: false}, {
+                field: 'emiPaymentDate',
+                colId: 'emiPaymentDate',
+                headerName: 'EMI Date',
+                flex: 1,
+                minWidth: 100,
+                sortable: true,
+                filter: true,
+            }),
+            {
+                field: 'noOfEmisPaid',
+                colId: 'noOfEmisPaid',
+                headerName: 'EMIs Paid',
+                flex: 0.7,
+                minWidth: 90,
+                valueGetter: (params) => params.data?.noOfEmisPaid ?? 0,
+                sortable: true,
+                filter: true,
             },
             {
-                field: 'clientContacts',
-                colId: 'clientContacts',
-                headerName: 'Sent To',
-                flex: 1,
-                cellRenderer: (params: { data?: SubmitQueryListRow }) => {
-                    if (!params.data) return '—';
-                    let emails: string[] = [];
-                    params.data.clientContacts.forEach((contact: ClientContact) => {
-                        if (contact.client_email) {
-                            emails.push(contact.client_email.trim());
-                        }
-                    });
-
-                    return emails.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                            {emails.map((email: string, index: number) => (
-                                <Badge key={index} variant="outline" className="h-5 px-1">
-                                    {email}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : '—';
+                field: 'isDue',
+                colId: 'isDue',
+                headerName: 'Due',
+                flex: 0.6,
+                minWidth: 70,
+                cellRenderer: (params: { data?: LoanAdvanceListRow }) => {
+                    if (params.data?.isDue === undefined) return '—';
+                    return (
+                        <Badge
+                            variant={params.data.isDue ? 'destructive' : 'outline'}
+                            className="h-5 px-2"
+                        >
+                            {params.data.isDue ? 'Yes' : 'No'}
+                        </Badge>
+                    );
                 },
-                sortable: false,
-                filter: false,
-
-            },
-            {
-                field: 'createdAt',
-                colId: 'createdAt',
-                headerName: 'Requested On',
-                flex: 1,
-                width: 100,
-                maxWidth: 150,
-                cellRenderer: (params: { data?: SubmitQueryListRow }) =>
-                    params.data?.createdAt ? formatDateTime(params.data.createdAt) : '—',
                 sortable: true,
                 filter: true,
             },
             {
                 headerName: 'Actions',
                 filter: false,
-                cellRenderer: createActionColumnRenderer(submitQueryActions),
+                cellRenderer: createActionColumnRenderer(loanAdvanceActions),
                 sortable: false,
                 pinned: 'right',
                 width: 80,
             },
         ],
-        [submitQueryActions]
+        [loanAdvanceActions]
     );
 
     if (loading) {
@@ -187,13 +202,13 @@ const LoanAdvanceListPage = () => {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Submit Query Against Tender</CardTitle>
+                    <CardTitle>Loan & Advance</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Failed to load Submitted Query list. Please try again later.
+                            Failed to load Loan & Advance list. Please try again later.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -206,11 +221,15 @@ const LoanAdvanceListPage = () => {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Submit Query</CardTitle>
+                        <CardTitle>Loan & Advance</CardTitle>
                         <CardDescription className="mt-2">
-                            Manage Submit Query entries
+                            Manage all loan and advance entries
                         </CardDescription>
                     </div>
+                    <Button onClick={() => navigate(paths.accounts.loanAdvancesCreate)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add New Loan
+                    </Button>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
@@ -220,7 +239,7 @@ const LoanAdvanceListPage = () => {
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="text"
-                            placeholder="Search..."
+                            placeholder="Search by bank name, account no..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-8"
@@ -230,9 +249,9 @@ const LoanAdvanceListPage = () => {
                 {rows.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-muted-foreground px-6">
                         <FileX2 className="h-12 w-12 mb-4" />
-                        <p className="text-lg font-medium">No Submitted Query entries</p>
+                        <p className="text-lg font-medium">No Loan & Advance entries found</p>
                         <p className="text-sm mt-2">
-                            Submit a Request entry using the button associated with tender on tender dashboard.
+                            Create a new loan entry using the "Add New Loan" button above.
                         </p>
                     </div>
                 ) : (
@@ -256,7 +275,7 @@ const LoanAdvanceListPage = () => {
                             },
                             onSortChanged: handleSortChanged,
                             overlayNoRowsTemplate:
-                                '<span style="padding: 10px; text-align: center;">No Submitted Query entries found</span>',
+                                '<span style="padding: 10px; text-align: center;">No Loan & Advance entries found</span>',
                         }}
                     />
                 )}
