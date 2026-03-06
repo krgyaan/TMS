@@ -1201,7 +1201,7 @@ export class TenderExecutiveService {
         ) tcs ON true
     `;
 
-        const missedStatus = [8, 10];
+        const missedStatus = [8, 10, 11];
 
         /* =====================================================
        ASSIGNED
@@ -1210,15 +1210,14 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at < '${from}'
+        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at >= '${from}'
+            AND tin.created_at < '${from}'
         )
-        AND ti.status = 1
         `);
-
         /**
          * Allocated During Period
          * All tenders assigned during selected period
@@ -1266,18 +1265,17 @@ export class TenderExecutiveService {
          * Assigned during period and still no infosheet by end of period
          */
         const assignedClosingPending = await exec(`
-            ${baseSelect}
-            WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
-            AND ti.status NOT IN (${missedStatus})
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-                AND tin.created_at >= '${to}'
-            )
-            AND ti.status = 1
-            `);
+        ${baseSelect}
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        -- AND ti.status NOT IN (${missedStatus})
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at <= '${to}'
+        )
+        `);
 
         /**
          * Closing Total (pending backlog)
@@ -1567,11 +1565,11 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
 
-                        statusChanged: {
-                            count: assignedDuringStatusChanged.length,
-                            value: this.sumValue(assignedDuringStatusChanged),
-                            drilldown: this.mapDrilldown(assignedDuringStatusChanged),
-                        },
+                        // statusChanged: {
+                        //     count: assignedDuringStatusChanged.length,
+                        //     value: this.sumValue(assignedDuringStatusChanged),
+                        //     drilldown: this.mapDrilldown(assignedDuringStatusChanged),
+                        // },
 
                         pending: {
                             count: assignedClosingPending.length,
