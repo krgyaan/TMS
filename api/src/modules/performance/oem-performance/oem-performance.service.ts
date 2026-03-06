@@ -1,22 +1,13 @@
+// src/modules/oem-performance/oem-performance.service.ts
+
 import { Inject, Injectable } from "@nestjs/common";
-import { and, between, eq, inArray, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { OemPerformanceQueryDto } from "./zod/oem-performance.dto";
-import { mapTenderOutcome } from "../team-leader-performance/team-leader-performance.service";
-import type { TenderOutcomeStatus } from "../types/tender.type";
 
-type OemTenderView = {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    value: number;
-    dueDate: Date;
-    status: TenderOutcomeStatus;
-};
+import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
+import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
+
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 @Injectable()
 export class OemPerformanceService {
@@ -25,129 +16,204 @@ export class OemPerformanceService {
         private readonly db: DbInstance
     ) {}
 
-    /* =====================================================
-       BASE QUERY
-    ===================================================== */
+    async getPerformance(filters: { oem?: string; from?: string; to?: string }) {
+        const { oem, from, to } = filters;
 
-    private async getBaseTenders(dto: OemPerformanceQueryDto) {
-        return this.db
-            .select({
-                id: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                gstValue: tenderInfos.gstValues,
-                dueDate: tenderInfos.dueDate,
-                status: tenderInfos.status,
-                rfqTo: tenderInfos.rfqTo,
-                oemDenied: tenderInfos.oemNotAllowed,
-            })
-            .from(tenderInfos)
-            .where(
-                and(
-                    eq(tenderInfos.deleteStatus, 0),
-                    between(tenderInfos.createdAt, dto.fromDate, dto.toDate),
-                    sql`${dto.oemId} = ANY (string_to_array(${tenderInfos.rfqTo}, ',')::int[])`
-                )
-            );
-    }
+        const oems = await this.db.select().from(vendorOrganizations);
 
-    /* =====================================================
-       SUMMARY (KPI CARDS)
-    ===================================================== */
-    async getOemOutcomes(dto: OemPerformanceQueryDto) {
-        const tenders = await this.getBaseTenders(dto);
+        let tendersQuery = this.db.select().from(tenderInfos);
 
-        const tendersWon: OemTenderView[] = [];
-        const tendersLost: OemTenderView[] = [];
-        const tendersSubmitted: OemTenderView[] = [];
-        const tendersNotAllowed: OemTenderView[] = [];
-        const rfqsSent: OemTenderView[] = [];
-
-        let valueWon = 0,
-            valueLost = 0,
-            valueSubmitted = 0;
-
-        const trendBuckets = new Map<string, { won: number; lost: number }>();
-
-        for (const t of tenders) {
-            const outcome = mapTenderOutcome(Number(t.status));
-            const isNotAllowed = t.oemDenied?.split(",").map(Number).includes(dto.oemId);
-
-            const mapped = {
-                id: t.id,
-                tenderNo: t.tenderNo,
-                tenderName: t.tenderName,
-                value: Number(t.gstValue ?? 0),
-                dueDate: t.dueDate,
-                status: outcome,
-            };
-
-            // KPI buckets
-            if (outcome === "Won") {
-                tendersWon.push(mapped);
-                valueWon += mapped.value;
-            } else if (outcome === "Lost") {
-                tendersLost.push(mapped);
-                valueLost += mapped.value;
-            } else if (outcome === "Result Awaited") {
-                tendersSubmitted.push(mapped);
-                valueSubmitted += mapped.value;
-            }
-
-            if (isNotAllowed) {
-                tendersNotAllowed.push(mapped);
-            }
-
-            rfqsSent.push(mapped);
-
-            // Trends
-            const label = `${t.dueDate.getFullYear()}-${t.dueDate.getMonth() + 1}`;
-            if (!trendBuckets.has(label)) trendBuckets.set(label, { won: 0, lost: 0 });
-            const bucket = trendBuckets.get(label)!;
-            if (outcome === "Won") bucket.won++;
-            if (outcome === "Lost") bucket.lost++;
+        if (from && to) {
+            tendersQuery = tendersQuery.where(and(gte(tenderInfos.dueDate, new Date(from)), lte(tenderInfos.dueDate, new Date(to))));
         }
 
-        const totalTendersWithOem = tendersWon.length + tendersLost.length + tendersSubmitted.length + tendersNotAllowed.length;
+        const tenders = await tendersQuery;
 
-        const winRate = tendersWon.length + tendersLost.length ? Math.round((tendersWon.length / (tendersWon.length + tendersLost.length)) * 100) : 0;
+        const notAllowedTenders = this.getNotAllowedTenders(tenders, oem);
+        const rfqsSentToOem = this.getRfqsSentToOem(tenders, oem);
+        const assignedApprovedSummary = this.getAssignedAndApprovedSummary(tenders, oem);
 
-        const trends = Array.from(trendBuckets.entries()).map(([label, v]) => ({
-            label,
-            winRate: v.won + v.lost ? Math.round((v.won / (v.won + v.lost)) * 100) : 0,
-        }));
+        const bidedTenders = await this.getTendersByOem(filters);
 
-        const complianceScore = totalTendersWithOem > 0 ? Math.round(100 - (tendersNotAllowed.length / totalTendersWithOem) * 100) : 100;
-
-        const winRateScore = Math.min(100, winRate * 1.2);
-        const totalScore = Math.round(winRateScore * 0.6 + complianceScore * 0.4);
+        const summary = {
+            ...assignedApprovedSummary,
+            ...this.calculateSummary(bidedTenders),
+        };
 
         return {
-            summary: {
-                totalTendersWithOem,
-                tendersWon: tendersWon.length,
-                tendersLost: tendersLost.length,
-                tendersSubmitted: tendersSubmitted.length,
-                tendersNotAllowed: tendersNotAllowed.length,
-                totalValueWon: valueWon,
-                totalValueLost: valueLost,
-                totalValueSubmitted: valueSubmitted,
-                winRate,
+            oems,
+            notAllowedTenders,
+            rfqsSentToOem,
+            summary,
+        };
+    }
+
+    // ---------------------------------------------------
+
+    getNotAllowedTenders(tenders: any[], selectedOem?: string) {
+        if (!selectedOem) return [];
+
+        return tenders
+            .filter(tender => {
+                if (!tender.oemNotAllowed) return false;
+
+                const denied = tender.oemNotAllowed.split(",");
+                return denied.map(v => v.trim()).includes(selectedOem);
+            })
+            .map(tender => ({
+                id: tender.id,
+                team: tender.team,
+                tender_no: tender.tenderNo,
+                tender_name: tender.tenderName,
+                due_date: tender.dueDate,
+                gst_values: Number(tender.gstValues),
+            }));
+    }
+
+    // ---------------------------------------------------
+
+    getRfqsSentToOem(tenders: any[], selectedOem?: string) {
+        if (!selectedOem) return [];
+
+        return tenders
+            .filter(tender => {
+                if (!tender.rfqTo) return false;
+
+                const sent = tender.rfqTo.split(",");
+                return sent.map(v => v.trim()).includes(selectedOem);
+            })
+            .map(tender => ({
+                id: tender.id,
+                team: tender.team,
+                tender_no: tender.tenderNo,
+                tender_name: tender.tenderName,
+                due_date: tender.dueDate,
+                gst_values: Number(tender.gstValues),
+            }));
+    }
+
+    // ---------------------------------------------------
+
+    getAssignedAndApprovedSummary(tenders: any[], selectedOem?: string) {
+        if (!selectedOem) return {};
+
+        const assigned = tenders.filter(tender => {
+            if (!tender.rfqTo) return false;
+
+            const sent = tender.rfqTo.split(",");
+            return sent.map(v => v.trim()).includes(selectedOem);
+        });
+
+        const approved = assigned.filter(t => t.tlStatus === 1);
+
+        const sumValues = (arr: any[]) => arr.reduce((sum, t) => sum + Number(t.gstValues), 0);
+
+        return {
+            tenders_assigned: {
+                count: assigned.length,
+                value: sumValues(assigned),
+                tender: assigned.map(t => t.tenderName),
             },
-            trends,
-            scoring: {
-                winRateScore,
-                complianceScore,
-                total: totalScore,
-            },
-            tendersByKpi: {
-                total: tenders,
-                tendersWon,
-                tendersLost,
-                tendersSubmitted,
-                tendersNotAllowed,
-                rfqsSent,
+            tenders_approved: {
+                count: approved.length,
+                value: sumValues(approved),
+                tender: approved.map(t => t.tenderName),
             },
         };
+    }
+
+    // ---------------------------------------------------
+
+    async getTendersByOem(filters: { oem?: string; from?: string; to?: string }) {
+        const { oem, from, to } = filters;
+
+        const query = this.db.execute(sql`
+      SELECT
+        bs.id,
+        bs.tender_id,
+        bs.status as bid_status,
+        ti.tender_name,
+        ti.gst_values,
+        ti.status as tender_status,
+        ti.rfq_to
+      FROM bid_submissions bs
+      JOIN tender_infos ti ON bs.tender_id = ti.id
+    `);
+
+        const result: any[] = (await query) as any[];
+
+        let filtered = result;
+
+        if (oem) {
+            filtered = filtered.filter(t =>
+                t.rfq_to
+                    ?.split(",")
+                    .map(v => v.trim())
+                    .includes(oem)
+            );
+        }
+
+        if (from && to) {
+            const fromDate = new Date(from);
+            const toDate = new Date(to);
+
+            filtered = filtered.filter(t => new Date(t.bid_submissions_date) >= fromDate && new Date(t.bid_submissions_date) <= toDate);
+        }
+
+        return filtered;
+    }
+
+    // ---------------------------------------------------
+
+    calculateSummary(tenders: any[]) {
+        const summary = {
+            tenders_bid: { tender: [], count: 0, value: 0 },
+            tenders_missed: { tender: [], count: 0, value: 0 },
+            tenders_disqualified: { tender: [], count: 0, value: 0 },
+            tender_results_awaited: { tender: [], count: 0, value: 0 },
+            tenders_won: { tender: [], count: 0, value: 0 },
+            tenders_lost: { tender: [], count: 0, value: 0 },
+        };
+
+        for (const tender of tenders) {
+            switch (tender.tender_status) {
+                case 8:
+                case 16:
+                    this.add(summary.tenders_missed, tender);
+                    break;
+
+                case 21:
+                case 22:
+                    this.add(summary.tenders_disqualified, tender);
+                    break;
+
+                case 17:
+                    this.add(summary.tender_results_awaited, tender);
+                    break;
+
+                case 24:
+                    this.add(summary.tenders_lost, tender);
+                    break;
+
+                case 25:
+                case 26:
+                case 27:
+                case 28:
+                    this.add(summary.tenders_won, tender);
+                    break;
+            }
+
+            if (tender.bid_status === "Bid Submitted") {
+                this.add(summary.tenders_bid, tender);
+            }
+        }
+
+        return summary;
+    }
+
+    private add(summaryItem: any, tender: any) {
+        summaryItem.count++;
+        summaryItem.value += Number(tender.gst_values);
+        summaryItem.tender.push(tender.tender_name);
     }
 }
