@@ -7,7 +7,8 @@ import { FileText } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
-import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from "@/hooks/useSelectOptions"
+import { useDnbStatusOptions } from "@/hooks/useSelectOptions"
+import { tenderFilesService } from "@/services/api/tender-files.service"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
@@ -59,55 +60,11 @@ const getOptionLabel = (
     return rawStr
 }
 
-const formatDocuments = (
-    documents: Array<string | { id?: number; documentName: string }> = [],
-    options?: Array<{ value: string; label: string }>,
-) => {
-    if (!documents.length) {
-        return <span className="text-muted-foreground">No documents listed</span>
-    }
-
-    return (
-        <div className="flex flex-wrap gap-2">
-            {documents.map((doc, index) => {
-                // Handle both string arrays and object arrays
-                if (typeof doc === "string") {
-                    const label = options ? getOptionLabel(options, doc) : doc
-                    if (!label || label === "—") {
-                        return null
-                    }
-                    return (
-                        <Badge key={doc} variant="outline">
-                            {label}
-                        </Badge>
-                    )
-                }
-
-                const rawName = doc.documentName
-                const docKey = doc.id ?? rawName ?? index
-                const label = options ? getOptionLabel(options, rawName) : rawName
-
-                if (!label || label === "—") {
-                    return null
-                }
-
-                return (
-                    <Badge key={docKey} variant="outline">
-                        {label}
-                    </Badge>
-                )
-            })}
-        </div>
-    )
-}
-
 export const InfoSheetView = ({
     infoSheet,
     isLoading,
 }: InfoSheetViewProps) => {
     const rejectionReasonOptions = useDnbStatusOptions()
-    const pqrOptions = usePqrOptions()
-    const financeDocumentOptions = useFinanceDocumentOptions()
 
     if (isLoading) {
         return (
@@ -706,7 +663,18 @@ export const InfoSheetView = ({
                                 Technical Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.technicalWorkOrders || [], pqrOptions)}
+                                <div className="flex flex-wrap gap-1">
+                                    {infoSheet.technicalWorkOrders?.map((order) => {
+                                        const filePath = order.poDocument?.[0];
+                                        return (
+                                            <Badge key={order.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                    {order.projectName}
+                                                </a>
+                                            </Badge>
+                                        )
+                                    })}
+                                </div>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -714,7 +682,18 @@ export const InfoSheetView = ({
                                 Financial Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.commercialDocuments || [], financeDocumentOptions)}
+                                <div className="flex flex-wrap gap-1">
+                                    {infoSheet.commercialDocuments?.map((doc) => {
+                                        const filePath = doc.documentPath?.[0];
+                                        return (
+                                            <Badge key={doc.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                    {doc.documentName}
+                                                </a>
+                                            </Badge>
+                                        );
+                                    })}
+                                </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>

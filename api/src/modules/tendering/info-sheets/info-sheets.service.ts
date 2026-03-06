@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import {
     tenderInformation,
     tenderClients,
@@ -25,10 +25,21 @@ import { TimersService } from '@/modules/timers/timers.service';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 
+export type TechnicalDocument = {
+    id: number;
+    projectName: string | null;
+    poDocument: string[] | null;
+};
+export type FinancialDocument = {
+    id: number;
+    documentName: string | null;
+    documentPath: string[] | null;
+};
+
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
-    technicalWorkOrders: TenderTechnicalDocument[];
-    commercialDocuments: TenderFinancialDocument[];
+    technicalWorkOrders: TechnicalDocument[];
+    commercialDocuments: FinancialDocument[];
 };
 
 @Injectable()
@@ -44,9 +55,7 @@ export class TenderInfoSheetsService {
         private readonly timersService: TimersService,
     ) { }
 
-    async findByTenderId(
-        tenderId: number
-    ): Promise<TenderInfoSheetWithRelations | null> {
+    async findByTenderId(tenderId: number): Promise<TenderInfoSheetWithRelations | null> {
         const info = await this.db
             .select()
             .from(tenderInformation)
@@ -75,18 +84,85 @@ export class TenderInfoSheetsService {
                 .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
         ]);
 
+        // Separate numeric IDs from text names for technical documents
+        const technicalDocIds: number[] = [];
+        const technicalDocNames: string[] = [];
+
+        technicalDocs.forEach(doc => {
+            const parsed = Number(doc.documentName);
+            if (!isNaN(parsed) && doc.documentName?.trim() !== '') {
+                technicalDocIds.push(parsed);
+            } else if (doc.documentName) {
+                technicalDocNames.push(doc.documentName);
+            }
+        });
+
+        // Separate numeric IDs from text names for financial documents
+        const financialDocIds: number[] = [];
+        const financialDocNames: string[] = [];
+
+        financialDocs.forEach(doc => {
+            const parsed = Number(doc.documentName);
+            if (!isNaN(parsed) && doc.documentName?.trim() !== '') {
+                financialDocIds.push(parsed);
+            } else if (doc.documentName) {
+                financialDocNames.push(doc.documentName);
+            }
+        });
+
+        // Fetch actual documents from pqr_documents and finance_documents
+        const [pqrDocumentsAll, financeDocumentsAll] = await Promise.all([
+            // Fetch PQR documents by ID or by project_name
+            technicalDocIds.length > 0 || technicalDocNames.length > 0
+                ? this.db
+                    .select({
+                        id: pqrDocuments.id,
+                        projectName: pqrDocuments.projectName,
+                        poDocument: pqrDocuments.uploadPo,
+                    })
+                    .from(pqrDocuments)
+                    .where(
+                        or(
+                            technicalDocIds.length > 0
+                                ? inArray(pqrDocuments.id, technicalDocIds)
+                                : undefined,
+                            technicalDocNames.length > 0
+                                ? inArray(pqrDocuments.projectName, technicalDocNames)
+                                : undefined
+                        )
+                    )
+                : Promise.resolve([]),
+
+            // Fetch Finance documents by ID or by document_name
+            financialDocIds.length > 0 || financialDocNames.length > 0
+                ? this.db
+                    .select({
+                        id: financeDocuments.id,
+                        documentName: financeDocuments.documentName,
+                        documentPath: financeDocuments.documentPath,
+                    })
+                    .from(financeDocuments)
+                    .where(
+                        or(
+                            financialDocIds.length > 0
+                                ? inArray(financeDocuments.id, financialDocIds)
+                                : undefined,
+                            financialDocNames.length > 0
+                                ? inArray(financeDocuments.documentName, financialDocNames)
+                                : undefined
+                        )
+                    )
+                : Promise.resolve([]),
+        ]);
+
         return {
             ...infoSheet,
             clients,
-            technicalWorkOrders: technicalDocs,
-            commercialDocuments: financialDocs,
+            technicalWorkOrders: pqrDocumentsAll,
+            commercialDocuments: financeDocumentsAll,
         };
     }
 
-    /**
-     * Get info sheet with tender details
-     * Uses shared tender service method
-     */
     async findByTenderIdWithTender(tenderId: number) {
         const [infoSheet, tender] = await Promise.all([
             this.findByTenderId(tenderId),
@@ -99,9 +175,6 @@ export class TenderInfoSheetsService {
         };
     }
 
-    /**
-     * Validate YES/NO fields before database insertion
-     */
     private validateYesNoFields(payload: TenderInfoSheetPayload): void {
         const yesNoFields = [
             { name: 'processingFeeRequired', value: payload.processingFeeRequired },
@@ -717,9 +790,6 @@ export class TenderInfoSheetsService {
         }
     }
 
-    /**
-     * Helper method to send email notifications
-     */
     private async sendEmail(
         eventType: string,
         tenderId: number,
@@ -746,9 +816,6 @@ export class TenderInfoSheetsService {
         }
     }
 
-    /**
-     * Send info sheet filled email
-     */
     private async sendInfoSheetFilledEmail(
         tenderId: number,
         infoSheet: TenderInfoSheetWithRelations,
@@ -809,31 +876,30 @@ export class TenderInfoSheetsService {
             }
         });
 
-        // Map document names to labels
-        const mapDocumentName = (docName: string, isTechnical: boolean): string => {
-            const docId = parseInt(docName, 10);
-            if (!isNaN(docId)) {
-                if (isTechnical && pqrMap.has(docId)) {
-                    return pqrMap.get(docId)!;
-                }
-                if (!isTechnical && financeMap.has(docId)) {
-                    return financeMap.get(docId)!;
-                }
-            }
-            // Return as-is if not a valid ID or not found in maps
-            return docName;
-        };
-
         // Build document lists with mapped names
         const teDocs = infoSheet.technicalWorkOrders.length > 0
-            ? infoSheet.technicalWorkOrders.map(doc => `<li>${mapDocumentName(doc.documentName, true)}</li>`).join('')
-            : '<li>None</li>';
-        const tenderDocs = infoSheet.commercialDocuments.length > 0
-            ? infoSheet.commercialDocuments.map(doc => `<li>${mapDocumentName(doc.documentName, false)}</li>`).join('')
-            : '<li>None</li>';
+            ? infoSheet.technicalWorkOrders.map(doc =>
+                `<li>${doc.projectName || `Document ${doc.id}`}</li>`
+            ).join('') : '<li>None</li>';
+
         const ceDocs = infoSheet.commercialDocuments.length > 0
-            ? infoSheet.commercialDocuments.map(doc => `<li>${mapDocumentName(doc.documentName, false)}</li>`).join('')
+            ? infoSheet.commercialDocuments.map(doc =>
+                `<li>${doc.documentName || `Document ${doc.id}`}</li>`
+            ).join('') : '<li>None</li>';
+
+        let docs = [];
+        if (tender.documents) {
+            try {
+                docs = JSON.parse(tender.documents);
+            } catch (e) {
+                docs = [];
+            }
+        }
+
+        const tenderDocs = docs.length > 0
+            ? docs.map((doc, index) => `<li>${doc || `Document ${index + 1}`}</li>`).join('')
             : '<li>None</li>';
+
 
         // Format array fields (modes) as comma-separated strings
         const formatArray = (arr: string[] | null | undefined): string => {
@@ -943,7 +1009,7 @@ export class TenderInfoSheetsService {
             courier_address: infoSheet.courierAddress || 'Not specified',
             te_final_remark: infoSheet.teFinalRemark || '',
             // Link & Assignee
-            link: `#/tendering/tender-approvals/${tenderId}/approval`, // TODO: Update with actual frontend URL
+            link: `#/tendering/tender-approvals/${tenderId}/approval`,
             assignee: assignee.name,
         };
 
