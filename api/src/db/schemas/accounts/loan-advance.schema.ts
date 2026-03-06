@@ -14,7 +14,7 @@ export const loanAdvances = pgTable('loan_advances', {
 
   // Dates
   sanctionLetterDate: date('sanction_letter_date').notNull(),
-  emiPaymentDate: date('emi_payment_date').notNull(), // Next EMI date
+  emiPaymentDate: date('emi_payment_date'), // Next EMI date
   lastEmiDate: date('last_emi_date'), // Last paid EMI date
 
   // Document uploads
