@@ -1214,7 +1214,7 @@ export class TenderExecutiveService {
           AND ti.created_at < '${from}'
           AND tin.id IS NULL
           AND ti.id = 1
-          AND ti.status NOT IN ${missedStatus}
+          AND ti.status NOT IN (${missedStatus})
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1245,7 +1245,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
         AND ti.created_at BETWEEN '${from}' AND '${to}'
         AND tin.id IS NULL
-        AND ti.status IN ${missedStatus}  
+        AND ti.status IN (${missedStatus})  
     `);
 
         const assignedTotal = await exec(`
