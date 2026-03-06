@@ -6,6 +6,7 @@ import { FileText } from "lucide-react";
 import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { BI_STATUSES, formatValue, getReadableStatusName, getStatusBadgeVariant } from "../constants";
 
 interface PaymentRequest {
     id: number;
@@ -13,8 +14,8 @@ interface PaymentRequest {
     purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string | number;
     dueDate: string | Date | null;
-    status: string;
-    remarks?: string | null;
+    createdAt: string | Date | null;
+    requestedBy?: string | null;
     instruments?: Array<{
         id: number;
         instrumentType: string;
@@ -37,19 +38,6 @@ interface EmdTenderFeeShowProps {
     tender?: TenderInfoWithNames | null;
     isLoading?: boolean;
 }
-
-const formatValue = (value?: string | number | null) => {
-    if (value === null || value === undefined || value === "") return "—";
-    return value;
-};
-
-const getStatusBadgeVariant = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === "pending") return "secondary";
-    if (statusLower === "approved" || statusLower === "received") return "default";
-    if (statusLower === "rejected" || statusLower === "cancelled") return "destructive";
-    return "outline";
-};
 
 const hasValue = (value?: string | Date | number | null) => {
     return value !== null && value !== undefined && value !== "";
@@ -114,8 +102,8 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                             <TableCell className="text-sm font-semibold">{instrument.instrumentType}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                             <TableCell>
-                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>{instrument.status}</Badge>
-                                <span>{instrument.action}</span>
+                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>{getReadableStatusName(instrument.status as keyof typeof BI_STATUSES)}</Badge>
+                                {/* <span>{instrument.action}</span> */}
                             </TableCell>
                         </TableRow>
 
@@ -266,18 +254,16 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>{emdRequest.status}</Badge>
-                                    </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(emdRequest.amountRequired)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatDateTime(emdRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
                                     <TableCell className="text-sm">{formatDateTime(emdRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(emdRequest.remarks)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
+                                    <TableCell className="text-sm">{emdRequest.requestedBy}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(emdRequest.instruments, "EMD")}
                             </>
@@ -292,18 +278,16 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>{tenderFeeRequest.status}</Badge>
-                                    </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(tenderFeeRequest.amountRequired)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatDateTime(tenderFeeRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
                                     <TableCell className="text-sm">{formatDateTime(tenderFeeRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(tenderFeeRequest.remarks)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
+                                    <TableCell className="text-sm">{tenderFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(tenderFeeRequest.instruments, "Tender Fee")}
                             </>
@@ -318,18 +302,16 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>{processingFeeRequest.status}</Badge>
-                                    </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(processingFeeRequest.amountRequired)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatDateTime(processingFeeRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
                                     <TableCell className="text-sm">{formatDateTime(processingFeeRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(processingFeeRequest.remarks)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
+                                    <TableCell className="text-sm">{processingFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
                                 {renderInstrumentRows(processingFeeRequest.instruments, "Processing Fee")}
                             </>
@@ -343,8 +325,8 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                             <TableCell colSpan={2} className="font-bold text-sm">
                                 {formatINR(
                                     (Number(emdRequest?.amountRequired) || 0) +
-                                        (Number(tenderFeeRequest?.amountRequired) || 0) +
-                                        (Number(processingFeeRequest?.amountRequired) || 0)
+                                    (Number(tenderFeeRequest?.amountRequired) || 0) +
+                                    (Number(processingFeeRequest?.amountRequired) || 0)
                                 )}
                             </TableCell>
                         </TableRow>
