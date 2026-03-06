@@ -28,4 +28,16 @@ export class MailAudienceService {
 
         return user;
     }
+
+    async getAdmin(): Promise<typeof users.$inferSelect> {
+        const [user] = await this.db.select().from(users).where(eq(users.id, 7));
+
+        return user;
+    }
+
+    async getCoordinator(): Promise<typeof users.$inferSelect | null> {
+        const result = await this.db.select({ user: users }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(eq(userRoles.roleId, 4)).limit(1);
+
+        return result.length ? result[0].user : null;
+    }
 }
