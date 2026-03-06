@@ -1201,6 +1201,8 @@ export class TenderExecutiveService {
         ) tcs ON true
     `;
 
+        const missedStatus = [8, 10];
+
         /* =====================================================
        ASSIGNED
     ===================================================== */
@@ -1212,6 +1214,7 @@ export class TenderExecutiveService {
           AND ti.created_at < '${from}'
           AND tin.id IS NULL
           AND ti.id = 1
+          AND ti.status NOT IN ${missedStatus}
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1242,7 +1245,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
         AND ti.created_at BETWEEN '${from}' AND '${to}'
         AND tin.id IS NULL
-        AND ti.status <> 1
+        AND ti.status IN ${missedStatus}  
     `);
 
         const assignedTotal = await exec(`
@@ -1252,6 +1255,7 @@ export class TenderExecutiveService {
           AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND tin.id IS NULL
           AND ti.id = 1
+        AND ti.status NOT IN ${missedStatus}
     `);
 
         /* =====================================================

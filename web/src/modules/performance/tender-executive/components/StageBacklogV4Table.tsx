@@ -38,9 +38,9 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <TableHead className="text-center">
                                 <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
                             </TableHead>
-                            {/* <TableHead className="text-center">
-                                <ColumnHeader title="Pending During" description="Tender Info pending at the end of the period" />
-                            </TableHead> */}
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Status Changed" description="Tenders with status changes during the period" />
+                            </TableHead>
                             <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
                             </TableHead>
