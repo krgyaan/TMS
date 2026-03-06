@@ -141,19 +141,6 @@ export class LoanAdvanceController {
     await this.loanAdvanceService.deleteEmi(id);
   }
 
-  // ===================== TDS FOLLOWUPS =====================
-
-  @Get(':loanId/tds-followups')
-  async listFollowups(@Param('loanId', ParseIntPipe) loanId: number) {
-    return this.loanAdvanceService.findFollowupsByLoanId(loanId);
-  }
-
-  @Delete('tds-followups/:id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteFollowup(@Param('id', ParseIntPipe) id: number) {
-    await this.loanAdvanceService.deleteFollowup(id);
-  }
-
   // ===================== TDS RECOVERIES =====================
 
   @Get(':loanId/tds-recoveries')
