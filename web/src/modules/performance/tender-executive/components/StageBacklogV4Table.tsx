@@ -39,7 +39,7 @@ function AssignmentTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Info Filled" description="Tender Info filled during the period" />
                             </TableHead>
                             {/* <TableHead className="text-center">
-                                <ColumnHeader title="Pending During" description="Tender Info pending at the end of the period" />
+                                <ColumnHeader title="Status Changed" description="Tenders with status changes during the period" />
                             </TableHead> */}
                             <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Tender Info pending at the end of the period" />
@@ -54,7 +54,7 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
-                            {/* <MetricCell data={stage.during.pending} /> */}
+                            {/* <MetricCell data={stage.during.statusChanged} /> */}
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>

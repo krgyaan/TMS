@@ -210,15 +210,15 @@ export class MailerService {
             if (isSandbox) {
                 this.logger.warn("SANDBOX MODE ACTIVE — overriding sender and recipients", {
                     originalSenderUserId: connection.userId,
-                    sandboxSenderUserId: 57,
+                    sandboxSenderUserId: process.env.MAIL_SENDER_ID,
                     originalTo: meta.to,
                     sandboxTo: process.env.MAIL_SANDBOX_TO,
                 });
 
-                const sandboxConnection = await this.googleService.getSanitizedGoogleConnection(57);
+                const sandboxConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(process.env.MAIL_SENDER_ID!));
 
                 if (!sandboxConnection) {
-                    this.logger.error("Sandbox Google connection missing for user 57");
+                    this.logger.error("Sandbox Google connection missing for user " + process.env.MAIL_SENDER_ID);
                     throw new Error("Sandbox Google connection not found");
                 }
 

@@ -3,6 +3,10 @@ export const FollowupMailTemplates = {
         name: "followup-default",
         basePath: "modules/follow-up/mails",
     },
+    ASSIGNED_TO_MAIL: {
+        name: "followup-assigned",
+        basePath: "modules/follow-up/mails",
+    },
     DD: {
         name: "followup-dd",
         basePath: "modules/follow-up/mails",

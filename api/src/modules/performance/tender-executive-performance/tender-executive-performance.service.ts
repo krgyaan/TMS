@@ -1201,51 +1201,86 @@ export class TenderExecutiveService {
         ) tcs ON true
     `;
 
+        const missedStatus = [8, 10, 11];
+
         /* =====================================================
        ASSIGNED
     ===================================================== */
-
         const assignedOpening = await exec(`
         ${baseSelect}
-        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
-          AND tin.id IS NULL
-          AND tl_status = 0
-          AND ti.status IN (1)
-    `);
-
+        AND ti.created_at < '${from}'
+        AND ti.status = 1
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at < '${from}'
+        )
+        `);
+        /**
+         * Allocated During Period
+         * All tenders assigned during selected period
+         */
         const assignedDuringTotal = await exec(`
-        ${baseSelect}
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-    `);
+            ${baseSelect}
+            WHERE ${baseWhere()}
+            AND ti.created_at BETWEEN '${from}' AND '${to}'
+            `);
 
+        /**
+         * Filled During
+         * Assigned during period and infosheet created during period
+         */
         const assignedDuringCompleted = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND tin.created_at BETWEEN '${from}' AND '${to}'
-    `);
+            ${baseSelect}
+            WHERE ${baseWhere()}
+            AND ti.created_at BETWEEN '${from}' AND '${to}'
+            AND EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+                AND tin.created_at BETWEEN '${from}' AND '${to}'
+            )
+            `);
 
-        const assignedDuringPending = await exec(`
-        ${baseSelect}
-        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND tin.id IS NULL
-    `);
+        /**
+         * Status Changed During
+         * Assigned during period but moved to missed/rejected without infosheet
+         */
+        const assignedDuringStatusChanged = await exec(`
+            ${baseSelect}
+            WHERE ${baseWhere()}
+            AND ti.created_at BETWEEN '${from}' AND '${to}'
+            AND ti.status IN (${missedStatus})
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            )
+            `);
 
-        const assignedTotal = await exec(`
+        /**
+         * Pending Closing
+         * Assigned during period and still no infosheet by end of period
+         */
+        const assignedClosingPending = await exec(`
         ${baseSelect}
-        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at < '${to}'
-          AND tin.id IS NULL
-          AND tl_status = 0
-          AND ti.status IN (1)
-    `);
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        -- AND ti.status NOT IN (${missedStatus})
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at <= '${to}'
+        )
+        `);
 
+        /**
+         * Closing Total (pending backlog)
+         */
+        const assignedTotal = assignedClosingPending;
         /* =====================================================
        APPROVED
     ===================================================== */
@@ -1510,26 +1545,36 @@ export class TenderExecutiveService {
                         value: this.sumValue(assignedOpening),
                         drilldown: this.mapDrilldown(assignedOpening),
                     },
+
                     total: {
                         count: assignedTotal.length,
                         value: this.sumValue(assignedTotal),
                         drilldown: this.mapDrilldown(assignedTotal),
                     },
+
                     during: {
                         total: {
                             count: assignedDuringTotal.length,
                             value: this.sumValue(assignedDuringTotal),
                             drilldown: this.mapDrilldown(assignedDuringTotal),
                         },
+
                         completed: {
                             count: assignedDuringCompleted.length,
                             value: this.sumValue(assignedDuringCompleted),
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
+
+                        // statusChanged: {
+                        //     count: assignedDuringStatusChanged.length,
+                        //     value: this.sumValue(assignedDuringStatusChanged),
+                        //     drilldown: this.mapDrilldown(assignedDuringStatusChanged),
+                        // },
+
                         pending: {
-                            count: assignedDuringPending.length,
-                            value: this.sumValue(assignedDuringPending),
-                            drilldown: this.mapDrilldown(assignedDuringPending),
+                            count: assignedClosingPending.length,
+                            value: this.sumValue(assignedClosingPending),
+                            drilldown: this.mapDrilldown(assignedClosingPending),
                         },
                     },
                 },

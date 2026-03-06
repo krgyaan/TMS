@@ -28,6 +28,8 @@ import { FollowupMailTemplates } from "./follow-up.mail";
 import { FollowupMailDataBuilder } from "./follow-up.mail-data";
 import { FollowupMailBase } from "./zod/mail.dto";
 
+import { MailAudienceService } from "@/core/mail/mail-audience.service";
+
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
@@ -55,7 +57,9 @@ export class FollowUpService {
         private readonly googleService: GoogleService,
 
         @Inject(WINSTON_MODULE_PROVIDER)
-        private readonly logger: Logger
+        private readonly logger: Logger,
+
+        private readonly mailAudience: MailAudienceService
     ) {}
 
     // ========================
@@ -108,7 +112,7 @@ export class FollowUpService {
             // ------------------------
             return await this.db.transaction(async tx => {
                 // 1. Insert main follow-up record
-                const [created] = await tx
+                const [followUp] = await tx
                     .insert(followUps)
                     .values({
                         area: dto.area,
@@ -138,17 +142,17 @@ export class FollowUpService {
                     })
                     .returning();
 
-                this.logger.debug("Follow-up main record inserted", { followUpId: created.id });
+                this.logger.debug("Follow-up main record inserted", { followUpId: followUp.id });
 
                 // 2. Insert relational contacts
                 this.logger.debug("Preparing to insert relational contacts", {
                     count: contacts.length,
-                    followUpId: created.id,
+                    followUpId: followUp.id,
                 });
 
                 if (contacts.length > 0) {
                     const mappedContacts = contacts.map(c => ({
-                        followUpId: created.id,
+                        followUpId: followUp.id,
                         name: c.name,
                         email: c.email,
                         phone: c.phone,
@@ -160,18 +164,84 @@ export class FollowUpService {
                     const insertResult = await tx.insert(followUpPersons).values(mappedContacts).returning();
 
                     this.logger.debug("Relational contacts insert result", {
-                        followUpId: created.id,
+                        followUpId: followUp.id,
                         insertedCount: insertResult.length,
                     });
                 } else {
-                    this.logger.warn("No contacts found to insert relationally", { followUpId: created.id });
+                    this.logger.warn("No contacts found to insert relationally", { followUpId: followUp.id });
                 }
 
                 this.logger.info("Follow-up created successfully inside transaction", {
-                    followUpId: created.id,
+                    followUpId: followUp.id,
                 });
 
-                return created;
+                // ===== MAIL SIDE EFFECT (non-blocking for courier creation) =====
+                try {
+                    // createdById null check
+                    if (followUp.createdById === null) {
+                        this.logger.warn("createdById missing, mail skipped", {
+                            followUpId: followUp.id,
+                        });
+                        return followUp;
+                    }
+
+                    const googleConnection = await this.googleService.getSanitizedGoogleConnection(followUp.createdById);
+
+                    if (!googleConnection) {
+                        this.logger.warn("Google connection missing, mail skipped", {
+                            followUpId: followUp.id,
+                        });
+                        return followUp;
+                    }
+
+                    let toEmailsList: string[] = [];
+                    let toUser: typeof users.$inferSelect | undefined;
+
+                    const [fromUser] = await this.db.select().from(users).where(eq(users.id, followUp.createdById));
+
+                    // assignedToId null check
+                    if (followUp.assignedToId !== null) {
+                        [toUser] = await this.db.select().from(users).where(eq(users.id, followUp.assignedToId));
+
+                        if (toUser) {
+                            toEmailsList = [toUser.email];
+                        }
+                    }
+
+                    const admin = await this.mailAudience.getAdmin();
+                    const coordinator = await this.db.select().from(users).where(eq(users.id, 8));
+
+                    const ccMail = [admin.email, coordinator[0]?.email];
+
+                    this.logger.info("To Email List", { toEmailsList });
+                    this.logger.info("CC Email List", { ccMail });
+
+                    const mailPayload = {
+                        teamMember: toUser?.name ?? "Team Member",
+                        organizationName: followUp.partyName,
+                        followUpFor: followUp.followupFor,
+                        followUpInitiator: fromUser?.name ?? "",
+                        formLink: `${process.env.FRONTEND_URL}/shared/follow-up/edit/${followUp.id}`,
+                    };
+
+                    await this.mailerService.sendMail(
+                        FollowupMailTemplates.ASSIGNED_TO_MAIL,
+                        mailPayload,
+                        {
+                            to: toEmailsList,
+                            cc: ccMail,
+                            subject: "New Follow Up Assigned",
+                        },
+                        googleConnection
+                    );
+                } catch (mailError: any) {
+                    this.logger.error("Follow-up Created mail failed (non-blocking)", {
+                        followUpId: followUp.id,
+                        error: mailError.message,
+                    });
+                }
+
+                return followUp;
             });
         } catch (error: any) {
             this.logger.error("Failed to create follow-up", {
@@ -779,7 +849,7 @@ export class FollowUpService {
 
     private transformFollowUp(f: any, includeHistory = false) {
         if (!f) {
-            this.logger.warn("transformFollowUp called with empty object");
+            // this.logger.warn("transformFollowUp called with empty object");
             return {};
         }
 
@@ -805,10 +875,10 @@ export class FollowUpService {
             result.follow_up_history = f.followUpsHistory || [];
         }
 
-        this.logger.debug("Follow-up transformed for response", {
-            followUpId: f.id,
-            contactsCount: result.followPerson.length,
-        });
+        // this.logger.debug("Follow-up transformed for response", {
+        //     followUpId: f.id,
+        //     contactsCount: result.followPerson.length,
+        // });
 
         return result;
     }
