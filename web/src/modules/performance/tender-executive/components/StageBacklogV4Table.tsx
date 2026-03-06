@@ -54,7 +54,7 @@ function AssignmentTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
-                            {/* <MetricCell data={stage.during.pending} /> */}
+                            <MetricCell data={stage.during.statusChanged} />
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
