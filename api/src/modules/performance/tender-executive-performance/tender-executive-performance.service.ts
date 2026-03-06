@@ -1255,7 +1255,7 @@ export class TenderExecutiveService {
           AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND tin.id IS NULL
           AND ti.id = 1
-        AND ti.status NOT IN ${missedStatus}
+        AND ti.status NOT IN (${missedStatus})
     `);
 
         /* =====================================================
