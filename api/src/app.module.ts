@@ -90,6 +90,7 @@ import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
+import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
 
 @Module({
     imports: [
@@ -189,7 +190,8 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ProjectsMasterrModule,
         // BusinessPerformanceModule,
         RequestExtensionsModule,
-        SubmitQueriesModule
+        SubmitQueriesModule,
+        LoanAdvanceModule
     ],
     controllers: [AppController],
     providers: [
