@@ -1211,6 +1211,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.created_at < '${from}'
           AND tin.id IS NULL
+          AND ti.id = 1
     `);
 
         const assignedDuringTotal = await exec(`
@@ -1230,16 +1231,27 @@ export class TenderExecutiveService {
         ${baseSelect}
         LEFT JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND tin.id IS NULL
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.id IS NULL
+        AND ti.status = 1
+    `);
+
+        const assignedDuringStatusChanged = await exec(`
+        ${baseSelect}
+        LEFT JOIN tender_information tin ON tin.tender_id = ti.id
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND tin.id IS NULL
+        AND ti.status <> 1
     `);
 
         const assignedTotal = await exec(`
         ${baseSelect}
         LEFT JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at < '${to}'
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND tin.id IS NULL
+          AND ti.id = 1
     `);
 
         /* =====================================================
@@ -1526,6 +1538,11 @@ export class TenderExecutiveService {
                             count: assignedDuringPending.length,
                             value: this.sumValue(assignedDuringPending),
                             drilldown: this.mapDrilldown(assignedDuringPending),
+                        },
+                        statusChanged: {
+                            count: assignedDuringStatusChanged.length,
+                            value: this.sumValue(assignedDuringStatusChanged),
+                            drilldown: this.mapDrilldown(assignedDuringStatusChanged),
                         },
                     },
                 },
