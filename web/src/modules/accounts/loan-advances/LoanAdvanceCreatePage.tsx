@@ -1,9 +1,7 @@
-import React from 'react'
+import LoanAdvanceForm from "./components/LoanAdvanceForm"
 
 const LoanAdvanceCreatePage = () => {
-  return (
-    <div>LoanAdvanceCreatePage</div>
-  )
+    return <LoanAdvanceForm mode="create" />
 }
 
 export default LoanAdvanceCreatePage

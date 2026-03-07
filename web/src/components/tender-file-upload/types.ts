@@ -59,7 +59,9 @@ export type TenderFileContext =
     | 'pqr-sap-gem-po'
     | 'pqr-completion'
     | 'pqr-performance-certificate'
-    | 'finance-document';
+    | 'finance-document'
+    | 'bankLoanSchedule'
+    | 'sanctionLetter';
 
 export interface FileConfig {
     context: string;

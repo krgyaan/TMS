@@ -12,7 +12,20 @@ const phoneNumber = z
   .max(20, 'Phone must not exceed 20 characters')
   .regex(/^[+]?[\d\s-]+$/, 'Invalid phone format');
 
-const optionalFile = z.array(z.string()).nullable().optional();
+const optionalFile = z.array(z.string()).optional();
+
+// ===================== BANK CONTACT FORM SCHEMA =====================
+
+export const BankContactFormSchema = z.object({
+  orgName: z.string().min(1, 'Organization name is required').max(255),
+  personName: z.string().min(1, 'Person name is required').max(255),
+  designation: z.string().max(255).optional(),
+  phone: phoneNumber,
+  email: z.email('Invalid email').optional().or(z.literal('')),
+});
+
+export type BankContactFormValues = z.infer<typeof BankContactFormSchema>;
+
 
 // ===================== LOAN ADVANCE FORM SCHEMA =====================
 
@@ -34,6 +47,7 @@ export const LoanAdvanceFormSchema = z.object({
   chargeMcaWebsite: z.string().default('No'),
   tdsToBeDeductedOnInterest: z.string().default('No'),
   principleOutstanding: decimalString.optional(),
+  bankContacts: z.array(BankContactFormSchema).default([]),
 });
 
 export type LoanAdvanceFormValues = z.infer<typeof LoanAdvanceFormSchema>;
@@ -46,18 +60,6 @@ export const LoanClosureFormSchema = z.object({
 });
 
 export type LoanClosureFormValues = z.infer<typeof LoanClosureFormSchema>;
-
-// ===================== BANK CONTACT FORM SCHEMA =====================
-
-export const BankContactFormSchema = z.object({
-  orgName: z.string().min(1, 'Organization name is required').max(255),
-  personName: z.string().min(1, 'Person name is required').max(255),
-  designation: z.string().max(255).optional().nullable(),
-  phone: phoneNumber,
-  email: z.email('Invalid email').optional().or(z.literal('')),
-});
-
-export type BankContactFormValues = z.infer<typeof BankContactFormSchema>;
 
 // ===================== DUE EMI FORM SCHEMA =====================
 

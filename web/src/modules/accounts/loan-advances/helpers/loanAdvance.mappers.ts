@@ -99,6 +99,7 @@ export const buildLoanAdvanceDefaultValues = (): LoanAdvanceFormValues => {
     chargeMcaWebsite: 'No',
     tdsToBeDeductedOnInterest: 'No',
     principleOutstanding: '',
+    bankContacts: []
   };
 };
 
@@ -123,6 +124,7 @@ export const mapLoanAdvanceResponseToForm = (
     chargeMcaWebsite: (response.chargeMcaWebsite ?? 'No'),
     tdsToBeDeductedOnInterest: (response.tdsToBeDeductedOnInterest ?? 'No'),
     principleOutstanding: toDecimalString(response.principleOutstanding),
+    bankContacts: response.bankContacts
   };
 };
 
@@ -206,7 +208,7 @@ export const buildBankContactDefaultValues = (bankName?: string): BankContactFor
   return {
     orgName: bankName ?? '',
     personName: '',
-    designation: null,
+    designation: '',
     phone: '',
     email: '',
   };
@@ -221,7 +223,7 @@ export const mapBankContactResponseToForm = (
   return {
     orgName: safeString(response.orgName),
     personName: safeString(response.personName),
-    designation: response.designation ?? null,
+    designation: response.designation ?? '',
     phone: safeString(response.phone),
     email: response.email ?? '',
   };

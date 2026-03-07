@@ -299,14 +299,14 @@ export const LOAN_PARTY_OPTIONS: SelectOption[] = [
 ];
 
 export const LOAN_TYPE_OPTIONS: SelectOption[] = [
-  { label: 'Term Loan', value: 'Term Loan' },
-  { label: 'CC', value: 'CC' },
-  { label: 'Limit', value: 'Limit' },
+    { label: 'Business Loan', value: 'Business Loan' },
+    { label: 'Term Loan', value: 'Term Loan' },
+    { label: 'CC/Limit', value: 'CC/Limit' },
 ];
 
 export const YES_NO_SELECT_OPTIONS: SelectOption[] = [
-  { label: 'Yes', value: 'Yes' },
-  { label: 'No', value: 'No' },
+    { label: 'Yes', value: 'Yes' },
+    { label: 'No', value: 'No' },
 ];
 
 export const LOAN_STATUS_SELECT_OPTIONS: SelectOption[] = [

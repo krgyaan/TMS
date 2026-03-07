@@ -59,7 +59,9 @@ export type TenderFileContext =
     | "pqr-sap-gem-po"
     | "pqr-completion"
     | "pqr-performance-certificate"
-    | "finance-document";
+    | "finance-document"
+    | "bankLoanSchedule"
+    | "sanctionLetter";
 
 export interface FileConfig {
     maxFiles: number;
@@ -707,6 +709,26 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         compressPdf: true,
         pdfQuality: 80,
     },
+    "bankLoanSchedule": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "sanctionLetter": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    }
 };
 
 export function getFileConfig(context: TenderFileContext): FileConfig {
