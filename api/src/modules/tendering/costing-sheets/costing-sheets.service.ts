@@ -138,7 +138,7 @@ export class CostingSheetsService {
             conditions.push(or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
                 isNull(tenderCostingSheets.submittedFinalPrice)) as any);
         } else if (activeTab === 'submitted') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(or(eq(tenderCostingSheets.status, 'Submitted'),
                 isNotNull(tenderCostingSheets.submittedFinalPrice)) as any);
         } else if (activeTab === 'tender-dnb') {
@@ -320,7 +320,7 @@ export class CostingSheetsService {
         ];
         const submittedConditions = [
             ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
             or(eq(tenderCostingSheets.status, 'Submitted'),
                 isNotNull(tenderCostingSheets.submittedFinalPrice)),
         ];

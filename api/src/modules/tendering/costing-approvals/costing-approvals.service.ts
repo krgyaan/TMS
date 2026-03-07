@@ -171,7 +171,7 @@ export class CostingApprovalsService {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
         } else if (activeTab === 'approved') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
         } else if (activeTab === 'tender-dnb') {
             conditions.push(inArray(tenderInfos.status, [8, 34]));
@@ -304,7 +304,7 @@ export class CostingApprovalsService {
         // Count approved: costing_status = 'Approved'
         const approvedConditions = [
             ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
             eq(tenderCostingSheets.status, 'Approved'),
         ];
 
