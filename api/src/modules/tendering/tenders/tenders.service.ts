@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { bidSubmissions, tenderResults } from '@/db/schemas';
+import { bidSubmissions, tenderResults, timerTrackers } from '@/db/schemas';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -639,13 +639,37 @@ export class TenderInfosService {
     }
 
     async delete(id: number): Promise<void> {
+        const now = new Date();
+
+        // Soft delete tender
         const result = await this.db
-            .delete(tenderInfos)
+            .update(tenderInfos)
+            .set({
+                deleteStatus: 1,
+            })
             .where(eq(tenderInfos.id, id))
             .returning();
+
         if (!result[0]) {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
+
+        // Cancel all running timers for this tender
+        await this.db
+            .update(timerTrackers)
+            .set({
+                status: 'cancelled',
+                endedAt: now,
+                pausedAt: null,
+                updatedAt: now,
+            })
+            .where(
+                and(
+                    eq(timerTrackers.entityType, 'TENDER'),
+                    eq(timerTrackers.entityId, id),
+                    eq(timerTrackers.status, 'running')
+                )
+            );
     }
 
     /**

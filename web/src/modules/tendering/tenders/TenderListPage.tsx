@@ -19,6 +19,7 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "./components/ChangeStatusModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
@@ -28,6 +29,9 @@ const TenderListPage = () => {
     const [search, setSearch] = useState<string>('');
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const debouncedSearch = useDebouncedSearch(search, 300);
+
+    const { canDelete } = useAuth();
+
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -155,10 +159,7 @@ const TenderListPage = () => {
                 }
             },
             icon: <Trash className="h-4 w-4" />,
-            visible: (row: TenderInfoWithNames) => {
-                // For now, show delete button for all users
-                return row.teamMember == 7 || row.teamMember == 8;
-            },
+            visible: canDelete,
         },
         {
             label: "Request Extension",
