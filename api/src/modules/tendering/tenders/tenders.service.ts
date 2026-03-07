@@ -798,7 +798,7 @@ export class TenderInfosService {
         if (tender.teamMember) {
             // Tender assigned - send to team member, from coordinator
             const assignee = await this.recipientResolver.getUserById(tender.teamMember);
-            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId) || 8;
 
             if (assignee && coordinatorUserId) {
                 await this.sendEmail(
@@ -823,7 +823,7 @@ export class TenderInfosService {
             }
         } else {
             // Tender unallocated - send to team leader, from coordinator
-            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
 
             if (coordinatorUserId) {
                 await this.sendEmail(
@@ -908,7 +908,7 @@ export class TenderInfosService {
         const assignee = await this.recipientResolver.getUserById(newTender.teamMember);
         if (!assignee) return;
 
-        const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+        const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
         if (!coordinatorUserId) return;
 
         await this.sendEmail(
@@ -962,7 +962,7 @@ export class TenderInfosService {
 
         // Get coordinator name and user ID
         const coordinatorName = await this.getCoordinatorName(tender.team);
-        const coordinatorUserId = await this.getCoordinatorUserId(tender.team);
+        const coordinatorUserId = await this.getCoordinatorUserId(tender.team)  || 8;
         if (!coordinatorUserId) return;
 
         // Format due date
