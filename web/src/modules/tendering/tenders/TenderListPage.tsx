@@ -9,7 +9,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw, Clock } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, RefreshCw, Clock, Archive } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -141,26 +141,6 @@ const TenderListPage = () => {
             icon: <Eye className="h-4 w-4" />,
         },
         {
-            label: "Edit",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
-            icon: <Pencil className="h-4 w-4" />,
-        },
-        {
-            label: "Delete",
-            className: "text-red-600",
-            onClick: async row => {
-                if (confirm(`Are you sure you want to delete tender "${row.tenderName}"?`)) {
-                    try {
-                        await deleteTender.mutateAsync(row.id);
-                    } catch (error) {
-                        console.error("Delete failed:", error);
-                    }
-                }
-            },
-            icon: <Trash className="h-4 w-4" />,
-            visible: () => canDelete("tender"),
-        },
-        {
             label: "Request Extension",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
@@ -169,7 +149,27 @@ const TenderListPage = () => {
             label: "Submit Queries",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.submitQueryCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
-        }
+        },
+        {
+            label: "Edit",
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
+            icon: <Pencil className="h-4 w-4" />,
+        },
+        {
+            label: "Archive",
+            className: "text-red-600",
+            onClick: async row => {
+                if (confirm(`Are you sure you want to archive tender "${row.tenderName}"?`)) {
+                    try {
+                        await deleteTender.mutateAsync(row.id);
+                    } catch (error) {
+                        console.error("Delete failed:", error);
+                    }
+                }
+            },
+            icon: <Archive className="h-4 w-4 text-red-600" />,
+            visible: () => canDelete("tender"),
+        },
     ];
 
     const colDefs = useMemo<ColDef<TenderWithTimer>[]>(() => [
