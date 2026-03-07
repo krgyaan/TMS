@@ -9,42 +9,27 @@ import { CreateLoanAdvanceDto, UpdateLoanAdvanceDto, LoanAdvanceQuery, LoanAdvan
 export class LoanAdvanceService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ===================== UTILITY METHODS =====================
+    private shouldShowNocUpload(
+        loanCloseStatus: string,
+        lastEmiDate: string | Date | null
+    ): boolean {
+        if (loanCloseStatus === 'Closed') return false;
+        if (!lastEmiDate) return false;
+        const closureDate = new Date(lastEmiDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return closureDate <= today;
+    }
 
-  private formatDate(date: Date | string | null): string | null {
-    if (!date) return null;
-    if (typeof date === 'string') return date;
-    return date.toISOString().split('T')[0];
-  }
-
-  private parseDecimal(value: string | number | null): string {
-    if (value === null || value === undefined) return '0.00';
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    return isNaN(num) ? '0.00' : num.toFixed(2);
-  }
-
-  private isDue(emiPaymentDate: string | Date | null): boolean {
-    if (!emiPaymentDate) return false;
-    const emiDate = new Date(emiPaymentDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return emiDate < today;
-  }
-
-  private shouldShowNocUpload(
-    loanCloseStatus: string,
-    lastEmiDate: string | Date | null
-  ): boolean {
-    if (loanCloseStatus === 'Closed') return false;
-    if (!lastEmiDate) return false;
-    const closureDate = new Date(lastEmiDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return closureDate <= today;
-  }
+    private isDue(emiPaymentDate: string | Date | null): boolean {
+        if (!emiPaymentDate) return false;
+        const emiDate = new Date(emiPaymentDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return emiDate < today;
+    }
 
   // ===================== LOAN ADVANCES =====================
-
   private mapLoanToResponse(row: any): LoanAdvanceResponse {
     return {
       id: row.id,
@@ -52,10 +37,10 @@ export class LoanAdvanceService {
       bankName: row.bankName,
       loanAccNo: row.loanAccNo,
       typeOfLoan: row.typeOfLoan,
-      loanAmount: this.parseDecimal(row.loanAmount),
-      sanctionLetterDate: this.formatDate(row.sanctionLetterDate) ?? '',
-      emiPaymentDate: this.formatDate(row.emiPaymentDate) ?? '',
-      lastEmiDate: this.formatDate(row.lastEmiDate),
+      loanAmount: row.loanAmount,
+      sanctionLetterDate: row.sanctionLetterDate ?? '',
+      emiPaymentDate: row.emiPaymentDate ?? '',
+      lastEmiDate: row.lastEmiDate,
       sanctionLetter: row.sanctionLetter,
       bankLoanSchedule: row.bankLoanSchedule,
       loanSchedule: row.loanSchedule,
@@ -64,10 +49,10 @@ export class LoanAdvanceService {
       loanCloseStatus: row.loanCloseStatus,
       closureCreatedMca: row.closureCreatedMca,
       bankNocDocument: row.bankNocDocument,
-      principleOutstanding: this.parseDecimal(row.principleOutstanding),
-      totalInterestPaid: this.parseDecimal(row.totalInterestPaid),
-      totalPenalChargesPaid: this.parseDecimal(row.totalPenalChargesPaid),
-      totalTdsToRecover: this.parseDecimal(row.totalTdsToRecover),
+      principleOutstanding: row.principleOutstanding,
+      totalInterestPaid: row.totalInterestPaid,
+      totalPenalChargesPaid: row.totalPenalChargesPaid,
+      totalTdsToRecover: row.totalTdsToRecover,
       noOfEmisPaid: row.noOfEmisPaid ?? 0,
       isDue: this.isDue(row.emiPaymentDate),
       showNocUpload: this.shouldShowNocUpload(row.loanCloseStatus, row.lastEmiDate),
@@ -433,11 +418,11 @@ export class LoanAdvanceService {
     return {
       id: row.id,
       loanId: row.loanId,
-      emiDate: this.formatDate(row.emiDate) ?? '',
-      principlePaid: this.parseDecimal(row.principlePaid),
-      interestPaid: this.parseDecimal(row.interestPaid),
-      tdsToBeRecovered: this.parseDecimal(row.tdsToBeRecovered),
-      penalChargesPaid: this.parseDecimal(row.penalChargesPaid),
+      emiDate: row.emiDate ?? '',
+      principlePaid: row.principlePaid,
+      interestPaid: row.interestPaid,
+      tdsToBeRecovered: row.tdsToBeRecovered,
+      penalChargesPaid: row.penalChargesPaid,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -532,9 +517,9 @@ export class LoanAdvanceService {
     return {
       id: row.id,
       loanId: row.loanId,
-      tdsAmount: this.parseDecimal(row.tdsAmount),
+      tdsAmount: row.tdsAmount,
       tdsDocument: row.tdsDocument,
-      tdsDate: this.formatDate(row.tdsDate) ?? '',
+      tdsDate: row.tdsDate ?? '',
       tdsRecoveryBankDetails: row.tdsRecoveryBankDetails,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

@@ -1,5 +1,6 @@
 import { pgTable, serial, varchar, decimal, date, timestamp, text, integer } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { jsonb } from 'drizzle-orm/pg-core';
 
 // ===================== MAIN TABLES =====================
 export const loanAdvances = pgTable('loan_advances', {
@@ -18,8 +19,8 @@ export const loanAdvances = pgTable('loan_advances', {
   lastEmiDate: date('last_emi_date'), // Last paid EMI date
 
   // Document uploads
-  sanctionLetter: varchar('sanction_letter', { length: 500 }), // File path/URL
-  bankLoanSchedule: varchar('bank_loan_schedule', { length: 500 }), // File path/URL
+   sanctionLetter: jsonb('sanction_letter').$type<string[]>(),
+  bankLoanSchedule: jsonb('bank_loan_schedule').$type<string[]>(),
   loanSchedule: text('loan_schedule'), // Google Sheet Link or file path
 
   // Boolean/Enum flags
@@ -28,8 +29,8 @@ export const loanAdvances = pgTable('loan_advances', {
 
   // Closure related
   loanCloseStatus: varchar('loan_close_status', { length: 20 }).notNull().default('Active'),
-  closureCreatedMca: varchar('closure_created_mca', { length: 500 }), // Document path
-  bankNocDocument: varchar('bank_noc_document', { length: 500 }), // Document path
+  closureCreatedMca: jsonb('closure_created_mca').$type<string[]>(),
+  bankNocDocument: jsonb('bank_noc_document').$type<string[]>(),
 
   // Computed/Cached fields (optional - can be calculated from loanDueEmis)
   principleOutstanding: decimal('principle_outstanding', { precision: 15, scale: 2 }).default('0'),
@@ -90,7 +91,7 @@ export const loanTdsRecoveries = pgTable('loan_tds_recoveries', {
 
   // Recovery details
   tdsAmount: decimal('tds_amount', { precision: 15, scale: 2 }).notNull(),
-  tdsDocument: varchar('tds_document', { length: 500 }), // TDS return document
+  tdsDocument: jsonb('tds_document').$type<string[]>(),
   tdsDate: date('tds_date').notNull(),
   tdsRecoveryBankDetails: text('tds_recovery_bank_details'), // Transaction details
 

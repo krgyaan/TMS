@@ -29,14 +29,14 @@ export interface LoanAdvanceResponse {
   sanctionLetterDate: string;
   emiPaymentDate: string;
   lastEmiDate: string | null;
-  sanctionLetter: string | null;
-  bankLoanSchedule: string | null;
+  sanctionLetter: string[] | null;
+  bankLoanSchedule: string[] | null;
   loanSchedule: string | null;
   chargeMcaWebsite: string;
   tdsToBeDeductedOnInterest: string;
   loanCloseStatus: string;
-  closureCreatedMca: string | null;
-  bankNocDocument: string | null;
+  closureCreatedMca: string[] | null;
+  bankNocDocument: string[] | null;
   principleOutstanding: string | null;
   totalInterestPaid: string | null;
   totalPenalChargesPaid: string | null;
@@ -58,8 +58,8 @@ export interface LoanAdvanceListRow {
   sanctionLetterDate: string | null;
   emiPaymentDate: string | null;
   lastEmiDate: string | null;
-  sanctionLetter: string | null;
-  bankLoanSchedule: string | null;
+  sanctionLetter: string[] | null;
+  bankLoanSchedule: string[] | null;
   loanSchedule: string | null;
   chargeMcaWebsite: string | null;
   tdsToBeDeductedOnInterest: string | null;
@@ -127,7 +127,7 @@ export interface TdsRecoveryResponse {
   id: number;
   loanId: number;
   tdsAmount: string;
-  tdsDocument: string | null;
+  tdsDocument: string[] | null;
   tdsDate: string;
   tdsRecoveryBankDetails: string | null;
   createdAt: string;
@@ -138,7 +138,7 @@ export interface TdsRecoveryListRow {
   id: number;
   loanId: number;
   tdsAmount: string | null;
-  tdsDocument: string | null;
+  tdsDocument: string[] | null;
   tdsDate: string | null;
   tdsRecoveryBankDetails: string | null;
   createdAt: string | null;
@@ -285,18 +285,6 @@ export interface SelectOption {
   label: string;
   value: string;
 }
-
-export const LOAN_PARTY_OPTIONS: SelectOption[] = [
-  { label: 'Volks Energie', value: 'Volks Energie' },
-  { label: 'Cafeena', value: 'Cafeena' },
-  { label: 'PG', value: 'PG' },
-  { label: 'Arjun', value: 'Arjun' },
-  { label: 'Geeta Goyal', value: 'Geeta Goyal' },
-  { label: 'SLG', value: 'SLG' },
-  { label: 'Sonal Badkur', value: 'Sonal Badkur' },
-  { label: 'Sabr Enterprises', value: 'Sabr Enterprises' },
-  { label: 'Toshitaa Transformations', value: 'Toshitaa Transformations' },
-];
 
 export const LOAN_TYPE_OPTIONS: SelectOption[] = [
     { label: 'Business Loan', value: 'Business Loan' },

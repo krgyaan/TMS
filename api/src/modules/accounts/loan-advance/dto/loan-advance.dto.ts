@@ -18,11 +18,15 @@ const phoneNumber = z
   .max(20, 'Phone number must not exceed 20 characters')
   .regex(/^[+]?[\d\s-]+$/, 'Invalid phone number format');
 
-const filePathOrUrl = z
-  .string()
-  .max(500, 'File path/URL must not exceed 500 characters')
-  .optional()
-  .nullable();
+// Helper for file arrays - accepts array, normalizes empty to null
+const fileArray = z
+  .array(z.string().max(500))
+  .nullish()
+  .transform((val) => {
+    if (!val || val.length === 0) return null;
+    // Normalize backslashes to forward slashes
+    return val.map(path => path.replace(/\\/g, '/'));
+  });
 
 // ===================== LOAN ADVANCES DTOs =====================
 
@@ -35,8 +39,8 @@ export const createLoanAdvanceSchema = z.object({
   sanctionLetterDate: dateString,
   emiPaymentDate: dateString,
   lastEmiDate: dateString.optional().nullable(),
-  sanctionLetter: filePathOrUrl,
-  bankLoanSchedule: filePathOrUrl,
+  sanctionLetter: fileArray,
+  bankLoanSchedule: fileArray,
   loanSchedule: z.string().max(2000).optional().nullable(),
   chargeMcaWebsite: z.string().default('No'),
   tdsToBeDeductedOnInterest: z.string().default('No'),
@@ -46,8 +50,8 @@ export const createLoanAdvanceSchema = z.object({
 export const updateLoanAdvanceSchema = createLoanAdvanceSchema.partial();
 
 export const loanClosureSchema = z.object({
-  bankNocDocument: z.string().min(1, 'Bank NOC document is required').max(500),
-  closureCreatedMca: filePathOrUrl,
+  bankNocDocument: fileArray,
+  closureCreatedMca: fileArray,
 });
 
 export const loanAdvanceQuerySchema = z.object({
@@ -112,7 +116,7 @@ export const createTdsRecoverySchema = z.object({
     (val) => parseFloat(val as string) > 0,
     { message: 'TDS amount must be greater than 0' }
   ),
-  tdsDocument: filePathOrUrl,
+  tdsDocument: fileArray,
   tdsDate: dateString,
   tdsRecoveryBankDetails: z.string().max(2000).optional().nullable(),
 });
@@ -159,14 +163,14 @@ export interface LoanAdvanceResponse {
   sanctionLetterDate: string;
   emiPaymentDate: string;
   lastEmiDate: string | null;
-  sanctionLetter: string | null;
-  bankLoanSchedule: string | null;
+  sanctionLetter: string[] | null;
+  bankLoanSchedule: string[] | null;
   loanSchedule: string | null;
   chargeMcaWebsite: string;
   tdsToBeDeductedOnInterest: string;
   loanCloseStatus: string;
-  closureCreatedMca: string | null;
-  bankNocDocument: string | null;
+  closureCreatedMca: string[] | null;
+  bankNocDocument: string[] | null;
   principleOutstanding: string | null;
   totalInterestPaid: string | null;
   totalPenalChargesPaid: string | null;
@@ -206,7 +210,7 @@ export interface TdsRecoveryResponse {
   id: number;
   loanId: number;
   tdsAmount: string;
-  tdsDocument: string | null;
+  tdsDocument: string[] | null;
   tdsDate: string;
   tdsRecoveryBankDetails: string | null;
   createdAt: Date;

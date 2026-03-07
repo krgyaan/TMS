@@ -232,7 +232,7 @@ export function LoanAdvanceForm({ mode, existingData }: LoanAdvanceFormProps) {
                                     name="loanSchedule"
                                     label="Loan Schedule (Google Sheet Link)"
                                 >
-                                    {field => <Input type="url" placeholder="https://docs.google.com/spreadsheets/..." {...field} />}
+                                    {field => <Input placeholder="https://docs.google.com/spreadsheets/..." {...field} />}
                                 </FieldWrapper>
 
                                 {/* Charge Created on MCA Website */}
@@ -252,38 +252,6 @@ export function LoanAdvanceForm({ mode, existingData }: LoanAdvanceFormProps) {
                                     placeholder="Select Yes or No"
                                 />
                             </div>
-
-                            {/* Show existing files in edit mode */}
-                            {mode === 'edit' && existingData && (
-                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-                                    {existingData.sanctionLetter && (
-                                        <div className="text-sm text-muted-foreground">
-                                            <span className="font-medium">Current Sanction Letter:</span>{' '}
-                                            <a
-                                                href={`/uploads/${existingData.sanctionLetter}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary underline"
-                                            >
-                                                View File
-                                            </a>
-                                        </div>
-                                    )}
-                                    {existingData.bankLoanSchedule && (
-                                        <div className="text-sm text-muted-foreground">
-                                            <span className="font-medium">Current Bank Loan Schedule:</span>{' '}
-                                            <a
-                                                href={`/uploads/${existingData.bankLoanSchedule}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary underline"
-                                            >
-                                                View File
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
                         {/* Bank/NBFC Contact Details Section */}

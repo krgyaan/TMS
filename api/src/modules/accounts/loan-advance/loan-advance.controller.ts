@@ -1,13 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { LoanAdvanceService } from './loan-advance.service';
 import { CreateLoanAdvanceDto, createLoanAdvanceSchema, UpdateLoanAdvanceDto, updateLoanAdvanceSchema, loanAdvanceQuerySchema, LoanClosureDto, loanClosureSchema, CreateLoanBankContactDto,  createLoanBankContactSchema, UpdateLoanBankContactDto, updateLoanBankContactSchema, CreateDueEmiDto, createDueEmiSchema, UpdateDueEmiDto, updateDueEmiSchema, CreateTdsRecoveryDto, createTdsRecoverySchema, UpdateTdsRecoveryDto, updateTdsRecoverySchema } from './dto/loan-advance.dto';
-import { Public } from '@/modules/auth/decorators';
 
 @Controller('loan-advances')
 export class LoanAdvanceController {
   constructor(private readonly loanAdvanceService: LoanAdvanceService) {}
 
-  @Public()
   @Get()
   async listLoans(
     @Query('page') page?: string,
