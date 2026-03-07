@@ -32,7 +32,6 @@ const TenderListPage = () => {
 
     const { canDelete } = useAuth();
 
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch]);
@@ -125,7 +124,7 @@ const TenderListPage = () => {
         ];
     }, [counts]);
 
-    const tenderActions: ActionItem<TenderWithTimer>[] = [
+    const tenderActions: ActionItem<TenderWithTimer & { canDelete: boolean }>[] = [
         {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
@@ -159,7 +158,7 @@ const TenderListPage = () => {
                 }
             },
             icon: <Trash className="h-4 w-4" />,
-            visible: canDelete,
+            visible: () => canDelete("tender"),
         },
         {
             label: "Request Extension",
