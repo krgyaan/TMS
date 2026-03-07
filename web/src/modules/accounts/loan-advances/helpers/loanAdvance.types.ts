@@ -46,6 +46,7 @@ export interface LoanAdvanceResponse {
   showNocUpload: boolean;
   createdAt: string;
   updatedAt: string;
+  bankContacts: BankContactResponse[];
 }
 
 export interface LoanAdvanceListRow {
@@ -148,9 +149,8 @@ export interface TdsRecoveryListRow {
 // ===================== FULL DETAILS RESPONSE =====================
 
 export interface LoanAdvanceFullDetails extends LoanAdvanceResponse {
-  bankContacts: BankContactResponse[];
-  dueEmis: DueEmiResponse[];
-  tdsRecoveries: TdsRecoveryResponse[];
+  loanDueEmis: DueEmiResponse[];
+  loanTdsRecoveries: TdsRecoveryResponse[];
 }
 
 // ===================== CREATE DTOs =====================

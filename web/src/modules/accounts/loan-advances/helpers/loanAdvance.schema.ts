@@ -43,7 +43,7 @@ export const LoanAdvanceFormSchema = z.object({
   lastEmiDate: z.string().optional().nullable(),
   sanctionLetter: optionalFile,
   bankLoanSchedule: optionalFile,
-  loanSchedule: z.string().max(2000).optional().nullable(),
+  loanSchedule: z.string().max(2000).optional(),
   chargeMcaWebsite: z.string().default('No'),
   tdsToBeDeductedOnInterest: z.string().default('No'),
   principleOutstanding: decimalString.optional(),
