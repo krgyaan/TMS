@@ -1,7 +1,10 @@
 export interface BankTransferDashboardRow {
     id: number;
+    requestId: number;
+    purpose: string | null;
     date: Date | null;
     teamMember: string | null;
+    member: string | null;
     utrNo: string | null;
     accountName: string | null;
     tenderName: string | null;

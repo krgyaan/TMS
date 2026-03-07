@@ -17,7 +17,8 @@ import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 
 @Controller('physical-docs')
@@ -25,19 +26,26 @@ export class PhysicalDocsController {
     private readonly logger = new Logger(PhysicalDocsController.name);
     constructor(
         private readonly physicalDocsService: PhysicalDocsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tab') tab?: 'pending' | 'sent' | 'tender-dnb',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        const result = await this.physicalDocsService.getDashboardData(tab, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        const result = await this.physicalDocsService.getDashboardData(user, parseNumber(teamId), tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -47,19 +55,7 @@ export class PhysicalDocsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'physical_docs');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'physical_docs');
                 return {
                     ...tender,
                     timer
@@ -74,8 +70,16 @@ export class PhysicalDocsController {
     }
 
     @Get('dashboard/counts')
-    async getDashboardCounts() {
-        return this.physicalDocsService.getDashboardCounts();
+    async getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.physicalDocsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('by-tender/:tenderId')

@@ -42,6 +42,8 @@ export type TenderInfoWithNames = TenderInfo & {
     locationState: string | null;
     websiteName: string | null;
     websiteLink: string | null;
+    bidSubmissionDate: Date | null;
+    resultDate: Date | null;
 };
 
 export type TenderReference = {
@@ -150,4 +152,10 @@ export type ResultDashboardCounts = {
     lost: number;
     disqualified: number;
     total: number;
+    totalAmounts: {
+        pending: number;
+        won: number;
+        lost: number;
+        disqualified: number;
+    };
 };

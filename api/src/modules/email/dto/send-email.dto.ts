@@ -23,6 +23,10 @@ export interface SendEmailOptions {
 
     // Optional
     labelPath?: string;
+    attachments?: {
+        files: string[];
+        baseDir?: string;
+    };
 }
 
 export interface SendTenderEmailOptions {
@@ -34,6 +38,10 @@ export interface SendTenderEmailOptions {
     subject: string;
     template: string;
     data: Record<string, any>;
+    attachments?: {
+        files: string[];
+        baseDir?: string;
+    };
 }
 
 export interface ResolvedEmail {
@@ -47,6 +55,7 @@ export interface ResolvedEmail {
     threadId?: string;
     inReplyTo?: string;
     messageId: string;
+    attachments?: Array<{ filename: string; path: string }>;
 }
 
 export interface SendResult {

@@ -19,6 +19,7 @@ import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ManualFormSchema = z.object({
     team: z.coerce.number().int().positive({ message: "Team is required" }),
@@ -65,6 +66,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const createTender = useCreateTender();
     const updateTender = useUpdateTender();
     const generateTenderName = useGenerateTenderName();
+    const { user, roleId, effectiveTeamId } = useAuth();
 
     const teamOptions = useTeamOptions([1, 2]);
     const organizationOptions = useOrganizationOptions();
@@ -116,9 +118,17 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     const userOptions = useUserOptions(team);
 
+    // Role-based locking flags (create mode only)
+    const lockTeam = mode === "create" && roleId !== 1 && roleId !== 2;
+    const lockUser = mode === "create" && roleId !== 3 && roleId !== 4;
+
+    const currentTeamId = effectiveTeamId ?? null;
+    const currentUserId = user?.id ?? null;
+
     const isInitialLoad = useRef(true);
     const previousValues = useRef<{ organization?: number; item?: number; location?: number; team?: number }>({});
 
+    // Initialize form values for edit mode
     useEffect(() => {
         if (!tender || mode !== "edit") {
             if (mode === "create") {
@@ -202,15 +212,36 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         previousValues.current = { organization, item, location, team };
     }, [organization, item, location, team, generateTenderName, manualForm]);
 
-    // Clear team member when team changes
+    // Clear team member when team changes (unless locked to current user)
     useEffect(() => {
         if (isInitialLoad.current) return;
 
         if (previousValues.current.team !== team) {
-            manualForm.setValue("teamMember", null, { shouldValidate: false });
+            // If user field is not locked, reset team member on team change
+            if (!lockUser) {
+                manualForm.setValue("teamMember", null, { shouldValidate: false });
+            }
             previousValues.current.team = team;
         }
-    }, [team, manualForm]);
+    }, [team, manualForm, lockUser]);
+
+    // Auto-select team for restricted roles in create mode
+    useEffect(() => {
+        if (mode !== "create") return;
+        if (!lockTeam) return;
+        if (!currentTeamId) return;
+
+        manualForm.setValue("team", currentTeamId, { shouldValidate: true });
+    }, [mode, lockTeam, currentTeamId, manualForm]);
+
+    // Auto-select team member (current user) for restricted roles in create mode
+    useEffect(() => {
+        if (mode !== "create") return;
+        if (!lockUser) return;
+        if (!currentUserId) return;
+
+        manualForm.setValue("teamMember", currentUserId, { shouldValidate: true });
+    }, [mode, lockUser, currentUserId, manualForm]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
@@ -340,6 +371,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Name"
                                         options={teamOptions}
                                         placeholder="Select Team"
+                                        disabled={lockTeam}
                                     />
 
                                     {/* Tender No */}
@@ -442,7 +474,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Member"
                                         options={userOptions}
                                         placeholder="Select User"
-                                        disabled={!team}
+                                        disabled={!team || lockUser}
                                     />
 
                                     {/* Due Date & Time */}

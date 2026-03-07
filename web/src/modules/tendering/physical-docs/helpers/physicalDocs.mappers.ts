@@ -23,7 +23,7 @@ export const buildDefaultValues = (
 
     return {
         tenderId,
-        courierNo: undefined as unknown as number,
+        courierNo: 0 as number,
         submittedDocs: [],
         physicalDocsPersons: personsFromClients.length > 0
             ? personsFromClients
@@ -41,10 +41,28 @@ export const mapResponseToForm = (
         return buildDefaultValues(tenderId, infoSheet);
     }
 
+    // Parse submittedDocs from JSON array string (e.g., '["2"]') or comma-separated string (legacy)
+    let submittedDocsArray: string[] = [];
+    if (existingData.submittedDocs) {
+        try {
+            // Try parsing as JSON array first
+            const parsed = JSON.parse(existingData.submittedDocs);
+            if (Array.isArray(parsed)) {
+                submittedDocsArray = parsed.filter(Boolean);
+            } else {
+                // Fallback to comma-separated string (legacy format)
+                submittedDocsArray = existingData.submittedDocs.split(',').filter(Boolean);
+            }
+        } catch {
+            // If JSON parsing fails, treat as comma-separated string (legacy format)
+            submittedDocsArray = existingData.submittedDocs.split(',').filter(Boolean);
+        }
+    }
+
     return {
         tenderId,
         courierNo: existingData.courierNo,
-        submittedDocs: existingData.submittedDocs?.split(',').filter(Boolean) || [],
+        submittedDocs: submittedDocsArray,
         physicalDocsPersons: existingData.persons?.map(person => ({
             name: person.name,
             email: person.email,
@@ -58,7 +76,7 @@ export const mapFormToCreatePayload = (values: PhysicalDocsFormValues): CreatePh
     return {
         tenderId: values.tenderId,
         courierNo: values.courierNo,
-        submittedDocs: values.submittedDocs.join(','),
+        submittedDocs: JSON.stringify(values.submittedDocs),
         physicalDocsPersons: values.physicalDocsPersons.map(person => ({
             name: person.name,
             email: person.email || '',
@@ -75,7 +93,7 @@ export const mapFormToUpdatePayload = (
     return {
         id,
         courierNo: values.courierNo,
-        submittedDocs: values.submittedDocs.join(','),
+        submittedDocs: JSON.stringify(values.submittedDocs),
         physicalDocsPersons: values.physicalDocsPersons.map(person => ({
             name: person.name,
             email: person.email || '',

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useOemNotAllowed, useOemRfqs, useOemScoring, useOemSummary, useOemTenders, useOemTrends } from "./oem-performance.hooks";
+import { useOemNotAllowed, useOemRfqs, useOemScoring, useOemSummary, useOemTenders, useOemTrends, useOemOutcomes } from "./oem-performance.hooks";
 
 /* Icons */
 import {
@@ -67,77 +67,6 @@ const STATUS_COLOR_MAP: Record<string, string> = {
     "Not Bid": "warning",
 };
 
-/* ================================
-   DUMMY DATA INTERFACES
-================================ */
-interface Oem {
-    id: number;
-    name: string;
-}
-
-interface OemSummary {
-    totalTendersWithOem: number;
-    tendersWon: number;
-    tendersLost: number;
-    tendersSubmitted: number;
-    tendersNotAllowed: number;
-    rfqsSent: number;
-    rfqsResponded: number;
-    totalValueWon: number;
-    totalValueLost: number;
-    totalValueSubmitted: number;
-    winRate: number; // percentage
-    rfqResponseRate: number; // percentage
-}
-
-interface OemTender {
-    id: string;
-    tenderNo: string;
-    tenderName: string;
-    organizationName: string;
-    value: number;
-    status: "Won" | "Lost" | "Submitted" | "Not Allowed" | "RFQ Sent" | "RFQ Responded";
-    teamMember: string;
-    team: string;
-    gstValue: number;
-    dueDate: string; // "YYYY-MM-DD"
-    rfqSentOn?: string; // "YYYY-MM-DD"
-    rfqResponseOn?: string; // "YYYY-MM-DD"
-}
-
-interface OemNotAllowedTender extends OemTender {
-    reason: string; // dummy reason
-}
-
-interface OemRfqSentTender extends OemTender {
-    rfqSentOn: string;
-    rfqResponseOn?: string;
-}
-
-interface OemKPICard {
-    key: string;
-    label: string;
-    count: number;
-    value?: number;
-    icon: any;
-    color: string;
-    bg: string;
-    percentage?: number; // For win rate, RFQ response rate
-}
-
-interface OemTrendData {
-    label: string; // e.g., 'Jan', 'Feb'
-    winRate: number; // percentage
-    rfqResponseRate: number; // percentage
-}
-
-interface OemScoring {
-    winRateScore: number;
-    responseEfficiencyScore: number;
-    complianceScore: number; // Based on tenders not allowed
-    total: number;
-}
-
 type OemScoringKey = "Win Rate" | "Response Efficiency" | "Compliance";
 
 export default function OemPerformanceDashboard() {
@@ -146,23 +75,34 @@ export default function OemPerformanceDashboard() {
     const [toDate, setToDate] = useState<string | null>("2025-12-01");
     const [selectedMetric, setSelectedMetric] = useState("total");
 
-    const enabled = !!selectedOemId && !!fromDate && !!toDate;
+    const params = useMemo(() => {
+        if (!selectedOemId || !fromDate || !toDate) return null;
 
-    const params = useMemo(
-        () => (enabled ? { oemId: selectedOemId!, fromDate: fromDate!, toDate: toDate!, metric: selectedMetric } : null),
-        [selectedOemId, fromDate, toDate, selectedMetric]
-    );
+        return {
+            oemId: selectedOemId,
+            fromDate,
+            toDate,
+        };
+    }, [selectedOemId, fromDate, toDate]);
 
     const { data: oems = [] } = useVendorOrganizations();
-    console.log(oems);
 
-    // Generate dummy data based on filters
-    const { data: tendersNotAllowed = [] } = useOemNotAllowed(params!, enabled);
-    const { data: rfqsSent = [] } = useOemRfqs(params!, enabled);
-    const { data: oemTenderList = [] } = useOemTenders(params!, enabled);
-    const { data: oemTrends = [] } = useOemTrends(params!, enabled);
-    const { data: summary } = useOemSummary(params!, enabled);
-    const { data: oemScoring } = useOemScoring(params!, enabled);
+    const { data } = useOemOutcomes(params);
+    console.log("oem data", data);
+
+    const summary = data?.summary;
+    const oemTrends = data?.trends ?? [];
+    const oemScoring = data?.scoring;
+    const tendersByKpi = data?.tendersByKpi ?? {};
+
+    const oemTenderList = tendersByKpi[selectedMetric] ?? [];
+    const tendersNotAllowed = tendersByKpi.tendersNotAllowed ?? [];
+    const rfqsSent = tendersByKpi.rfqsSent ?? [];
+
+    console.log("selectedMetric:", selectedMetric);
+    console.log("tendersByKpi keys:", Object.keys(tendersByKpi));
+    console.log("bucket:", tendersByKpi[selectedMetric]);
+
     // KPI Card Data for OEM
     const OEM_KPI_DATA = useMemo((): OemKPICard[] => {
         return [
@@ -537,68 +477,6 @@ export default function OemPerformanceDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* ===== RFQs SENT TO THIS OEM TABLE ===== */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Mail className="h-5 w-5 text-purple-600" />
-                            RFQs Sent to This OEM
-                            <Badge variant="secondary">{rfqsSent.length}</Badge>
-                        </CardTitle>
-                        <CardDescription>Detailed list of RFQs sent to this OEM and their response status.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Team Member</TableHead>
-                                    <TableHead>Tender</TableHead>
-                                    <TableHead className="text-right">GST Value</TableHead>
-                                    <TableHead>Due Date</TableHead>
-                                    <TableHead>RFQ Sent On</TableHead>
-                                    <TableHead>Response On</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rfqsSent.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                            No RFQs found for this category.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    rfqsSent.map(tender => (
-                                        <TableRow key={tender.id}>
-                                            <TableCell>
-                                                <div className="font-medium">{tender.teamMember}</div>
-                                                <div className="text-sm text-muted-foreground">{tender.team} Team</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
-                                                    {tender.tenderName}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(tender.gstValue)}</TableCell>
-                                            <TableCell>{tender.dueDate}</TableCell>
-                                            <TableCell>{tender.rfqSentOn}</TableCell>
-                                            <TableCell>
-                                                {tender.rfqResponseOn ? <Badge variant="default">{tender.rfqResponseOn}</Badge> : <Badge variant="secondary">Pending</Badge>}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <Eye className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
                 {/* ===== ALL TENDERS WORKED WITH THIS OEM TABLE (FILTERED BY SELECTED METRIC) ===== */}
                 <Card className="shadow-sm border-0 ring-1 ring-border/50">
                     <CardHeader className="flex flex-row items-center justify-between pb-4">
@@ -649,6 +527,68 @@ export default function OemPerformanceDashboard() {
                                             <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
                                             <TableCell>
                                                 <Badge variant={STATUS_COLOR_MAP[tender.status] as "default" | "destructive" | "secondary" | "warning"}>{tender.status}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                    <Eye className="h-4 w-4 text-muted-foreground" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                {/* ===== RFQs SENT TO THIS OEM TABLE ===== */}
+                <Card className="shadow-sm border-0 ring-1 ring-border/50">
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Mail className="h-5 w-5 text-purple-600" />
+                            RFQs Sent to This OEM
+                            <Badge variant="secondary">{rfqsSent.length}</Badge>
+                        </CardTitle>
+                        <CardDescription>Detailed list of RFQs sent to this OEM and their response status.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead>Team Member</TableHead>
+                                    <TableHead>Tender</TableHead>
+                                    <TableHead className="text-right">GST Value</TableHead>
+                                    <TableHead>Due Date</TableHead>
+                                    <TableHead>RFQ Sent On</TableHead>
+                                    <TableHead>Response On</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rfqsSent.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                                            No RFQs found for this category.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    rfqsSent.map(tender => (
+                                        <TableRow key={tender.id}>
+                                            <TableCell>
+                                                <div className="font-medium">{tender.teamMember}</div>
+                                                <div className="text-sm text-muted-foreground">{tender.team} Team</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
+                                                    {tender.tenderName}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">{formatCurrency(tender.gstValue)}</TableCell>
+                                            <TableCell>{tender.dueDate}</TableCell>
+                                            <TableCell>{tender.rfqSentOn}</TableCell>
+                                            <TableCell>
+                                                {tender.rfqResponseOn ? <Badge variant="default">{tender.rfqResponseOn}</Badge> : <Badge variant="secondary">Pending</Badge>}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
