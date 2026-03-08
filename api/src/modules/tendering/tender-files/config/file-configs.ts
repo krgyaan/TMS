@@ -62,7 +62,8 @@ export type TenderFileContext =
     | "finance-document"
     | "bankLoanSchedule"
     | "sanctionLetter"
-    | "tdsDocument";
+    | "tdsDocument"
+    | "bankNoc";
 
 export interface FileConfig {
     maxFiles: number;
@@ -739,7 +740,17 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         imageQuality: 80,
         compressPdf: true,
         pdfQuality: 80,
-    }
+    },
+    "bankNoc": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
 };
 
 export function getFileConfig(context: TenderFileContext): FileConfig {
