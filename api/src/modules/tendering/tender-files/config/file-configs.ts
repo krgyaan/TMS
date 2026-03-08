@@ -61,7 +61,8 @@ export type TenderFileContext =
     | "pqr-performance-certificate"
     | "finance-document"
     | "bankLoanSchedule"
-    | "sanctionLetter";
+    | "sanctionLetter"
+    | "tdsDocument";
 
 export interface FileConfig {
     maxFiles: number;
@@ -720,6 +721,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     "sanctionLetter": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "tdsDocument": {
         maxFiles: 2,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
