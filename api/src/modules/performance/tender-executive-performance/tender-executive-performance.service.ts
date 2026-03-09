@@ -1481,12 +1481,13 @@ export class TenderExecutiveService {
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                 AND tr.created_at BETWEEN '${from}' AND '${to}'
-          )
+                AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
+        )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
