@@ -55,7 +55,7 @@ export type LoanAdvanceFormValues = z.infer<typeof LoanAdvanceFormSchema>;
 // ===================== LOAN CLOSURE FORM SCHEMA =====================
 
 export const LoanClosureFormSchema = z.object({
-  bankNocDocument: z.array(z.string()).min(1, 'Bank NOC document is required'),
+  bankNocDocument: optionalFile,
   closureCreatedMca: optionalFile,
 });
 

@@ -61,12 +61,12 @@ export function EmiDueForm({
     };
 
     return (
-        <Card className="border-orange-200 bg-orange-50/30">
+        <Card>
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CalendarClock className="h-5 w-5 text-orange-600" />
-                        <CardTitle className="text-lg text-orange-800">Record EMI Payment</CardTitle>
+                        <CardTitle className="text-lg">Record EMI Payment</CardTitle>
                     </div>
                     {onCancel && (
                         <Button variant="ghost" size="sm" onClick={onCancel}>

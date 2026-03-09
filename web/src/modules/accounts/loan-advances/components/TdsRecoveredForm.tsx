@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Save, X, IndianRupee } from 'lucide-react';
 import { TdsRecoveredFormSchema, type TdsRecoveredFormValues } from '../helpers/loanAdvance.schema';
 import { useCreateTdsRecovery } from '@/hooks/api/useLoanAdvance';
@@ -47,7 +46,7 @@ export function TdsRecoveredForm({
                 loanId,
                 data: {
                     tdsAmount: values.tdsAmount,
-                    tdsDocument: values.tdsDocument.length > 0 ? values.tdsDocument : null,
+                    tdsDocument: values.tdsDocument,
                     tdsDate: values.tdsDate,
                     tdsRecoveryBankDetails: values.tdsRecoveryBankDetails || null,
                 },
@@ -62,12 +61,12 @@ export function TdsRecoveredForm({
     const remainingTds = parseFloat(totalTdsToRecover ?? '0');
 
     return (
-        <Card className="border-green-200 bg-green-50/30">
+        <Card>
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <IndianRupee className="h-5 w-5 text-green-600" />
-                        <CardTitle className="text-lg text-green-800">Record TDS Recovery</CardTitle>
+                        <IndianRupee className="h-5 w-5" />
+                        <CardTitle className="text-lg">Record TDS Recovery</CardTitle>
                     </div>
                     {onCancel && (
                         <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -82,7 +81,7 @@ export function TdsRecoveredForm({
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
                             {/* TDS Amount Recovered */}
                             <FieldWrapper
                                 control={form.control}
@@ -118,7 +117,6 @@ export function TdsRecoveredForm({
                                     onChange={(paths) => form.setValue('tdsDocument', paths)}
                                     label="Upload TDS Return Document"
                                     disabled={isSubmitting}
-                                    maxFiles={5}
                                 />
                             </div>
                         </div>
@@ -129,13 +127,12 @@ export function TdsRecoveredForm({
                             name="tdsRecoveryBankDetails"
                             label="TDS Recovery Bank Transaction Details"
                         >
-                            {(field) => (
-                                <Textarea
-                                    {...field}
-                                    placeholder="Enter bank transaction details (Account No, Transaction ID, etc.)"
-                                    rows={3}
-                                />
-                            )}
+                            {(field) => (<textarea
+                                className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                placeholder="Remarks"
+                                maxLength={200}
+                                {...field}
+                            />)}
                         </FieldWrapper>
 
                         <div className="flex justify-end gap-2 pt-4">
@@ -147,7 +144,6 @@ export function TdsRecoveredForm({
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="bg-green-500 hover:bg-green-600 text-white"
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
