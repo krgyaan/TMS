@@ -2040,7 +2040,7 @@ export class TenderExecutiveService {
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at < '${from}'
+          AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
           AND pi.status NOT ILIKE '%rejected%'
           AND pi.status NOT ILIKE '%pending%'
           AND (
@@ -2066,7 +2066,7 @@ export class TenderExecutiveService {
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at BETWEEN '${from}' AND '${to}'
+          AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND pi.status NOT ILIKE '%pending%'
           AND (
