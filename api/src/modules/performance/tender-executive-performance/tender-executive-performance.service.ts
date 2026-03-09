@@ -1400,7 +1400,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${missedStatus})
-        AND ti.status NOT IN (18, 22, 24)
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1497,7 +1497,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${missedStatus})
-        AND ti.status NOT IN (18, 22, 24)
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
