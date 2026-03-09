@@ -2,10 +2,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLoanAdvance } from "@/hooks/api/useLoanAdvance";
 import { AlertCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TdsRecoveredForm from "./components/TdsRecoveredForm";
+import { Separator } from "@/components/ui/separator";
+import TdsRecoveryHistory from "./components/TdsRecoveryHistory";
+import { paths } from "@/app/routes/paths";
 
 const LoanTdsPage = () => {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const loanId = Number(id);
 
@@ -32,7 +36,13 @@ const LoanTdsPage = () => {
             </Alert>
         );
     }
-    return <TdsRecoveredForm loanId={loanId} totalTdsToRecover={loanAdvance.totalTdsToRecover} />
+    return (
+        <>
+            <TdsRecoveredForm loanId={loanId} totalTdsToRecover={loanAdvance.totalTdsToRecover} onCancel={() => navigate(paths.accounts.loanAdvances)} />
+            <Separator className="my-5" />
+            <TdsRecoveryHistory loanId={loanId} />
+        </>
+    )
 }
 
 export default LoanTdsPage;

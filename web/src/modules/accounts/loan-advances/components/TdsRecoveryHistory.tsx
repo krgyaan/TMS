@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Calendar, FileText, Banknote } from 'lucide-react';
 import { useLoanTdsRecoveries, useDeleteTdsRecovery } from '@/hooks/api/useLoanAdvance';
-import { formatCurrency, formatDateDisplay } from '../helpers/loanAdvance.mappers';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { formatDate } from '@/hooks/useFormatedDate';
 
 interface TdsRecoveryHistoryProps {
     loanId: number;
@@ -51,7 +52,7 @@ export function TdsRecoveryHistory({ loanId }: TdsRecoveryHistoryProps) {
                     </CardTitle>
                     {totalRecovered > 0 && (
                         <Badge variant="outline" className="text-green-700 border-green-300">
-                            Total Recovered: {formatCurrency(totalRecovered)}
+                            Total Recovered: {formatINR(Number(totalRecovered))}
                         </Badge>
                     )}
                 </div>
@@ -75,11 +76,11 @@ export function TdsRecoveryHistory({ loanId }: TdsRecoveryHistoryProps) {
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                {formatDateDisplay(recovery.tdsDate)}
+                                                {formatDate(recovery.tdsDate)}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right font-semibold text-green-600">
-                                            {formatCurrency(recovery.tdsAmount)}
+                                            {formatINR(Number(recovery.tdsAmount))}
                                         </TableCell>
                                         <TableCell className="max-w-[200px] truncate">
                                             {recovery.tdsRecoveryBankDetails || '-'}
@@ -111,7 +112,7 @@ export function TdsRecoveryHistory({ loanId }: TdsRecoveryHistoryProps) {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Delete TDS Recovery</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            Are you sure you want to delete this TDS recovery record of {formatCurrency(recovery.tdsAmount)}?
+                                                            Are you sure you want to delete this TDS recovery record of {formatINR(Number(recovery.tdsAmount))}?
                                                             This will recalculate the loan aggregates.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>

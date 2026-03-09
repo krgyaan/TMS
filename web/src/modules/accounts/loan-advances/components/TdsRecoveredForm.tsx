@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { Save, X, IndianRupee } from 'lucide-react';
+import { Save, IndianRupee, ArrowLeft } from 'lucide-react';
 import { TdsRecoveredFormSchema, type TdsRecoveredFormValues } from '../helpers/loanAdvance.schema';
 import { useCreateTdsRecovery } from '@/hooks/api/useLoanAdvance';
 import DateInput from '@/components/form/DateInput';
 import { TenderFileUploader } from '@/components/tender-file-upload';
-import { formatCurrency } from '../helpers/loanAdvance.mappers';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 interface TdsRecoveredFormProps {
     loanId: number;
@@ -58,8 +58,6 @@ export function TdsRecoveredForm({
         }
     };
 
-    const remainingTds = parseFloat(totalTdsToRecover ?? '0');
-
     return (
         <Card>
             <CardHeader className="pb-4">
@@ -69,13 +67,13 @@ export function TdsRecoveredForm({
                         <CardTitle className="text-lg">Record TDS Recovery</CardTitle>
                     </div>
                     {onCancel && (
-                        <Button variant="ghost" size="sm" onClick={onCancel}>
-                            <X className="h-4 w-4" />
+                        <Button variant="outline" size="sm" onClick={onCancel}>
+                            <ArrowLeft className="h-4 w-4" /> Back
                         </Button>
                     )}
                 </div>
                 <CardDescription>
-                    Remaining TDS to Recover: <span className="font-semibold text-green-700">{formatCurrency(totalTdsToRecover)}</span>
+                    Remaining TDS to Recover: <span className="font-semibold text-green-700">{formatINR(Number(totalTdsToRecover))}</span>
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -94,7 +92,6 @@ export function TdsRecoveredForm({
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        max={remainingTds}
                                         placeholder="Enter TDS amount"
                                     />
                                 )}
@@ -129,7 +126,7 @@ export function TdsRecoveredForm({
                         >
                             {(field) => (<textarea
                                 className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                placeholder="Remarks"
+                                placeholder="TDS Recovery Bank Transaction Details"
                                 maxLength={200}
                                 {...field}
                             />)}
