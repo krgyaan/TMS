@@ -195,7 +195,7 @@ function ResultTable({ stage }: { stage: any }) {
                             <MetricCell data={stage.opening} />
                             <MetricCell data={stage.during.total} />
                             <MetricCell data={stage.during.completed} />
-                            <MetricCell data={stage.during.pending} />
+                            <MetricCell data={stage.during.disqualified} />
                             <MetricCell data={stage.total} />
                         </TableRow>
                     </TableBody>
