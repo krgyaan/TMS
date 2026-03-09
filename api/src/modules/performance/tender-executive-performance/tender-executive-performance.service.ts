@@ -1685,14 +1685,18 @@ export class TenderExecutiveService {
                             value: this.sumValue(resultAwaitedDuringTotal),
                             drilldown: this.mapDrilldown(resultAwaitedDuringTotal),
                         },
-
+                        disqualified: {
+                            // 🔥 bids that entered result stage during period
+                            count: disqualifiedDuringCompleted.length,
+                            value: this.sumValue(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                        },
                         completed: {
                             // 🔥 result received during period
                             count: wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length,
                             value: this.sumValue([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
                             drilldown: this.mapDrilldown([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
                         },
-
                         pending: {
                             // 🔥 pending during = entered - completed
                             count: resultAwaitedDuringTotal.length - (wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length),
