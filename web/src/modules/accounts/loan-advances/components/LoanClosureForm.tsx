@@ -99,7 +99,6 @@ export function LoanClosureForm({ loan, onSuccess, onCancel }: LoanClosureFormPr
                   onChange={(paths) => form.setValue('bankNocDocument', paths)}
                   label="Upload Bank NOC Document *"
                   disabled={isSubmitting}
-                  maxFiles={5}
                 />
                 {form.formState.errors.bankNocDocument && (
                   <p className="text-sm text-destructive mt-1">
@@ -117,7 +116,6 @@ export function LoanClosureForm({ loan, onSuccess, onCancel }: LoanClosureFormPr
                     onChange={(paths) => form.setValue('closureCreatedMca', paths)}
                     label="Upload MCA Closure Document *"
                     disabled={isSubmitting}
-                    maxFiles={5}
                   />
                   {form.formState.errors.closureCreatedMca && (
                     <p className="text-sm text-destructive mt-1">
