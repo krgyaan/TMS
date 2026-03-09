@@ -1335,6 +1335,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at < '${from}'
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1346,6 +1347,7 @@ export class TenderExecutiveService {
         const bidDuringTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
+        AND ti.status NOT IN (${missedStatus})
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at BETWEEN '${from}' AND '${to}'
@@ -1381,6 +1383,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at <= '${to}'
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1622,9 +1625,9 @@ export class TenderExecutiveService {
                     },
                     during: {
                         total: {
-                            count: approvedDuringCompleted.length,
-                            value: this.sumValue(approvedDuringCompleted),
-                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                            count: bidDuringTotal.length,
+                            value: this.sumValue(bidDuringTotal),
+                            drilldown: this.mapDrilldown(bidDuringTotal),
                         },
                         completed: {
                             count: bidDuringCompleted.length,
