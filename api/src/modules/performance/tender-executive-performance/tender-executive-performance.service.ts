@@ -1335,6 +1335,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at < '${from}'
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1346,6 +1347,7 @@ export class TenderExecutiveService {
         const bidDuringTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
+        AND ti.status NOT IN (${missedStatus})
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at BETWEEN '${from}' AND '${to}'
@@ -1381,6 +1383,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at <= '${to}'
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1547,9 +1550,9 @@ export class TenderExecutiveService {
                     },
 
                     total: {
-                        count: assignedTotal.length,
-                        value: this.sumValue(assignedTotal),
-                        drilldown: this.mapDrilldown(assignedTotal),
+                        count: assignedTotal.length + assignedOpening.length,
+                        value: this.sumValue([...assignedTotal, ...assignedOpening]),
+                        drilldown: this.mapDrilldown([...assignedTotal, ...assignedOpening]),
                     },
 
                     during: {
@@ -1622,9 +1625,9 @@ export class TenderExecutiveService {
                     },
                     during: {
                         total: {
-                            count: approvedDuringCompleted.length,
-                            value: this.sumValue(approvedDuringCompleted),
-                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                            count: bidDuringTotal.length,
+                            value: this.sumValue(bidDuringTotal),
+                            drilldown: this.mapDrilldown(bidDuringTotal),
                         },
                         completed: {
                             count: bidDuringCompleted.length,
@@ -1685,14 +1688,18 @@ export class TenderExecutiveService {
                             value: this.sumValue(resultAwaitedDuringTotal),
                             drilldown: this.mapDrilldown(resultAwaitedDuringTotal),
                         },
-
+                        disqualified: {
+                            // 🔥 bids that entered result stage during period
+                            count: disqualifiedDuringCompleted.length,
+                            value: this.sumValue(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                        },
                         completed: {
                             // 🔥 result received during period
                             count: wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length,
                             value: this.sumValue([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
                             drilldown: this.mapDrilldown([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
                         },
-
                         pending: {
                             // 🔥 pending during = entered - completed
                             count: resultAwaitedDuringTotal.length - (wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length),
