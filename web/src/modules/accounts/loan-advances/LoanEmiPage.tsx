@@ -2,10 +2,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLoanAdvance } from "@/hooks/api/useLoanAdvance";
 import { AlertCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import EmiDueForm from "./components/EmiDueForm";
+import EmiHistory from "./components/EmiHistory";
+import { paths } from "@/app/routes/paths";
+import { Separator } from "@/components/ui/separator";
 
 const LoanEmiPage = () => {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const loanId = Number(id);
 
@@ -33,7 +37,11 @@ const LoanEmiPage = () => {
         );
     }
     return (
-        <EmiDueForm loanId={loanId} loanAmount={loanAdvance.loanAmount} principleOutstanding={loanAdvance.principleOutstanding} />
+        <>
+            <EmiDueForm loanId={loanId} loanAmount={loanAdvance.loanAmount} principleOutstanding={loanAdvance.principleOutstanding} onCancel={() => navigate(paths.accounts.loanAdvances)} />
+            <Separator className="my-5" />
+            <EmiHistory loanId={loanId} />
+        </>
     )
 }
 

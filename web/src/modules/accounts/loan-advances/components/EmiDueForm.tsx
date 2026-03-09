@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { Save, X, CalendarClock } from 'lucide-react';
+import { Save, CalendarClock, ArrowLeft } from 'lucide-react';
 import { EmiDueFormSchema, type EmiDueFormValues } from '../helpers/loanAdvance.schema';
 import { useCreateEmi } from '@/hooks/api/useLoanAdvance';
 import DateInput from '@/components/form/DateInput';
-import { formatCurrency } from '../helpers/loanAdvance.mappers';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 interface EmiDueFormProps {
     loanId: number;
@@ -69,15 +69,15 @@ export function EmiDueForm({
                         <CardTitle className="text-lg">Record EMI Payment</CardTitle>
                     </div>
                     {onCancel && (
-                        <Button variant="ghost" size="sm" onClick={onCancel}>
-                            <X className="h-4 w-4" />
+                        <Button variant="outline" size="sm" onClick={onCancel}>
+                            <ArrowLeft className="h-4 w-4" /> Back
                         </Button>
                     )}
                 </div>
                 <CardDescription>
-                    Outstanding Principal: <span className="font-semibold text-orange-700">{formatCurrency(principleOutstanding)}</span>
+                    Outstanding Principal: <span className="font-semibold text-orange-700">{formatINR(Number(principleOutstanding))}</span>
                     {' | '}
-                    Loan Amount: <span className="font-semibold">{formatCurrency(loanAmount)}</span>
+                    Loan Amount: <span className="font-semibold">{formatINR(loanAmount)}</span>
                 </CardDescription>
             </CardHeader>
             <CardContent>

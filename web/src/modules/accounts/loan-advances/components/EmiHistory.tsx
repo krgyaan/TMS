@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Calendar, History } from 'lucide-react';
 import { useLoanEmis, useDeleteEmi } from '@/hooks/api/useLoanAdvance';
-import { formatCurrency, formatDateDisplay } from '../helpers/loanAdvance.mappers';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 interface EmiHistoryProps {
     loanId: number;
@@ -71,23 +72,23 @@ export function EmiHistory({ loanId }: EmiHistoryProps) {
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    {formatDateDisplay(emi.emiDate)}
+                                                    {formatDate(emi.emiDate)}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatCurrency(emi.principlePaid)}
+                                                {formatINR(Number(emi.principlePaid))}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatCurrency(emi.interestPaid)}
+                                                {formatINR(Number(emi.interestPaid))}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatCurrency(emi.tdsToBeRecovered)}
+                                                {formatINR(Number(emi.tdsToBeRecovered))}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatCurrency(emi.penalChargesPaid)}
+                                                {formatINR(Number(emi.penalChargesPaid))}
                                             </TableCell>
                                             <TableCell className="text-right font-semibold">
-                                                {formatCurrency(total)}
+                                                {formatINR(total)}
                                             </TableCell>
                                             <TableCell>
                                                 <AlertDialog>
@@ -104,7 +105,7 @@ export function EmiHistory({ loanId }: EmiHistoryProps) {
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete EMI Record</AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Are you sure you want to delete this EMI payment record from {formatDateDisplay(emi.emiDate)}?
+                                                                Are you sure you want to delete this EMI payment record from {formatDate(emi.emiDate)}?
                                                                 This will recalculate the loan aggregates.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
