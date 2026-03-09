@@ -1399,6 +1399,8 @@ export class TenderExecutiveService {
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+        AND ti.status NOT IN (${missedStatus})
+        AND ti.status NOT IN (18, 22, 24)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1450,6 +1452,17 @@ export class TenderExecutiveService {
           )
     `);
 
+        const resultAwaitedDuringCompleted = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                AND tr.created_at BETWEEN '${from}' AND '${to}'
+          )
+    `);
+
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1483,6 +1496,8 @@ export class TenderExecutiveService {
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+        AND ti.status NOT IN (${missedStatus})
+        AND ti.status NOT IN (18, 22, 24)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1641,33 +1656,6 @@ export class TenderExecutiveService {
                         },
                     },
                 },
-
-                // missed: {
-                //     opening: {
-                //         count: missedOpening.length,
-                //         value: this.sumValue(missedOpening),
-                //         drilldown: this.mapDrilldown(missedOpening),
-                //     },
-                //     total: {
-                //         count: missedOpening.length + missedDuringCompleted.length,
-                //         value: this.sumValue([...missedOpening, ...missedDuringCompleted]),
-                //         drilldown: this.mapDrilldown([...missedOpening, ...missedDuringCompleted]),
-                //     },
-                //     during: {
-                //         total: {
-                //             count: bidDuringCompleted.length,
-                //             value: this.sumValue(bidDuringCompleted),
-                //             drilldown: this.mapDrilldown(bidDuringCompleted),
-                //         },
-                //         completed: {
-                //             count: missedDuringCompleted.length,
-                //             value: this.sumValue(missedDuringCompleted),
-                //             drilldown: this.mapDrilldown(missedDuringCompleted),
-                //         },
-                //         pending: { count: 0, value: 0, drilldown: [] },
-                //     },
-                // },
-
                 resultAwaited: {
                     opening: {
                         count: resultAwaitedOpening.length,
@@ -1694,17 +1682,11 @@ export class TenderExecutiveService {
                             value: this.sumValue(disqualifiedDuringCompleted),
                             drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
                         },
-                        completed: {
+                        received: {
                             // 🔥 result received during period
-                            count: wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length,
-                            value: this.sumValue([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
-                            drilldown: this.mapDrilldown([...wonDuringCompleted, ...lostDuringCompleted, ...disqualifiedDuringCompleted]),
-                        },
-                        pending: {
-                            // 🔥 pending during = entered - completed
-                            count: resultAwaitedDuringTotal.length - (wonDuringCompleted.length + lostDuringCompleted.length + disqualifiedDuringCompleted.length),
-                            value: 0,
-                            drilldown: [],
+                            count: resultAwaitedDuringCompleted.length,
+                            value: this.sumValue(resultAwaitedDuringCompleted),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
                         },
                     },
                 },
