@@ -1301,6 +1301,32 @@ export class TenderExecutiveService {
           AND ti.tl_status = 1
     `);
 
+        const approvedDuringAccepted = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at BETWEEN '${from}' AND '${to}'
+        )
+        AND ti.tl_status = 1
+        `);
+
+        const approvedDuringRejected = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at BETWEEN '${from}' AND '${to}'
+        )
+        AND ti.tl_status = 2
+        `);
+
         const approvedDuringPending = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
@@ -1309,13 +1335,13 @@ export class TenderExecutiveService {
           AND ti.tl_status = 0
     `);
 
-        const approvedDuringRejected = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND tin.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status = 2
-    `);
+        //     const approvedDuringRejected = await exec(`
+        //     ${baseSelect}
+        //     JOIN tender_information tin ON tin.tender_id = ti.id
+        //     WHERE ${baseWhere()}
+        //       AND tin.created_at BETWEEN '${from}' AND '${to}'
+        //       AND ti.tl_status = 2
+        // `);
 
         const approvedTotal = await exec(`
         ${baseSelect}
@@ -1615,9 +1641,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
                         completed: {
-                            count: approvedDuringCompleted.length,
-                            value: this.sumValue(approvedDuringCompleted),
-                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                            count: approvedDuringAccepted.length,
+                            value: this.sumValue(approvedDuringAccepted),
+                            drilldown: this.mapDrilldown(approvedDuringAccepted),
                         },
                         rejected: {
                             count: approvedDuringRejected.length,
