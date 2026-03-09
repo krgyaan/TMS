@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, FileX2, Search, Plus, Clock1 } from 'lucide-react';
+import { AlertCircle, Eye, Edit, FileX2, Search, Plus, CalendarClock, FileCheck, Receipt } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -54,7 +54,17 @@ const LoanAdvanceListPage = () => {
             {
                 label: 'Due EMI',
                 onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
-                icon: <Clock1 className='h-4 w-4' />
+                icon: <CalendarClock className='h-4 w-4' />
+            },
+            {
+                label: 'Loan Closure',
+                onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
+                icon: <FileCheck className='h-4 w-4' />
+            },
+            {
+                label: 'TDS Recovery',
+                onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
+                icon: <Receipt className='h-4 w-4' />
             },
             {
                 label: 'View',
@@ -126,7 +136,7 @@ const LoanAdvanceListPage = () => {
                 sortable: true,
                 filter: true,
             }),
-            dateCol<LoanAdvanceListRow>('emiPaymentDate', {includeTime: false}, {
+            dateCol<LoanAdvanceListRow>('emiPaymentDate', { includeTime: false }, {
                 field: 'emiPaymentDate',
                 colId: 'emiPaymentDate',
                 headerName: 'EMI Date',
