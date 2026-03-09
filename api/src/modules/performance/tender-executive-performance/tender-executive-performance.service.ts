@@ -1547,9 +1547,9 @@ export class TenderExecutiveService {
                     },
 
                     total: {
-                        count: assignedTotal.length,
-                        value: this.sumValue(assignedTotal),
-                        drilldown: this.mapDrilldown(assignedTotal),
+                        count: assignedTotal.length + assignedOpening.length,
+                        value: this.sumValue([...assignedTotal, ...assignedOpening]),
+                        drilldown: this.mapDrilldown([...assignedTotal, ...assignedOpening]),
                     },
 
                     during: {
