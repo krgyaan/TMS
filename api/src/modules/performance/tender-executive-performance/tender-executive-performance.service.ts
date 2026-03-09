@@ -1983,7 +1983,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2010,7 +2010,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2032,7 +2032,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2058,7 +2058,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2085,7 +2085,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
