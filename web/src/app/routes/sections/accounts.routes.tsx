@@ -8,6 +8,9 @@ const Accounts_LoanAdvances = lazy(() => import("@/modules/accounts/loan-advance
 const Accounts_LoanAdvances_Create = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceCreatePage"));
 const Accounts_LoanAdvances_Edit = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceEditPage"));
 const Accounts_LoanAdvances_View = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceShowPage"));
+const Accounts_LoanAdvances_Emi = lazy(() => import("@/modules/accounts/loan-advances/LoanEmiPage"));
+const Accounts_LoanAdvances_Tds = lazy(() => import("@/modules/accounts/loan-advances/LoanTdsPage"));
+const Accounts_LoanAdvances_Closure = lazy(() => import("@/modules/accounts/loan-advances/LoanClosurePage"));
 const Accounts_TaskChecklists = lazy(() => import("@/modules/accounts/task-checlkists"));
 const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists"));
 const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
@@ -26,6 +29,9 @@ export default function AccountsRoutes() {
             <Route path="loan-advances/create" element={<RouteWrapper><Accounts_LoanAdvances_Create /></RouteWrapper>} />
             <Route path="loan-advances/:id/edit" element={<RouteWrapper><Accounts_LoanAdvances_Edit /></RouteWrapper>} />
             <Route path="loan-advances/:id" element={<RouteWrapper><Accounts_LoanAdvances_View /></RouteWrapper>} />
+            <Route path="loan-advances/emis/:id" element={<RouteWrapper><Accounts_LoanAdvances_Emi /></RouteWrapper>} />
+            <Route path="loan-advances/tds/:id" element={<RouteWrapper><Accounts_LoanAdvances_Tds /></RouteWrapper>} />
+            <Route path="loan-advances/closure/:id" element={<RouteWrapper><Accounts_LoanAdvances_Closure /></RouteWrapper>} />
             <Route path="account-checklists" element={<RouteWrapper><Accounts_TaskChecklists /></RouteWrapper>} />
             <Route path="gst-checklists" element={<RouteWrapper><Accounts_GSTChecklists /></RouteWrapper>} />
             <Route path="fixed-expenses" element={<RouteWrapper><Accounts_FixedExpenses /></RouteWrapper>} />
