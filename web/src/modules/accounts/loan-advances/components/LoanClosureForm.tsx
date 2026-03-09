@@ -3,7 +3,7 @@ import { useForm, type SubmitHandler, useWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { Save, X, FileCheck, AlertTriangle } from 'lucide-react';
+import { Save, FileCheck, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { LoanClosureFormSchema, type LoanClosureFormValues } from '../helpers/loanAdvance.schema';
 import { useCloseLoanAdvance } from '@/hooks/api/useLoanAdvance';
 import { TenderFileUploader } from '@/components/tender-file-upload';
@@ -68,8 +68,8 @@ export function LoanClosureForm({ loan, onSuccess, onCancel }: LoanClosureFormPr
                         <CardTitle className="text-lg">Close Loan</CardTitle>
                     </div>
                     {onCancel && (
-                        <Button variant="ghost" size="sm" onClick={onCancel}>
-                            <X className="h-4 w-4" />
+                        <Button variant="outline" size="sm" onClick={onCancel}>
+                            <ArrowLeft className="h-4 w-4" /> Back
                         </Button>
                     )}
                 </div>

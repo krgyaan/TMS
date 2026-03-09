@@ -2,10 +2,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLoanAdvance } from "@/hooks/api/useLoanAdvance";
 import { AlertCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import LoanClosureForm from "./components/LoanClosureForm";
+import { paths } from "@/app/routes/paths";
 
 const LoanClosurePage = () => {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const loanId = Number(id);
 
@@ -32,7 +34,7 @@ const LoanClosurePage = () => {
             </Alert>
         );
     }
-    return <LoanClosureForm loan={loanAdvance} />
+    return <LoanClosureForm loan={loanAdvance} onSuccess={() => navigate(paths.accounts.loanAdvances)} onCancel={() => navigate(paths.accounts.loanAdvances)} />
 }
 
 export default LoanClosurePage;
