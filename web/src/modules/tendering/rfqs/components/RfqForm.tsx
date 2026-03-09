@@ -90,7 +90,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const form = useForm<FormValues>({
         resolver: zodResolver(RfqFormSchema) as Resolver<FormValues>,
         defaultValues: {
-            dueDate: undefined,
+            dueDate: tenderData.dueDate,
             items: [{ requirement: '', unit: '', qty: undefined }],
             vendorRows: [],
             docList: '',
@@ -145,40 +145,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
 
     useEffect(() => {
         if (initialData && allVendorOrganizations) {
-            // Map flat requestedVendor string ("101,102") back to structured rows
-            const currentVendorIds = (initialData.requestedVendor || '').split(',').filter(Boolean);
-
-            // Group IDs by Organization to rebuild the UI rows
             const reconstructedRows: FormValues['vendorRows'] = [];
-
-            // if (initialData && allowedVendors) {
-            //     allowedVendors.forEach(org => {
-            //         const personsInThisOrg = org.persons
-            //             .filter(p => currentVendorIds.includes(String(p.id)))
-            //             .map(p => String(p.id));
-
-            //         if (personsInThisOrg.length > 0) {
-            //             reconstructedRows.push({
-            //                 orgId: String(org.id),
-            //                 personIds: personsInThisOrg
-            //             });
-            //         }
-            //     });
-            // }
-
-            allVendorOrganizations.forEach(org => {
-                const personsInThisOrg = org.persons
-                    .filter(p => currentVendorIds.includes(String(p.id)))
-                    .map(p => String(p.id));
-
-                if (personsInThisOrg.length > 0) {
-                    reconstructedRows.push({
-                        orgId: String(org.id),
-                        personIds: personsInThisOrg
-                    });
-                }
-            });
-
             // Group documents by docType
             const scopeOfWorkDocs = initialData.documents
                 ?.filter(d => d.docType === 'SCOPE_OF_WORK')
@@ -289,7 +256,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                         <CardDescription>
                             Configure requirements and select vendors for this tender.
                             {/* Tender Info Summary */}
-                            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm bg-background p-3 rounded-md border">
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm bg-background p-3 rounded-md border">
                                 <div>
                                     <span className="text-muted-foreground block text-xs uppercase font-bold">Tender Number</span>
                                     <span className="font-medium">{tenderData.tenderNo}</span>
@@ -301,6 +268,10 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                 <div>
                                     <span className="text-muted-foreground block text-xs uppercase font-bold">Item Name</span>
                                     <span className="font-medium">{tenderData.itemName}</span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground block text-xs uppercase font-bold">Tender Due Date</span>
+                                    <span className="font-medium">{formatDateTime(tenderData.dueDate)}</span>
                                 </div>
                             </div>
                         </CardDescription>
@@ -322,13 +293,26 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                         <div className="space-y-4">
                             <div className="w-full md:w-1/3">
                                 <FieldWrapper control={form.control} name="dueDate" label="Due Date">
-                                    {(field) => (
-                                        <DateTimeInput
-                                            value={field.value ? (formatDateTime(field.value)) : ''}
-                                            onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
-                                            placeholder="Select date and time"
-                                        />
-                                    )}
+                                    {(field) => {
+                                        // Convert Date to datetime-local format: "YYYY-MM-DDTHH:mm"
+                                        const toDateTimeLocalString = (date: Date | undefined | null): string => {
+                                            if (!date || isNaN(date.getTime())) return '';
+                                            const year = date.getFullYear();
+                                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                                            const day = String(date.getDate()).padStart(2, '0');
+                                            const hours = String(date.getHours()).padStart(2, '0');
+                                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                                            return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                        };
+
+                                        return (
+                                            <DateTimeInput
+                                                value={toDateTimeLocalString(field.value)}
+                                                onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
+                                                placeholder="Select date and time"
+                                            />
+                                        );
+                                    }}
                                 </FieldWrapper>
                             </div>
 
