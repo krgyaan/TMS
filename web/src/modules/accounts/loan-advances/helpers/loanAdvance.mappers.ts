@@ -391,32 +391,6 @@ export const mapTdsRecoveryFormToUpdateDto = (
 // ===================== DISPLAY FORMATTERS =====================
 
 /**
- * Format currency for display
- */
-export const formatCurrency = (value: string | number | null | undefined): string => {
-  const num = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(num);
-};
-
-/**
- * Format date for display (DD-MM-YYYY)
- */
-export const formatDateDisplay = (value: string | null | undefined): string => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-/**
  * Get loan status badge color
  */
 export const getLoanStatusColor = (status: string | null | undefined): string => {

@@ -199,7 +199,7 @@ export interface CreateTdsRecoveryDto {
 }
 
 export interface LoanClosureDto {
-  bankNocDocument: string[];
+  bankNocDocument: string[] | null;
   closureCreatedMca?: string[] | null;
 }
 

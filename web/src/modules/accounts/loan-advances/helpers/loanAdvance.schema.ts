@@ -55,7 +55,7 @@ export type LoanAdvanceFormValues = z.infer<typeof LoanAdvanceFormSchema>;
 // ===================== LOAN CLOSURE FORM SCHEMA =====================
 
 export const LoanClosureFormSchema = z.object({
-  bankNocDocument: z.array(z.string()).min(1, 'Bank NOC document is required'),
+  bankNocDocument: optionalFile,
   closureCreatedMca: optionalFile,
 });
 
@@ -63,8 +63,8 @@ export type LoanClosureFormValues = z.infer<typeof LoanClosureFormSchema>;
 
 // ===================== DUE EMI FORM SCHEMA =====================
 
-export const DueEmiFormSchema = z
-  .object({
+export const EmiDueFormSchema = z
+    .object({
     emiDate: z.string().min(1, 'EMI date is required'),
     principlePaid: z
       .string()
@@ -74,8 +74,16 @@ export const DueEmiFormSchema = z
       .string()
       .regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount')
       .or(z.literal('')),
-    tdsToBeRecovered: decimalString.optional().default('0'),
-    penalChargesPaid: decimalString.optional().default('0'),
+    tdsToBeRecovered: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount')
+      .optional()
+      .default('0'),
+    penalChargesPaid: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount')
+      .optional()
+      .default('0'),
   })
   .refine(
     (data) => {
@@ -89,11 +97,11 @@ export const DueEmiFormSchema = z
     }
   );
 
-export type DueEmiFormValues = z.infer<typeof DueEmiFormSchema>;
+export type EmiDueFormValues = z.infer<typeof EmiDueFormSchema>;
 
 // ===================== TDS RECOVERY FORM SCHEMA =====================
 
-export const TdsRecoveryFormSchema = z.object({
+export const TdsRecoveredFormSchema = z.object({
   tdsAmount: z
     .string()
     .min(1, 'TDS amount is required')
@@ -104,7 +112,13 @@ export const TdsRecoveryFormSchema = z.object({
   tdsRecoveryBankDetails: z.string().max(2000).optional().nullable(),
 });
 
-export type TdsRecoveryFormValues = z.infer<typeof TdsRecoveryFormSchema>;
+export type TdsRecoveredFormValues = z.infer<typeof TdsRecoveredFormSchema>;
+
+// ===================== TDS FOLLOWUP FORM SCHEMA =====================
+export const TdsFollowupDocumentsSchema = z.object({
+  form16Document: z.array(z.string()).optional().default([]),
+  otherDocument: z.array(z.string()).optional().default([]),
+});
 
 // ===================== QUERY/FILTER SCHEMA =====================
 

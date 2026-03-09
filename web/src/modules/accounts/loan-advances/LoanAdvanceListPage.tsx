@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, FileX2, Search, Plus, Clock1 } from 'lucide-react';
+import { AlertCircle, Eye, Edit, FileX2, Search, Plus, CalendarClock, FileCheck, Receipt } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -52,12 +52,28 @@ const LoanAdvanceListPage = () => {
     const loanAdvanceActions: ActionItem<LoanAdvanceListRow>[] = useMemo(
         () => [
             {
-                label: 'Due EMI',
-                onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
-                icon: <Clock1 className='h-4 w-4' />
+                label: 'EMI Payment',
+                onClick: (row) => navigate(paths.accounts.loanEmiPayment(row.id)),
+                icon: <CalendarClock className='h-4 w-4' />,
+                // Only show if EMI is due and loan is active
+                hidden: (row: LoanAdvanceListRow) => !row.isDue || row.loanCloseStatus !== 'Active',
             },
             {
-                label: 'View',
+                label: 'TDS Recovery',
+                onClick: (row) => navigate(paths.accounts.loanTdsRecovery(row.id)),
+                icon: <Receipt className='h-4 w-4' />,
+                // Only show if there's TDS to recover
+                hidden: (row: LoanAdvanceListRow) => parseFloat(row.totalTdsToRecover ?? '0') <= 0,
+            },
+            {
+                label: 'Close Loan',
+                onClick: (row) => navigate(paths.accounts.loanClosure(row.id)),
+                icon: <FileCheck className='h-4 w-4' />,
+                // Only show if loan can be closed (showNocUpload is true)
+                hidden: (row: LoanAdvanceListRow) => !row.showNocUpload || row.loanCloseStatus !== 'Active',
+            },
+            {
+                label: 'View Details',
                 onClick: (row) => navigate(paths.accounts.loanAdvancesView(row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
@@ -65,7 +81,7 @@ const LoanAdvanceListPage = () => {
                 label: 'Edit',
                 onClick: (row) => navigate(paths.accounts.loanAdvancesEdit(row.id)),
                 icon: <Edit className="h-4 w-4" />,
-            },
+            }
         ],
         [navigate]
     );
@@ -126,7 +142,7 @@ const LoanAdvanceListPage = () => {
                 sortable: true,
                 filter: true,
             }),
-            dateCol<LoanAdvanceListRow>('emiPaymentDate', {includeTime: false}, {
+            dateCol<LoanAdvanceListRow>('emiPaymentDate', { includeTime: false }, {
                 field: 'emiPaymentDate',
                 colId: 'emiPaymentDate',
                 headerName: 'EMI Date',

@@ -61,7 +61,10 @@ export type TenderFileContext =
     | 'pqr-performance-certificate'
     | 'finance-document'
     | 'bankLoanSchedule'
-    | 'sanctionLetter';
+    | 'sanctionLetter'
+    | 'tdsDocument'
+    | 'bankNoc'
+    | 'mcaClosure';
 
 export interface FileConfig {
     context: string;
