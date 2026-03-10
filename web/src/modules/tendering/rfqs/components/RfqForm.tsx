@@ -30,7 +30,7 @@ import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 const RfqFormSchema = z.object({
-    dueDate: z.date({ message: "Due date is required" }),
+    dueDate: z.coerce.date({ message: "Due date is required" }),
 
     scopeOfWorkPaths: z.array(z.string()).default([]),
     techSpecsPaths: z.array(z.string()).default([]),
@@ -90,7 +90,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     const form = useForm<FormValues>({
         resolver: zodResolver(RfqFormSchema) as Resolver<FormValues>,
         defaultValues: {
-            dueDate: tenderData.dueDate,
+            dueDate: tenderData?.dueDate ? new Date(tenderData.dueDate) : undefined,
             items: [{ requirement: '', unit: '', qty: undefined }],
             vendorRows: [],
             docList: '',
