@@ -91,6 +91,11 @@ import { ProjectsMasterModule } from "./modules/master/projects-master/projects-
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
+import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
+import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
+import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
+import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
 
 @Module({
     imports: [
@@ -181,6 +186,11 @@ import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.
         ChequeModule,
         TimersModule,
         WoBasicDetailsModule,
+        WoDetailsModule,
+        WoContactsModule,
+        WoAmendmentsModule,
+        WoDocumentsModule,
+        WoQueriesModule,
         KickOffMeetingModule,
         ProjectsModule,
         FollowupSchedulerModule,
