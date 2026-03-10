@@ -6,8 +6,7 @@ import {
 import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { woDocuments } from '@db/schemas/wo-documents.schema';
-import { woDetails } from '@db/schemas/wo-details.schema';
+import { woDocuments, woDetails } from '@db/schemas/operations';
 import type {
   CreateWoDocumentDto,
   UpdateWoDocumentDto,

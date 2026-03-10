@@ -9,7 +9,7 @@ import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull } from 'drizzle-or
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
-import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, PauseWorkflowDto, ResumeWorkflowDto, UpdateWorkflowStageDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 
 export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 
