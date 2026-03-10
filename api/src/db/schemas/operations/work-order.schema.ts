@@ -1,3 +1,4 @@
+import { bigserial } from "drizzle-orm/pg-core";
 import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, date, boolean } from "drizzle-orm/pg-core";
 
 /**
@@ -8,7 +9,7 @@ import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, dat
  * Once filled, the project appears on Project Dashboard and triggers TL assignment workflow.
  */
 export const woBasicDetails = pgTable("wo_basic_details", {
-    id: bigint("id", { mode: "number" }).primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
 
     // Source reference - links to either a TMS tender or manual enquiry
     tenderId: bigint("tender_id", { mode: "number" }), // Reference to TMS tender (auto-fills data)
@@ -65,7 +66,7 @@ export const woBasicDetails = pgTable("wo_basic_details", {
  * Email sent to TL and CEO with PSS and WO Dashboard Link once filled.
  */
 export const woDetails = pgTable("wo_details",{
-        id: bigint("id", { mode: "number" }).primaryKey(),
+        id: bigserial("id", { mode: "number" }).primaryKey(),
         woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }), // FK to woBasicDetails
 
         // Liquidated Damages (LD) configuration
@@ -118,7 +119,7 @@ export const woDetails = pgTable("wo_details",{
  * Initiates followup workflow when woAmendmentNeeded = true in woDetails.
  */
 export const woAmendments = pgTable("wo_amendments", {
-    id: bigint("id", { mode: "number" }).primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     woDetailId: bigint("wo_detail_id", { mode: "number" }), // FK to woDetails
 
     // Amendment details - identifies exact location and changes needed
@@ -139,7 +140,7 @@ export const woAmendments = pgTable("wo_amendments", {
  * Detailed WO upload only if isDetailedWoApplicable = true in workflow.
  */
 export const woDocuments = pgTable("wo_documents", {
-  id: bigint("id", { mode: "number" }).primaryKey(),
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   woDetailId: bigint("wo_detail_id", { mode: "number" }), // FK to woDetails
 
   // Document type and versioning
@@ -158,7 +159,7 @@ export const woDocuments = pgTable("wo_documents", {
  * Shows old contacts + Add button for new contacts.
  */
 export const woContacts = pgTable("wo_contacts", {
-    id: bigint("id", { mode: "number" }).primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }), // FK to woBasicDetails
 
     // Client organization details
@@ -180,7 +181,7 @@ export const woContacts = pgTable("wo_contacts", {
  * TL can query TE, OE, or both simultaneously.
  */
 export const woQueries = pgTable("wo_queries", {
-    id: bigint("id", { mode: "number" }).primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull(), // FK to woDetails
 
     // Query metadata

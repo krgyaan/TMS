@@ -84,45 +84,6 @@ export const RemoveOeAssignmentSchema = z.object({
 export type RemoveOeAssignmentDto = z.infer<typeof RemoveOeAssignmentSchema>;
 
 // ============================================
-// WORKFLOW CONTROL SCHEMAS
-// ============================================
-
-/**
- * Schema for pausing workflow during PO amendment process
- * TL can pause when waiting for edited PO from client
- */
-export const PauseWorkflowSchema = z.object({
-  reason: z.string().min(1).max(500).optional(),
-});
-
-export type PauseWorkflowDto = z.infer<typeof PauseWorkflowSchema>;
-
-/**
- * Schema for resuming workflow after edited PO is uploaded
- */
-export const ResumeWorkflowSchema = z.object({
-  editedPoDocument: z.string().max(255).optional(),
-  notes: z.string().max(500).optional(),
-});
-
-export type ResumeWorkflowDto = z.infer<typeof ResumeWorkflowSchema>;
-
-/**
- * Schema for updating workflow stage
- */
-export const UpdateWorkflowStageSchema = z.object({
-  currentStage: z.enum([
-    "basic_details",
-    "wo_details",
-    "wo_acceptance",
-    "wo_upload",
-    "completed",
-  ]),
-});
-
-export type UpdateWorkflowStageDto = z.infer<typeof UpdateWorkflowStageSchema>;
-
-// ============================================
 // QUERY/FILTER SCHEMAS
 // ============================================
 
