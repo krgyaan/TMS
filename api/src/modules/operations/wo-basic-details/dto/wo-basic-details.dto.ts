@@ -1,8 +1,13 @@
 import { z } from "zod";
 
 // ============================================
-// WO Basic Details DTOs
+// WO BASIC DETAILS SCHEMAS
 // ============================================
+
+/**
+ * Schema for creating new WO Basic Details
+ * Used by TE (Tendering Executive) within 12 hours of PO receipt
+ */
 export const CreateWoBasicDetailSchema = z.object({
   // Source reference - one of these should be provided
   tenderId: z.number().int().positive().optional(),
@@ -11,7 +16,7 @@ export const CreateWoBasicDetailSchema = z.object({
   // Core WO information
   woNumber: z.string().max(255).optional(),
   woDate: z.string().date().optional(), // ISO date string "YYYY-MM-DD"
-  projectCode: z.string().max(100).optional(),
+  projectCode: z.string().max(100).optional(), // Auto-generated, optional on create
   projectName: z.string().max(255).optional(),
 
   // Workflow state tracking
@@ -26,24 +31,6 @@ export const CreateWoBasicDetailSchema = z.object({
 
   // Document upload
   wo_draft: z.string().max(255).optional(),
-
-  // Operations Executive assignments
-  oeFirst: z.number().int().positive().optional(),
-  oeFirstAssignedAt: z.string().datetime().optional(),
-  oeFirstAssignedBy: z.number().int().positive().optional(),
-
-  oeSiteVisit: z.number().int().positive().optional(),
-  oeSiteVisitAssignedAt: z.string().datetime().optional(),
-  oeSiteVisitAssignedBy: z.number().int().positive().optional(),
-
-  oeDocsPrep: z.number().int().positive().optional(),
-  oeDocsPrepVisitAssignedAt: z.string().datetime().optional(),
-  oeDocsPrepVisitAssignedBy: z.number().int().positive().optional(),
-
-  // Workflow control
-  isWorkflowPaused: z.boolean().default(false).optional(),
-  workflowPausedAt: z.string().datetime().optional(),
-  workflowResumedAt: z.string().datetime().optional(),
 });
 
 export type CreateWoBasicDetailDto = z.infer<typeof CreateWoBasicDetailSchema>;
@@ -51,185 +38,234 @@ export const UpdateWoBasicDetailSchema = CreateWoBasicDetailSchema.partial();
 export type UpdateWoBasicDetailDto = z.infer<typeof UpdateWoBasicDetailSchema>;
 
 // ============================================
-// WO Details DTOs
-// ============================================
-export const CreateWoDetailSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-
-  // Liquidated Damages (LD) configuration
-  ldApplicable: z.boolean().default(true).optional(),
-  maxLd: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
-  ldStartDate: z.string().date().optional(),
-  maxLdDate: z.string().date().optional(),
-
-  // Performance Bank Guarantee (PBG) configuration
-  isPbgApplicable: z.boolean().default(false),
-  filledBgFormat: z.string().max(255).optional(),
-
-  // Contract Agreement configuration
-  isContractAgreement: z.boolean().default(false),
-  contractAgreementFormat: z.string().max(255).optional(),
-
-  // Budget validation
-  budgetPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
-
-  // WO Acceptance Form Fields
-  woAcceptance: z.boolean().default(false).optional(),
-  woAcceptanceAt: z.string().datetime().optional(),
-  woAmendmentNeeded: z.boolean().default(false).optional(),
-
-  // Followup and courier references
-  followupId: z.number().int().positive().optional(),
-  courierId: z.number().int().positive().optional(),
-
-  // TL Timeline Management
-  tlId: z.number().int().positive().optional(),
-  tlQueryRaisedAt: z.string().datetime().optional(),
-  tlFinalDecisionAt: z.string().datetime().optional(),
-
-  // Record status
-  status: z.boolean().default(true).optional(),
-});
-
-export type CreateWoDetailDto = z.infer<typeof CreateWoDetailSchema>;
-export const UpdateWoDetailSchema = CreateWoDetailSchema.partial();
-export type UpdateWoDetailDto = z.infer<typeof UpdateWoDetailSchema>;
-
-// ============================================
-// WO Contact DTOs
-// ============================================
-export const CreateWoContactSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-
-  // Client organization details
-  organization: z.string().max(100).optional(),
-  departments: z.enum(["EIC", "User", "C&P", "Finance"]).optional(),
-
-  // Contact person details
-  name: z.string().max(255).optional(),
-  designation: z.string().max(50).optional(),
-  phone: z.string().max(20).regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number format").optional(),
-  email: z.string().email().max(255).optional(),
-});
-
-export type CreateWoContactDto = z.infer<typeof CreateWoContactSchema>;
-export const UpdateWoContactSchema = CreateWoContactSchema.partial();
-export type UpdateWoContactDto = z.infer<typeof UpdateWoContactSchema>;
-
-// ============================================
-// WO Amendment DTOs
-// ============================================
-export const CreateWoAmendmentSchema = z.object({
-  woDetailId: z.number().int().positive(),
-
-  // Amendment details
-  pageNo: z.string().max(100).optional(),
-  clauseNo: z.string().max(100).optional(),
-  currentStatement: z.string().optional(),
-  correctedStatement: z.string().optional(),
-});
-
-export type CreateWoAmendmentDto = z.infer<typeof CreateWoAmendmentSchema>;
-export const UpdateWoAmendmentSchema = CreateWoAmendmentSchema.partial();
-export type UpdateWoAmendmentDto = z.infer<typeof UpdateWoAmendmentSchema>;
-
-// ============================================
-// WO Document DTOs
-// ============================================
-export const CreateWoDocumentSchema = z.object({
-  woDetailId: z.number().int().positive(),
-
-  // Document type and versioning
-  type: z.enum(["draftWo", "acceptedWoSigned", "finalWo", "detailedWo", "sapPo", "foa"]),
-  version: z.number().int().positive().optional(),
-  filePath: z.string().max(500),
-  uploadedAt: z.string().datetime().optional(),
-});
-
-export type CreateWoDocumentDto = z.infer<typeof CreateWoDocumentSchema>;
-export const UpdateWoDocumentSchema = CreateWoDocumentSchema.partial();
-export type UpdateWoDocumentDto = z.infer<typeof UpdateWoDocumentSchema>;
-
-// ============================================
-// WO Query DTOs
-// ============================================
-export const CreateWoQuerySchema = z.object({
-  woDetailId: z.number().int().positive(),
-
-  // Query metadata
-  queryBy: z.number().int().positive(),
-  queryTo: z.enum(["TE", "OE", "BOTH"]),
-  queryText: z.string().min(1, "Query text is required"),
-  queryRaisedAt: z.string().datetime().optional(),
-
-  // Response tracking
-  responseText: z.string().optional(),
-  respondedBy: z.number().int().positive().optional(),
-  respondedAt: z.string().datetime().optional(),
-
-  // Query lifecycle
-  status: z.enum(["pending", "responded", "closed"]).default("pending"),
-});
-
-export type CreateWoQueryDto = z.infer<typeof CreateWoQuerySchema>;
-export const UpdateWoQuerySchema = CreateWoQuerySchema.partial();
-export type UpdateWoQueryDto = z.infer<typeof UpdateWoQuerySchema>;
-
-// ============================================
-// Additional Utility Schemas
+// OE ASSIGNMENT SCHEMAS
 // ============================================
 
-// Schema for assigning OE (used by TL)
+/**
+ * Schema for assigning Operations Executive (OE) to a project
+ * Used by TL within 12 hours of Basic Details creation
+ */
 export const AssignOeSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-  assignmentType: z.enum(["first", "siteVisit", "docsPrep"]),
-  oeUserId: z.number().int().positive(),
+  assignmentType: z.enum(["first", "siteVisit", "docsPrep"], {
+    required_error: "Assignment type is required",
+    invalid_type_error: "Invalid assignment type",
+  }),
+  oeUserId: z.number().int().positive({
+    message: "Valid OE user ID is required",
+  }),
+  assignedBy: z.number().int().positive().optional(), // Auto-filled from auth context
 });
+
 export type AssignOeDto = z.infer<typeof AssignOeSchema>;
 
-// Schema for WO Acceptance decision by TL
-export const WoAcceptanceDecisionSchema = z.object({
-  woDetailId: z.number().int().positive(),
-  accepted: z.boolean(),
-  amendmentNeeded: z.boolean().optional(),
-  amendments: z.array(
-      z.object({
-        pageNo: z.string().max(100),
-        clauseNo: z.string().max(100),
-        currentStatement: z.string(),
-        correctedStatement: z.string(),
-      })
-    )
-    .optional(),
-});
-export type WoAcceptanceDecisionDto = z.infer<typeof WoAcceptanceDecisionSchema>;
-
-// Schema for responding to a query
-export const QueryResponseSchema = z.object({
-  woQueryId: z.number().int().positive(),
-  responseText: z.string().min(1, "Response text is required"),
-});
-export type QueryResponseDto = z.infer<typeof QueryResponseSchema>;
-
-// Schema for pausing/resuming workflow
-export const WorkflowControlSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-  action: z.enum(["pause", "resume"]),
-});
-export type WorkflowControlDto = z.infer<typeof WorkflowControlSchema>;
-
-// Schema for bulk contact creation
-export const CreateBulkWoContactsSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-  contacts: z.array(
+/**
+ * Schema for bulk OE assignment
+ * Allows TL to assign multiple OEs at once
+ */
+export const BulkAssignOeSchema = z.object({
+  assignments: z.array(
     z.object({
-      organization: z.string().max(100).optional(),
-      departments: z.enum(["EIC", "User", "C&P", "Finance"]).optional(),
-      name: z.string().max(255).optional(),
-      designation: z.string().max(50).optional(),
-      phone: z.string().max(20).regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number format").optional(),
-      email: z.string().email().max(255).optional(),
+      assignmentType: z.enum(["first", "siteVisit", "docsPrep"]),
+      oeUserId: z.number().int().positive(),
     })
-  ),
+  ).min(1, "At least one assignment is required"),
+  assignedBy: z.number().int().positive().optional(),
 });
-export type CreateBulkWoContactsDto = z.infer<typeof CreateBulkWoContactsSchema>;
+
+export type BulkAssignOeDto = z.infer<typeof BulkAssignOeSchema>;
+
+/**
+ * Schema for removing OE assignment
+ */
+export const RemoveOeAssignmentSchema = z.object({
+  assignmentType: z.enum(["first", "siteVisit", "docsPrep"]),
+});
+
+export type RemoveOeAssignmentDto = z.infer<typeof RemoveOeAssignmentSchema>;
+
+// ============================================
+// WORKFLOW CONTROL SCHEMAS
+// ============================================
+
+/**
+ * Schema for pausing workflow during PO amendment process
+ * TL can pause when waiting for edited PO from client
+ */
+export const PauseWorkflowSchema = z.object({
+  reason: z.string().min(1).max(500).optional(),
+});
+
+export type PauseWorkflowDto = z.infer<typeof PauseWorkflowSchema>;
+
+/**
+ * Schema for resuming workflow after edited PO is uploaded
+ */
+export const ResumeWorkflowSchema = z.object({
+  editedPoDocument: z.string().max(255).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export type ResumeWorkflowDto = z.infer<typeof ResumeWorkflowSchema>;
+
+/**
+ * Schema for updating workflow stage
+ */
+export const UpdateWorkflowStageSchema = z.object({
+  currentStage: z.enum([
+    "basic_details",
+    "wo_details",
+    "wo_acceptance",
+    "wo_upload",
+    "completed",
+  ]),
+});
+
+export type UpdateWorkflowStageDto = z.infer<typeof UpdateWorkflowStageSchema>;
+
+// ============================================
+// QUERY/FILTER SCHEMAS
+// ============================================
+
+/**
+ * Schema for filtering/querying WO Basic Details list
+ */
+export const WoBasicDetailsQuerySchema = z.object({
+  // Pagination
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+
+  // Filters
+  tenderId: z.coerce.number().int().positive().optional(),
+  enquiryId: z.coerce.number().int().positive().optional(),
+  projectCode: z.string().max(100).optional(),
+  projectName: z.string().max(255).optional(),
+  currentStage: z
+    .enum([
+      "basic_details",
+      "wo_details",
+      "wo_acceptance",
+      "wo_upload",
+      "completed",
+    ])
+    .optional(),
+  oeFirst: z.coerce.number().int().positive().optional(),
+  oeSiteVisit: z.coerce.number().int().positive().optional(),
+  oeDocsPrep: z.coerce.number().int().positive().optional(),
+  isWorkflowPaused: z
+    .enum(["true", "false"])
+    .transform((val) => val === "true")
+    .optional(),
+
+  // Date range filters
+  woDateFrom: z.string().date().optional(),
+  woDateTo: z.string().date().optional(),
+  createdAtFrom: z.string().datetime().optional(),
+  createdAtTo: z.string().datetime().optional(),
+
+  // Sorting
+  sortBy: z
+    .enum([
+      "woDate",
+      "createdAt",
+      "updatedAt",
+      "projectCode",
+      "woValuePreGst",
+      "grossMargin",
+    ])
+    .default("createdAt")
+    .optional(),
+  sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
+
+  // Search
+  search: z.string().max(255).optional(), // Search across projectName, woNumber, projectCode
+});
+
+export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema>;
+
+// ============================================
+// RESPONSE SCHEMAS
+// ============================================
+
+/**
+ * Schema for WO Basic Details response with related data
+ */
+export const WoBasicDetailsResponseSchema = z.object({
+  id: z.number(),
+  tenderId: z.number().nullable(),
+  enquiryId: z.number().nullable(),
+  woNumber: z.string().nullable(),
+  woDate: z.string().nullable(),
+  projectCode: z.string(),
+  projectName: z.string().nullable(),
+  currentStage: z.string(),
+  woValuePreGst: z.string().nullable(),
+  woValueGstAmt: z.string().nullable(),
+  receiptPreGst: z.string().nullable(),
+  budgetPreGst: z.string().nullable(),
+  grossMargin: z.string().nullable(),
+  wo_draft: z.string().nullable(),
+
+  // OE assignments
+  oeFirst: z.number().nullable(),
+  oeFirstAssignedAt: z.string().nullable(),
+  oeFirstAssignedBy: z.number().nullable(),
+  oeSiteVisit: z.number().nullable(),
+  oeSiteVisitAssignedAt: z.string().nullable(),
+  oeSiteVisitAssignedBy: z.number().nullable(),
+  oeDocsPrep: z.number().nullable(),
+  oeDocsPrepVisitAssignedAt: z.string().nullable(),
+  oeDocsPrepVisitAssignedBy: z.number().nullable(),
+
+  // Workflow control
+  isWorkflowPaused: z.boolean(),
+  workflowPausedAt: z.string().nullable(),
+  workflowResumedAt: z.string().nullable(),
+
+  // Timestamps
+  createdAt: z.string(),
+  updatedAt: z.string(),
+
+  // Related data (optional, populated on demand)
+  contacts: z.array(z.any()).optional(),
+  woDetail: z.any().optional(),
+});
+
+export type WoBasicDetailsResponseDto = z.infer<typeof WoBasicDetailsResponseSchema>;
+
+/**
+ * Paginated list response schema
+ */
+export const WoBasicDetailsListResponseSchema = z.object({
+  data: z.array(WoBasicDetailsResponseSchema),
+  meta: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+export type WoBasicDetailsListResponseDto = z.infer<typeof WoBasicDetailsListResponseSchema>;
+
+// ============================================
+// VALIDATION HELPERS
+// ============================================
+
+/**
+ * Schema for validating financial calculations
+ */
+export const CalculateGrossMarginSchema = z.object({
+  receiptPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  budgetPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/),
+});
+
+export type CalculateGrossMarginDto = z.infer<typeof CalculateGrossMarginSchema>;
+
+/**
+ * Schema for validating project code uniqueness
+ */
+export const CheckProjectCodeSchema = z.object({
+  projectCode: z.string().max(100),
+});
+
+export type CheckProjectCodeDto = z.infer<typeof CheckProjectCodeSchema>;
