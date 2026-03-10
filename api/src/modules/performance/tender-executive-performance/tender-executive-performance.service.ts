@@ -1301,6 +1301,32 @@ export class TenderExecutiveService {
           AND ti.tl_status = 1
     `);
 
+        const approvedDuringAccepted = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at BETWEEN '${from}' AND '${to}'
+        )
+        AND ti.tl_status = 1
+        `);
+
+        const approvedDuringRejected = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND EXISTS (
+            SELECT 1
+            FROM tender_information tin
+            WHERE tin.tender_id = ti.id
+            AND tin.created_at BETWEEN '${from}' AND '${to}'
+        )
+        AND ti.tl_status = 2
+        `);
+
         const approvedDuringPending = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
@@ -1309,13 +1335,13 @@ export class TenderExecutiveService {
           AND ti.tl_status = 0
     `);
 
-        const approvedDuringRejected = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND tin.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status = 2
-    `);
+        //     const approvedDuringRejected = await exec(`
+        //     ${baseSelect}
+        //     JOIN tender_information tin ON tin.tender_id = ti.id
+        //     WHERE ${baseWhere()}
+        //       AND tin.created_at BETWEEN '${from}' AND '${to}'
+        //       AND ti.tl_status = 2
+        // `);
 
         const approvedTotal = await exec(`
         ${baseSelect}
@@ -1455,12 +1481,13 @@ export class TenderExecutiveService {
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+        AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                 AND tr.created_at BETWEEN '${from}' AND '${to}'
-          )
+                AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
+        )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
@@ -1615,9 +1642,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
                         completed: {
-                            count: approvedDuringCompleted.length,
-                            value: this.sumValue(approvedDuringCompleted),
-                            drilldown: this.mapDrilldown(approvedDuringCompleted),
+                            count: approvedDuringAccepted.length,
+                            value: this.sumValue(approvedDuringAccepted),
+                            drilldown: this.mapDrilldown(approvedDuringAccepted),
                         },
                         rejected: {
                             count: approvedDuringRejected.length,
@@ -1956,7 +1983,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -1983,7 +2010,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2005,7 +2032,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2013,7 +2040,7 @@ export class TenderExecutiveService {
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at < '${from}'
+          AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
           AND pi.status NOT ILIKE '%rejected%'
           AND pi.status NOT ILIKE '%pending%'
           AND (
@@ -2031,7 +2058,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
@@ -2039,7 +2066,7 @@ export class TenderExecutiveService {
         JOIN payment_instruments pi ON pi.request_id = pr.id
         JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at BETWEEN '${from}' AND '${to}'
+          AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
           AND pi.status NOT ILIKE '%rejected%'
           AND pi.status NOT ILIKE '%pending%'
           AND (
@@ -2058,7 +2085,7 @@ export class TenderExecutiveService {
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pr.amount_required  AS "value",
+            pi.amount  AS "value",
             pi.instrument_type  AS "instrumentType",
             ti.tender_no        AS "tenderNo",
             ti.tender_name      AS "tenderName"
