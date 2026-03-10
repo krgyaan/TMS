@@ -1,4 +1,4 @@
-﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus } from "@nestjs/common";
+﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus, Delete } from "@nestjs/common";
 import { z } from "zod";
 import { VendorsService } from "@/modules/master/vendors/vendors.service";
 
@@ -50,9 +50,9 @@ export class VendorsController {
         return this.vendorsService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //   await this.vendorsService.delete(id);
-    // }
+    @Delete(":id")
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param("id", ParseIntPipe) id: number) {
+        await this.vendorsService.delete(id);
+    }
 }
