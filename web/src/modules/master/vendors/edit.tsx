@@ -77,9 +77,7 @@ const EditVendorPage = () => {
 
     const { data: organization, isLoading, error } = useVendorOrganizationWithRelations(orgId);
     const updateVendor = useUpdateVendorOrganizationWithRelations();
-    const createGst = useCreateVendorGst();
-    const updateGst = useUpdateVendorGst();
-    const deleteGst = useDeleteVendorGst();
+
     const createAccount = useCreateVendorAccount();
     const updateAccount = useUpdateVendorAccount();
     const deleteAccount = useDeleteVendorAccount();
@@ -232,19 +230,19 @@ const EditVendorPage = () => {
                                 </TabsList>
 
                                 <TabsContent value="gsts" className="mt-4">
-                                    <GstList orgId={orgId!} gsts={orgWithRelations.gsts || []} />
+                                    <GstSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="accounts" className="mt-4">
-                                    <AccountList orgId={orgId!} accounts={orgWithRelations.accounts || []} />
+                                    <AccountSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="persons" className="mt-4">
-                                    <PersonList orgId={orgId!} persons={orgWithRelations.persons || []} />
+                                    <PersonSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="files" className="mt-4">
-                                    <FileList files={orgWithRelations.files || []} persons={orgWithRelations.persons || []} />
+                                    <FileSection orgId={orgId!} />
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
@@ -379,7 +377,7 @@ const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
                                         <>
                                             <div className="text-sm text-muted-foreground">{person.email}</div>
                                             <div className="text-sm text-muted-foreground">{person.mobile}</div>
-                                            <div className="text-sm text-muted-foreground">{person.address ? person.address : ""}</div>
+                                            <div className="text-sm text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">{person.address ? person.address : ""}</div>
                                         </>
                                     )}
                                 </div>
