@@ -78,7 +78,7 @@ import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-tr
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 // import { BusinessPerformanceModule } from "./modules/performance/business/business-performance.module";
-import { WorkOrderModule } from "@/modules/operations/work-order/work-order.module";
+import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
@@ -180,7 +180,7 @@ import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.
         BankTransferModule,
         ChequeModule,
         TimersModule,
-        WorkOrderModule,
+        WoBasicDetailsModule,
         KickOffMeetingModule,
         ProjectsModule,
         FollowupSchedulerModule,
