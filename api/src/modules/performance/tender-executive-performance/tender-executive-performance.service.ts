@@ -1975,135 +1975,133 @@ export class TenderExecutiveService {
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.value ?? 0), 0);
 
         /* =====================================================
-       A. OPENING
-       Paid before period & still pending
-    ===================================================== */
+   A. OPENING
+===================================================== */
 
         const opening = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pi.amount  AS "value",
+            pi.amount           AS "value",
             pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
+            COALESCE(ti.tender_no, '-') AS "tenderNo",
+            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at < '${from}'
-          AND pi.status NOT ILIKE '%rejected%'
-          AND pi.status NOT ILIKE '%pending%'
-          AND pi.status ILIKE '%accepted%'
-          AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-          );
-    `);
+        AND pr.created_at < '${from}'
+        AND pi.status NOT ILIKE '%rejected%'
+        AND pi.status NOT ILIKE '%pending%'
+        AND pi.status ILIKE '%accepted%'
+        AND (
+            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
+        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
+        );
+        `);
 
         /* =====================================================
-       B. PAID DURING PERIOD (ALL)
-    ===================================================== */
+   B. PAID DURING PERIOD (ALL)
+===================================================== */
 
         const paidDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pi.amount  AS "value",
+            pi.amount           AS "value",
             pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
+            COALESCE(ti.tender_no, '-') AS "tenderNo",
+            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at BETWEEN '${from}' AND '${to}'
-          AND pi.status NOT ILIKE '%rejected%'
-          AND pi.status NOT ILIKE '%pending%'
-          AND pi.instrument_type NOT IN ('Cheque')
-    `);
+        AND pr.created_at BETWEEN '${from}' AND '${to}'
+        AND pi.status NOT ILIKE '%rejected%'
+        AND pi.status NOT ILIKE '%pending%'
+        AND pi.instrument_type NOT IN ('Cheque')
+        `);
 
         /* =====================================================
-       C. RECEIVED FOR PRIOR PAID
-    ===================================================== */
+   C. RECEIVED FOR PRIOR PAID
+===================================================== */
 
         const receivedForPrior = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pi.amount  AS "value",
+            pi.amount           AS "value",
             pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
+            COALESCE(ti.tender_no, '-') AS "tenderNo",
+            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
-          AND pi.status NOT ILIKE '%rejected%'
-          AND pi.status NOT ILIKE '%pending%'
-          AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-          );
-    `);
+        AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
+        AND pi.status NOT ILIKE '%rejected%'
+        AND pi.status NOT ILIKE '%pending%'
+        AND (
+            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+        );
+        `);
 
         /* =====================================================
-       D. RECEIVED FOR DURING PAID
-    ===================================================== */
+   D. RECEIVED FOR DURING PAID
+===================================================== */
 
         const receivedForDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pi.amount  AS "value",
+            pi.amount           AS "value",
             pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
+            COALESCE(ti.tender_no, '-') AS "tenderNo",
+            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
-          AND pi.status NOT ILIKE '%rejected%'
-          AND pi.status NOT ILIKE '%pending%'
-          AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-          );
-    `);
+        AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
+        AND pi.status NOT ILIKE '%rejected%'
+        AND pi.status NOT ILIKE '%pending%'
+        AND (
+            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
+        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
+        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
+        );
+        `);
 
         /* =====================================================
-       E. CLOSING
-       Pending at end of period
-    ===================================================== */
+   E. CLOSING
+   Pending at end of period
+===================================================== */
 
         const closing = await exec(`
         SELECT
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
-            pi.amount  AS "value",
+            pi.amount           AS "value",
             pi.instrument_type  AS "instrumentType",
-            ti.tender_no        AS "tenderNo",
-            ti.tender_name      AS "tenderName"
+            COALESCE(ti.tender_no, '-') AS "tenderNo",
+            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
-        JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
-          AND pr.created_at < '${to}'
-          AND pi.status NOT ILIKE '%rejected%'
-          AND pi.status NOT ILIKE '%pending%'
-          AND pi.status ILIKE '%accepted%'
-          AND (
-              (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-           OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-           OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-          );
-    `);
-
+        AND pr.created_at < '${to}'
+        AND pi.status NOT ILIKE '%rejected%'
+        AND pi.status NOT ILIKE '%pending%'
+        AND pi.status ILIKE '%accepted%'
+        AND (
+            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
+        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
+        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
+        );
+        `);
         /* =====================================================
        FINAL RESPONSE (dashboard-ready)
     ===================================================== */
