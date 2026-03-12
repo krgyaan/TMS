@@ -1,7 +1,5 @@
 export type TenderFileContext =
     | "tender-documents"
-    | "bg-format-files"
-    | "bg-po-files"
     | "emds"
     | "tender-fees"
     | "physical-docs"
@@ -29,6 +27,8 @@ export type TenderFileContext =
     | "result-screenshots"
     | "bg-format-imran"
     | "bg-prefilled-signed"
+    | "bg-format-files"
+    | "bg-po-files"
     | "bg-sfms-conf"
     | "bg-fdr-copy"
     | "bg-ext-letter"

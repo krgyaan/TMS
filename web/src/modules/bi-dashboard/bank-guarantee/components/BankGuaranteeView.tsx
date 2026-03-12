@@ -2,9 +2,62 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Shield } from 'lucide-react';
+import { Shield, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
+import { formatDate } from '@/hooks/useFormatedDate';
+
+const FileLink = ({ file }: { file?: string }) => {
+    if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
+
+    return (
+        <div className="flex gap-3 items-center">
+            <a
+                href={file}
+                target="_blank"
+                className="flex items-center gap-1 text-blue-600 hover:underline"
+            >
+                <Eye className="h-4 w-4" />
+                {file?.split('_').slice(1).join('_')}
+            </a>
+        </div>
+    );
+};
+
+const SectionHeader = ({ title }: { title: string }) => (
+    <TableRow className="bg-muted/50">
+        <TableCell colSpan={4} className="font-semibold text-sm">
+            {title}
+        </TableCell>
+    </TableRow>
+);
+
+const DataRow = ({ label1, value1, label2, value2 }: {
+    label1: string;
+    value1: React.ReactNode;
+    label2?: string;
+    value2?: React.ReactNode;
+}) => (
+    <TableRow className="hover:bg-muted/30 transition-colors">
+        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+            {label1}
+        </TableCell>
+        <TableCell className="text-sm w-1/4 whitespace-normal [overflow-wrap:anywhere]">
+            {value1}
+        </TableCell>
+        {label2 ? (
+            <>
+                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                    {label2}
+                </TableCell>
+                <TableCell className="text-sm w-1/4 whitespace-normal [overflow-wrap:anywhere]">
+                    {value2}
+                </TableCell>
+            </>
+        ) : (
+            <TableCell colSpan={2} />
+        )}
+    </TableRow>
+);
 
 interface BankGuaranteeViewProps {
     data: any;
@@ -38,16 +91,39 @@ export function BankGuaranteeView({
         return null;
     }
 
-    const calculateBgClaimPeriod = (expiryDate: Date | null, claimExpiryDate: Date | null): number | null => {
+    const calculateBgClaimPeriod = (
+        expiryDate: Date | null,
+        claimExpiryDate: Date | null
+    ): number | null => {
         if (!expiryDate || !claimExpiryDate) return null;
         const diffTime = claimExpiryDate.getTime() - expiryDate.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays;
     };
 
-    const bgClaimPeriod = data.bgExpiryDate && data.claimExpiryDateBg
-        ? calculateBgClaimPeriod(new Date(data.bgExpiryDate), new Date(data.claimExpiryDateBg))
-        : null;
+    const bgClaimPeriod =
+        data.bgExpiryDate && data.claimExpiryDateBg
+            ? calculateBgClaimPeriod(
+                new Date(data.bgExpiryDate),
+                new Date(data.claimExpiryDateBg)
+            )
+            : null;
+
+    // Check if sections have data
+    const hasFdrDetails = data.fdrNo || data.fdrAmt || data.fdrCopy || data.fdrCancellationDate;
+    const hasBankInfo = data.bankName || data.bgBankAcc || data.bgBankIfsc;
+    const hasExtensionDetails = data.extendedAmount || data.extendedValidityDate;
+    const hasCourierInfo =
+        data.bgCourierAddress ||
+        data.courierRequestNo ||
+        data.courierDocketNo ||
+        data.courierNo ||
+        data.courierAddress;
+    const hasReturnInfo =
+        data.returnCourierDocketNo ||
+        data.returnCourierSlip ||
+        data.bgCancellationConfirmation ||
+        data.bankReferenceNo;
 
     return (
         <Card className={className}>
@@ -60,358 +136,288 @@ export function BankGuaranteeView({
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Basic Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Basic Information
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                BG No
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
-                                {data.bgNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                BG Date
-                            </TableCell>
-                            <TableCell className="text-sm w-1/4">
-                                {data.bgDate ? formatDate(data.bgDate) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Beneficiary Name
-                            </TableCell>
-                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                {data.beneficiaryName || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Amount
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {data.amount ? formatINR(Number(data.amount)) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Status
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                <Badge variant="outline">{data.status || '—'}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Purpose
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.purpose || '—'}
-                            </TableCell>
-                        </TableRow>
+                        {/* Section 1: Basic Information */}
+                        <SectionHeader title="Basic Information" />
+                        <DataRow
+                            label1="BG No"
+                            value1={<span className="font-semibold">{data.bgNo || '—'}</span>}
+                            label2="BG Date"
+                            value2={data.bgDate ? formatDate(data.bgDate) : '—'}
+                        />
+                        <DataRow
+                            label1="Amount"
+                            value1={
+                                <span className="font-semibold">
+                                    {data.amount ? formatINR(Number(data.amount)) : '—'}
+                                </span>
+                            }
+                            label2="Status"
+                            value2={<Badge variant="outline">{data.status || '—'}</Badge>}
+                        />
+                        <DataRow
+                            label1="Purpose"
+                            value1={data.bgPurpose || data.purpose || '—'}
+                            label2="Beneficiary Name"
+                            value2={data.beneficiaryName || '—'}
+                        />
 
-                        {/* Request Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Request Information
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Request ID
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestId ?? '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Request Type
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestType || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Requested By
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestedByName || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Docket No
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.docketNo || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                BG Needs
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.bgNeeds || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                BG Purpose
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.bgPurpose || '—'}
-                            </TableCell>
-                        </TableRow>
-                        {data.requestRemarks && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Remarks
-                                </TableCell>
-                                <TableCell className="text-sm break-words" colSpan={3}>
-                                    {data.requestRemarks}
-                                </TableCell>
-                            </TableRow>
-                        )}
+                        {/* Section 2: Request Information */}
+                        <SectionHeader title="Request Information" />
+                        <DataRow
+                            label1="Request ID"
+                            value1={data.requestId ?? '—'}
+                            label2="Request Type"
+                            value2={data.requestType || '—'}
+                        />
+                        <DataRow
+                            label1="Requested By"
+                            value1={data.requestedByName || '—'}
+                            label2="Rejection Reasons"
+                            value2={data.rejectionReasons || '—'}
+                        />
+                        <DataRow
+                            label1="Prefilled Forms (Unsigned)"
+                            value1={<FileLink file={data.prefilledFormsUnsigned} />}
+                            label2="Prefilled Forms (Signed)"
+                            value2={<FileLink file={data.prefilledFormsSigned} />}
+                        />
+                        <DataRow
+                            label1="BG Format by TE"
+                            value1={<FileLink file={data.bgFormatTe} />}
+                            label2="BG Format by Accounts"
+                            value2={<FileLink file={data.bgFormatAccounts} />}
+                        />
+                        <DataRow
+                            label1="PO / Request Letter / Tender Name"
+                            value1={<FileLink file={data.poRequestLetter} />}
+                        />
 
-                        {/* Tender/Project Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Tender/Project Information
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender No
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderNo || data.projectNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Name
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderName || data.projectName || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Bid Validity
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Status
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderStatusName || '—'}
-                            </TableCell>
-                        </TableRow>
+                        {/* Section 3: Tender/Project Information */}
+                        <SectionHeader title="Tender/Project Information" />
+                        <DataRow
+                            label1="Tender No"
+                            value1={data.tenderNo || data.projectNo || '—'}
+                            label2="Tender Name"
+                            value2={data.tenderName || data.projectName || '—'}
+                        />
+                        <DataRow
+                            label1="Bid Validity"
+                            value1={
+                                data.tenderDueDate
+                                    ? formatDate(data.tenderDueDate)
+                                    : data.requestDueDate
+                                        ? formatDate(data.requestDueDate)
+                                        : '—'
+                            }
+                            label2="Tender Status"
+                            value2={data.tenderStatusName || '—'}
+                        />
 
-                        {/* BG Details */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                BG Details
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Expiry Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.bgExpiryDate ? formatDate(data.bgExpiryDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Claim Expiry Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.claimExpiryDateBg ? formatDate(data.claimExpiryDateBg) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Validity Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.validityDate ? formatDate(data.validityDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                BG Claim Period
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {bgClaimPeriod !== null ? `${bgClaimPeriod} days` : '—'}
-                            </TableCell>
-                        </TableRow>
+                        {/* Section 4: Beneficiary & Client Information */}
+                        <SectionHeader title="Beneficiary & Client Information" />
+                        <DataRow
+                            label1="Beneficiary Address"
+                            value1={data.beneficiaryAddress || '—'}
+                            label2="Client Emails"
+                            value2={data.clientEmails?.join(', ') || '—'}
+                        />
+                        <DataRow
+                            label1="Client Bank Account Name"
+                            value1={data.clientBankAccName || '—'}
+                            label2="Client Account No"
+                            value2={data.clientAccNo || '—'}
+                        />
+                        <DataRow
+                            label1="Client Bank IFSC"
+                            value1={data.ifsc || '—'}
+                        />
 
-                        {/* Charges */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Charges
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                BG Charges Paid
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {data.bgChargeDeducted ? formatINR(Number(data.bgChargeDeducted)) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Stamp Charges
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.stampChargesDeducted ? formatINR(Number(data.stampChargesDeducted)) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                SFMS Charges
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.sfmsChargesDeducted ? formatINR(Number(data.sfmsChargesDeducted)) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Other Charges
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.otherChargesDeducted ? formatINR(Number(data.otherChargesDeducted)) : '—'}
-                            </TableCell>
-                        </TableRow>
+                        {/* Section 5: BG Validity & Dates */}
+                        <SectionHeader title="BG Validity & Dates" />
+                        <DataRow
+                            label1="Validity Date"
+                            value1={data.validityDate ? formatDate(data.validityDate) : '—'}
+                            label2="Expiry Date"
+                            value2={data.bgExpiryDate ? formatDate(data.bgExpiryDate) : '—'}
+                        />
+                        <DataRow
+                            label1="Claim Expiry Date"
+                            value1={data.claimExpiryDateBg ? formatDate(data.claimExpiryDateBg) : '—'}
+                            label2="BG Claim Period"
+                            value2={bgClaimPeriod !== null ? `${bgClaimPeriod} days` : '—'}
+                        />
+                        <DataRow
+                            label1="Soft Copy of BG"
+                            value1={<FileLink file={data.bgSoftCopy} />}
+                            label2="SFMS File"
+                            value2={<FileLink file={data.sfmsFile} />}
+                        />
 
-                        {/* FDR Details */}
-                        {(data.fdrNo || data.fdrAmt) && (
+                        {/* Section 6: BG Issuing Bank Information */}
+                        {hasBankInfo && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        FDR Details
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        FDR No
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.fdrNo || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        FDR Value
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {data.fdrAmt ? formatINR(Number(data.fdrAmt)) : '—'}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        FDR Validity
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        FDR ROI
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.fdrRoi ? `${Number(data.fdrRoi)}%` : '—'}
-                                    </TableCell>
-                                </TableRow>
+                                <SectionHeader title="BG Issuing Bank Information" />
+                                <DataRow
+                                    label1="Bank Name"
+                                    value1={data.bankName || '—'}
+                                    label2="Bank Account"
+                                    value2={data.bgBankAcc || '—'}
+                                />
+                                <DataRow
+                                    label1="Bank IFSC"
+                                    value1={data.bgBankIfsc || '—'}
+                                />
                             </>
                         )}
 
-                        {/* Bank Information */}
-                        {data.bankName && (
+                        {/* Section 7: Charges */}
+                        <SectionHeader title="Charges" />
+                        <DataRow
+                            label1="BG Charges Paid"
+                            value1={
+                                <span className="font-semibold">
+                                    {data.bgChargeDeducted
+                                        ? formatINR(Number(data.bgChargeDeducted))
+                                        : '—'}
+                                </span>
+                            }
+                            label2="Stamp Charges"
+                            value2={
+                                data.stampChargesDeducted
+                                    ? formatINR(Number(data.stampChargesDeducted))
+                                    : '—'
+                            }
+                        />
+                        <DataRow
+                            label1="SFMS Charges"
+                            value1={
+                                data.sfmsChargesDeducted
+                                    ? formatINR(Number(data.sfmsChargesDeducted))
+                                    : '—'
+                            }
+                            label2="Other Charges"
+                            value2={
+                                data.otherChargesDeducted
+                                    ? formatINR(Number(data.otherChargesDeducted))
+                                    : '—'
+                            }
+                        />
+
+                        {/* Section 8: FDR Details */}
+                        {hasFdrDetails && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Bank Information
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Bank Name
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.bankName || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Bank Account
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.bgBankAcc || '—'}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Bank IFSC
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.bgBankIfsc || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Beneficiary Address
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.beneficiaryAddress || '—'}
-                                    </TableCell>
-                                </TableRow>
+                                <SectionHeader title="FDR Details" />
+                                <DataRow
+                                    label1="FDR No"
+                                    value1={data.fdrNo || '—'}
+                                    label2="FDR Amount"
+                                    value2={
+                                        <span className="font-semibold">
+                                            {data.fdrAmt ? formatINR(Number(data.fdrAmt)) : '—'}
+                                        </span>
+                                    }
+                                />
+                                <DataRow
+                                    label1="FDR Validity"
+                                    value1={data.fdrValidity ? formatDate(data.fdrValidity) : '—'}
+                                    label2="FDR ROI"
+                                    value2={data.fdrRoi ? `${Number(data.fdrRoi)}%` : '—'}
+                                />
+                                <DataRow
+                                    label1="FDR Copy"
+                                    value1={<FileLink file={data.fdrCopy} />}
+                                    label2="FDR Cancellation Date"
+                                    value2={
+                                        data.fdrCancellationDate
+                                            ? formatDate(data.fdrCancellationDate)
+                                            : '—'
+                                    }
+                                />
+                                <DataRow
+                                    label1="Cancelled FDR Amount"
+                                    value1={
+                                        data.cancelledFdrAmount
+                                            ? formatINR(Number(data.cancelledFdrAmount))
+                                            : '—'
+                                    }
+                                />
                             </>
                         )}
 
-                        {/* Extension Details */}
-                        {(data.extendedAmount || data.extendedValidityDate) && (
+                        {/* Section 9: Courier & Dispatch Information */}
+                        {hasCourierInfo && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Extension Details
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Extended Amount
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {data.extendedAmount ? formatINR(Number(data.extendedAmount)) : '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Extended Validity Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.extendedValidityDate ? formatDate(data.extendedValidityDate) : '—'}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Extended Claim Expiry Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.extendedClaimExpiryDate ? formatDate(data.extendedClaimExpiryDate) : '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Extended Bank Name
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.extendedBankName || '—'}
-                                    </TableCell>
-                                </TableRow>
+                                <SectionHeader title="Courier & Dispatch Information" />
+                                <DataRow
+                                    label1="BG Courier Address"
+                                    value1={data.bgCourierAddress || data.courierAddress || '—'}
+                                    label2="Courier Request No"
+                                    value2={data.courierRequestNo || '—'}
+                                />
+                                <DataRow
+                                    label1="Courier Docket No"
+                                    value1={data.courierDocketNo || data.courierNo || '—'}
+                                    label2="Courier Docket Slip"
+                                    value2={<FileLink file={data.courierDocketSlip} />}
+                                />
                             </>
                         )}
 
-                        {/* Courier Information */}
-                        {data.courierNo && (
+                        {/* Section 10: BG Return & Cancellation */}
+                        {hasReturnInfo && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Courier Information
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Courier No
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.courierNo || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                        Courier Address
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.courierAddress || '—'}
-                                    </TableCell>
-                                </TableRow>
+                                <SectionHeader title="BG Return & Cancellation" />
+                                <DataRow
+                                    label1="Return Courier Docket No"
+                                    value1={data.returnCourierDocketNo || '—'}
+                                    label2="Return Courier Slip"
+                                    value2={<FileLink file={data.returnCourierSlip} />}
+                                />
+                                <DataRow
+                                    label1="BG Cancellation Confirmation"
+                                    value1={<FileLink file={data.bgCancellationConfirmation} />}
+                                    label2="Bank Reference No"
+                                    value2={data.bankReferenceNo || '—'}
+                                />
+                                <DataRow
+                                    label1="Followup Proof"
+                                    value1={<FileLink file={data.followupProof} />}
+                                    label2="Followup Proof Image"
+                                    value2={<FileLink file={data.followupProofImage} />}
+                                />
+                            </>
+                        )}
+
+                        {/* Section 11: Extension Details */}
+                        {hasExtensionDetails && (
+                            <>
+                                <SectionHeader title="Extension Details" />
+                                <DataRow
+                                    label1="Extended Amount"
+                                    value1={
+                                        <span className="font-semibold">
+                                            {data.extendedAmount
+                                                ? formatINR(Number(data.extendedAmount))
+                                                : '—'}
+                                        </span>
+                                    }
+                                    label2="Extended Validity Date"
+                                    value2={
+                                        data.extendedValidityDate
+                                            ? formatDate(data.extendedValidityDate)
+                                            : '—'
+                                    }
+                                />
+                                <DataRow
+                                    label1="Extended Claim Expiry Date"
+                                    value1={
+                                        data.extendedClaimExpiryDate
+                                            ? formatDate(data.extendedClaimExpiryDate)
+                                            : '—'
+                                    }
+                                    label2="Extended Bank Name"
+                                    value2={data.extendedBankName || '—'}
+                                />
                             </>
                         )}
                     </TableBody>
