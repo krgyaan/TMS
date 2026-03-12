@@ -1991,6 +1991,7 @@ export class TenderExecutiveService {
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
         AND pr.created_at < '${from}'
+        AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND pi.status ILIKE '%accepted%'
@@ -2018,6 +2019,7 @@ export class TenderExecutiveService {
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
         AND pr.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND pi.instrument_type NOT IN ('Cheque')
@@ -2040,6 +2042,7 @@ export class TenderExecutiveService {
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
         AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
+        AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND (
@@ -2066,6 +2069,7 @@ export class TenderExecutiveService {
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
         AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
+        AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND (
@@ -2093,6 +2097,7 @@ export class TenderExecutiveService {
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
         WHERE ${baseWhere()}
         AND pr.created_at < '${to}'
+        AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND pi.status ILIKE '%accepted%'
