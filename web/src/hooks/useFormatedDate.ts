@@ -26,7 +26,7 @@ export const formatDateTime = (date: string | Date | null | undefined) => {
 
 export const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return '—';
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     return d.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: '2-digit',
