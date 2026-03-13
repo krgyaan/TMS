@@ -97,10 +97,17 @@ export const paths = {
 
     // ==================== OPERATIONS ====================
     operations: {
-        workOrder: "/operations/work-order",
+        woBasicDetailListPage: "/operations/work-order/basic-details",
+        woBasicDetailCreatePage: "/operations/work-order/basic-details/create",
+        woBasicDetailEditPage: (id: number) => `/operations/work-order/basic-details/${id}/edit`,
+        woBasicDetailShowPage: (id: number) => `/operations/work-order/basic-details/${id}`,
+        woDetailListPage: "/operations/work-order/details",
+        woDetailCreatePage: "/operations/work-order/details/create",
+        woDetailEditPage: (id: number) => `/operations/work-order/details/${id}/edit`,
+        woDetailShowPage: (id: number) => `/operations/work-order/details/${id}`,
+
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
-
         projectDashboard: "/operations/project-dashboard",
         raisePoForm: "/operations/project-dashboard/purchase-order/create",
         viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,

@@ -65,7 +65,8 @@ const navMain: NavGroup[] = [
         title: "Operations",
         icon: Wrench,
         items: [
-            { title: "Work Order", url: paths.operations.workOrder, permission: "work-orders" },
+            { title: "Basic Details", url: paths.operations.woBasicDetailListPage, permission: "basic-details" },
+            { title: "WO Details", url: paths.operations.woDetailListPage, permission: "wo-details" },
             { title: "Kick Off", url: paths.operations.kickOff, permission: "kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard, permission: "project-dashboard" },
