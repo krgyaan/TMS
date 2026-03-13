@@ -5,6 +5,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Shield, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 const FileLink = ({ file }: { file?: string }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
@@ -12,7 +13,7 @@ const FileLink = ({ file }: { file?: string }) => {
     return (
         <div className="flex gap-3 items-center">
             <a
-                href={file}
+                href={tenderFilesService.getFileUrl(file)}
                 target="_blank"
                 className="flex items-center gap-1 text-blue-600 hover:underline"
             >
