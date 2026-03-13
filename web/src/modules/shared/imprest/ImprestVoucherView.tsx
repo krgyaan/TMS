@@ -582,8 +582,10 @@ const ImprestVoucherView: React.FC = () => {
 
                 html.pdf-export .voucher-items th:nth-child(3),
                 html.pdf-export .voucher-items td:nth-child(3) {
-                    font-size: 9px;        /* smaller, accounting-style */
+                    font-size: 8.5px;        /* smaller font */
                     letter-spacing: 0.2px;
+                    white-space: nowrap;     /* 🔑 prevents line break */
+                    word-break: keep-all;    /* 🔑 do not break text */
                 }
                html.pdf-export .voucher-items th:nth-child(4),
                 html.pdf-export .voucher-items td:nth-child(4) {
@@ -631,6 +633,11 @@ const ImprestVoucherView: React.FC = () => {
                     display: none !important;
                 }
 
+                .voucher-items td:nth-child(3) {
+                    white-space: nowrap;
+                    word-break: keep-all;
+                    font-size: 10px;
+                }
             `}</style>
         </div>
     );
