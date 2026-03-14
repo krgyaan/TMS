@@ -474,7 +474,7 @@ export class DocumentChecklistsService {
         await this.sendEmail("document-checklist.submitted", tenderId, tender.teamMember, `Document Checklist - ${tender.tenderName}`, "document-checklist-submitted", emailData, {
             to: [{ type: "role", role: "Team Leader", teamId: tender.team }],
             cc: [{ type: "role", role: "Admin", teamId: tender.team }],
-            // attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+            attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
         });
     }
 }
